@@ -3,13 +3,14 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/alecthomas/assert"
 	"runtime"
 	. "rxgo/observable"
 	"sort"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/alecthomas/assert"
 )
 
 func add(a, b int) int {
@@ -455,7 +456,7 @@ func TestRetry(t *testing.T) {
 }
 
 func TestFlatMap(t *testing.T) {
-	actual, err := Range(1, 2).FlatMap(func(n int) *IntStream { return Range(n, 2) }).ToArrayWithError()
+	actual, err := Range(1, 2).FlatMap(func(n int) IntStream { return Range(n, 2) }).ToArrayWithError()
 	assert.NoError(t, err)
 	sort.Ints(actual)
 	assert.Equal(t, []int{1, 2, 2, 3}, actual)
