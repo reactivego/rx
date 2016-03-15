@@ -24,10 +24,10 @@ func main() {
 		s.Dispose()
 	})
 
-	observable = observable.Distinct()
+	fobservable := observable.Distinct().MapFloat64(func(v int) float64 { return float64(v) * 1.62 })
 
 	term := make(chan struct{})
-	subscription := observable.SubscribeFunc(func(v int, err error, complete bool) {
+	subscription := fobservable.Subscribe(func(v float64, err error, complete bool) {
 		if err != nil || complete {
 			close(term)
 			return
