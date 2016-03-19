@@ -560,15 +560,13 @@ func (s Int) merge(observables []Int, delayError bool) Int {
 		}
 
 		execute := func(scheduler Scheduler) {
-			for _, subscribe := range observables {
-				parent := subscribe(operator)
-				if !unsubscribers.Add(parent) {
-					return
+			scheduler.Schedule(func() {
+				for _, o := range observables {
+					if !unsubscribers.Add(o.Subscribe(operator)) {
+						return
+					}
 				}
-				if executor, ok := parent.(Executor); ok {
-					executor.ExecuteOn(scheduler)
-				}
-			}
+			})
 		}
 
 		return &struct {
