@@ -1,10 +1,11 @@
-package main
+// +build !unsubscriber
+
+package observable
 
 import (
 	"errors"
 	"fmt"
 	"runtime"
-	. "rxgo/observable"
 	"sort"
 	"sync"
 	"testing"
@@ -86,13 +87,6 @@ func TestSkipLast(t *testing.T) {
 	assert.Equal(t, []int{1, 2, 3}, a)
 }
 
-func TestUnsubscribe(t *testing.T) {
-	var s Int32Subscription
-	assert.False(t, s.Disposed())
-	s.Dispose()
-	assert.True(t, s.Disposed())
-}
-
 func TestAverageInt(t *testing.T) {
 	a := FromInts(1, 2, 3, 4, 5).Average().ToArray()
 	assert.Equal(t, []int{3}, a)
@@ -126,6 +120,8 @@ func TestCount(t *testing.T) {
 func TestToOneWithError(t *testing.T) {
 	_, err := FromInts(1, 2).ToOneWithError()
 	assert.Error(t, err)
+	_, err = EmptyInt().ToOneWithError()
+	assert.Error(t, err)
 	value, err := FromInts(3).ToOneWithError()
 	assert.NoError(t, err)
 	assert.Equal(t, 3, value)
@@ -141,7 +137,7 @@ func TestToOneWithError(t *testing.T) {
 // 	})
 // 	_, err := o.ToOneWithError()
 // 	assert.Error(t, err)
-// 	assert.True(t, sub.Disposed())
+// 	assert.True(t, sub.Unsubscribed())
 // }
 
 func TestMin(t *testing.T) {
@@ -204,16 +200,17 @@ func TestDoOnComplete(t *testing.T) {
 	assert.True(t, complete)
 }
 
-func TestDoOnFinally(t *testing.T) {
-	var oerr error
-	_, err := ThrowInt(errors.New("error")).DoOnFinally(func(err error) { oerr = err }).ToArrayWithError()
-	assert.Equal(t, err, oerr)
+func TestFinally(t *testing.T) {
+	finally := false
+	_, err := ThrowInt(errors.New("error")).Finally(func() { finally = true }).ToArrayWithError()
+	assert.True(t, finally)
+	assert.Error(t, err)
 
-	complete := false
-	a, err := EmptyInt().DoOnFinally(func(err error) { complete = (err == nil) }).ToArrayWithError()
-	assert.NoError(t, err)
+	finally = false
+	a, err := EmptyInt().Finally(func() { finally = true }).ToArrayWithError()
+	assert.True(t, finally)
 	assert.Equal(t, []int{}, a)
-	assert.True(t, complete)
+	assert.NoError(t, err)
 }
 
 func TestReplay(t *testing.T) {
@@ -456,24 +453,10 @@ func TestRetry(t *testing.T) {
 }
 
 func TestFlatMap(t *testing.T) {
-	actual, err := Range(1, 2).FlatMap(func(n int) IntStream { return Range(n, 2) }).ToArrayWithError()
+	actual, err := Range(1, 2).FlatMap(func(n int) Int { return Range(n, 2) }).ToArrayWithError()
 	assert.NoError(t, err)
 	sort.Ints(actual)
 	assert.Equal(t, []int{1, 2, 2, 3}, actual)
-}
-
-func TestChannelSubscription(t *testing.T) {
-	done := make(chan bool)
-	unsubscribed := false
-	var s Subscription = NewChannelSubscription()
-	events, ok := s.(SubscriptionEvents)
-	assert.True(t, ok)
-	events.OnUnsubscribe(func() { unsubscribed = true; done <- true })
-	assert.False(t, s.Disposed())
-	s.Dispose()
-	assert.True(t, s.Disposed())
-	<-done
-	assert.True(t, unsubscribed)
 }
 
 func TestTimeout(t *testing.T) {
@@ -483,7 +466,7 @@ func TestTimeout(t *testing.T) {
 	actual, err := CreateInt(func(subscriber IntSubscriber) {
 		subscriber.Next(1)
 		time.Sleep(time.Millisecond * 500)
-		assert.True(t, subscriber.Disposed())
+		assert.True(t, subscriber.Unsubscribed())
 		wg.Done()
 	}).
 		Timeout(time.Millisecond * 250).
@@ -498,7 +481,7 @@ func TestTimeout(t *testing.T) {
 
 func TestFork(t *testing.T) {
 	ch := make(chan int, 30)
-	s := FromIntChannel(ch).Fork()
+	s := FromIntChannel(ch).Fork() // allready does a subscribe, but channel blocks.
 	a := []int{}
 	b := []int{}
 	sub := s.SubscribeNext(func(n int) { a = append(a, n) })
@@ -506,35 +489,15 @@ func TestFork(t *testing.T) {
 	ch <- 1
 	ch <- 2
 	ch <- 3
-	runtime.Gosched()
-	sub.Dispose()
-	assert.True(t, sub.Disposed())
+	// make sure the channel gets enough time to be fully processed.
+	for i := 0; i < 5; i++ {
+		runtime.Gosched()
+	}
+	sub.Unsubscribe()
+	assert.True(t, sub.Unsubscribed())
 	ch <- 4
 	close(ch)
 	s.Wait()
 	assert.Equal(t, []int{1, 2, 3, 4}, b)
 	assert.Equal(t, []int{1, 2, 3}, a)
 }
-
-// func TestLinkedSubscription(t *testing.T) {
-// 	linked := NewLinkedSubscription()
-// 	sub := NewGenericSubscription()
-// 	assert.False(t, linked.Disposed())
-// 	assert.False(t, sub.Disposed())
-// 	linked.Link(sub)
-// 	assert.Panics(t, func() { linked.Link(sub) })
-// 	linked.Dispose()
-// 	assert.True(t, sub.Disposed())
-// 	assert.True(t, linked.Disposed())
-// }
-
-// func TestLinkedSubscriptionUnsubscribesTargetOnLink(t *testing.T) {
-// 	linked := NewLinkedSubscription()
-// 	sub := NewGenericSubscription()
-// 	linked.Dispose()
-// 	assert.True(t, linked.Disposed())
-// 	assert.False(t, sub.Disposed())
-// 	linked.Link(sub)
-// 	assert.True(t, linked.Disposed())
-// 	assert.True(t, sub.Disposed())
-// }

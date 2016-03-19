@@ -1,623 +1,112 @@
-/*
-TODO
-
-
-Changes to
-
-Should Subscription interface be renamed to Unsubscriber and Dispose and Disposed
-to Unsubscribe and Unsubscribed?
-
-Should the CreateFunc be changed to return an OnUnsubscribed function that can be called by
-a subscription implementation to let the observable know that the Subscriber is gone. Especially
-when using go routines this could be used to close a channel so the go routine of the observable
-terminates.
-
-
-*/
-
 package observable
 
 import (
 	"errors"
+	"rxgo/examples/mousetest/mouse"
+	"rxgo/observable/filters"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
 // ErrTimeout is delivered to an observer if the stream times out.
 var ErrTimeout = errors.New("timeout")
 
-// MaxReplaySize is the maximum size of a replay buffer. Can be modified.
-var MaxReplaySize = 16384
-
 ////////////////////////////////////////////////////////
-// Subscription
+// Scheduler
 ////////////////////////////////////////////////////////
 
-type Subscription interface {
-	Dispose()
-	Disposed() bool
+type Scheduler interface {
+	Schedule(task func())
 }
 
-// SubscriptionEvents provides lifecycle event callbacks for a Subscription.
-type SubscriptionEvents interface {
-	OnUnsubscribe(func())
+type SchedulerFunc func(task func())
+
+func (s SchedulerFunc) Schedule(task func()) {
+	s(task)
 }
 
-// Int32Subscription is an Int32 value with atomic operations implementing the Subscription interface
-
-type Int32Subscription int32
-
-func (t *Int32Subscription) Dispose() {
-	atomic.StoreInt32((*int32)(t), 1)
-}
-
-func (t *Int32Subscription) Disposed() bool {
-	return atomic.LoadInt32((*int32)(t)) == 1
-}
-
-// ClosedSubscription is a subscription that always reports that it is already closed.
-type ClosedSubscription struct{}
-
-func (ClosedSubscription) Dispose() {
-}
-
-func (ClosedSubscription) Disposed() bool {
-	return true
-}
-
-// ChannelSubscription is implemented with a channel which is closed when unsubscribed.
-type ChannelSubscription chan struct{}
-
-func NewChannelSubscription() ChannelSubscription {
-	return make(ChannelSubscription)
-}
-
-func (c ChannelSubscription) Dispose() {
-	defer recover()
-	close(c)
-}
-
-func (c ChannelSubscription) Disposed() bool {
-	select {
-	case _, ok := <-c:
-		return !ok
-	default:
-		return false
-	}
-}
-
-func (c ChannelSubscription) OnUnsubscribe(handler func()) {
-	go func() {
-		<-c
-		handler()
-	}()
-}
-
-// CallbackSubscription is implemented as a pointer to a callback function. Whenever Dispose()
-// is called the callback is invoked. The method Disposed() returns true when the pointer to the
-// callback function has been set to nil.
-type CallbackSubscription func()
-
-func (c *CallbackSubscription) Dispose() {
-	if *c != nil {
-		(*c)()
-		*c = nil
-	}
-}
-
-func (c *CallbackSubscription) Disposed() bool {
-	return *c == nil
-}
+var ImmediateScheduler SchedulerFunc = func(task func()) { task() }
+var GoroutineScheduler SchedulerFunc = func(task func()) { go task() }
 
 ////////////////////////////////////////////////////////
-// Observer
+// Executor
 ////////////////////////////////////////////////////////
 
-type Observer func(interface{}, error, bool)
-
-func (f Observer) Next(next interface{}) {
-	f(next, nil, false)
+type Executor interface {
+	ExecuteOn(scheduler Scheduler)
 }
 
-func (f Observer) Error(err error) {
-	f(nil, err, false)
-}
+type ExecutorFunc func(scheduler Scheduler)
 
-func (f Observer) Complete() {
-	f(nil, nil, true)
-}
-
-////////////////////////////////////////////////////////
-//  Generic Filter Implementations
-////////////////////////////////////////////////////////
-
-type FilterFactory func(Observer) Observer
-
-type FiltersNamespace struct{}
-
-var filters FiltersNamespace
-
-func (FiltersNamespace) Distinct() FilterFactory {
-	factory := func(observer Observer) Observer {
-		seen := map[interface{}]struct{}{}
-		filter := func(next interface{}, err error, complete bool) {
-			if err == nil && !complete {
-				if _, ok := seen[next]; ok {
-					return
-				}
-				seen[next] = struct{}{}
-			}
-			observer(next, err, complete)
-		}
-		return filter
-	}
-	return factory
-}
-
-func (FiltersNamespace) ElementAt(n int) FilterFactory {
-	factory := func(observer Observer) Observer {
-		i := 0
-		filter := func(next interface{}, err error, complete bool) {
-			switch {
-			case err != nil:
-				observer.Error(err)
-			case complete:
-				observer.Complete()
-			default:
-				if i == n {
-					observer.Next(next)
-				}
-				i++
-			}
-		}
-		return filter
-	}
-	return factory
-}
-
-func (FiltersNamespace) Filter(f func(next interface{}) bool) FilterFactory {
-	factory := func(observer Observer) Observer {
-		filter := func(next interface{}, err error, complete bool) {
-			switch {
-			case err != nil:
-				observer.Error(err)
-			case complete:
-				observer.Complete()
-			default:
-				if f(next) {
-					observer.Next(next)
-				}
-			}
-		}
-		return filter
-	}
-	return factory
-}
-
-func (FiltersNamespace) First() FilterFactory {
-	factory := func(observer Observer) Observer {
-		start := true
-		filter := func(next interface{}, err error, complete bool) {
-			switch {
-			case err != nil:
-				observer.Error(err)
-			case complete:
-				observer.Complete()
-			default:
-				if start {
-					observer.Next(next)
-				}
-				start = false
-			}
-		}
-		return filter
-	}
-	return factory
-}
-
-func (FiltersNamespace) Last() FilterFactory {
-	factory := func(observer Observer) Observer {
-		have := false
-		var last interface{}
-		filter := func(next interface{}, err error, complete bool) {
-			switch {
-			case err != nil:
-				if have {
-					observer.Next(last)
-				}
-				observer.Error(err)
-			case complete:
-				if have {
-					observer.Next(last)
-				}
-				observer.Complete()
-			default:
-				last = next
-				have = true
-			}
-		}
-		return filter
-	}
-	return factory
-}
-
-func (FiltersNamespace) Skip(n int) FilterFactory {
-	factory := func(observer Observer) Observer {
-		i := 0
-		filter := func(next interface{}, err error, complete bool) {
-			if err != nil || complete || i >= n {
-				observer(next, err, complete)
-			}
-			i++
-		}
-		return filter
-	}
-	return factory
-}
-
-func (FiltersNamespace) SkipLast(n int) FilterFactory {
-	factory := func(observer Observer) Observer {
-		read := 0
-		write := 0
-		n++
-		buffer := make([]interface{}, n)
-		filter := func(next interface{}, err error, complete bool) {
-			switch {
-			case err != nil:
-				observer.Error(err)
-			case complete:
-				observer.Complete()
-			default:
-				buffer[write] = next
-				write = (write + 1) % n
-				if write == read {
-					observer.Next(buffer[read])
-					read = (read + 1) % n
-				}
-			}
-		}
-		return filter
-	}
-	return factory
-}
-
-func (FiltersNamespace) Take(n int) FilterFactory {
-	factory := func(observer Observer) Observer {
-		taken := 0
-		filter := func(next interface{}, err error, complete bool) {
-			if taken < n {
-				observer(next, err, complete)
-				if err == nil && !complete {
-					taken++
-					if taken >= n {
-						observer.Complete()
-					}
-				}
-			}
-		}
-		return filter
-	}
-	return factory
-}
-
-func (FiltersNamespace) TakeLast(n int) FilterFactory {
-	factory := func(observer Observer) Observer {
-		read := 0
-		write := 0
-		n++
-		buffer := make([]interface{}, n)
-		filter := func(next interface{}, err error, complete bool) {
-			switch {
-			case err != nil:
-				for read != write {
-					observer.Next(buffer[read])
-					read = (read + 1) % n
-				}
-				observer.Error(err)
-			case complete:
-				for read != write {
-					observer.Next(buffer[read])
-					read = (read + 1) % n
-				}
-				observer.Complete()
-			default:
-				buffer[write] = next
-				write = (write + 1) % n
-				if write == read {
-					read = (read + 1) % n
-				}
-			}
-		}
-		return filter
-	}
-	return factory
-}
-
-func (FiltersNamespace) IgnoreElements() FilterFactory {
-	factory := func(observer Observer) Observer {
-		filter := func(next interface{}, err error, complete bool) {
-			if err != nil || complete {
-				observer(next, err, complete)
-			}
-		}
-		return filter
-	}
-	return factory
-}
-
-func (FiltersNamespace) One() FilterFactory {
-	factory := func(observer Observer) Observer {
-		count := 0
-		var value interface{}
-		filter := func(next interface{}, err error, complete bool) {
-			if count > 1 {
-				return
-			}
-			switch {
-			case err != nil:
-				observer.Error(err)
-			case complete:
-				if count == 2 {
-					observer.Error(errors.New("expected one value"))
-				} else {
-					observer.Next(value)
-					observer.Complete()
-				}
-			default:
-				count++
-				if count == 2 {
-					observer.Error(errors.New("expected one value"))
-					return
-				}
-				value = next
-			}
-		}
-		return filter
-	}
-	return factory
-}
-
-type timedEntry struct {
-	v interface{}
-	t time.Time
-}
-
-func (FiltersNamespace) Replay(size int, duration time.Duration) FilterFactory {
-	read := 0
-	write := 0
-	if size == 0 {
-		size = MaxReplaySize
-	}
-	if duration == 0 {
-		duration = time.Hour * 24 * 7 * 52
-	}
-	size++
-	buffer := make([]timedEntry, size)
-	factory := func(observer Observer) Observer {
-		filter := func(next interface{}, err error, complete bool) {
-			now := time.Now()
-			switch {
-			case err != nil:
-				cursor := read
-				for cursor != write {
-					if buffer[cursor].t.After(now) {
-						observer.Next(buffer[cursor].v)
-					}
-					cursor = (cursor + 1) % size
-				}
-				observer.Error(err)
-			case complete:
-				cursor := read
-				for cursor != write {
-					if buffer[cursor].t.After(now) {
-						observer.Next(buffer[cursor].v)
-					}
-					cursor = (cursor + 1) % size
-				}
-				observer.Complete()
-			default:
-				buffer[write] = timedEntry{next, time.Now().Add(duration)}
-				write = (write + 1) % size
-				if write == read {
-					if buffer[read].t.After(now) {
-						observer.Next(buffer[read].v)
-					}
-					read = (read + 1) % size
-				}
-			}
-		}
-		return filter
-	}
-	return factory
-}
-
-func (FiltersNamespace) Sample(window time.Duration) FilterFactory {
-	factory := func(observer Observer) Observer {
-		mutex := &sync.Mutex{}
-		cancel := make(chan bool, 1)
-		var last interface{}
-		haveNew := false
-		go func() {
-			for {
-				select {
-				case <-time.After(window):
-					mutex.Lock()
-					if haveNew {
-						observer.Next(last)
-						haveNew = false
-					}
-					mutex.Unlock()
-				case <-cancel:
-					return
-				}
-			}
-		}()
-		filter := func(next interface{}, err error, complete bool) {
-			switch {
-			case err != nil:
-				cancel <- true
-				observer.Error(err)
-			case complete:
-				cancel <- true
-				observer.Complete()
-			default:
-				mutex.Lock()
-				last = next
-				haveNew = true
-				mutex.Unlock()
-			}
-		}
-		return filter
-	}
-	return factory
-}
-
-func (FiltersNamespace) Debounce(duration time.Duration) FilterFactory {
-	factory := func(observer Observer) Observer {
-		errch := make(chan error)
-		completech := make(chan bool)
-		valuech := make(chan interface{})
-		go func() {
-			var timeout <-chan time.Time
-			var nextValue interface{}
-			for {
-				select {
-				case <-timeout:
-					observer.Next(nextValue)
-					timeout = nil
-				case nextValue = <-valuech:
-					timeout = time.After(duration)
-				case err := <-errch:
-					if timeout != nil {
-						observer.Next(nextValue)
-					}
-					observer.Error(err)
-					return
-				case <-completech:
-					if timeout != nil {
-						observer.Next(nextValue)
-					}
-					observer.Complete()
-					return
-				}
-			}
-		}()
-		filter := func(next interface{}, err error, complete bool) {
-			switch {
-			case err != nil:
-				errch <- err
-			case complete:
-				completech <- true
-			default:
-				valuech <- next
-			}
-		}
-		return filter
-	}
-	return factory
+func (e ExecutorFunc) ExecuteOn(scheduler Scheduler) {
+	e(scheduler)
 }
 
 ////////////////////////////////////////////////////////
 // Int
 ////////////////////////////////////////////////////////
 
-type ObservableInt interface {
-	Subscribe(IntObserver) Subscription
-}
+type Int func(IntObserverFunc) Unsubscriber
 
-type IntObserver func(int, error, bool)
-
-var zeroInt = *new(int)
-
-func (f IntObserver) Next(next int) {
-	f(next, nil, false)
-}
-
-func (f IntObserver) Error(err error) {
-	f(zeroInt, err, false)
-}
-
-func (f IntObserver) Complete() {
-	f(zeroInt, nil, true)
-}
-
-type IntSubscriber interface {
-	Next(int)
-	Error(error)
-	Complete()
-	Subscription
-}
-
-type IntCreateCallback func(IntSubscriber)
-
-func (callback IntCreateCallback) Subscribe(observer IntObserver) Subscription {
-	subscriber := &struct {
-		IntObserver
-		Subscription
-	}{observer, new(Int32Subscription)}
-	go callback(subscriber)
-	return subscriber
-}
-
-type IntStream func(IntObserver) Subscription
-
-func (s IntStream) Subscribe(observer IntObserver) Subscription {
-	return s(observer)
-}
-
-func (s IntStream) SubscribeNext(f func(v int)) Subscription {
-	return s.Subscribe(func(next int, err error, complete bool) {
-		if err == nil && !complete {
-			f(next)
-		}
-	})
-}
-
-// Wait for completion of the stream and return any error.
-func (s IntStream) Wait() error {
-	errch := make(chan error)
-	s.Subscribe(func(next int, err error, complete bool) {
-		switch {
-		case err != nil:
-			errch <- err
-		case complete:
-			errch <- nil
-		default:
-		}
-	})
-	return <-errch
-}
+var zeroInt int
 
 /////////////////////////////////////////////////////////////////////////////
 // FROM
 /////////////////////////////////////////////////////////////////////////////
 
+type IntSubscriber interface {
+	Next(int)
+	Error(error)
+	Complete()
+	Unsubscribe()
+	Unsubscribed() bool
+}
+
+type CreateIntFunc func(IntSubscriber)
+
+func (f CreateIntFunc) Subscribe(observer IntObserverFunc) Unsubscriber {
+	var subscriber struct {
+		IntObserverFunc
+		ExecutorFunc
+		UnsubscriberInt
+	}
+	subscriber.IntObserverFunc = observer
+	subscriber.ExecutorFunc = func(scheduler Scheduler) {
+		task := func() {
+			if !subscriber.Unsubscribed() {
+				defer subscriber.Unsubscribe()
+				f(&subscriber)
+			}
+		}
+		scheduler.Schedule(task)
+	}
+	return &subscriber
+}
+
 // CreateInt calls f(subscriber) to produce values for a stream of ints.
-func CreateInt(f IntCreateCallback) IntStream {
+func CreateInt(f CreateIntFunc) Int {
 	return f.Subscribe
 }
 
-func Range(start, count int) IntStream {
+func Range(start, count int) Int {
 	end := start + count
 	return CreateInt(func(subscriber IntSubscriber) {
 		for i := start; i < end; i++ {
-			if subscriber.Disposed() {
+			if subscriber.Unsubscribed() {
 				return
 			}
 			subscriber.Next(i)
 		}
 		subscriber.Complete()
-		subscriber.Dispose()
 	})
 }
 
-func Interval(interval time.Duration) IntStream {
+func Interval(interval time.Duration) Int {
 	return CreateInt(func(subscriber IntSubscriber) {
 		i := 0
 		for {
 			time.Sleep(interval)
-			if subscriber.Disposed() {
+			if subscriber.Unsubscribed() {
 				return
 			}
 			subscriber.Next(i)
@@ -627,10 +116,10 @@ func Interval(interval time.Duration) IntStream {
 }
 
 // Repeat value count times.
-func RepeatInt(value, count int) IntStream {
+func RepeatInt(value, count int) Int {
 	return CreateInt(func(subscriber IntSubscriber) {
 		for i := 0; i < count; i++ {
-			if subscriber.Disposed() {
+			if subscriber.Unsubscribed() {
 				return
 			}
 			subscriber.Next(value)
@@ -642,80 +131,125 @@ func RepeatInt(value, count int) IntStream {
 // StartInt is designed to be used with functions that return a
 // (int, error) tuple.
 //
-// If the error is non-nil the returned IntStream will be that error,
+// If the error is non-nil the returned Int will be that error,
 // otherwise it will be a single-value stream of int.
-func StartInt(f func() (int, error)) IntStream {
+func StartInt(f func() (int, error)) Int {
 	return CreateInt(func(subscriber IntSubscriber) {
-		if v, err := f(); err != nil {
+		if next, err := f(); err != nil {
 			subscriber.Error(err)
 		} else {
-			subscriber.Next(v)
+			subscriber.Next(next)
 			subscriber.Complete()
 		}
 	})
 }
 
-func NeverInt() IntStream {
-	return CreateInt(func(subscriber IntSubscriber) {})
+func NeverInt() Int {
+	return CreateInt(func(subscriber IntSubscriber) {
+	})
 }
 
-func EmptyInt() IntStream {
+func EmptyInt() Int {
 	return CreateInt(func(subscriber IntSubscriber) {
 		subscriber.Complete()
 	})
 }
 
-func ThrowInt(err error) IntStream {
+func ThrowInt(err error) Int {
 	return CreateInt(func(subscriber IntSubscriber) {
 		subscriber.Error(err)
 	})
 }
 
-func FromIntArray(array []int) IntStream {
+func FromIntArray(array []int) Int {
 	return CreateInt(func(subscriber IntSubscriber) {
-		for _, v := range array {
-			if subscriber.Disposed() {
+		for _, next := range array {
+			if subscriber.Unsubscribed() {
 				return
 			}
-			subscriber.Next(v)
+			subscriber.Next(next)
 		}
 		subscriber.Complete()
-		subscriber.Dispose()
 	})
 }
 
-func FromInts(array ...int) IntStream {
+func FromInts(array ...int) Int {
 	return FromIntArray(array)
 }
 
-func JustInt(element int) IntStream {
-	return FromIntArray([]int{element})
-}
-
-func MergeInt(observables ...ObservableInt) IntStream {
-	if len(observables) == 0 {
-		return EmptyInt()
-	}
-	return (IntStream(observables[0].Subscribe)).Merge(observables[1:]...)
-}
-
-func MergeIntDelayError(observables ...ObservableInt) IntStream {
-	if len(observables) == 0 {
-		return EmptyInt()
-	}
-	return (IntStream(observables[0].Subscribe)).MergeDelayError(observables[1:]...)
-}
-
-func FromIntChannel(ch <-chan int) IntStream {
+func JustInt(element int) Int {
 	return CreateInt(func(subscriber IntSubscriber) {
-		for v := range ch {
-			if subscriber.Disposed() {
+		subscriber.Next(element)
+		subscriber.Complete()
+	})
+}
+
+func MergeInt(observables ...Int) Int {
+	if len(observables) == 0 {
+		return EmptyInt()
+	}
+	return (Int(observables[0].Subscribe)).Merge(observables[1:]...)
+}
+
+func MergeIntDelayError(observables ...Int) Int {
+	if len(observables) == 0 {
+		return EmptyInt()
+	}
+	return (Int(observables[0].Subscribe)).MergeDelayError(observables[1:]...)
+}
+
+func FromIntChannel(ch <-chan int) Int {
+	return CreateInt(func(subscriber IntSubscriber) {
+		for next := range ch {
+			if subscriber.Unsubscribed() {
 				return
 			}
-			subscriber.Next(v)
+			subscriber.Next(next)
 		}
 		subscriber.Complete()
 	})
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Subscribe
+/////////////////////////////////////////////////////////////////////////////
+
+func (s Int) SubscribeOn(scheduler Scheduler) Int {
+	subscribe := func(observer IntObserverFunc) Unsubscriber {
+		unsubscriber := s(observer)
+		if executor, ok := unsubscriber.(Executor); ok {
+			executor.ExecuteOn(scheduler)
+		}
+		return struct{ Unsubscriber }{unsubscriber}
+	}
+	return subscribe
+}
+
+func (s Int) Subscribe(observer IntObserverFunc) Unsubscriber {
+	unsubscriber := s(observer)
+	if executor, ok := unsubscriber.(Executor); ok {
+		executor.ExecuteOn(GoroutineScheduler)
+	}
+	return struct{ Unsubscriber }{unsubscriber}
+}
+
+func (s Int) SubscribeNext(f func(v int)) Unsubscriber {
+	return s.Subscribe(func(next int, err error, completed bool) {
+		if err == nil && !completed {
+			f(next)
+		}
+	})
+}
+
+// Wait for completion of the stream and return any error.
+func (s Int) Wait() error {
+	errch := make(chan error)
+	s.Subscribe(func(next int, err error, completed bool) {
+		if err != nil || completed {
+			errch <- err
+		}
+	})
+	return <-errch
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -723,81 +257,78 @@ func FromIntChannel(ch <-chan int) IntStream {
 /////////////////////////////////////////////////////////////////////////////
 
 // ToOneWithError blocks until the stream emits exactly one value. Otherwise, it errors.
-func (s IntStream) ToOneWithError() (int, error) {
-	valuech := make(chan int, 1)
+func (s Int) ToOneWithError() (v int, e error) {
+	v = zeroInt
 	errch := make(chan error, 1)
-	s.One().Subscribe(func(next int, err error, complete bool) {
-		if err != nil {
+	s.One().Subscribe(func(next int, err error, completed bool) {
+		if err != nil || completed {
 			errch <- err
-		} else if !complete {
-			valuech <- next
+			// Close errch to make subsequent use of it panic. This will prevent
+			// a coroutine inside an observable getting stuck on errch and leaking.
+			close(errch)
+		} else {
+			v = next
 		}
 	})
-	select {
-	case value := <-valuech:
-		return value, nil
-	case err := <-errch:
-		return zeroInt, err
-	}
+	e = <-errch
+	return
 }
 
 // ToOne blocks and returns the only value emitted by the stream, or the zero
 // value if an error occurs.
-func (s IntStream) ToOne() int {
+func (s Int) ToOne() int {
 	value, _ := s.ToOneWithError()
 	return value
 }
 
 // ToArrayWithError collects all values from the stream into an array,
 // returning it and any error.
-func (s IntStream) ToArrayWithError() ([]int, error) {
-	array := []int{}
-	completech := make(chan bool, 1)
+func (s Int) ToArrayWithError() (a []int, e error) {
+	a = []int{}
 	errch := make(chan error, 1)
-	s.Subscribe(func(next int, err error, complete bool) {
-		switch {
-		case err != nil:
+	s.Subscribe(func(next int, err error, completed bool) {
+		if err != nil || completed {
 			errch <- err
-		case complete:
-			completech <- true
-		default:
-			array = append(array, next)
+			// Close errch to make subsequent use of it panic. This will prevent
+			// a coroutine inside an observable getting stuck on errch and leaking.
+			close(errch)
+		} else {
+			a = append(a, next)
 		}
 	})
-	select {
-	case <-completech:
-		return array, nil
-	case err := <-errch:
-		return array, err
-	}
+	e = <-errch
+	return
 }
 
 // ToArray blocks and returns the values from the stream in an array.
-func (s IntStream) ToArray() []int {
+func (s Int) ToArray() []int {
 	out, _ := s.ToArrayWithError()
 	return out
 }
 
-// ToChannelWithError returns value and error channels corresponding to the stream elements and any error.
-func (s IntStream) ToChannelWithError() (<-chan int, <-chan error) {
-	ch := make(chan int, 1)
+// ToChannelWithError returns next and error channels corresponding to the stream elements and
+// any error. When the next channel closes, it may be either because of an error or
+// because the observable completed. The next channel may be closed without having emitted any
+// values. The error channel always emits a value to indicate the observable has finished.
+// When the error channel emits nil then the observable completed without errors, otherwise
+// the error channel emits the error. When the observable has finished both channels will be
+// closed.
+func (s Int) ToChannelWithError() (<-chan int, <-chan error) {
+	nextch := make(chan int, 1)
 	errch := make(chan error, 1)
-	s.Subscribe(func(next int, err error, complete bool) {
-		switch {
-		case err != nil:
+	s.Subscribe(func(next int, err error, completed bool) {
+		if err != nil || completed {
 			errch <- err
 			close(errch)
-			close(ch)
-		case complete:
-			close(ch)
-		default:
-			ch <- next
+			close(nextch)
+		} else {
+			nextch <- next
 		}
 	})
-	return ch, errch
+	return nextch, errch
 }
 
-func (s IntStream) ToChannel() <-chan int {
+func (s Int) ToChannel() <-chan int {
 	ch, _ := s.ToChannelWithError()
 	return ch
 }
@@ -806,132 +337,122 @@ func (s IntStream) ToChannel() <-chan int {
 // FILTERS
 /////////////////////////////////////////////////////////////////////////////
 
-func (makeGenericFilter FilterFactory) FilterIntStream(source IntStream) IntStream {
-
-	subscribe := func(sink IntObserver) Subscription {
-		generic2Int := func(next interface{}, err error, complete bool) {
-			switch {
-			case err != nil:
-				sink.Error(err)
-			case complete:
-				sink.Complete()
-			default:
-				sink.Next(next.(int))
+func (s Int) WrapFilter(filter filters.Filter) Int {
+	subscribe := func(sink IntObserverFunc) Unsubscriber {
+		genericToIntSink := func(next interface{}, err error, completed bool) {
+			if nextInt, ok := next.(int); ok {
+				sink(nextInt, err, completed)
+			} else {
+				sink(zeroInt, err, completed)
 			}
 		}
-		genericFilter := makeGenericFilter(generic2Int)
-		int2Generic := func(next int, err error, complete bool) {
-			genericFilter(next, err, complete)
+		genericToGenericFilter := filter(genericToIntSink)
+		intToGenericSource := func(next int, err error, completed bool) {
+			genericToGenericFilter(next, err, completed)
 		}
-		return source.Subscribe(int2Generic)
+		return s(intToGenericSource)
 	}
-
 	return subscribe
 }
 
 // Distinct removes duplicate elements in the stream.
-func (s IntStream) Distinct() IntStream {
-	return filters.Distinct().FilterIntStream(s)
+func (s Int) Distinct() Int {
+	return s.WrapFilter(filters.Distinct())
 }
 
 // ElementAt yields the Nth element of the stream.
-func (s IntStream) ElementAt(n int) IntStream {
-	return filters.ElementAt(n).FilterIntStream(s)
+func (s Int) ElementAt(n int) Int {
+	return s.WrapFilter(filters.ElementAt(n))
 }
 
 // Filter elements in the stream on a function.
-func (s IntStream) Filter(f func(int) bool) IntStream {
-	filter := func(v interface{}) bool {
+func (s Int) Filter(f func(int) bool) Int {
+	predicate := func(v interface{}) bool {
 		return f(v.(int))
 	}
-	return filters.Filter(filter).FilterIntStream(s)
+	return s.WrapFilter(filters.Where(predicate))
 }
 
 // Last returns just the first element of the stream.
-func (s IntStream) First() IntStream {
-	return filters.First().FilterIntStream(s)
+func (s Int) First() Int {
+	return s.WrapFilter(filters.First())
 }
 
 // Last returns just the last element of the stream.
-func (s IntStream) Last() IntStream {
-	return filters.Last().FilterIntStream(s)
+func (s Int) Last() Int {
+	return s.WrapFilter(filters.Last())
 }
 
 // SkipLast skips the first N elements of the stream.
-func (s IntStream) Skip(n int) IntStream {
-	return filters.Skip(n).FilterIntStream(s)
+func (s Int) Skip(n int) Int {
+	return s.WrapFilter(filters.Skip(n))
 }
 
 // SkipLast skips the last N elements of the stream.
-func (s IntStream) SkipLast(n int) IntStream {
-	return filters.SkipLast(n).FilterIntStream(s)
+func (s Int) SkipLast(n int) Int {
+	return s.WrapFilter(filters.SkipLast(n))
 }
 
 // Take returns just the first N elements of the stream.
-func (s IntStream) Take(n int) IntStream {
-	return filters.Take(n).FilterIntStream(s)
+func (s Int) Take(n int) Int {
+	return s.WrapFilter(filters.Take(n))
 }
 
 // TakeLast returns just the last N elements of the stream.
-func (s IntStream) TakeLast(n int) IntStream {
-	return filters.TakeLast(n).FilterIntStream(s)
+func (s Int) TakeLast(n int) Int {
+	return s.WrapFilter(filters.TakeLast(n))
 }
 
 // IgnoreElements ignores elements of the stream and emits only the completion events.
-func (s IntStream) IgnoreElements() IntStream {
-	return filters.IgnoreElements().FilterIntStream(s)
+func (s Int) IgnoreElements() Int {
+	return s.WrapFilter(filters.IgnoreElements())
 }
 
 // IgnoreCompletion ignores the completion event of the stream and therefore returns a stream that never completes.
-func (s IntStream) IgnoreCompletion() IntStream {
-	subscribe := func(observer IntObserver) Subscription {
-		filter := func(next int, err error, complete bool) {
-			if !complete {
-				observer(next, err, complete)
+func (s Int) IgnoreCompletion() Int {
+	subscribe := func(observer IntObserverFunc) Unsubscriber {
+		operator := func(next int, err error, completed bool) {
+			if !completed {
+				observer(next, err, completed)
 			}
 		}
-		return s.Subscribe(filter)
+		return s(operator)
 	}
 	return subscribe
 }
 
-func (s IntStream) One() IntStream {
-	return filters.One().FilterIntStream(s)
+func (s Int) One() Int {
+	return s.WrapFilter(filters.One())
 }
 
-func (s IntStream) Replay(size int, duration time.Duration) IntStream {
-	return filters.Replay(size, duration).FilterIntStream(s)
+func (s Int) Replay(size int, duration time.Duration) Int {
+	return s.WrapFilter(filters.Replay(size, duration))
 }
 
-func (s IntStream) Sample(duration time.Duration) IntStream {
-	return filters.Sample(duration).FilterIntStream(s)
+func (s Int) Sample(duration time.Duration) Int {
+	return s.WrapFilter(filters.Sample(duration))
 }
 
 // Debounce reduces subsequent duplicates to single items during a certain duration
-func (s IntStream) Debounce(duration time.Duration) IntStream {
-	return filters.Debounce(duration).FilterIntStream(s)
+func (s Int) Debounce(duration time.Duration) Int {
+	return s.WrapFilter(filters.Debounce(duration))
 }
 
 /////////////////////////////////////////////////////////////////////////////
 // COUNT
 /////////////////////////////////////////////////////////////////////////////
 
-func (s IntStream) Count() IntStream {
-	subscribe := func(observer IntObserver) Subscription {
+func (s Int) Count() Int {
+	subscribe := func(observer IntObserverFunc) Unsubscriber {
 		count := 0
-		filter := func(next int, err error, complete bool) {
-			switch {
-			case err != nil:
-				observer.Next(count)
-				observer.Error(err)
-			case complete:
-				observer.Next(count)
-				observer.Complete()
-			default:
-				count++
+		operator := func(next int, err error, completed bool) {
+			if err != nil || completed {
+				observer(count, nil, false)
+				observer(zeroInt, err, completed)
 			}
+			count++
 		}
-		return s.Subscribe(filter)
+		return s(operator)
 	}
 	return subscribe
 }
@@ -940,177 +461,226 @@ func (s IntStream) Count() IntStream {
 // CONCAT
 /////////////////////////////////////////////////////////////////////////////
 
-type concatInt struct {
-	observables []ObservableInt
-}
+func (s Int) Concat(observables ...Int) Int {
+	allObservables := append([]Int{s}, observables...)
+	subscribe := func(observer IntObserverFunc) Unsubscriber {
+		unsubscribers := &UnsubscriberCollection{}
 
-func (m *concatInt) Subscribe(observer IntObserver) Subscription {
-	if len(m.observables) == 0 {
-		observer.Complete()
-		return ClosedSubscription{}
-	}
-	type switchingIntObserver struct {
-		switchFunc   IntObserver
-		count        int
-		subscription Subscription
-	}
-
-	var obs *switchingIntObserver
-	switchFunc := func(next int, err error, complete bool) {
-		switch {
-		case err != nil:
-			observer.Error(err)
-			obs.count = len(m.observables)
-			obs.subscription.Dispose()
-		case complete:
-			obs.count++
-			if obs.count >= len(m.observables) {
-				observer.Complete()
-				obs.subscription.Dispose()
-			} else {
-				obs.subscription = m.observables[obs.count].Subscribe(obs.switchFunc)
+		var index int
+		var maxIndex = len(allObservables) - 1
+		operator := func(next int, err error, completed bool) {
+			switch {
+			case err != nil:
+				observer(next, err, completed)
+				index = maxIndex // force termination of executor
+			case completed:
+				if index == maxIndex {
+					observer(next, err, completed)
+				}
+			default:
+				observer(next, err, completed)
 			}
-		default:
-			observer.Next(next)
 		}
-	}
-	obs = &switchingIntObserver{switchFunc, 0, nil}
-	obs.subscription = m.observables[0].Subscribe(obs.switchFunc)
-	return new(Int32Subscription)
-}
 
-func (s IntStream) Concat(observables ...ObservableInt) IntStream {
-	return (&concatInt{append([]ObservableInt{s}, observables...)}).Subscribe
+		execute := func(scheduler Scheduler) {
+			scheduler.Schedule(func() {
+				for i, subscribe := range allObservables {
+					if index == maxIndex {
+						return // termination forced by error
+					}
+					index = i
+					parent := subscribe(operator)
+					if !unsubscribers.Set(parent) {
+						return
+					}
+					if executor, ok := parent.(Executor); ok {
+						executor.ExecuteOn(ImmediateScheduler) // will invoke operator function repeatedly
+					}
+				}
+			})
+		}
+
+		return &struct {
+			ExecutorFunc
+			Unsubscriber
+		}{execute, unsubscribers}
+	}
+	return subscribe
 }
 
 /////////////////////////////////////////////////////////////////////////////
 // MERGE
 /////////////////////////////////////////////////////////////////////////////
 
-type mergeInt struct {
-	delayError  bool
-	observables []ObservableInt
-}
+func (s Int) merge(observables []Int, delayError bool) Int {
+	subscribe := func(observer IntObserverFunc) Unsubscriber {
+		unsubscribers := &UnsubscriberCollection{}
 
-func (m *mergeInt) Subscribe(observer IntObserver) Subscription {
-	lock := sync.Mutex{}
-	completed := 0
-	var firstError error
-	relay := func(next int, err error, complete bool) {
-		lock.Lock()
-		defer lock.Unlock()
-		if completed >= len(m.observables) {
-			return
-		}
+		var (
+			olock     sync.Mutex
+			merged    int
+			count     = len(observables)
+			lastError error
+		)
+		operator := func(next int, err error, completed bool) {
+			// Only one observable can be forwarding at any one time.
+			olock.Lock()
+			defer olock.Unlock()
 
-		switch {
-		case err != nil:
-			if m.delayError {
-				firstError = err
-				completed++
-			} else {
-				observer.Error(err)
-				completed = len(m.observables)
+			if merged >= count {
+				return
 			}
 
-		case complete:
-			completed++
-			if completed == len(m.observables) {
-				if firstError != nil {
-					observer.Error(firstError)
+			switch {
+			case err != nil:
+				if delayError {
+					lastError = err
+					merged++
 				} else {
-					observer.Complete()
+					observer.Error(err)
+					merged = count
+					// tell all still executing observables, we're no longer interested
+					unsubscribers.Unsubscribe()
+				}
+
+			case completed:
+				merged++
+				if merged == count {
+					if lastError != nil {
+						observer.Error(lastError)
+					} else {
+						observer.Complete()
+					}
+				}
+			default:
+				observer.Next(next)
+			}
+		}
+
+		execute := func(scheduler Scheduler) {
+			for _, subscribe := range observables {
+				parent := subscribe(operator)
+				if !unsubscribers.Add(parent) {
+					return
+				}
+				if executor, ok := parent.(Executor); ok {
+					executor.ExecuteOn(scheduler)
 				}
 			}
-		default:
-			observer.Next(next)
 		}
+
+		return &struct {
+			ExecutorFunc
+			Unsubscriber
+		}{execute, unsubscribers}
 	}
-	for _, observable := range m.observables {
-		observable.Subscribe(relay)
-	}
-	return new(Int32Subscription)
+	return subscribe
 }
 
 // Merge an arbitrary number of observables with this one.
 // An error from any of the observables will terminate the merged stream.
-func (s IntStream) Merge(other ...ObservableInt) IntStream {
+func (s Int) Merge(other ...Int) Int {
 	if len(other) == 0 {
 		return s
 	}
-	return (&mergeInt{false, append(other, s)}).Subscribe
+	return s.merge(append(other, s), false)
 }
 
 // Merge an arbitrary number of observables with this one.
 // Any error will be deferred until all observables terminate.
-func (s IntStream) MergeDelayError(other ...ObservableInt) IntStream {
+func (s Int) MergeDelayError(other ...Int) Int {
 	if len(other) == 0 {
 		return s
 	}
-	return (&mergeInt{true, append(other, s)}).Subscribe
+	return s.merge(append(other, s), true)
 }
 
 /////////////////////////////////////////////////////////////////////////////
 // CATCH
 /////////////////////////////////////////////////////////////////////////////
 
-type catchInt struct {
-	parent ObservableInt
-	catch  ObservableInt
-}
+func (s Int) Catch(catch Int) Int {
+	subscribe := func(observer IntObserverFunc) Unsubscriber {
+		unsubscribers := &UnsubscriberCollection{}
 
-func (r *catchInt) Subscribe(observer IntObserver) Subscription {
-	subscription := new(Int32Subscription)
-	run := func(next int, err error, complete bool) {
-		switch {
-		case err != nil:
-			r.catch.Subscribe(observer)
-		case complete:
-			observer.Complete()
-		default:
-			observer.Next(next)
+		var thrownError error
+		operator := func(next int, err error, completed bool) {
+			if err != nil {
+				thrownError = err
+			} else {
+				observer(next, err, completed)
+			}
 		}
-	}
-	r.parent.Subscribe(run)
-	return subscription
-}
 
-func (s IntStream) Catch(catch ObservableInt) IntStream {
-	return (&catchInt{s, catch}).Subscribe
+		execute := func(scheduler Scheduler) {
+			scheduler.Schedule(func() {
+				parent := s(operator)
+				if !unsubscribers.Set(parent) {
+					return
+				}
+				if executor, ok := parent.(Executor); ok {
+					executor.ExecuteOn(ImmediateScheduler)
+				}
+				if thrownError != nil {
+					// The catch observable needs to be controlled by our
+					// subscriber's Unsubscribe call and therefore is set
+					// in the unsubscribers.
+					// W.r.t. scheduling, the catch observable may have
+					// its own configuration.
+					unsubscribers.Set(catch.Subscribe(observer))
+				}
+			})
+		}
+
+		return &struct {
+			ExecutorFunc
+			Unsubscriber
+		}{execute, unsubscribers}
+	}
+	return subscribe
 }
 
 /////////////////////////////////////////////////////////////////////////////
 // RETRY
 /////////////////////////////////////////////////////////////////////////////
 
-type retryIntObserver struct {
-	observable ObservableInt
-	observer   IntObserver
-}
+func (s Int) Retry() Int {
+	subscribe := func(observer IntObserverFunc) Unsubscriber {
+		unsubscribers := &UnsubscriberCollection{}
 
-func (r *retryIntObserver) retry(next int, err error, complete bool) {
-	switch {
-	case err != nil:
-		r.observable.Subscribe(IntObserver(r.retry))
-	case complete:
-		r.observer.Complete()
-	default:
-		r.observer.Next(next)
+		finished := false
+		operator := func(next int, err error, completed bool) {
+			switch {
+			case err != nil:
+				// ignore
+			case completed:
+				finished = true
+				observer.Complete()
+			default:
+				observer.Next(next)
+			}
+		}
+
+		execute := func(scheduler Scheduler) {
+			scheduler.Schedule(func() {
+				for !finished {
+					parent := s(operator)
+					if !unsubscribers.Set(parent) {
+						return
+					}
+					if executor, ok := parent.(Executor); ok {
+						executor.ExecuteOn(ImmediateScheduler)
+					}
+				}
+			})
+		}
+
+		return &struct {
+			ExecutorFunc
+			Unsubscriber
+		}{execute, unsubscribers}
 	}
-}
-
-type retryInt struct {
-	observable ObservableInt
-}
-
-func (r *retryInt) Subscribe(observer IntObserver) Subscription {
-	ro := &retryIntObserver{r.observable, observer}
-	r.observable.Subscribe(IntObserver(ro.retry))
-	return new(Int32Subscription)
-}
-
-func (s IntStream) Retry() IntStream {
-	return (&retryInt{s}).Subscribe
+	return subscribe
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -1118,57 +688,58 @@ func (s IntStream) Retry() IntStream {
 /////////////////////////////////////////////////////////////////////////////
 
 // Do applies a function for each value passing through the stream.
-func (s IntStream) Do(f func(next int)) IntStream {
-	subscribe := func(observer IntObserver) Subscription {
-		filter := func(next int, err error, complete bool) {
-			if err == nil && !complete {
+func (s Int) Do(f func(next int)) Int {
+	subscribe := func(observer IntObserverFunc) Unsubscriber {
+		operator := func(next int, err error, completed bool) {
+			if err == nil && !completed {
 				f(next)
 			}
-			observer(next, err, complete)
+			observer(next, err, completed)
 		}
-		return s.Subscribe(filter)
+		return s(operator)
 	}
 	return subscribe
 }
 
 // DoOnError applies a function for any error on the stream.
-func (s IntStream) DoOnError(f func(err error)) IntStream {
-	subscribe := func(observer IntObserver) Subscription {
-		filter := func(next int, err error, complete bool) {
+func (s Int) DoOnError(f func(err error)) Int {
+	subscribe := func(observer IntObserverFunc) Unsubscriber {
+		operator := func(next int, err error, completed bool) {
 			if err != nil {
 				f(err)
 			}
-			observer(next, err, complete)
+			observer(next, err, completed)
 		}
-		return s.Subscribe(filter)
+		return s(operator)
 	}
 	return subscribe
 }
 
 // DoOnComplete applies a function when the stream completes.
-func (s IntStream) DoOnComplete(f func()) IntStream {
-	subscribe := func(observer IntObserver) Subscription {
-		filter := func(next int, err error, complete bool) {
-			if complete {
+func (s Int) DoOnComplete(f func()) Int {
+	subscribe := func(observer IntObserverFunc) Unsubscriber {
+		operator := func(next int, err error, completed bool) {
+			if completed {
 				f()
 			}
-			observer(next, err, complete)
+			observer(next, err, completed)
 		}
-		return s.Subscribe(filter)
+		return s(operator)
 	}
 	return subscribe
 }
 
-// DoOnFinally applies a function for any error or completion on the stream, using err == nil to indicate completion.
-func (s IntStream) DoOnFinally(f func(err error)) IntStream {
-	subscribe := func(observer IntObserver) Subscription {
-		filter := func(next int, err error, complete bool) {
-			if err != nil || complete {
-				f(err)
+// Finally applies a function for any error or completion on the stream.
+// This doesn't expose whether this was an error or a completion.
+func (s Int) Finally(f func()) Int {
+	subscribe := func(observer IntObserverFunc) Unsubscriber {
+		operator := func(next int, err error, completed bool) {
+			if err != nil || completed {
+				f()
 			}
-			observer(next, err, complete)
+			observer(next, err, completed)
 		}
-		return s.Subscribe(filter)
+		return s(operator)
 	}
 	return subscribe
 }
@@ -1177,22 +748,18 @@ func (s IntStream) DoOnFinally(f func(err error)) IntStream {
 // REDUCE
 /////////////////////////////////////////////////////////////////////////////
 
-func (s IntStream) Reduce(initial int, reducer func(int, int) int) IntStream {
+func (s Int) Reduce(initial int, reducer func(int, int) int) Int {
 	value := initial
-	subscribe := func(observer IntObserver) Subscription {
-		filter := func(next int, err error, complete bool) {
-			switch {
-			case err != nil:
-				observer.Next(value)
-				observer.Error(err)
-			case complete:
-				observer.Next(value)
-				observer.Complete()
-			default:
+	subscribe := func(observer IntObserverFunc) Unsubscriber {
+		operator := func(next int, err error, completed bool) {
+			if err != nil || completed {
+				observer(value, nil, false)
+				observer(zeroInt, err, completed)
+			} else {
 				value = reducer(value, next)
 			}
 		}
-		return s.Subscribe(filter)
+		return s(operator)
 	}
 	return subscribe
 }
@@ -1201,21 +768,18 @@ func (s IntStream) Reduce(initial int, reducer func(int, int) int) IntStream {
 // SCAN
 /////////////////////////////////////////////////////////////////////////////
 
-func (s IntStream) Scan(initial int, f func(int, int) int) IntStream {
+func (s Int) Scan(initial int, f func(int, int) int) Int {
 	value := initial
-	subscribe := func(observer IntObserver) Subscription {
-		filter := func(next int, err error, complete bool) {
-			switch {
-			case err != nil:
-				observer.Error(err)
-			case complete:
-				observer.Complete()
-			default:
+	subscribe := func(observer IntObserverFunc) Unsubscriber {
+		operator := func(next int, err error, completed bool) {
+			if err != nil || completed {
+				observer(zeroInt, err, completed)
+			} else {
 				value = f(value, next)
-				observer.Next(value)
+				observer(value, nil, false)
 			}
 		}
-		return s.Subscribe(filter)
+		return s(operator)
 	}
 	return subscribe
 }
@@ -1224,141 +788,167 @@ func (s IntStream) Scan(initial int, f func(int, int) int) IntStream {
 // TIMEOUT
 /////////////////////////////////////////////////////////////////////////////
 
-type timeoutInt struct {
-	parent  ObservableInt
-	timeout time.Duration
-}
-
-func (t *timeoutInt) Subscribe(observer IntObserver) Subscription {
-	subscription := NewChannelSubscription()
-	cancel := t.parent.Subscribe(observer)
-	go func() {
-		select {
-		case <-time.After(t.timeout):
-			observer.Error(ErrTimeout)
-			cancel.Dispose()
-			subscription.Dispose()
-		case <-subscription:
-			cancel.Dispose()
-		}
-	}()
-	return subscription
-}
-
-func (s IntStream) Timeout(timeout time.Duration) IntStream {
-	return (&timeoutInt{s, timeout}).Subscribe
+func (s Int) Timeout(timeout time.Duration) Int {
+	subscribe := func(observer IntObserverFunc) Unsubscriber {
+		cancel := s(observer)
+		unsubscriber := NewUnsubscriberChannel()
+		go func() {
+			select {
+			case <-time.After(timeout):
+				observer.Error(ErrTimeout)
+				cancel.Unsubscribe()
+				unsubscriber.Unsubscribe()
+			case <-unsubscriber:
+				cancel.Unsubscribe()
+			}
+		}()
+		return unsubscriber
+	}
+	return subscribe
 }
 
 /////////////////////////////////////////////////////////////////////////////
 // FORK
 /////////////////////////////////////////////////////////////////////////////
 
-type forkedIntStream struct {
-	lock      sync.Mutex
-	parent    ObservableInt
-	observers []IntObserver
-}
-
-func (f *forkedIntStream) Subscribe(observer IntObserver) Subscription {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	i := len(f.observers)
-	f.observers = append(f.observers, observer)
-	sub := new(CallbackSubscription)
-	*sub = CallbackSubscription(func() {
-		f.lock.Lock()
-		defer f.lock.Unlock()
-		f.observers[i] = nil
-	})
-	return sub
-}
-
 // Fork replicates each event from the parent to every subscriber of the fork.
-func (s IntStream) Fork() IntStream {
-	f := &forkedIntStream{parent: s}
-	s.Subscribe(IntObserver(func(n int, err error, complete bool) {
-		f.lock.Lock()
-		defer f.lock.Unlock()
-		for _, o := range f.observers {
-			if o == nil {
-				continue
-			}
-			switch {
-			case err != nil:
-				o.Error(err)
-			case complete:
-				o.Complete()
-			default:
-				o.Next(n)
+func (s Int) Fork() Int {
+	var (
+		lock      sync.Mutex
+		observers []IntObserverFunc
+	)
+
+	operator := func(next int, err error, completed bool) {
+		lock.Lock()
+		defer lock.Unlock()
+		for _, observer := range observers {
+			if observer != nil {
+				observer(next, err, completed)
 			}
 		}
-	}))
-	return f.Subscribe
+	}
+	s(operator)
+
+	subscribe := func(observer IntObserverFunc) Unsubscriber {
+		lock.Lock()
+		defer lock.Unlock()
+		index := len(observers)
+		observers = append(observers, observer)
+		unsubscriber := UnsubscriberFunc(func() {
+			lock.Lock()
+			defer lock.Unlock()
+			observers[index] = nil
+		})
+		return &unsubscriber
+	}
+	return subscribe
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// PUBLISH
+/////////////////////////////////////////////////////////////////////////////
+
+type ConnectableInt struct {
+	Int
+	connect func() Unsubscriber
+}
+
+// Connect will subscribe to the parent observable to start receiving values.
+// All values will then be passed on to the observers that subscribed to this
+// connectable observable
+func (s ConnectableInt) Connect() Unsubscriber {
+	return s.connect()
+}
+
+// Publish creates a connectable observable that only starts emitting values
+// after the Connect method is called on it.
+func (s Int) Publish() ConnectableInt {
+	var (
+		lock      sync.Mutex
+		observers []IntObserverFunc
+	)
+
+	// Connect our operator observer function to the source start receiving
+	// values from the source and forward them to our subscribers.
+	connect := func() Unsubscriber {
+		operator := func(next int, err error, completed bool) {
+			lock.Lock()
+			defer lock.Unlock()
+			for _, observer := range observers {
+				if observer != nil {
+					observer(next, err, completed)
+				}
+			}
+		}
+		return s(operator)
+	}
+
+	// This subscribe function is installed so it is called by the code we inherit from Int
+	// We should add subscribing observers to the slice of observers that are already subscribed.
+	subscribe := func(observer IntObserverFunc) Unsubscriber {
+		lock.Lock()
+		defer lock.Unlock()
+		index := len(observers)
+		observers = append(observers, observer)
+		unsubscriber := UnsubscriberFunc(func() {
+			lock.Lock()
+			defer lock.Unlock()
+			observers[index] = nil
+		})
+		return &unsubscriber
+	}
+	return ConnectableInt{Int: subscribe, connect: connect}
 }
 
 /////////////////////////////////////////////////////////////////////////////
 // MATHEMATICAL
 /////////////////////////////////////////////////////////////////////////////
 
-func (s IntStream) Average() IntStream {
+func (s Int) Average() Int {
 	var sum int
 	var count int
-	subscribe := func(observer IntObserver) Subscription {
-		filter := func(next int, err error, complete bool) {
-			switch {
-			case err != nil:
-				observer.Next(sum / count)
-				observer.Error(err)
-			case complete:
-				observer.Next(sum / count)
-				observer.Complete()
-			default:
+	subscribe := func(observer IntObserverFunc) Unsubscriber {
+		operator := func(next int, err error, completed bool) {
+			if err != nil || completed {
+				observer(sum/count, nil, false)
+				observer(zeroInt, err, completed)
+			} else {
 				sum += next
 				count++
 			}
 		}
-		return s.Subscribe(filter)
+		return s(operator)
 	}
 	return subscribe
 }
 
-func (s IntStream) Sum() IntStream {
+func (s Int) Sum() Int {
 	var sum int
-	subscribe := func(observer IntObserver) Subscription {
-		filter := func(next int, err error, complete bool) {
-			switch {
-			case err != nil:
-				observer.Next(sum)
-				observer.Error(err)
-			case complete:
-				observer.Next(sum)
-				observer.Complete()
-			default:
+	subscribe := func(observer IntObserverFunc) Unsubscriber {
+		operator := func(next int, err error, completed bool) {
+			if err != nil || completed {
+				observer(sum, nil, false)
+				observer(zeroInt, err, completed)
+			} else {
 				sum += next
 			}
 		}
-		return s.Subscribe(filter)
+		return s(operator)
 	}
 	return subscribe
 }
 
-func (s IntStream) Min() IntStream {
+func (s Int) Min() Int {
 	started := false
 	var min int
-	subscribe := func(observer IntObserver) Subscription {
-		filter := func(next int, err error, complete bool) {
-			switch {
-			case err != nil:
+	subscribe := func(observer IntObserverFunc) Unsubscriber {
+		operator := func(next int, err error, completed bool) {
+			if err != nil || completed {
 				if started {
-					observer.Next(min)
+					observer(min, nil, false)
 				}
-				observer.Error(err)
-			case complete:
-				if started {
-					observer.Next(min)
-				}
-				observer.Complete()
-			default:
+				observer(zeroInt, err, completed)
+			} else {
 				if started {
 					if min > next {
 						min = next
@@ -1369,30 +959,24 @@ func (s IntStream) Min() IntStream {
 				}
 			}
 		}
-		return s.Subscribe(filter)
+		return s(operator)
 	}
 	return subscribe
 }
 
-func (s IntStream) Max() IntStream {
+func (s Int) Max() Int {
 	started := false
 	var max int
-	subscribe := func(observer IntObserver) Subscription {
-		filter := func(next int, err error, complete bool) {
-			switch {
-			case err != nil:
+	subscribe := func(observer IntObserverFunc) Unsubscriber {
+		operator := func(next int, err error, completed bool) {
+			if err != nil || completed {
 				if started {
-					observer.Next(max)
+					observer(max, nil, false)
 				}
-				observer.Error(err)
-			case complete:
+				observer(zeroInt, err, completed)
+			} else {
 				if started {
-					observer.Next(max)
-				}
-				observer.Complete()
-			default:
-				if started {
-					if max <= next {
+					if max < next {
 						max = next
 					}
 				} else {
@@ -1401,7 +985,7 @@ func (s IntStream) Max() IntStream {
 				}
 			}
 		}
-		return s.Subscribe(filter)
+		return s(operator)
 	}
 	return subscribe
 }
@@ -1410,49 +994,49 @@ func (s IntStream) Max() IntStream {
 // MAP and FLATMAP (int -> int)
 /////////////////////////////////////////////////////////////////////////////
 
-func (s IntStream) Map(f func(int) int) IntStream {
-	subscribe := func(observer IntObserver) Subscription {
-		filter := func(next int, err error, complete bool) {
+func (s Int) Map(f func(int) int) Int {
+	subscribe := func(observer IntObserverFunc) Unsubscriber {
+		operator := func(next int, err error, completed bool) {
 			var mapped int
-			if err == nil && !complete {
+			if err == nil && !completed {
 				mapped = f(next)
 			}
-			observer(mapped, err, complete)
+			observer(mapped, err, completed)
 		}
-		return s.Subscribe(filter)
+		return s(operator)
 	}
 	return subscribe
 }
 
-func (s IntStream) FlatMap(f func(int) IntStream) IntStream {
+func (s Int) FlatMap(f func(int) Int) Int {
+	subscribe := func(observer IntObserverFunc) Unsubscriber {
 
-	subscribe := func(observer IntObserver) Subscription {
-		subscription := new(Int32Subscription)
+		subscription := new(UnsubscriberInt)
 		var wg sync.WaitGroup
 		var mx sync.Mutex
-		gatedObserver := func(next int, err error, complete bool) {
+		gatedObserver := func(next int, err error, completed bool) {
 			mx.Lock()
 			defer mx.Unlock()
-			observer(next, err, complete)
+			observer(next, err, completed)
 		}
-		filter := func(next int, err error, complete bool) {
+
+		operator := func(next int, err error, completed bool) {
 			switch {
 			case err != nil:
 				wg.Wait()
 				observer.Error(err)
-			case complete:
+			case completed:
 				wg.Wait()
 				observer.Complete()
 			default:
 				wg.Add(1)
-				nextStream := f(next)
-				nextStream.DoOnFinally(func(error) { wg.Done() }).IgnoreCompletion().Subscribe(gatedObserver)
+				f(next).Finally(func() { wg.Done() }).IgnoreCompletion().Subscribe(gatedObserver)
 			}
 		}
-		s.Subscribe(filter)
+		s(operator)
+
 		return subscription
 	}
-
 	return subscribe
 }
 
@@ -1460,48 +1044,46 @@ func (s IntStream) FlatMap(f func(int) IntStream) IntStream {
 // MAP and FLATMAP (int -> float64)
 /////////////////////////////////////////////////////////////////////////////
 
-func (s IntStream) MapFloat64(f func(int) float64) Float64Stream {
-	subscribe := func(observer Float64Observer) Subscription {
-		filter := func(next int, err error, complete bool) {
+func (s Int) MapFloat64(f func(int) float64) Float64 {
+	subscribe := func(observer Float64ObserverFunc) Unsubscriber {
+		operator := func(next int, err error, completed bool) {
 			var mapped float64
-			if err == nil && !complete {
+			if err == nil && !completed {
 				mapped = f(next)
 			}
-			observer(mapped, err, complete)
+			observer(mapped, err, completed)
 		}
-		return s.Subscribe(filter)
+		return s(operator)
 	}
 	return subscribe
 }
 
-func (s IntStream) FlatMapFloat64(f func(int) Float64Stream) Float64Stream {
-
-	subscribe := func(observer Float64Observer) Subscription {
+func (s Int) FlatMapFloat64(f func(int) Float64) Float64 {
+	subscribe := func(observer Float64ObserverFunc) Unsubscriber {
 		var wg sync.WaitGroup
 		var mx sync.Mutex
-		gatedObserver := func(next float64, err error, complete bool) {
+		gatedObserver := func(next float64, err error, completed bool) {
 			mx.Lock()
 			defer mx.Unlock()
-			observer(next, err, complete)
+			observer(next, err, completed)
 		}
-		filter := func(next int, err error, complete bool) {
+		operator := func(next int, err error, completed bool) {
 			switch {
 			case err != nil:
 				wg.Wait()
 				observer.Error(err)
-			case complete:
+			case completed:
 				wg.Wait()
 				observer.Complete()
 			default:
 				wg.Add(1)
-				nextStream := f(next)
-				nextStream.DoOnFinally(func(error) { wg.Done() }).IgnoreCompletion().Subscribe(gatedObserver)
+				next := f(next)
+				next.Finally(func() { wg.Done() }).IgnoreCompletion().Subscribe(gatedObserver)
 			}
 		}
-		s.Subscribe(filter)
-		return new(Int32Subscription)
+		s(operator)
+		return new(UnsubscriberInt)
 	}
-
 	return subscribe
 }
 
@@ -1509,191 +1091,302 @@ func (s IntStream) FlatMapFloat64(f func(int) Float64Stream) Float64Stream {
 // MAP and FLATMAP (int -> string)
 /////////////////////////////////////////////////////////////////////////////
 
-func (s IntStream) MapString(f func(int) string) StringStream {
-	subscribe := func(observer StringObserver) Subscription {
-		filter := func(next int, err error, complete bool) {
+func (s Int) MapString(f func(int) string) String {
+	subscribe := func(observer StringObserverFunc) Unsubscriber {
+		operator := func(next int, err error, completed bool) {
 			var mapped string
-			if err == nil && !complete {
+			if err == nil && !completed {
 				mapped = f(next)
 			}
-			observer(mapped, err, complete)
+			observer(mapped, err, completed)
 		}
-		return s.Subscribe(filter)
+		return s(operator)
 	}
 	return subscribe
 }
 
-func (s IntStream) FlatMapString(f func(int) StringStream) StringStream {
-
-	subscribe := func(observer StringObserver) Subscription {
+func (s Int) FlatMapString(f func(int) String) String {
+	subscribe := func(observer StringObserverFunc) Unsubscriber {
 		var wg sync.WaitGroup
 		var mx sync.Mutex
-		gatedObserver := func(next string, err error, complete bool) {
+		gatedObserver := func(next string, err error, completed bool) {
 			mx.Lock()
 			defer mx.Unlock()
-			observer(next, err, complete)
+			observer(next, err, completed)
 		}
-		filter := func(next int, err error, complete bool) {
+		operator := func(next int, err error, completed bool) {
 			switch {
 			case err != nil:
 				wg.Wait()
 				observer.Error(err)
-			case complete:
+			case completed:
 				wg.Wait()
 				observer.Complete()
 			default:
 				wg.Add(1)
-				nextStream := f(next)
-				nextStream.DoOnFinally(func(error) { wg.Done() }).IgnoreCompletion().Subscribe(gatedObserver)
+				next := f(next)
+				next.Finally(func() { wg.Done() }).IgnoreCompletion().Subscribe(gatedObserver)
 			}
 		}
-		s.Subscribe(filter)
-		return new(Int32Subscription)
+		s(operator)
+		return new(UnsubscriberInt)
 	}
-
 	return subscribe
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// MAP and FLATMAP (int -> *mouse.Move)
+/////////////////////////////////////////////////////////////////////////////
+
+func (s Int) MapMove(f func(int) *mouse.Move) Move {
+	subscribe := func(observer MoveObserverFunc) Unsubscriber {
+		operator := func(next int, err error, completed bool) {
+			var mapped *mouse.Move
+			if err == nil && !completed {
+				mapped = f(next)
+			}
+			observer(mapped, err, completed)
+		}
+		return s(operator)
+	}
+	return subscribe
+}
+
+func (s Int) FlatMapMove(f func(int) Move) Move {
+	subscribe := func(observer MoveObserverFunc) Unsubscriber {
+		var wg sync.WaitGroup
+		var mx sync.Mutex
+		gatedObserver := func(next *mouse.Move, err error, completed bool) {
+			mx.Lock()
+			defer mx.Unlock()
+			observer(next, err, completed)
+		}
+		operator := func(next int, err error, completed bool) {
+			switch {
+			case err != nil:
+				wg.Wait()
+				observer.Error(err)
+			case completed:
+				wg.Wait()
+				observer.Complete()
+			default:
+				wg.Add(1)
+				next := f(next)
+				next.Finally(func() { wg.Done() }).IgnoreCompletion().Subscribe(gatedObserver)
+			}
+		}
+		s(operator)
+		return new(UnsubscriberInt)
+	}
+	return subscribe
+}
+
+type IntObserverFunc func(int, error, bool)
+
+func (f IntObserverFunc) Next(next int) {
+	f(next, nil, false)
+}
+
+func (f IntObserverFunc) Error(err error) {
+	f(zeroInt, err, false)
+}
+
+func (f IntObserverFunc) Complete() {
+	f(zeroInt, nil, true)
 }
 
 ////////////////////////////////////////////////////////
 // Float64
 ////////////////////////////////////////////////////////
 
-type ObservableFloat64 interface {
-	Subscribe(Float64Observer) Subscription
-}
+type Float64 func(Float64ObserverFunc) Unsubscriber
 
-type Float64Observer func(float64, error, bool)
+var zeroFloat64 float64
 
-var zeroFloat64 = *new(float64)
-
-func (f Float64Observer) Next(next float64) {
-	f(next, nil, false)
-}
-
-func (f Float64Observer) Error(err error) {
-	f(zeroFloat64, err, false)
-}
-
-func (f Float64Observer) Complete() {
-	f(zeroFloat64, nil, true)
-}
-
-type Float64Stream func(Float64Observer) Subscription
-
-func (s Float64Stream) Subscribe(observer Float64Observer) Subscription {
-	return s(observer)
+func (s Float64) Subscribe(observer Float64ObserverFunc) Unsubscriber {
+	unsubscriber := s(observer)
+	if executor, ok := unsubscriber.(Executor); ok {
+		executor.ExecuteOn(GoroutineScheduler)
+	}
+	return unsubscriber
 }
 
 // IgnoreCompletion ignores the completion event of the stream and therefore returns a stream that never completes.
-func (s Float64Stream) IgnoreCompletion() Float64Stream {
-	subscribe := func(observer Float64Observer) Subscription {
-		filter := func(next float64, err error, complete bool) {
-			if !complete {
-				observer(next, err, complete)
+func (s Float64) IgnoreCompletion() Float64 {
+	subscribe := func(observer Float64ObserverFunc) Unsubscriber {
+		operator := func(next float64, err error, completed bool) {
+			if !completed {
+				observer(next, err, completed)
 			}
 		}
-		return s.Subscribe(filter)
+		return s(operator)
 	}
 	return subscribe
 }
 
-// DoOnFinally applies a function for any error or completion on the stream, using err == nil to indicate completion.
-func (s Float64Stream) DoOnFinally(f func(err error)) Float64Stream {
-	subscribe := func(observer Float64Observer) Subscription {
-		filter := func(next float64, err error, complete bool) {
-			if err != nil || complete {
-				f(err)
+// Finally applies a function for any error or completion on the stream, using err == nil to indicate completion.
+func (s Float64) Finally(f func()) Float64 {
+	subscribe := func(observer Float64ObserverFunc) Unsubscriber {
+		operator := func(next float64, err error, completed bool) {
+			if err != nil || completed {
+				f()
 			}
-			observer(next, err, complete)
+			observer(next, err, completed)
 		}
-		return s.Subscribe(filter)
+		return s(operator)
 	}
 	return subscribe
+}
+
+type Float64ObserverFunc func(float64, error, bool)
+
+func (f Float64ObserverFunc) Next(next float64) {
+	f(next, nil, false)
+}
+
+func (f Float64ObserverFunc) Error(err error) {
+	f(zeroFloat64, err, false)
+}
+
+func (f Float64ObserverFunc) Complete() {
+	f(zeroFloat64, nil, true)
 }
 
 ////////////////////////////////////////////////////////
 // String
 ////////////////////////////////////////////////////////
 
-type ObservableString interface {
-	Subscribe(StringObserver) Subscription
+type String func(StringObserverFunc) Unsubscriber
+
+var zeroString string
+
+func (s String) Subscribe(observer StringObserverFunc) Unsubscriber {
+	unsubscriber := s(observer)
+	if executor, ok := unsubscriber.(Executor); ok {
+		executor.ExecuteOn(GoroutineScheduler)
+	}
+	return unsubscriber
 }
 
-type StringObserver func(string, error, bool)
-
-var zeroString = *new(string)
-
-func (f StringObserver) Next(next string) {
-	f(next, nil, false)
-}
-
-func (f StringObserver) Error(err error) {
-	f(zeroString, err, false)
-}
-
-func (f StringObserver) Complete() {
-	f(zeroString, nil, true)
-}
-
-type StringStream func(StringObserver) Subscription
-
-func (s StringStream) Subscribe(observer StringObserver) Subscription {
-	return s(observer)
-}
-
-// ToArrayWithError collects all values from the stream stringo an array,
+// ToArrayWithError collects all values from the stream into an array,
 // returning it and any error.
-func (s StringStream) ToArrayWithError() ([]string, error) {
-	array := []string{}
-	completech := make(chan bool, 1)
+func (s String) ToArrayWithError() (a []string, e error) {
+	a = []string{}
 	errch := make(chan error, 1)
-	s.Subscribe(func(next string, err error, complete bool) {
-		switch {
-		case err != nil:
+	s.Subscribe(func(next string, err error, completed bool) {
+		if err != nil || completed {
 			errch <- err
-		case complete:
-			completech <- true
-		default:
-			array = append(array, next)
+			// Close errch to make subsequent use of it panic. This will prevent
+			// a coroutine inside an observable getting stuck on errch and leaking.
+			close(errch)
+		} else {
+			a = append(a, next)
 		}
 	})
-	select {
-	case <-completech:
-		return array, nil
-	case err := <-errch:
-		return array, err
-	}
+	e = <-errch
+	return
 }
 
 // ToArray blocks and returns the values from the stream in an array.
-func (s StringStream) ToArray() []string {
+func (s String) ToArray() []string {
 	out, _ := s.ToArrayWithError()
 	return out
 }
 
 // IgnoreCompletion ignores the completion event of the stream and therefore returns a stream that never completes.
-func (s StringStream) IgnoreCompletion() StringStream {
-	subscribe := func(observer StringObserver) Subscription {
-		filter := func(next string, err error, complete bool) {
-			if !complete {
-				observer(next, err, complete)
+func (s String) IgnoreCompletion() String {
+	subscribe := func(observer StringObserverFunc) Unsubscriber {
+		operator := func(next string, err error, completed bool) {
+			if !completed {
+				observer(next, err, completed)
 			}
 		}
-		return s.Subscribe(filter)
+		return s(operator)
 	}
 	return subscribe
 }
 
-// DoOnFinally applies a function for any error or completion on the stream, using err == nil to indicate completion.
-func (s StringStream) DoOnFinally(f func(err error)) StringStream {
-	subscribe := func(observer StringObserver) Subscription {
-		filter := func(next string, err error, complete bool) {
-			if err != nil || complete {
-				f(err)
+// Finally applies a function for any error or completion on the stream, using err == nil to indicate completion.
+func (s String) Finally(f func()) String {
+	subscribe := func(observer StringObserverFunc) Unsubscriber {
+		operator := func(next string, err error, completed bool) {
+			if err != nil || completed {
+				f()
 			}
-			observer(next, err, complete)
+			observer(next, err, completed)
 		}
-		return s.Subscribe(filter)
+		return s(operator)
 	}
 	return subscribe
+}
+
+type StringObserverFunc func(string, error, bool)
+
+func (f StringObserverFunc) Next(next string) {
+	f(next, nil, false)
+}
+
+func (f StringObserverFunc) Error(err error) {
+	f(zeroString, err, false)
+}
+
+func (f StringObserverFunc) Complete() {
+	f(zeroString, nil, true)
+}
+
+////////////////////////////////////////////////////////
+// Move
+////////////////////////////////////////////////////////
+
+type Move func(MoveObserverFunc) Unsubscriber
+
+var zeroMove *mouse.Move
+
+func (s Move) Subscribe(observer MoveObserverFunc) Unsubscriber {
+	unsubscriber := s(observer)
+	if executor, ok := unsubscriber.(Executor); ok {
+		executor.ExecuteOn(GoroutineScheduler)
+	}
+	return unsubscriber
+}
+
+// IgnoreCompletion ignores the completion event of the stream and therefore returns a stream that never completes.
+func (s Move) IgnoreCompletion() Move {
+	subscribe := func(observer MoveObserverFunc) Unsubscriber {
+		operator := func(next *mouse.Move, err error, completed bool) {
+			if !completed {
+				observer(next, err, completed)
+			}
+		}
+		return s(operator)
+	}
+	return subscribe
+}
+
+// Finally applies a function for any error or completion on the stream, using err == nil to indicate completion.
+func (s Move) Finally(f func()) Move {
+	subscribe := func(observer MoveObserverFunc) Unsubscriber {
+		operator := func(next *mouse.Move, err error, completed bool) {
+			if err != nil || completed {
+				f()
+			}
+			observer(next, err, completed)
+		}
+		return s(operator)
+	}
+	return subscribe
+}
+
+type MoveObserverFunc func(*mouse.Move, error, bool)
+
+func (f MoveObserverFunc) Next(next *mouse.Move) {
+	f(next, nil, false)
+}
+
+func (f MoveObserverFunc) Error(err error) {
+	f(zeroMove, err, false)
+}
+
+func (f MoveObserverFunc) Complete() {
+	f(zeroMove, nil, true)
 }
