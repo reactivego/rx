@@ -468,33 +468,35 @@ func (s Int) Concat(observables ...Int) Int {
 
 		var index int
 		var maxIndex = len(allObservables) - 1
+
+		var wg sync.WaitGroup
 		operator := func(next int, err error, completed bool) {
 			switch {
 			case err != nil:
-				observer(next, err, completed)
-				index = maxIndex // force termination of executor
+				index = maxIndex
+				observer.Error(err)
+				wg.Done()
 			case completed:
 				if index == maxIndex {
-					observer(next, err, completed)
+					observer.Complete()
 				}
+				wg.Done()
 			default:
-				observer(next, err, completed)
+				observer.Next(next)
 			}
 		}
 
 		execute := func(scheduler Scheduler) {
 			scheduler.Schedule(func() {
-				for i, subscribe := range allObservables {
-					if index == maxIndex {
-						return // termination forced by error
-					}
+				for i, o := range allObservables {
 					index = i
-					parent := subscribe(operator)
-					if !unsubscribers.Set(parent) {
+					wg.Add(1)
+					if !unsubscribers.Set(o.Subscribe(operator)) {
 						return
 					}
-					if executor, ok := parent.(Executor); ok {
-						executor.ExecuteOn(ImmediateScheduler) // will invoke operator function repeatedly
+					wg.Wait()
+					if index == maxIndex {
+						return
 					}
 				}
 			})
