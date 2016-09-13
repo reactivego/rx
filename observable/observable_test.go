@@ -136,7 +136,7 @@ func TestToOneWithError(t *testing.T) {
 
 // func TestToOneWithErrorCancelsSubscription(t *testing.T) {
 // 	var sub Subscription
-// 	o := CreateInt(func(observer IntSubscriber) {
+// 	o := CreateInt(func(observer IntObserver) {
 // 		sub = observer
 // 		observer.Next(1)
 // 		observer.Next(2)
@@ -265,7 +265,7 @@ func TestReplayWithExpiry(t *testing.T) {
 }
 
 func TestCreate(t *testing.T) {
-	s := CreateInt(func(observer IntSubscriber) {
+	s := CreateInt(func(observer IntObserver) {
 		observer.Next(0)
 		observer.Next(1)
 		observer.Next(2)
@@ -373,7 +373,7 @@ func TestSample(t *testing.T) {
 }
 
 func TestDebounce(t *testing.T) {
-	s := CreateInt(func(observer IntSubscriber) {
+	s := CreateInt(func(observer IntObserver) {
 		time.Sleep(100 * time.Millisecond)
 		observer.Next(1)
 		time.Sleep(300 * time.Millisecond)
@@ -389,14 +389,14 @@ func TestDebounce(t *testing.T) {
 }
 
 func TestMerge(t *testing.T) {
-	sa := CreateInt(func(observer IntSubscriber) {
+	sa := CreateInt(func(observer IntObserver) {
 		time.Sleep(10 * time.Millisecond)
 		observer.Next(1)
 		time.Sleep(10 * time.Millisecond)
 		observer.Next(3)
 		observer.Complete()
 	})
-	sb := CreateInt(func(observer IntSubscriber) {
+	sb := CreateInt(func(observer IntObserver) {
 		time.Sleep(5 * time.Millisecond)
 		observer.Next(0)
 		time.Sleep(10 * time.Millisecond)
@@ -408,12 +408,12 @@ func TestMerge(t *testing.T) {
 }
 
 func TestMergeDelayError(t *testing.T) {
-	sa := CreateInt(func(observer IntSubscriber) {
+	sa := CreateInt(func(observer IntObserver) {
 		time.Sleep(10 * time.Millisecond)
 		observer.Next(1)
 		observer.Error(errors.New("error"))
 	})
-	sb := CreateInt(func(observer IntSubscriber) {
+	sb := CreateInt(func(observer IntObserver) {
 		time.Sleep(5 * time.Millisecond)
 		observer.Next(0)
 		time.Sleep(10 * time.Millisecond)
@@ -443,7 +443,7 @@ func TestRecover(t *testing.T) {
 
 func TestRetry(t *testing.T) {
 	errored := false
-	a := CreateInt(func(observer IntSubscriber) {
+	a := CreateInt(func(observer IntObserver) {
 		observer.Next(1)
 		observer.Next(2)
 		observer.Next(3)
@@ -470,10 +470,10 @@ func TestTimeout(t *testing.T) {
 	wg := sync.WaitGroup{}
 	start := time.Now()
 	wg.Add(1)
-	actual, err := CreateInt(func(subscriber IntSubscriber) {
-		subscriber.Next(1)
+	actual, err := CreateInt(func(observer IntObserver) {
+		observer.Next(1)
 		time.Sleep(time.Millisecond * 500)
-		assert.True(t, subscriber.Unsubscribed())
+		assert.True(t, observer.Unsubscribed())
 		wg.Done()
 	}).
 		Timeout(time.Millisecond * 250).

@@ -27,11 +27,11 @@ type Scheduler schedulers.Scheduler
 
 type Unsubscriber unsubscriber.Unsubscriber
 
-// Subscription is an interface returned by the observable
-// function call. See e.g. type ObservableInt. Every observable 
-// is essentially a function taking an Observer (function) as
-// parameter and returning a Subscription (interface).
-type Subscription interface {
+// Subscribable is an interface returned as a result of calling
+// the observable function. See e.g. type ObservableInt. Every
+// observable is essentially a function taking an Observer (function)
+// as parameter and returning a Subscribable (interface).
+type Subscribable interface {
 	SubscribeOn(scheduler Scheduler)
 	Unsubscriber
 }
@@ -45,15 +45,14 @@ func (s SubscribeOnFunc) SubscribeOn(scheduler Scheduler) {
 {{range $type := .Types -}}
 {{$name := $type|TypeName -}}
 ////////////////////////////////////////////////////////
-// Observable{{$name}}
+// {{$name}}Observer
 ////////////////////////////////////////////////////////
-
-type Observable{{$name}} func({{$name}}ObserverFunc) Subscription
 
 type {{$name}}Observer interface {
 	Next({{$type}})
 	Error(error)
 	Complete()
+	Unsubscriber
 }
 
 type {{$name}}ObserverFunc func({{$type}}, error, bool)
@@ -72,20 +71,19 @@ func (f {{$name}}ObserverFunc) Complete() {
 	f(zero{{$name}}, nil, true)
 }
 
+////////////////////////////////////////////////////////
+// Observable{{$name}}
+////////////////////////////////////////////////////////
+
+type Observable{{$name}} func({{$name}}ObserverFunc) Subscribable
+
 /////////////////////////////////////////////////////////////////////////////
 // FROM
 /////////////////////////////////////////////////////////////////////////////
 
-type {{$name}}Subscriber interface {
-	{{$name}}Observer
-	Unsubscriber
-}
-
-type {{$name}}CreateFunc func({{$name}}Subscriber)
-
-// Create{{$name}} calls f(subscriber) to produce values for a stream of ints.
-func Create{{$name}}(f {{$name}}CreateFunc) Observable{{$name}} {
-	subscribe := func(observer {{$name}}ObserverFunc) Subscription {
+// Create{{$name}} calls f(observer) to produce values for a stream of ints.
+func Create{{$name}}(f func({{$name}}Observer)) Observable{{$name}} {
+	subscribe := func(observer {{$name}}ObserverFunc) Subscribable {
 		unsubscriber := new(unsubscriber.Int32)
 
 		operation := func(next {{$type}}, err error, completed bool) {
@@ -98,11 +96,11 @@ func Create{{$name}}(f {{$name}}CreateFunc) Observable{{$name}} {
 			scheduler.Schedule(func() {
 				if !unsubscriber.Unsubscribed() {
 					defer unsubscriber.Unsubscribe()
-					subscriber := &struct {
+					observer := &struct {
 						{{$name}}ObserverFunc
 						Unsubscriber
 					}{operation, unsubscriber}
-					f(subscriber)
+					f(observer)
 				}
 			})
 		}
@@ -116,31 +114,31 @@ func Create{{$name}}(f {{$name}}CreateFunc) Observable{{$name}} {
 }
 
 func Empty{{$name}}() Observable{{$name}} {
-	return Create{{$name}}(func(subscriber {{$name}}Subscriber) {
-		subscriber.Complete()
+	return Create{{$name}}(func(observer {{$name}}Observer) {
+		observer.Complete()
 	})
 }
 
 func Never{{$name}}() Observable{{$name}} {
-	return Create{{$name}}(func(subscriber {{$name}}Subscriber) {
+	return Create{{$name}}(func(observer {{$name}}Observer) {
 	})
 }
 
 func Throw{{$name}}(err error) Observable{{$name}} {
-	return Create{{$name}}(func(subscriber {{$name}}Subscriber) {
-		subscriber.Error(err)
+	return Create{{$name}}(func(observer {{$name}}Observer) {
+		observer.Error(err)
 	})
 }
 
 func From{{$name}}Array(array []{{$type}}) Observable{{$name}} {
-	return Create{{$name}}(func(subscriber {{$name}}Subscriber) {
+	return Create{{$name}}(func(observer {{$name}}Observer) {
 		for _, next := range array {
-			if subscriber.Unsubscribed() {
+			if observer.Unsubscribed() {
 				return
 			}
-			subscriber.Next(next)
+			observer.Next(next)
 		}
-		subscriber.Complete()
+		observer.Complete()
 	})
 }
 
@@ -149,27 +147,27 @@ func From{{$name}}s(array ...{{$type}}) Observable{{$name}} {
 }
 
 func From{{$name}}Channel(ch <-chan {{$type}}) Observable{{$name}} {
-	return Create{{$name}}(func(subscriber {{$name}}Subscriber) {
+	return Create{{$name}}(func(observer {{$name}}Observer) {
 		for next := range ch {
-			if subscriber.Unsubscribed() {
+			if observer.Unsubscribed() {
 				return
 			}
-			subscriber.Next(next)
+			observer.Next(next)
 		}
-		subscriber.Complete()
+		observer.Complete()
 	})
 }
 
 {{if eq $type "int" -}}
 func Interval(interval time.Duration) Observable{{$name}} {
-	return Create{{$name}}(func(subscriber {{$name}}Subscriber) {
+	return Create{{$name}}(func(observer {{$name}}Observer) {
 		i := 0
 		for {
 			time.Sleep(interval)
-			if subscriber.Unsubscribed() {
+			if observer.Unsubscribed() {
 				return
 			}
-			subscriber.Next(i)
+			observer.Next(i)
 			i++
 		}
 	})
@@ -178,23 +176,23 @@ func Interval(interval time.Duration) Observable{{$name}} {
 {{end -}}
 
 func Just{{$name}}(element {{$type}}) Observable{{$name}} {
-	return Create{{$name}}(func(subscriber {{$name}}Subscriber) {
-		subscriber.Next(element)
-		subscriber.Complete()
+	return Create{{$name}}(func(observer {{$name}}Observer) {
+		observer.Next(element)
+		observer.Complete()
 	})
 }
 
 {{if eq $type "int" -}}
 func Range(start, count int) Observable{{$name}} {
 	end := start + count
-	return Create{{$name}}(func(subscriber {{$name}}Subscriber) {
+	return Create{{$name}}(func(observer {{$name}}Observer) {
 		for i := start; i < end; i++ {
-			if subscriber.Unsubscribed() {
+			if observer.Unsubscribed() {
 				return
 			}
-			subscriber.Next(i)
+			observer.Next(i)
 		}
-		subscriber.Complete()
+		observer.Complete()
 	})
 }
 
@@ -202,14 +200,14 @@ func Range(start, count int) Observable{{$name}} {
 
 // Repeat value count times.
 func Repeat{{$name}}(value {{$type}}, count int) Observable{{$name}} {
-	return Create{{$name}}(func(subscriber {{$name}}Subscriber) {
+	return Create{{$name}}(func(observer {{$name}}Observer) {
 		for i := 0; i < count; i++ {
-			if subscriber.Unsubscribed() {
+			if observer.Unsubscribed() {
 				return
 			}
-			subscriber.Next(value)
+			observer.Next(value)
 		}
-		subscriber.Complete()
+		observer.Complete()
 	})
 }
 
@@ -219,12 +217,12 @@ func Repeat{{$name}}(value {{$type}}, count int) Observable{{$name}} {
 // If the error is non-nil the returned Observable{{$name}} will be that error,
 // otherwise it will be a single-value stream of {{$type}}.
 func Start{{$name}}(f func() ({{$type}}, error)) Observable{{$name}} {
-	return Create{{$name}}(func(subscriber {{$name}}Subscriber) {
+	return Create{{$name}}(func(observer {{$name}}Observer) {
 		if next, err := f(); err != nil {
-			subscriber.Error(err)
+			observer.Error(err)
 		} else {
-			subscriber.Next(next)
-			subscriber.Complete()
+			observer.Next(next)
+			observer.Complete()
 		}
 	})
 }
@@ -248,25 +246,25 @@ func Merge{{$name}}DelayError(observables ...Observable{{$name}}) Observable{{$n
 /////////////////////////////////////////////////////////////////////////////
 
 func (s Observable{{$name}}) SubscribeOn(scheduler Scheduler) Observable{{$name}} {
-	subscribe := func(observer {{$name}}ObserverFunc) Subscription {
-		subscription := s(observer)
-		subscription.SubscribeOn(scheduler)
+	subscribe := func(observer {{$name}}ObserverFunc) Subscribable {
+		subscribable := s(observer)
+		subscribable.SubscribeOn(scheduler)
 		subscribeOn := func(scheduler Scheduler) {
 			// ignore
 		}
 		return &struct {
 			SubscribeOnFunc
 			Unsubscriber
-		}{subscribeOn, subscription}
+		}{subscribeOn, subscribable}
 	}
 	return subscribe
 }
 
 func (s Observable{{$name}}) Subscribe(observer {{$name}}ObserverFunc) Unsubscriber {
-	subscription := s(observer)
-	subscription.SubscribeOn(schedulers.GoroutineScheduler)
-	// Only export Unsubscriber interface, not whole Subscription.
-	return &struct{ Unsubscriber }{subscription}
+	subscribable := s(observer)
+	subscribable.SubscribeOn(schedulers.GoroutineScheduler)
+	// Only export Unsubscriber interface, not whole Subscribable.
+	return &struct{ Unsubscriber }{subscribable}
 }
 
 func (s Observable{{$name}}) SubscribeNext(f func(v {{$type}})) Unsubscriber {
@@ -376,7 +374,7 @@ func (s Observable{{$name}}) ToChannel() <-chan {{$type}} {
 /////////////////////////////////////////////////////////////////////////////
 
 func (s Observable{{$name}}) adaptFilter(filter filters.Filter) Observable{{$name}} {
-	subscribe := func(sink {{$name}}ObserverFunc) Subscription {
+	subscribe := func(sink {{$name}}ObserverFunc) Subscribable {
 		genericTo{{$name}}Sink := func(next interface{}, err error, completed bool) {
 			if next{{$name}}, ok := next.({{$type}}); ok {
 				sink(next{{$name}}, err, completed)
@@ -448,7 +446,7 @@ func (s Observable{{$name}}) IgnoreElements() Observable{{$name}} {
 
 // IgnoreCompletion ignores the completion event of the stream and therefore returns a stream that never completes.
 func (s Observable{{$name}}) IgnoreCompletion() Observable{{$name}} {
-	subscribe := func(observer {{$name}}ObserverFunc) Subscription {
+	subscribe := func(observer {{$name}}ObserverFunc) Subscribable {
 		operator := func(next {{$type}}, err error, completed bool) {
 			if !completed {
 				observer(next, err, completed)
@@ -487,7 +485,7 @@ func (s Observable{{$name}}) Debounce(duration time.Duration) Observable{{$name}
 /////////////////////////////////////////////////////////////////////////////
 
 func (s Observable{{$name}}) Count() Observable{{$otherName}} {
-	subscribe := func(observer {{$otherName}}ObserverFunc) Subscription {
+	subscribe := func(observer {{$otherName}}ObserverFunc) Subscribable {
 		count := 0
 		operator := func(next {{$type}}, err error, completed bool) {
 			if err != nil || completed {
@@ -512,7 +510,7 @@ func (s Observable{{$name}}) Concat(other ...Observable{{$name}}) Observable{{$n
 	if len(other) == 0 {
 		return s
 	}
-	subscribe := func(observer {{$name}}ObserverFunc) Subscription {
+	subscribe := func(observer {{$name}}ObserverFunc) Subscribable {
 		unsubscribers := &unsubscriber.Collection{}
 
 		var index int
@@ -538,11 +536,11 @@ func (s Observable{{$name}}) Concat(other ...Observable{{$name}}) Observable{{$n
 		subscribeOn := func(scheduler Scheduler) {
 			// Execute the first observable on the passed in scheduler.
 			wg.Add(1)
-			subscription := s(operator)
-			if !unsubscribers.Set(subscription) {
+			subscribable := s(operator)
+			if !unsubscribers.Set(subscribable) {
 				return
 			}
-			subscription.SubscribeOn(scheduler)
+			subscribable.SubscribeOn(scheduler)
 			wg.Wait()
 
 			for i, observable := range other {
@@ -575,7 +573,7 @@ func (s Observable{{$name}}) merge(other []Observable{{$name}}, delayError bool)
 	if len(other) == 0 {
 		return s
 	}
-	subscribe := func(observer {{$name}}ObserverFunc) Subscription {
+	subscribe := func(observer {{$name}}ObserverFunc) Subscribable {
 		unsubscribers := &unsubscriber.Collection{}
 
 		var (
@@ -621,11 +619,11 @@ func (s Observable{{$name}}) merge(other []Observable{{$name}}, delayError bool)
 		}
 
 		subscribeOn := func(scheduler Scheduler) {
-			subscription := s(operator)
-			if !unsubscribers.Add(subscription) {
+			subscribable := s(operator)
+			if !unsubscribers.Add(subscribable) {
 				return
 			}
-			subscription.SubscribeOn(scheduler)
+			subscribable.SubscribeOn(scheduler)
 			for _, observable := range other {
 				unsubscriber := observable.Subscribe(operator)
 				if !unsubscribers.Add(unsubscriber) {
@@ -659,7 +657,7 @@ func (s Observable{{$name}}) MergeDelayError(other ...Observable{{$name}}) Obser
 /////////////////////////////////////////////////////////////////////////////
 
 func (s Observable{{$name}}) Catch(catch Observable{{$name}}) Observable{{$name}} {
-	subscribe := func(observer {{$name}}ObserverFunc) Subscription {
+	subscribe := func(observer {{$name}}ObserverFunc) Subscribable {
 		unsubscribers := &unsubscriber.Collection{}
 
 		throwChan := make(chan error, 1)
@@ -687,11 +685,11 @@ func (s Observable{{$name}}) Catch(catch Observable{{$name}}) Observable{{$name}
 		subscribeOn := func(scheduler Scheduler) {
 			go catcher()
 
-			subscription := s(operator)
-			if !unsubscribers.Set(subscription) {
+			subscribable := s(operator)
+			if !unsubscribers.Set(subscribable) {
 				return
 			}
-			subscription.SubscribeOn(scheduler)
+			subscribable.SubscribeOn(scheduler)
 		}
 
 		unsubscribe := func() {
@@ -712,7 +710,7 @@ func (s Observable{{$name}}) Catch(catch Observable{{$name}}) Observable{{$name}
 /////////////////////////////////////////////////////////////////////////////
 
 func (s Observable{{$name}}) Retry() Observable{{$name}} {
-	subscribe := func(observer {{$name}}ObserverFunc) Subscription {
+	subscribe := func(observer {{$name}}ObserverFunc) Subscribable {
 		unsubscribers := &unsubscriber.Collection{}
 
 		throwChan := make(chan error, 1)
@@ -733,22 +731,22 @@ func (s Observable{{$name}}) Retry() Observable{{$name}} {
 				if err == nil {
 					return
 				}
-				subscription := s(operator)
-				if !unsubscribers.Set(subscription) {
+				subscribable := s(operator)
+				if !unsubscribers.Set(subscribable) {
 					return
 				}
-				subscription.SubscribeOn(scheduler)
+				subscribable.SubscribeOn(scheduler)
 			}
 		}
 
 		subscribeOn := func(scheduler Scheduler) {
 			go catcher(scheduler)
 
-			subscription := s(operator)
-			if !unsubscribers.Set(subscription) {
+			subscribable := s(operator)
+			if !unsubscribers.Set(subscribable) {
 				return
 			}
-			subscription.SubscribeOn(scheduler)
+			subscribable.SubscribeOn(scheduler)
 		}
 
 		unsubscribe := func() {
@@ -770,7 +768,7 @@ func (s Observable{{$name}}) Retry() Observable{{$name}} {
 
 // Do applies a function for each value passing through the stream.
 func (s Observable{{$name}}) Do(f func(next {{$type}})) Observable{{$name}} {
-	subscribe := func(observer {{$name}}ObserverFunc) Subscription {
+	subscribe := func(observer {{$name}}ObserverFunc) Subscribable {
 		operator := func(next {{$type}}, err error, completed bool) {
 			if err == nil && !completed {
 				f(next)
@@ -784,7 +782,7 @@ func (s Observable{{$name}}) Do(f func(next {{$type}})) Observable{{$name}} {
 
 // DoOnError applies a function for any error on the stream.
 func (s Observable{{$name}}) DoOnError(f func(err error)) Observable{{$name}} {
-	subscribe := func(observer {{$name}}ObserverFunc) Subscription {
+	subscribe := func(observer {{$name}}ObserverFunc) Subscribable {
 		operator := func(next {{$type}}, err error, completed bool) {
 			if err != nil {
 				f(err)
@@ -798,7 +796,7 @@ func (s Observable{{$name}}) DoOnError(f func(err error)) Observable{{$name}} {
 
 // DoOnComplete applies a function when the stream completes.
 func (s Observable{{$name}}) DoOnComplete(f func()) Observable{{$name}} {
-	subscribe := func(observer {{$name}}ObserverFunc) Subscription {
+	subscribe := func(observer {{$name}}ObserverFunc) Subscribable {
 		operator := func(next {{$type}}, err error, completed bool) {
 			if completed {
 				f()
@@ -813,7 +811,7 @@ func (s Observable{{$name}}) DoOnComplete(f func()) Observable{{$name}} {
 // Finally applies a function for any error or completion on the stream.
 // This doesn't expose whether this was an error or a completion.
 func (s Observable{{$name}}) Finally(f func()) Observable{{$name}} {
-	subscribe := func(observer {{$name}}ObserverFunc) Subscription {
+	subscribe := func(observer {{$name}}ObserverFunc) Subscribable {
 		operator := func(next {{$type}}, err error, completed bool) {
 			if err != nil || completed {
 				f()
@@ -831,7 +829,7 @@ func (s Observable{{$name}}) Finally(f func()) Observable{{$name}} {
 
 func (s Observable{{$name}}) Reduce(initial {{$type}}, reducer func({{$type}}, {{$type}}) {{$type}}) Observable{{$name}} {
 	value := initial
-	subscribe := func(observer {{$name}}ObserverFunc) Subscription {
+	subscribe := func(observer {{$name}}ObserverFunc) Subscribable {
 		operator := func(next {{$type}}, err error, completed bool) {
 			if err != nil || completed {
 				observer(value, nil, false)
@@ -851,7 +849,7 @@ func (s Observable{{$name}}) Reduce(initial {{$type}}, reducer func({{$type}}, {
 
 func (s Observable{{$name}}) Scan(initial {{$type}}, f func({{$type}}, {{$type}}) {{$type}}) Observable{{$name}} {
 	value := initial
-	subscribe := func(observer {{$name}}ObserverFunc) Subscription {
+	subscribe := func(observer {{$name}}ObserverFunc) Subscribable {
 		operator := func(next {{$type}}, err error, completed bool) {
 			if err != nil || completed {
 				observer(zero{{$name}}, err, completed)
@@ -870,7 +868,7 @@ func (s Observable{{$name}}) Scan(initial {{$type}}, f func({{$type}}, {{$type}}
 /////////////////////////////////////////////////////////////////////////////
 
 func (s Observable{{$name}}) Timeout(timeout time.Duration) Observable{{$name}} {
-	subscribe := func(observer {{$name}}ObserverFunc) Subscription {
+	subscribe := func(observer {{$name}}ObserverFunc) Subscribable {
 		unsubscribers := &unsubscriber.Collection{}
 
 		unsubchan := make(chan struct{})
@@ -906,11 +904,11 @@ func (s Observable{{$name}}) Timeout(timeout time.Duration) Observable{{$name}} 
 		subscribeOn := func(scheduler Scheduler) {
 			go deliver()
 
-			subscription := s(operator)
-			if !unsubscribers.Set(subscription) {
+			subscribable := s(operator)
+			if !unsubscribers.Set(subscribable) {
 				return
 			}
-			subscription.SubscribeOn(scheduler)
+			subscribable.SubscribeOn(scheduler)
 		}
 
 		unsubscribe := func() {
@@ -930,7 +928,7 @@ func (s Observable{{$name}}) Timeout(timeout time.Duration) Observable{{$name}} 
 // FORK
 /////////////////////////////////////////////////////////////////////////////
 
-// Fork replicates each event from the parent to every subscriber of the fork.
+// Fork replicates each event from the parent to every observer of the fork.
 // This allows multiple subscriptions to a single observable.
 func (s Observable{{$name}}) Fork() Observable{{$name}} {
 	var observers struct {
@@ -968,7 +966,7 @@ func (s Observable{{$name}}) Fork() Observable{{$name}} {
 		})
 	}
 
-	subscribe := func(observer {{$name}}ObserverFunc) Subscription {
+	subscribe := func(observer {{$name}}ObserverFunc) Subscribable {
 		unsubscribers := &unsubscriber.Collection{}
 		index := addObserver(observer)
 
@@ -1047,7 +1045,7 @@ func (s Observable{{$name}}) Publish() Connectable{{$name}} {
 		})
 	}
 
-	subscribe := func(observer {{$name}}ObserverFunc) Subscription {
+	subscribe := func(observer {{$name}}ObserverFunc) Subscribable {
 		unsubscribers := &unsubscriber.Collection{}
 		index := addObserver(observer)
 
@@ -1082,7 +1080,7 @@ func (s Observable{{$name}}) Publish() Connectable{{$name}} {
 func (s Observable{{$name}}) Average() Observable{{$name}} {
 	var sum {{$type}}
 	var count {{$type}}
-	subscribe := func(observer {{$name}}ObserverFunc) Subscription {
+	subscribe := func(observer {{$name}}ObserverFunc) Subscribable {
 		operator := func(next {{$type}}, err error, completed bool) {
 			if err != nil || completed {
 				observer(sum/count, nil, false)
@@ -1099,7 +1097,7 @@ func (s Observable{{$name}}) Average() Observable{{$name}} {
 
 func (s Observable{{$name}}) Sum() Observable{{$name}} {
 	var sum {{$type}}
-	subscribe := func(observer {{$name}}ObserverFunc) Subscription {
+	subscribe := func(observer {{$name}}ObserverFunc) Subscribable {
 		operator := func(next {{$type}}, err error, completed bool) {
 			if err != nil || completed {
 				observer(sum, nil, false)
@@ -1116,7 +1114,7 @@ func (s Observable{{$name}}) Sum() Observable{{$name}} {
 func (s Observable{{$name}}) Min() Observable{{$name}} {
 	started := false
 	var min {{$type}}
-	subscribe := func(observer {{$name}}ObserverFunc) Subscription {
+	subscribe := func(observer {{$name}}ObserverFunc) Subscribable {
 		operator := func(next {{$type}}, err error, completed bool) {
 			if err != nil || completed {
 				if started {
@@ -1142,7 +1140,7 @@ func (s Observable{{$name}}) Min() Observable{{$name}} {
 func (s Observable{{$name}}) Max() Observable{{$name}} {
 	started := false
 	var max {{$type}}
-	subscribe := func(observer {{$name}}ObserverFunc) Subscription {
+	subscribe := func(observer {{$name}}ObserverFunc) Subscribable {
 		operator := func(next {{$type}}, err error, completed bool) {
 			if err != nil || completed {
 				if started {
@@ -1174,7 +1172,7 @@ func (s Observable{{$name}}) Max() Observable{{$name}} {
 /////////////////////////////////////////////////////////////////////////////
 
 func (s Observable{{$name}}) Map{{$otherName}}(f func({{$type}}) {{$otherType}}) Observable{{$otherName}} {
-	subscribe := func(observer {{$otherName}}ObserverFunc) Subscription {
+	subscribe := func(observer {{$otherName}}ObserverFunc) Subscribable {
 		operator := func(next {{$type}}, err error, completed bool) {
 			var mapped {{$otherType}}
 			if err == nil && !completed {
@@ -1192,7 +1190,7 @@ func (s Observable{{$name}}) Map{{$otherName}}(f func({{$type}}) {{$otherType}})
 /////////////////////////////////////////////////////////////////////////////
 
 func (s Observable{{$name}}) FlatMap{{$otherName}}(f func({{$type}}) Observable{{$otherName}}) Observable{{$otherName}} {
-	subscribe := func(observer {{$otherName}}ObserverFunc) Subscription {
+	subscribe := func(observer {{$otherName}}ObserverFunc) Subscribable {
 		unsubscribers := &unsubscriber.Collection{}
 
 		var wait struct {
@@ -1262,11 +1260,11 @@ func (s Observable{{$name}}) FlatMap{{$otherName}}(f func({{$type}}) Observable{
 		}
 
 		subscribeOn := func(scheduler Scheduler) {
-			subscription := s(operator)
-			if !unsubscribers.Add(subscription) {
+			subscribable := s(operator)
+			if !unsubscribers.Add(subscribable) {
 				return
 			}
-			subscription.SubscribeOn(scheduler)
+			subscribable.SubscribeOn(scheduler)
 		}
 
 		unsubscribe := func() {

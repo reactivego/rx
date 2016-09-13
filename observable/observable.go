@@ -35,15 +35,14 @@ func (s SubscribeOnFunc) SubscribeOn(scheduler Scheduler) {
 }
 
 ////////////////////////////////////////////////////////
-// ObservableInt
+// IntObserver
 ////////////////////////////////////////////////////////
-
-type ObservableInt func(IntObserverFunc) Subscribable
 
 type IntObserver interface {
 	Next(int)
 	Error(error)
 	Complete()
+	Unsubscriber
 }
 
 type IntObserverFunc func(int, error, bool)
@@ -62,19 +61,18 @@ func (f IntObserverFunc) Complete() {
 	f(zeroInt, nil, true)
 }
 
+////////////////////////////////////////////////////////
+// ObservableInt
+////////////////////////////////////////////////////////
+
+type ObservableInt func(IntObserverFunc) Subscribable
+
 /////////////////////////////////////////////////////////////////////////////
 // FROM
 /////////////////////////////////////////////////////////////////////////////
 
-type IntSubscriber interface {
-	IntObserver
-	Unsubscriber
-}
-
-type IntCreateFunc func(IntSubscriber)
-
-// CreateInt calls f(subscriber) to produce values for a stream of ints.
-func CreateInt(f IntCreateFunc) ObservableInt {
+// CreateInt calls f(observer) to produce values for a stream of ints.
+func CreateInt(f func(IntObserver)) ObservableInt {
 	subscribe := func(observer IntObserverFunc) Subscribable {
 		unsubscriber := new(unsubscriber.Int32)
 
@@ -88,11 +86,11 @@ func CreateInt(f IntCreateFunc) ObservableInt {
 			scheduler.Schedule(func() {
 				if !unsubscriber.Unsubscribed() {
 					defer unsubscriber.Unsubscribe()
-					subscriber := &struct {
+					observer := &struct {
 						IntObserverFunc
 						Unsubscriber
 					}{operation, unsubscriber}
-					f(subscriber)
+					f(observer)
 				}
 			})
 		}
@@ -106,31 +104,31 @@ func CreateInt(f IntCreateFunc) ObservableInt {
 }
 
 func EmptyInt() ObservableInt {
-	return CreateInt(func(subscriber IntSubscriber) {
-		subscriber.Complete()
+	return CreateInt(func(observer IntObserver) {
+		observer.Complete()
 	})
 }
 
 func NeverInt() ObservableInt {
-	return CreateInt(func(subscriber IntSubscriber) {
+	return CreateInt(func(observer IntObserver) {
 	})
 }
 
 func ThrowInt(err error) ObservableInt {
-	return CreateInt(func(subscriber IntSubscriber) {
-		subscriber.Error(err)
+	return CreateInt(func(observer IntObserver) {
+		observer.Error(err)
 	})
 }
 
 func FromIntArray(array []int) ObservableInt {
-	return CreateInt(func(subscriber IntSubscriber) {
+	return CreateInt(func(observer IntObserver) {
 		for _, next := range array {
-			if subscriber.Unsubscribed() {
+			if observer.Unsubscribed() {
 				return
 			}
-			subscriber.Next(next)
+			observer.Next(next)
 		}
-		subscriber.Complete()
+		observer.Complete()
 	})
 }
 
@@ -139,61 +137,61 @@ func FromInts(array ...int) ObservableInt {
 }
 
 func FromIntChannel(ch <-chan int) ObservableInt {
-	return CreateInt(func(subscriber IntSubscriber) {
+	return CreateInt(func(observer IntObserver) {
 		for next := range ch {
-			if subscriber.Unsubscribed() {
+			if observer.Unsubscribed() {
 				return
 			}
-			subscriber.Next(next)
+			observer.Next(next)
 		}
-		subscriber.Complete()
+		observer.Complete()
 	})
 }
 
 func Interval(interval time.Duration) ObservableInt {
-	return CreateInt(func(subscriber IntSubscriber) {
+	return CreateInt(func(observer IntObserver) {
 		i := 0
 		for {
 			time.Sleep(interval)
-			if subscriber.Unsubscribed() {
+			if observer.Unsubscribed() {
 				return
 			}
-			subscriber.Next(i)
+			observer.Next(i)
 			i++
 		}
 	})
 }
 
 func JustInt(element int) ObservableInt {
-	return CreateInt(func(subscriber IntSubscriber) {
-		subscriber.Next(element)
-		subscriber.Complete()
+	return CreateInt(func(observer IntObserver) {
+		observer.Next(element)
+		observer.Complete()
 	})
 }
 
 func Range(start, count int) ObservableInt {
 	end := start + count
-	return CreateInt(func(subscriber IntSubscriber) {
+	return CreateInt(func(observer IntObserver) {
 		for i := start; i < end; i++ {
-			if subscriber.Unsubscribed() {
+			if observer.Unsubscribed() {
 				return
 			}
-			subscriber.Next(i)
+			observer.Next(i)
 		}
-		subscriber.Complete()
+		observer.Complete()
 	})
 }
 
 // Repeat value count times.
-func RepeatInt(value, count int) ObservableInt {
-	return CreateInt(func(subscriber IntSubscriber) {
+func RepeatInt(value int, count int) ObservableInt {
+	return CreateInt(func(observer IntObserver) {
 		for i := 0; i < count; i++ {
-			if subscriber.Unsubscribed() {
+			if observer.Unsubscribed() {
 				return
 			}
-			subscriber.Next(value)
+			observer.Next(value)
 		}
-		subscriber.Complete()
+		observer.Complete()
 	})
 }
 
@@ -203,12 +201,12 @@ func RepeatInt(value, count int) ObservableInt {
 // If the error is non-nil the returned ObservableInt will be that error,
 // otherwise it will be a single-value stream of int.
 func StartInt(f func() (int, error)) ObservableInt {
-	return CreateInt(func(subscriber IntSubscriber) {
+	return CreateInt(func(observer IntObserver) {
 		if next, err := f(); err != nil {
-			subscriber.Error(err)
+			observer.Error(err)
 		} else {
-			subscriber.Next(next)
-			subscriber.Complete()
+			observer.Next(next)
+			observer.Complete()
 		}
 	})
 }
@@ -518,7 +516,7 @@ func (s ObservableInt) Passthrough_3() ObservableInt {
 			// already be running once we get the subscribable back.
 			subscribable := s(operator)
 			// Set subscribable in the unsubscribers so Unsubscribe() will
-			// propagate correctly from the subscriber to the observable.
+			// propagate correctly from the observer to the observable.
 			if !unsubscribers.Set(subscribable) {
 				return
 			}
@@ -959,7 +957,7 @@ func (s ObservableInt) Timeout(timeout time.Duration) ObservableInt {
 // FORK
 /////////////////////////////////////////////////////////////////////////////
 
-// Fork replicates each event from the parent to every subscriber of the fork.
+// Fork replicates each event from the parent to every observer of the fork.
 // This allows multiple subscriptions to a single observable.
 func (s ObservableInt) Fork() ObservableInt {
 	var observers struct {
