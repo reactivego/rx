@@ -14,14 +14,14 @@ func main() {
 		println("subscription received...")
 		for i := 0; i < 15; i++ {
 			for j := 0; j < 3; j++ {
-				if s.Disposed() {
+				if s.Unsubscribed() {
 					return
 				}
 				s.Next(i)
 			}
 		}
 		s.Complete()
-		s.Dispose()
+		s.Unsubscribe()
 	})
 
 	fobservable := observable.Distinct().MapFloat64(func(v int) float64 { return float64(v) * 1.62 })
@@ -35,8 +35,8 @@ func main() {
 		println(v)
 	})
 	<-term
-	if subscription.Disposed() {
-		println("subscription disposed....")
+	if subscription.Unsubscribed() {
+		println("subscription unsubscribed....")
 	} else {
 		println("subscription still alive....")
 	}

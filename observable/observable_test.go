@@ -1,5 +1,3 @@
-// +build !unsubscriber
-
 package observable
 
 import (
@@ -63,7 +61,16 @@ func TestLast(t *testing.T) {
 }
 
 func TestMap(t *testing.T) {
-	a := FromInts(1, 2, 3, 4).MapString(func(i int) string { return fmt.Sprintf("%d!", i) }).ToArray()
+	var a []string
+	var doneChan = make(chan struct{})
+	FromInts(1, 2, 3, 4).MapString(func(i int) string { return fmt.Sprintf("%d!", i) }).Subscribe(func(next string, err error, completed bool) {
+		if err != nil || completed {
+			close(doneChan)
+		} else {
+			a = append(a, next)
+		}
+	})
+	<-doneChan
 	assert.Equal(t, a, []string{"1!", "2!", "3!", "4!"})
 }
 
@@ -453,7 +460,7 @@ func TestRetry(t *testing.T) {
 }
 
 func TestFlatMap(t *testing.T) {
-	actual, err := Range(1, 2).FlatMap(func(n int) Int { return Range(n, 2) }).ToArrayWithError()
+	actual, err := Range(1, 2).FlatMap(func(n int) ObservableInt { return Range(n, 2) }).ToArrayWithError()
 	assert.NoError(t, err)
 	sort.Ints(actual)
 	assert.Equal(t, []int{1, 2, 2, 3}, actual)

@@ -6,9 +6,6 @@ import (
 	"time"
 )
 
-// MaxReplaySize is the maximum size of a replay buffer. Can be modified.
-var MaxReplaySize = 16384
-
 type ObserverFunc func(interface{}, error, bool)
 
 func (f ObserverFunc) Next(next interface{}) {
@@ -245,7 +242,7 @@ func Replay(size int, duration time.Duration) Filter {
 	read := 0
 	write := 0
 	if size == 0 {
-		size = MaxReplaySize
+		size = 16384
 	}
 	if duration == 0 {
 		duration = time.Hour * 24 * 7 * 52
@@ -293,38 +290,44 @@ func Replay(size int, duration time.Duration) Filter {
 
 func Sample(window time.Duration) Filter {
 	filter := func(observer ObserverFunc) ObserverFunc {
-		mutex := &sync.Mutex{}
-		cancel := make(chan bool, 1)
-		var last interface{}
-		haveNew := false
-		go func() {
+		var cancel = make(chan struct{})
+		var last struct {
+			sync.Mutex
+			Value interface{}
+			Fresh bool
+		}
+
+		//FIXME: make sure sampler gets killed on Unsubcribe
+		sampler := func() {
 			for {
 				select {
 				case <-time.After(window):
-					mutex.Lock()
-					if haveNew {
-						observer.Next(last)
-						haveNew = false
+					last.Lock()
+					if last.Fresh {
+						observer.Next(last.Value)
+						last.Fresh = false
 					}
-					mutex.Unlock()
+					last.Unlock()
 				case <-cancel:
 					return
 				}
 			}
-		}()
+		}
+		go sampler()
+
 		operator := func(next interface{}, err error, completed bool) {
-			switch {
-			case err != nil:
-				cancel <- true
-				observer.Error(err)
-			case completed:
-				cancel <- true
-				observer.Complete()
-			default:
-				mutex.Lock()
-				last = next
-				haveNew = true
-				mutex.Unlock()
+			if err != nil || completed {
+				close(cancel)
+				if err != nil {
+					observer.Error(err)
+				} else {
+					observer.Complete()
+				}
+			} else {
+				last.Lock()
+				defer last.Unlock()
+				last.Value = next
+				last.Fresh = true
 			}
 		}
 		return operator
@@ -335,40 +338,38 @@ func Sample(window time.Duration) Filter {
 func Debounce(duration time.Duration) Filter {
 	filter := func(observer ObserverFunc) ObserverFunc {
 		errch := make(chan error)
-		completech := make(chan bool)
 		valuech := make(chan interface{})
-		go func() {
-			var timeout <-chan time.Time
+
+		//FIXME: make sure debouncer gets killed on Unsubscribe
+		debouncer := func() {
 			var nextValue interface{}
+			var timeout <-chan time.Time
 			for {
 				select {
+				case nextValue = <-valuech:
+					timeout = time.After(duration)
 				case <-timeout:
 					observer.Next(nextValue)
 					timeout = nil
-				case nextValue = <-valuech:
-					timeout = time.After(duration)
 				case err := <-errch:
 					if timeout != nil {
 						observer.Next(nextValue)
 					}
-					observer.Error(err)
-					return
-				case <-completech:
-					if timeout != nil {
-						observer.Next(nextValue)
+					if err != nil {
+						observer.Error(err)
+					} else {
+						observer.Complete()
 					}
-					observer.Complete()
 					return
 				}
 			}
-		}()
+		}
+		go debouncer()
+
 		operator := func(next interface{}, err error, completed bool) {
-			switch {
-			case err != nil:
+			if err != nil || completed {
 				errch <- err
-			case completed:
-				completech <- true
-			default:
+			} else {
 				valuech <- next
 			}
 		}

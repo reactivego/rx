@@ -1,9 +1,10 @@
-// +build special
-
-package rxgo
+package main
 
 import (
 	"errors"
+	"runtime"
+	"sort"
+	"sync"
 	"testing"
 	"time"
 
@@ -11,13 +12,25 @@ import (
 	"rxgo/observable"
 )
 
-func TestNilRange(t *testing.T) {
-	var items []observable.Unsubscriber
-	assert.NotPanics(t, func() {
-		for _, v := range items {
-			_ = v
-		}
-	}, "Calling range on nil slice should not panic")
+func TestSample(t *testing.T) {
+	a := observable.Interval(time.Millisecond * 90).Sample(time.Millisecond * 200).Take(3).ToArray()
+	assert.Equal(t, []int{1, 3, 5}, a)
+}
+
+func TestDebounce(t *testing.T) {
+	s := observable.CreateInt(func(observer observable.IntSubscriber) {
+		time.Sleep(100 * time.Millisecond)
+		observer.Next(1)
+		time.Sleep(300 * time.Millisecond)
+		observer.Next(2)
+		time.Sleep(80 * time.Millisecond)
+		observer.Next(3)
+		time.Sleep(110 * time.Millisecond)
+		observer.Next(4)
+		observer.Complete()
+	})
+	a := s.Debounce(time.Millisecond * 100).ToArray()
+	assert.Equal(t, []int{1, 3, 4}, a)
 }
 
 func TestConcat(t *testing.T) {
@@ -97,4 +110,55 @@ func TestRetry(t *testing.T) {
 	b := a.Retry().ToArray()
 	assert.Equal(t, []int{1, 2, 3, 1, 2, 3}, b)
 	assert.True(t, errored)
+}
+
+func TestTimeout(t *testing.T) {
+	wg := sync.WaitGroup{}
+	start := time.Now()
+	wg.Add(1)
+	actual, err := observable.CreateInt(func(subscriber observable.IntSubscriber) {
+		subscriber.Next(1)
+		time.Sleep(time.Millisecond * 500)
+		assert.True(t, subscriber.Unsubscribed())
+		wg.Done()
+	}).
+		Timeout(time.Millisecond * 250).
+		ToArrayWithError()
+	elapsed := time.Now().Sub(start)
+	assert.Error(t, err)
+	assert.Equal(t, observable.ErrTimeout, err)
+	assert.True(t, elapsed > time.Millisecond*250 && elapsed < time.Millisecond*500)
+	assert.Equal(t, []int{1}, actual)
+	wg.Wait()
+}
+
+func TestFork(t *testing.T) {
+	ch := make(chan int, 30)
+	s := observable.FromIntChannel(ch).Fork() // allready does a subscribe, but channel blocks.
+	a := []int{}
+	b := []int{}
+	sub := s.SubscribeNext(func(n int) { a = append(a, n) })
+	s.SubscribeNext(func(n int) { b = append(b, n) })
+	ch <- 1
+	ch <- 2
+	ch <- 3
+	// make sure the channel gets enough time to be fully processed.
+	for i := 0; i < 10; i++ {
+		time.Sleep(20 * time.Millisecond)
+		runtime.Gosched()
+	}
+	sub.Unsubscribe()
+	assert.True(t, sub.Unsubscribed())
+	ch <- 4
+	close(ch)
+	s.Wait()
+	assert.Equal(t, []int{1, 2, 3, 4}, b)
+	assert.Equal(t, []int{1, 2, 3}, a)
+}
+
+func TestFlatMap(t *testing.T) {
+	actual, err := observable.Range(1, 2).FlatMap(func(n int) observable.ObservableInt { return observable.Range(n, 2) }).ToArrayWithError()
+	assert.NoError(t, err)
+	sort.Ints(actual)
+	assert.Equal(t, []int{1, 2, 2, 3}, actual)
 }

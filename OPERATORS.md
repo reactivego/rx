@@ -1,6 +1,3 @@
-package rxgo
-
-/*
 # Creating Observables
 Operators that originate new Observables.
 
@@ -110,5 +107,3 @@ Replay — ensure that all observers see the same sequence of emitted items, eve
 
 # Operators to Convert Observables
 To — convert an Observable into another object or data structure
-
-*/
