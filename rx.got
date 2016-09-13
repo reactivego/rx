@@ -44,7 +44,7 @@ type {{$name}}Observer interface {
 	Next({{$type}})
 	Error(error)
 	Complete()
-	Unsubscriber
+	Unsubscribed() bool
 }
 
 type {{$name}}ObserverFunc func({{$type}}, error, bool)

@@ -34,7 +34,7 @@ type IntObserver interface {
 	Next(int)
 	Error(error)
 	Complete()
-	Unsubscriber
+	Unsubscribed() bool
 }
 
 type IntObserverFunc func(int, error, bool)
