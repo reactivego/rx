@@ -91,7 +91,7 @@ func ExampleMapString() {
 
 func ExampleSubscribeOn() {
 	done := make(chan struct{})
-	unsubscriber := FromInts(1, 2, 3, 4, 5).SubscribeOn(schedulers.GoroutineScheduler).Subscribe(func(next int, err error, completed bool) {
+	FromInts(1, 2, 3, 4, 5).SubscribeOn(schedulers.GoroutineScheduler).Subscribe(func(next int, err error, completed bool) {
 		switch {
 		case err != nil:
 			fmt.Println(err)
@@ -105,13 +105,6 @@ func ExampleSubscribeOn() {
 	})
 	<-done
 
-	// Check that Subscription does not leak out via Unsubscriber returned by Subscribe function.
-	if _, ok := unsubscriber.(Subscribable); ok {
-		fmt.Println("Subscription interface was exported by Subscribe")
-	} else {
-		fmt.Println("Subscription interface was NOT exported by Subscribe")
-	}
-
 	//Output:
 	// 1
 	// 2
@@ -119,5 +112,4 @@ func ExampleSubscribeOn() {
 	// 4
 	// 5
 	// completed
-	// Subscription interface was NOT exported by Subscribe
 }
