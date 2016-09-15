@@ -8,80 +8,72 @@ import (
 type Unsubscriber interface {
 	Unsubscribe()
 	Unsubscribed() bool
+	OnUnsubscribe(func())
+	AddChild() Unsubscriber
+	Wait()
 }
 
 ////////////////////////////////////////////////////////
-// Int32
+// Standard
 ////////////////////////////////////////////////////////
-
-// Int32 is an Int32 value with atomic operations implementing the Unsubscriber interface
-type Int32 int32
-
-func (t *Int32) Unsubscribe() {
-	atomic.StoreInt32((*int32)(t), 1)
-}
-
-func (t *Int32) Unsubscribed() bool {
-	return atomic.LoadInt32((*int32)(t)) == 1
-}
-
-////////////////////////////////////////////////////////
-// Collection
-////////////////////////////////////////////////////////
-
-// Collection is itself an Unsubscriber that will forward an Unsubscribe method
-// call to all unsubscribers in the collection. Useful for managing a collection of
-// concurrently operating subscribers in e.g. a merge operation.
-type Collection struct {
-	Int32
+// Standard is the standard unsubscriber implementation
+// that can also call back to a function when unsubscribed.
+type Standard struct {
+	int32
+	onUnsubscribe []func()
 	sync.Mutex
-	unsubscribers []Unsubscriber
-	onUnsubscribe func()
 }
 
-// Add will append the unsubscriber to the list of unsubscribers already present.
-func (c *Collection) Add(u Unsubscriber) bool {
-	c.Lock()
-	defer c.Unlock()
-	if c.Unsubscribed() {
-		u.Unsubscribe()
-		return false
-	}
-	c.unsubscribers = append(c.unsubscribers, u)
-	return true
+func (r *Standard) Unsubscribed() bool {
+	return atomic.LoadInt32((*int32)(&r.int32)) == 1
 }
 
-// Set will replace the collection of unsubscribers with a single unsubscriber.
-func (c *Collection) Set(u Unsubscriber) bool {
-	c.Lock()
-	defer c.Unlock()
-	if c.Unsubscribed() {
-		u.Unsubscribe()
-		return false
-	}
-	c.unsubscribers = []Unsubscriber{u}
-	return true
-}
-
-func (c *Collection) Unsubscribe() {
-	c.Lock()
-	defer c.Unlock()
-	if c.Unsubscribed() {
+func (r *Standard) Unsubscribe() {
+	r.Lock()
+	defer r.Unlock()
+	if r.Unsubscribed() {
 		return
 	}
-	c.Int32.Unsubscribe()
-	for _, unsubscriber := range c.unsubscribers {
-		if !unsubscriber.Unsubscribed() {
-			unsubscriber.Unsubscribe()
-		}
-	}
-	if c.onUnsubscribe != nil {
-		c.onUnsubscribe()
+	atomic.StoreInt32((*int32)(&r.int32), 1)
+	for _, f := range r.onUnsubscribe {
+		f()
 	}
 }
 
-func (c *Collection) OnUnsubscribe(f func()) {
-	c.Lock()
-	defer c.Unlock()
-	c.onUnsubscribe = f
+func (r *Standard) OnUnsubscribe(f func()) {
+	r.Lock()
+	defer r.Unlock()
+	if r.Unsubscribed() {
+		f()
+	} else {
+		r.onUnsubscribe = append(r.onUnsubscribe, f)
+	}
+}
+
+// AddChild will create an Unsubscriber who's Unsubscribe
+// method will be called when the parent's (the current object)
+// Unsubscribe method is called. Calling the Unsubscribe method
+// on the child will NOT propagate to the parent!
+func (r *Standard) AddChild() Unsubscriber {
+	r.Lock()
+	defer r.Unlock()
+	child := &Standard{}
+	if r.Unsubscribed() {
+		child.Unsubscribe()
+	} else {
+		r.onUnsubscribe = append(r.onUnsubscribe, child.Unsubscribe)
+	}
+	return child
+}
+
+func (r *Standard) Wait() {
+	done := make(chan struct{})
+	r.OnUnsubscribe(func() {
+		close(done)
+	})
+	<-done
+}
+
+func New() Unsubscriber {
+	return &Standard{}
 }

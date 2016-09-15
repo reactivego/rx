@@ -460,7 +460,7 @@ func TestRetry(t *testing.T) {
 }
 
 func TestFlatMap(t *testing.T) {
-	actual, err := Range(1, 2).FlatMap(func(n int) ObservableInt { return Range(n, 2) }).ToArrayWithError()
+	actual, err := Range(1, 2).FlatMapInt(func(n int) ObservableInt { return Range(n, 2) }).ToArrayWithError()
 	assert.NoError(t, err)
 	sort.Ints(actual)
 	assert.Equal(t, []int{1, 2, 2, 3}, actual)
@@ -471,40 +471,42 @@ func TestTimeout(t *testing.T) {
 	start := time.Now()
 	wg.Add(1)
 	actual, err := CreateInt(func(observer IntObserver) {
+		defer wg.Done()
 		observer.Next(1)
 		time.Sleep(time.Millisecond * 500)
-		assert.True(t, observer.Unsubscribed())
-		wg.Done()
+		assert.True(t, observer.Unsubscribed(), "observer should be Unsubscribed")
 	}).
 		Timeout(time.Millisecond * 250).
 		ToArrayWithError()
 	elapsed := time.Now().Sub(start)
 	assert.Error(t, err)
 	assert.Equal(t, ErrTimeout, err)
-	assert.True(t, elapsed > time.Millisecond*250 && elapsed < time.Millisecond*500)
+	assert.True(t, elapsed > time.Millisecond*250 && elapsed < time.Millisecond*500, "elapsed time should be between 250 and 500 ms")
 	assert.Equal(t, []int{1}, actual)
 	wg.Wait()
 }
 
 func TestFork(t *testing.T) {
 	ch := make(chan int, 30)
-	s := FromIntChannel(ch).Fork() // allready does a subscribe, but channel blocks.
+	s := FromIntChannel(ch).Fork() // allready does a subscribe, but nothing in channel yet...
 	a := []int{}
 	b := []int{}
-	sub := s.SubscribeNext(func(n int) { a = append(a, n) })
-	s.SubscribeNext(func(n int) { b = append(b, n) })
+	asub := s.SubscribeNext(func(n int) { a = append(a, n) })
+	bsub := s.SubscribeNext(func(n int) { b = append(b, n) })
 	ch <- 1
 	ch <- 2
 	ch <- 3
 	// make sure the channel gets enough time to be fully processed.
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 10; i++ {
+		time.Sleep(20 * time.Millisecond)
 		runtime.Gosched()
 	}
-	sub.Unsubscribe()
-	assert.True(t, sub.Unsubscribed())
+	asub.Unsubscribe()
+	assert.True(t, asub.Unsubscribed())
 	ch <- 4
 	close(ch)
-	s.Wait()
+	bsub.Wait()
 	assert.Equal(t, []int{1, 2, 3, 4}, b)
 	assert.Equal(t, []int{1, 2, 3}, a)
+	//assert.True(t, false, "force fail")
 }

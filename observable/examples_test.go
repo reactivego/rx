@@ -2,7 +2,7 @@ package observable
 
 import (
 	"fmt"
-	"rxgo/schedulers"
+	"rxgo/scheduler"
 	"time"
 )
 
@@ -91,7 +91,7 @@ func ExampleMapString() {
 
 func ExampleSubscribeOn() {
 	done := make(chan struct{})
-	FromInts(1, 2, 3, 4, 5).SubscribeOn(schedulers.GoroutineScheduler).Subscribe(func(next int, err error, completed bool) {
+	FromInts(1, 2, 3, 4, 5).SubscribeOn(scheduler.Goroutines).Subscribe(func(next int, err error, completed bool) {
 		switch {
 		case err != nil:
 			fmt.Println(err)

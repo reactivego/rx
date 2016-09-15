@@ -8,7 +8,7 @@ package {{.Package}}
 import (
 	"errors"
 	"rxgo/filters"
-	"rxgo/schedulers"
+	"rxgo/scheduler"
 	"rxgo/unsubscriber"
 	"sync"
 	"time"
@@ -23,16 +23,9 @@ var ErrTimeout = errors.New("timeout")
 // MaxReplaySize is the maximum size of a replay buffer. Can be modified.
 var MaxReplaySize = {{.MaxReplaySize}}
 
-type Scheduler schedulers.Scheduler
+type Scheduler scheduler.Scheduler
 
 type Unsubscriber unsubscriber.Unsubscriber
-
-// Subscribable is a struct returned as a result of calling
-// the observable function. See e.g. type ObservableInt.
-type Subscribable struct {
-	SubscribeOn func(scheduler Scheduler)
-	Unsubscriber
-}
 
 {{range $type := .Types -}}
 {{$name := $type|TypeName -}}
@@ -56,7 +49,7 @@ func (f {{$name}}ObserverFunc) Next(next {{$type}}) {
 }
 
 func (f {{$name}}ObserverFunc) Error(err error) {
-	f(zero{{$name}}, err, false)
+	f(zero{{$name}}, err, err==nil)
 }
 
 func (f {{$name}}ObserverFunc) Complete() {
@@ -67,9 +60,9 @@ func (f {{$name}}ObserverFunc) Complete() {
 // Observable{{$name}}
 ////////////////////////////////////////////////////////
 
-// Every observable is essentially a function taking
-// an Observer (function) and returning a Subscribable.
-type Observable{{$name}} func({{$name}}ObserverFunc) Subscribable
+// Every observable is essentially a function taking an
+// Observer function, scheduler and an unsubscriber.
+type Observable{{$name}} func({{$name}}ObserverFunc, Scheduler, Unsubscriber)
 
 /////////////////////////////////////////////////////////////////////////////
 // FROM
@@ -77,29 +70,21 @@ type Observable{{$name}} func({{$name}}ObserverFunc) Subscribable
 
 // Create{{$name}} calls f(observer) to produce values for a stream of ints.
 func Create{{$name}}(f func({{$name}}Observer)) Observable{{$name}} {
-	observable := func(observer {{$name}}ObserverFunc) Subscribable {
-		unsubscriber := new(unsubscriber.Int32)
-
-		operation := func(next {{$type}}, err error, completed bool) {
+	observable := func(observer {{$name}}ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
+		scheduler.Schedule(func() {
 			if !unsubscriber.Unsubscribed() {
-				observer(next, err, completed)
-			}
-		}
-
-		subscribeOn := func(scheduler Scheduler) {
-			scheduler.Schedule(func() {
-				if !unsubscriber.Unsubscribed() {
-					defer unsubscriber.Unsubscribe()
-					observer := &struct {
-						{{$name}}ObserverFunc
-						Unsubscriber
-					}{operation, unsubscriber}
-					f(observer)
+				operation := func(next {{$type}}, err error, completed bool) {
+					if !unsubscriber.Unsubscribed() {
+						observer(next, err, completed)
+					}
 				}
-			})
-		}
-
-		return Subscribable{subscribeOn, unsubscriber}
+				observer := &struct {
+					{{$name}}ObserverFunc
+					Unsubscriber
+				}{operation, unsubscriber}
+				f(observer)
+			}
+		})
 	}
 	return observable
 }
@@ -149,17 +134,46 @@ func From{{$name}}Channel(ch <-chan {{$type}}) Observable{{$name}} {
 	})
 }
 
+func From{{$name}}ChannelWithError(data <-chan {{$type}}, errs <-chan error) Observable{{$name}} {
+	return Create{{$name}}(func(observer {{$name}}Observer) {
+		for {
+			select {
+			case next, ok := <-data:
+				if observer.Unsubscribed() {
+					return
+				}
+				if ok {
+					observer.Next(next)
+				} else {
+					data = nil
+					observer.Complete()
+					return
+				}
+			case err, ok := <-errs:
+				if observer.Unsubscribed() {
+					return
+				}
+				if ok {
+					if err != nil {
+						observer.Error(err)
+						return
+					}
+				} else {
+					errs = nil
+				}
+			}
+		}	})
+}
+
 {{if eq $type "int" -}}
 func Interval(interval time.Duration) Observable{{$name}} {
 	return Create{{$name}}(func(observer {{$name}}Observer) {
-		i := 0
-		for {
+		for i := 0; ; i++ {
 			time.Sleep(interval)
 			if observer.Unsubscribed() {
 				return
 			}
 			observer.Next(i)
-			i++
 		}
 	})
 }
@@ -237,19 +251,29 @@ func Merge{{$name}}DelayError(observables ...Observable{{$name}}) Observable{{$n
 /////////////////////////////////////////////////////////////////////////////
 
 func (o Observable{{$name}}) SubscribeOn(scheduler Scheduler) Observable{{$name}} {
-	observable := func(observer {{$name}}ObserverFunc) Subscribable {
-		subscribable := o(observer)
-		subscribable.SubscribeOn(scheduler)
-		subscribable.SubscribeOn = func(scheduler Scheduler) { /* ignore */ }
-		return subscribable
+	observable := func(observer {{$name}}ObserverFunc, _ Scheduler, unsubscriber Unsubscriber) {
+		// override the scheduler
+		o(observer, scheduler, unsubscriber)
 	}
 	return observable
 }
 
+// Subscribe an observer function to the observable.
+// This method returns an Unsubscriber. You can always call Unsubscribe
+// on the returned Unsubscriber to make sure all resources (goroutines)
+// are deallocated. If the subscription terminates naturally because
+// of an error or when the stream of data is complete then the Unsubscribe
+// method on the Unsubscriber is automatically called internally.
 func (o Observable{{$name}}) Subscribe(observer {{$name}}ObserverFunc) Unsubscriber {
-	subscribable := o(observer)
-	subscribable.SubscribeOn(schedulers.GoroutineScheduler)
-	return subscribable.Unsubscriber
+	unsubscriber := unsubscriber.New()
+	operator := func(next {{$type}}, err error, completed bool) {
+		observer(next, err, completed)
+		if err != nil || completed {
+			unsubscriber.Unsubscribe()
+		}
+	}
+	o(operator, scheduler.Goroutines, unsubscriber)
+	return unsubscriber
 }
 
 func (o Observable{{$name}}) SubscribeNext(f func(v {{$type}})) Unsubscriber {
@@ -359,7 +383,7 @@ func (o Observable{{$name}}) ToChannel() <-chan {{$type}} {
 /////////////////////////////////////////////////////////////////////////////
 
 func (o Observable{{$name}}) adaptFilter(filter filters.Filter) Observable{{$name}} {
-	observable := func(sink {{$name}}ObserverFunc) Subscribable {
+	observable := func(sink {{$name}}ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
 		genericTo{{$name}}Sink := func(next interface{}, err error, completed bool) {
 			if next{{$name}}, ok := next.({{$type}}); ok {
 				sink(next{{$name}}, err, completed)
@@ -371,7 +395,7 @@ func (o Observable{{$name}}) adaptFilter(filter filters.Filter) Observable{{$nam
 		intToGenericSource := func(next {{$type}}, err error, completed bool) {
 			genericToGenericFilter(next, err, completed)
 		}
-		return o(intToGenericSource)
+		o(intToGenericSource, scheduler, unsubscriber)
 	}
 	return observable
 }
@@ -431,15 +455,7 @@ func (o Observable{{$name}}) IgnoreElements() Observable{{$name}} {
 
 // IgnoreCompletion ignores the completion event of the stream and therefore returns a stream that never completes.
 func (o Observable{{$name}}) IgnoreCompletion() Observable{{$name}} {
-	observable := func(observer {{$name}}ObserverFunc) Subscribable {
-		operator := func(next {{$type}}, err error, completed bool) {
-			if !completed {
-				observer(next, err, completed)
-			}
-		}
-		return o(operator)
-	}
-	return observable
+	return o.adaptFilter(filters.IgnoreCompletion())
 }
 
 func (o Observable{{$name}}) One() Observable{{$name}} {
@@ -470,7 +486,7 @@ func (o Observable{{$name}}) Debounce(duration time.Duration) Observable{{$name}
 /////////////////////////////////////////////////////////////////////////////
 
 func (o Observable{{$name}}) Count() Observable{{$otherName}} {
-	observable := func(observer {{$otherName}}ObserverFunc) Subscribable {
+	observable := func(observer {{$otherName}}ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
 		count := 0
 		operator := func(next {{$type}}, err error, completed bool) {
 			if err != nil || completed {
@@ -479,7 +495,7 @@ func (o Observable{{$name}}) Count() Observable{{$otherName}} {
 			}
 			count++
 		}
-		return o(operator)
+		o(operator, scheduler, unsubscriber)
 	}
 	return observable
 }
@@ -495,54 +511,38 @@ func (o Observable{{$name}}) Concat(other ...Observable{{$name}}) Observable{{$n
 	if len(other) == 0 {
 		return o
 	}
-	observable := func(observer {{$name}}ObserverFunc) Subscribable {
-		unsubscribers := &unsubscriber.Collection{}
-
+	observable := func(observer {{$name}}ObserverFunc, sched Scheduler, unsub Unsubscriber) {
 		var index int
 		var maxIndex = 1 + len(other) - 1
 
-		var wg sync.WaitGroup
 		operator := func(next {{$type}}, err error, completed bool) {
 			switch {
 			case err != nil:
 				index = maxIndex
 				observer.Error(err)
-				wg.Done()
 			case completed:
 				if index == maxIndex {
 					observer.Complete()
 				}
-				wg.Done()
 			default:
 				observer.Next(next)
 			}
 		}
 
-		subscribeOn := func(scheduler Scheduler) {
-			// Execute the first observable on the passed in scheduler.
-			wg.Add(1)
-			subscribable := o(operator)
-			if !unsubscribers.Set(subscribable) {
+		// Execute the concat on the passed in scheduler.
+		sched.Schedule(func() {
+			o(operator, scheduler.Immediate, unsub)
+			if index == maxIndex {
 				return
-			}
-			subscribable.SubscribeOn(scheduler)
-			wg.Wait()
-
+			}			
 			for i, observable := range other {
 				index = i + 1
-				wg.Add(1)
-				unsubscriber := observable.Subscribe(operator)
-				if !unsubscribers.Set(unsubscriber) {
-					return
-				}
-				wg.Wait()
+				observable(operator, scheduler.Immediate, unsub)
 				if index == maxIndex {
 					return
 				}
 			}
-		}
-
-		return Subscribable{subscribeOn, unsubscribers}
+		})
 	}
 	return observable
 }
@@ -555,9 +555,7 @@ func (o Observable{{$name}}) merge(other []Observable{{$name}}, delayError bool)
 	if len(other) == 0 {
 		return o
 	}
-	observable := func(observer {{$name}}ObserverFunc) Subscribable {
-		unsubscribers := &unsubscriber.Collection{}
-
+	observable := func(observer {{$name}}ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
 		var (
 			olock     sync.Mutex
 			merged    int
@@ -582,8 +580,6 @@ func (o Observable{{$name}}) merge(other []Observable{{$name}}, delayError bool)
 				} else {
 					observer.Error(err)
 					merged = count
-					// tell all still executing observables, we're no longer interested
-					unsubscribers.Unsubscribe()
 				}
 
 			case completed:
@@ -600,21 +596,10 @@ func (o Observable{{$name}}) merge(other []Observable{{$name}}, delayError bool)
 			}
 		}
 
-		subscribeOn := func(scheduler Scheduler) {
-			subscribable := o(operator)
-			if !unsubscribers.Add(subscribable) {
-				return
-			}
-			subscribable.SubscribeOn(scheduler)
-			for _, observable := range other {
-				unsubscriber := observable.Subscribe(operator)
-				if !unsubscribers.Add(unsubscriber) {
-					return
-				}
-			}
+		o(operator, scheduler, unsubscriber)
+		for _, o := range other {
+			o(operator, scheduler, unsubscriber)
 		}
-
-		return Subscribable{subscribeOn, unsubscribers}
 	}
 	return observable
 }
@@ -636,47 +621,15 @@ func (o Observable{{$name}}) MergeDelayError(other ...Observable{{$name}}) Obser
 /////////////////////////////////////////////////////////////////////////////
 
 func (o Observable{{$name}}) Catch(catch Observable{{$name}}) Observable{{$name}} {
-	observable := func(observer {{$name}}ObserverFunc) Subscribable {
-		unsubscribers := &unsubscriber.Collection{}
-
-		throwChan := make(chan error, 1)
+	observable := func(observer {{$name}}ObserverFunc, sched Scheduler, unsub Unsubscriber) {
 		operator := func(next {{$type}}, err error, completed bool) {
-			switch {
-			case err != nil:
-				throwChan <- err
-			case completed:
-				observer.Complete()
-				throwChan <- nil
-			default:
-				observer.Next(next)
+			if err != nil {
+				catch(observer, scheduler.Immediate, unsub)
+			} else {
+				observer(next, err, completed)
 			}
 		}
-
-		catcher := func() {
-			if err := <-throwChan; err != nil {
-				unsubscriber := catch.Subscribe(observer)
-				if !unsubscribers.Set(unsubscriber) {
-					return
-				}
-			}
-		}
-
-		subscribeOn := func(scheduler Scheduler) {
-			go catcher()
-
-			subscribable := o(operator)
-			if !unsubscribers.Set(subscribable) {
-				return
-			}
-			subscribable.SubscribeOn(scheduler)
-		}
-
-		unsubscribe := func() {
-			throwChan <- nil
-		}
-		unsubscribers.OnUnsubscribe(unsubscribe)
-
-		return Subscribable{subscribeOn, unsubscribers}
+		o(operator, sched, unsub)
 	}
 	return observable
 }
@@ -686,51 +639,21 @@ func (o Observable{{$name}}) Catch(catch Observable{{$name}}) Observable{{$name}
 /////////////////////////////////////////////////////////////////////////////
 
 func (o Observable{{$name}}) Retry() Observable{{$name}} {
-	observable := func(observer {{$name}}ObserverFunc) Subscribable {
-		unsubscribers := &unsubscriber.Collection{}
-
-		throwChan := make(chan error, 1)
-		operator := func(next {{$type}}, err error, completed bool) {
-			switch {
-			case err != nil:
-				throwChan <- err
-			case completed:
-				observer.Complete()
-				throwChan <- nil
-			default:
-				observer.Next(next)
-			}
-		}
-
-		catcher := func(scheduler Scheduler) {
-			for err := range throwChan {
-				if err == nil {
-					return
+	observable := func(observer {{$name}}ObserverFunc, sched Scheduler, unsub Unsubscriber) {
+		sched.Schedule(func() {
+			if !unsub.Unsubscribed() {
+				var done bool
+				operator := func(next {{$type}}, err error, completed bool) {
+					if err == nil {
+						observer(next, err, completed)
+						done = completed
+					}
 				}
-				subscribable := o(operator)
-				if !unsubscribers.Set(subscribable) {
-					return
+				for !unsub.Unsubscribed() && !done {
+					o(operator, scheduler.Immediate, unsub)
 				}
-				subscribable.SubscribeOn(scheduler)
 			}
-		}
-
-		subscribeOn := func(scheduler Scheduler) {
-			go catcher(scheduler)
-
-			subscribable := o(operator)
-			if !unsubscribers.Set(subscribable) {
-				return
-			}
-			subscribable.SubscribeOn(scheduler)
-		}
-
-		unsubscribe := func() {
-			throwChan <- nil
-		}
-		unsubscribers.OnUnsubscribe(unsubscribe)
-
-		return Subscribable{subscribeOn, unsubscribers}
+		})
 	}
 	return observable
 }
@@ -741,42 +664,42 @@ func (o Observable{{$name}}) Retry() Observable{{$name}} {
 
 // Do applies a function for each value passing through the stream.
 func (o Observable{{$name}}) Do(f func(next {{$type}})) Observable{{$name}} {
-	observable := func(observer {{$name}}ObserverFunc) Subscribable {
+	observable := func(observer {{$name}}ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
 		operator := func(next {{$type}}, err error, completed bool) {
 			if err == nil && !completed {
 				f(next)
 			}
 			observer(next, err, completed)
 		}
-		return o(operator)
+		o(operator, scheduler, unsubscriber)
 	}
 	return observable
 }
 
 // DoOnError applies a function for any error on the stream.
 func (o Observable{{$name}}) DoOnError(f func(err error)) Observable{{$name}} {
-	observable := func(observer {{$name}}ObserverFunc) Subscribable {
+	observable := func(observer {{$name}}ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
 		operator := func(next {{$type}}, err error, completed bool) {
 			if err != nil {
 				f(err)
 			}
 			observer(next, err, completed)
 		}
-		return o(operator)
+		o(operator, scheduler, unsubscriber)
 	}
 	return observable
 }
 
 // DoOnComplete applies a function when the stream completes.
 func (o Observable{{$name}}) DoOnComplete(f func()) Observable{{$name}} {
-	observable := func(observer {{$name}}ObserverFunc) Subscribable {
+	observable := func(observer {{$name}}ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
 		operator := func(next {{$type}}, err error, completed bool) {
 			if completed {
 				f()
 			}
 			observer(next, err, completed)
 		}
-		return o(operator)
+		o(operator, scheduler, unsubscriber)
 	}
 	return observable
 }
@@ -784,14 +707,14 @@ func (o Observable{{$name}}) DoOnComplete(f func()) Observable{{$name}} {
 // Finally applies a function for any error or completion on the stream.
 // This doesn't expose whether this was an error or a completion.
 func (o Observable{{$name}}) Finally(f func()) Observable{{$name}} {
-	observable := func(observer {{$name}}ObserverFunc) Subscribable {
+	observable := func(observer {{$name}}ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
 		operator := func(next {{$type}}, err error, completed bool) {
 			if err != nil || completed {
 				f()
 			}
 			observer(next, err, completed)
 		}
-		return o(operator)
+		o(operator, scheduler, unsubscriber)
 	}
 	return observable
 }
@@ -801,8 +724,8 @@ func (o Observable{{$name}}) Finally(f func()) Observable{{$name}} {
 /////////////////////////////////////////////////////////////////////////////
 
 func (o Observable{{$name}}) Reduce(initial {{$type}}, reducer func({{$type}}, {{$type}}) {{$type}}) Observable{{$name}} {
-	value := initial
-	observable := func(observer {{$name}}ObserverFunc) Subscribable {
+	observable := func(observer {{$name}}ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
+		value := initial
 		operator := func(next {{$type}}, err error, completed bool) {
 			if err != nil || completed {
 				observer(value, nil, false)
@@ -811,7 +734,7 @@ func (o Observable{{$name}}) Reduce(initial {{$type}}, reducer func({{$type}}, {
 				value = reducer(value, next)
 			}
 		}
-		return o(operator)
+		o(operator, scheduler, unsubscriber)
 	}
 	return observable
 }
@@ -821,8 +744,8 @@ func (o Observable{{$name}}) Reduce(initial {{$type}}, reducer func({{$type}}, {
 /////////////////////////////////////////////////////////////////////////////
 
 func (o Observable{{$name}}) Scan(initial {{$type}}, f func({{$type}}, {{$type}}) {{$type}}) Observable{{$name}} {
-	value := initial
-	observable := func(observer {{$name}}ObserverFunc) Subscribable {
+	observable := func(observer {{$name}}ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
+		value := initial
 		operator := func(next {{$type}}, err error, completed bool) {
 			if err != nil || completed {
 				observer(zero{{$name}}, err, completed)
@@ -831,7 +754,7 @@ func (o Observable{{$name}}) Scan(initial {{$type}}, f func({{$type}}, {{$type}}
 				observer(value, nil, false)
 			}
 		}
-		return o(operator)
+		o(operator, scheduler, unsubscriber)
 	}
 	return observable
 }
@@ -841,55 +764,52 @@ func (o Observable{{$name}}) Scan(initial {{$type}}, f func({{$type}}, {{$type}}
 /////////////////////////////////////////////////////////////////////////////
 
 func (o Observable{{$name}}) Timeout(timeout time.Duration) Observable{{$name}} {
-	observable := func(observer {{$name}}ObserverFunc) Subscribable {
-		unsubscribers := &unsubscriber.Collection{}
+	observable := func(observer {{$name}}ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
 
-		unsubchan := make(chan struct{})
-		errchan := make(chan error)
-		nextchan := make(chan {{$type}})
-		deliver := func() {
-			for {
-				select {
-				case <-unsubchan:
-					return
-				case <-time.After(timeout):
-					observer(zero{{$name}}, ErrTimeout, false)
-					unsubscribers.Unsubscribe()
-					return
-				case err := <-errchan:
-					observer(zero{{$name}}, err, err == nil)
-					unsubscribers.Unsubscribe()
-					return
-				case next := <-nextchan:
-					observer(next, nil, false)
+		if scheduler.Asynchronous() {
+			// Asynchronous, so all scheduled tasks are executed in parallel.
+			unsubscriber := unsubscriber.AddChild()
+
+			deadline := time.NewTimer(timeout)
+
+			var lock sync.Mutex
+			operator := func(next {{$type}}, err error, completed bool) {
+				lock.Lock()
+				defer lock.Unlock()
+
+				if deadline.Stop() {
+					// next data received before deadline expired.
+					observer(next, err, completed)
+					deadline.Reset(timeout)
+				} else {
+					// unfortunately the deadline has expired.
+					observer.Error(ErrTimeout)
+					unsubscriber.Unsubscribe()
 				}
 			}
-		}
 
-		operator := func(next {{$type}}, err error, completed bool) {
-			if err != nil || completed {
-				errchan <- err
-			} else {
-				nextchan <- next
+			scheduler.Schedule(func() {
+				<-deadline.C
+				{{$name}}ObserverFunc(operator).Error(ErrTimeout)
+			})
+
+			o(operator, scheduler, unsubscriber)
+
+		} else {
+			// Synchronous, meaning all Scheduled tasks are executed in sequence.
+			unsubscriber := unsubscriber.AddChild()
+			lastTime := time.Now()
+			operator := func(next {{$type}}, err error, completed bool) {
+				if time.Since(lastTime) > timeout {
+					unsubscriber.Unsubscribe()
+					observer.Error(ErrTimeout)
+				} else {
+					observer(next, err, completed)
+					lastTime = time.Now()
+				}
 			}
+			o(operator, scheduler, unsubscriber)
 		}
-
-		subscribeOn := func(scheduler Scheduler) {
-			go deliver()
-
-			subscribable := o(operator)
-			if !unsubscribers.Set(subscribable) {
-				return
-			}
-			subscribable.SubscribeOn(scheduler)
-		}
-
-		unsubscribe := func() {
-			close(unsubchan)
-		}
-		unsubscribers.OnUnsubscribe(unsubscribe)
-
-		return Subscribable{subscribeOn, unsubscribers}
 	}
 	return observable
 }
@@ -900,62 +820,13 @@ func (o Observable{{$name}}) Timeout(timeout time.Duration) Observable{{$name}} 
 
 // Fork replicates each event from the parent to every observer of the fork.
 // This allows multiple subscriptions to a single observable.
+// This only works for hot observables, cold observables may drain out to the
+// first connected observable even before a subsequent observer subscribes.
 func (o Observable{{$name}}) Fork() Observable{{$name}} {
-	var observers struct {
-		sync.Mutex
-		items []{{$name}}ObserverFunc
-	}
-
-	addObserver := func(observer {{$name}}ObserverFunc) int {
-		observers.Lock()
-		defer observers.Unlock()
-		index := len(observers.items)
-		observers.items = append(observers.items, observer)
-		return index
-	}
-
-	removeObserver := func(index int) {
-		observers.Lock()
-		defer observers.Unlock()
-		observers.items[index] = nil
-	}
-
-	eachObserver := func(f func(observer {{$name}}ObserverFunc)) {
-		observers.Lock()
-		defer observers.Unlock()
-		for _, observer := range observers.items {
-			if observer != nil {
-				f(observer)
-			}
-		}
-	}
-
-	operator := func(next {{$type}}, err error, completed bool) {
-		eachObserver(func(observer {{$name}}ObserverFunc) {
-			observer(next, err, completed)
-		})
-	}
-
-	observable := func(observer {{$name}}ObserverFunc) Subscribable {
-		unsubscribers := &unsubscriber.Collection{}
-		index := addObserver(observer)
-
-		subscribeOn := func(scheduler Scheduler) {
-		}
-
-		unsubscribe := func() {
-			removeObserver(index)
-		}
-		unsubscribers.OnUnsubscribe(unsubscribe)
-
-		return Subscribable{subscribeOn, unsubscribers}
-	}
-
-	// Subscribes immediately on creation of the observable.
-	// So before anybody actually subscribed.
-	o.Subscribe(operator)
-
-	return observable
+	fork := o.Publish()
+	// TODO: Nobody can actually Unsubscribe from this thing....
+	fork.Connect()
+	return fork.Observable{{$name}}
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -977,60 +848,100 @@ func (c Connectable{{$name}}) Connect() Unsubscriber {
 // Publish creates a connectable observable that only starts emitting values
 // after the Connect method is called on it.
 func (o Observable{{$name}}) Publish() Connectable{{$name}} {
-	var observers struct {
-		sync.Mutex
-		items []{{$name}}ObserverFunc
+
+	type channel struct {
+		data chan {{$type}}
+		errs chan error
 	}
 
-	addObserver := func(observer {{$name}}ObserverFunc) int {
-		observers.Lock()
-		defer observers.Unlock()
-		index := len(observers.items)
-		observers.items = append(observers.items, observer)
+	var channels struct {
+		sync.Mutex
+		items []*channel
+	}
+
+	addChannel := func(data chan {{$type}}, errs chan error) int {
+		channels.Lock()
+		defer channels.Unlock()
+		index := len(channels.items)
+		channels.items = append(channels.items, &channel{data, errs})
 		return index
 	}
 
-	removeObserver := func(index int) {
-		observers.Lock()
-		defer observers.Unlock()
-		observers.items[index] = nil
+	removeChannel := func(index int) {
+		channels.Lock()
+		defer channels.Unlock()
+		ch := channels.items[index]
+		if ch != nil {
+			if ch.data != nil {
+				close(ch.data)
+			}
+			channels.items[index] = nil
+		}
 	}
 
-	eachObserver := func(f func(observer {{$name}}ObserverFunc)) {
-		observers.Lock()
-		defer observers.Unlock()
-		for _, observer := range observers.items {
-			if observer != nil {
-				f(observer)
+	removeAllChannels := func() {
+		channels.Lock()
+		defer channels.Unlock()
+		for index, ch := range channels.items {
+			if ch != nil {
+				if ch.data != nil {
+					close(ch.data)
+				}
+				channels.items[index] = nil
+			}
+		}
+	}
+
+	broadcastData := func(next {{$type}}) {
+		channels.Lock()
+		defer channels.Unlock()
+		for _, ch := range channels.items {
+			if ch != nil {
+				if ch.data != nil {
+					ch.data <- next
+				}
+			}
+		}
+	}
+
+	broadcastError := func(err error) {
+		channels.Lock()
+		defer channels.Unlock()
+		for _, ch := range channels.items {
+			if ch != nil {
+				if ch.errs != nil {
+					ch.errs <- err
+				}
 			}
 		}
 	}
 
 	operator := func(next {{$type}}, err error, completed bool) {
-		eachObserver(func(observer {{$name}}ObserverFunc) {
-			observer(next, err, completed)
-		})
-	}
-
-	observable := func(observer {{$name}}ObserverFunc) Subscribable {
-		unsubscribers := &unsubscriber.Collection{}
-		index := addObserver(observer)
-
-		subscribeOn := func(scheduler Scheduler) {
+		switch {
+		case err != nil:
+			broadcastError(err)
+		case completed:
+			removeAllChannels()
+		default:
+			broadcastData(next)
 		}
-
-		unsubscribe := func() {
-			removeObserver(index)
-		}
-		unsubscribers.OnUnsubscribe(unsubscribe)
-
-		return Subscribable{subscribeOn, unsubscribers}
 	}
 
 	// Connect our operator observer function to the source start receiving
 	// values from the source and forward them to our subscribers.
 	connect := func() Unsubscriber {
+		// TODO: Can Connect() Unsubscribe() Connect() sequence be used to pause/restart the stream?
 		return o.Subscribe(operator)
+	}
+
+	observable := func(observer {{$name}}ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
+		data := make(chan {{$type}}, 1)
+		errs := make(chan error, 1)
+		index := addChannel(data, errs)
+		unsubscriber.OnUnsubscribe(func() {
+			removeChannel(index)
+		})
+		From{{$name}}ChannelWithError(data, errs)(observer, scheduler, unsubscriber)
 	}
 
 	return Connectable{{$name}}{Observable{{$name}}: observable, connect: connect}
@@ -1042,9 +953,9 @@ func (o Observable{{$name}}) Publish() Connectable{{$name}} {
 /////////////////////////////////////////////////////////////////////////////
 
 func (o Observable{{$name}}) Average() Observable{{$name}} {
-	var sum {{$type}}
-	var count {{$type}}
-	observable := func(observer {{$name}}ObserverFunc) Subscribable {
+	observable := func(observer {{$name}}ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
+		var sum {{$type}}
+		var count {{$type}}
 		operator := func(next {{$type}}, err error, completed bool) {
 			if err != nil || completed {
 				observer(sum/count, nil, false)
@@ -1054,14 +965,14 @@ func (o Observable{{$name}}) Average() Observable{{$name}} {
 				count++
 			}
 		}
-		return o(operator)
+		o(operator, scheduler, unsubscriber)
 	}
 	return observable
 }
 
 func (o Observable{{$name}}) Sum() Observable{{$name}} {
-	var sum {{$type}}
-	observable := func(observer {{$name}}ObserverFunc) Subscribable {
+	observable := func(observer {{$name}}ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
+		var sum {{$type}}
 		operator := func(next {{$type}}, err error, completed bool) {
 			if err != nil || completed {
 				observer(sum, nil, false)
@@ -1070,15 +981,15 @@ func (o Observable{{$name}}) Sum() Observable{{$name}} {
 				sum += next
 			}
 		}
-		return o(operator)
+		o(operator, scheduler, unsubscriber)
 	}
 	return observable
 }
 
 func (o Observable{{$name}}) Min() Observable{{$name}} {
-	started := false
-	var min {{$type}}
-	observable := func(observer {{$name}}ObserverFunc) Subscribable {
+	observable := func(observer {{$name}}ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
+		started := false
+		var min {{$type}}
 		operator := func(next {{$type}}, err error, completed bool) {
 			if err != nil || completed {
 				if started {
@@ -1096,15 +1007,15 @@ func (o Observable{{$name}}) Min() Observable{{$name}} {
 				}
 			}
 		}
-		return o(operator)
+		o(operator, scheduler, unsubscriber)
 	}
 	return observable
 }
 
 func (o Observable{{$name}}) Max() Observable{{$name}} {
-	started := false
-	var max {{$type}}
-	observable := func(observer {{$name}}ObserverFunc) Subscribable {
+	observable := func(observer {{$name}}ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
+		started := false
+		var max {{$type}}
 		operator := func(next {{$type}}, err error, completed bool) {
 			if err != nil || completed {
 				if started {
@@ -1122,7 +1033,7 @@ func (o Observable{{$name}}) Max() Observable{{$name}} {
 				}
 			}
 		}
-		return o(operator)
+		o(operator, scheduler, unsubscriber)
 	}
 	return observable
 }
@@ -1136,7 +1047,7 @@ func (o Observable{{$name}}) Max() Observable{{$name}} {
 /////////////////////////////////////////////////////////////////////////////
 
 func (o Observable{{$name}}) Map{{$otherName}}(f func({{$type}}) {{$otherType}}) Observable{{$otherName}} {
-	observable := func(observer {{$otherName}}ObserverFunc) Subscribable {
+	observable := func(observer {{$otherName}}ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
 		operator := func(next {{$type}}, err error, completed bool) {
 			var mapped {{$otherType}}
 			if err == nil && !completed {
@@ -1144,27 +1055,55 @@ func (o Observable{{$name}}) Map{{$otherName}}(f func({{$type}}) {{$otherType}})
 			}
 			observer(mapped, err, completed)
 		}
-		return o(operator)
+		o(operator, scheduler, unsubscriber)
 	}
 	return observable
 }
 
+{{end -}}
+
+{{range $otherType := $.MapTypes -}}
+{{$otherName := $otherType|TypeName -}}
 /////////////////////////////////////////////////////////////////////////////
-// FLATMAP ({{$type}},{{$otherName}})
+// FLATMAP ({{$type}},{{$otherType}})
 /////////////////////////////////////////////////////////////////////////////
 
 func (o Observable{{$name}}) FlatMap{{$otherName}}(f func({{$type}}) Observable{{$otherName}}) Observable{{$otherName}} {
-	observable := func(observer {{$otherName}}ObserverFunc) Subscribable {
-		unsubscribers := &unsubscriber.Collection{}
-
+	observable := func(observer {{$otherName}}ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
 		var wait struct {
 			sync.Mutex
 			Condition *sync.Cond
 			Accum     int
+
+			Add         func()
+			Done        func()
+			Cancel      func()
+			WaitForZero func() bool
 		}
 		wait.Condition = sync.NewCond(&wait.Mutex)
 
-		waitForZero := func() bool {
+		wait.Add = func() {
+			wait.Lock()
+			defer wait.Unlock()
+			wait.Accum++
+			wait.Condition.Broadcast()
+		}
+
+		wait.Done = func() {
+			wait.Lock()
+			defer wait.Unlock()
+			wait.Accum--
+			wait.Condition.Broadcast()
+		}
+
+		wait.Cancel = func() {
+			wait.Lock()
+			defer wait.Unlock()
+			wait.Accum = -1
+			wait.Condition.Broadcast()
+		}
+
+		wait.WaitForZero = func() bool {
 			wait.Lock()
 			defer wait.Unlock()
 			for wait.Accum > 0 {
@@ -1173,34 +1112,13 @@ func (o Observable{{$name}}) FlatMap{{$otherName}}(f func({{$type}}) Observable{
 			return (wait.Accum == 0)
 		}
 
-		waitAdd := func() {
-			wait.Lock()
-			defer wait.Unlock()
-			wait.Accum++
-			wait.Condition.Broadcast()
-		}
-
-		waitDone := func() {
-			wait.Lock()
-			defer wait.Unlock()
-			wait.Accum--
-			wait.Condition.Broadcast()
-		}
-
-		waitCancel := func() {
-			wait.Lock()
-			defer wait.Unlock()
-			wait.Accum = -1
-			wait.Condition.Broadcast()
-		}
-
 		var lock sync.Mutex
 		flatten := func(next {{$otherType}}, err error, completed bool) {
 			lock.Lock()
 			defer lock.Unlock()
 			// Finally
 			if err != nil || completed {
-				waitDone()
+				wait.Done()
 			}
 			// IgnoreCompletion
 			if !completed {
@@ -1208,35 +1126,20 @@ func (o Observable{{$name}}) FlatMap{{$otherName}}(f func({{$type}}) Observable{
 			}
 		}
 
+		unsubscriber.OnUnsubscribe(wait.Cancel)
+
 		operator := func(next {{$type}}, err error, completed bool) {
 			if err != nil || completed {
-				if waitForZero() {
+				if wait.WaitForZero() {
 					observer(zero{{$otherName}}, err, err == nil)
 				}
 			} else {
-				waitAdd()
-				unsubscriber := f(next).Subscribe(flatten)
-				if !unsubscribers.Add(unsubscriber) {
-					return
-				}
-
+				wait.Add()
+				f(next)(flatten, scheduler, unsubscriber)
 			}
 		}
 
-		subscribeOn := func(scheduler Scheduler) {
-			subscribable := o(operator)
-			if !unsubscribers.Add(subscribable) {
-				return
-			}
-			subscribable.SubscribeOn(scheduler)
-		}
-
-		unsubscribe := func() {
-			waitCancel()
-		}
-		unsubscribers.OnUnsubscribe(unsubscribe)
-
-		return Subscribable{subscribeOn, unsubscribers}
+		o(operator, scheduler, unsubscriber)
 	}
 	return observable
 }

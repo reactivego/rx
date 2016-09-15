@@ -13,7 +13,7 @@ func (f ObserverFunc) Next(next interface{}) {
 }
 
 func (f ObserverFunc) Error(err error) {
-	f(nil, err, false)
+	f(nil, err, err == nil)
 }
 
 func (f ObserverFunc) Complete() {
@@ -202,6 +202,18 @@ func IgnoreElements() Filter {
 	return filter
 }
 
+func IgnoreCompletion() Filter {
+	filter := func(observer ObserverFunc) ObserverFunc {
+		operator := func(next interface{}, err error, completed bool) {
+			if !completed {
+				observer(next, err, completed)
+			}
+		}
+		return operator
+	}
+	return filter
+}
+
 func One() Filter {
 	filter := func(observer ObserverFunc) ObserverFunc {
 		count := 0
@@ -297,7 +309,7 @@ func Sample(window time.Duration) Filter {
 			Fresh bool
 		}
 
-		//FIXME: make sure sampler gets killed on Unsubcribe
+		// TODO: make sure sampler gets killed on Unsubcribe
 		sampler := func() {
 			for {
 				select {
@@ -340,7 +352,7 @@ func Debounce(duration time.Duration) Filter {
 		errch := make(chan error)
 		valuech := make(chan interface{})
 
-		//FIXME: make sure debouncer gets killed on Unsubscribe
+		// TODO: make sure debouncer gets killed on Unsubscribe
 		debouncer := func() {
 			var nextValue interface{}
 			var timeout <-chan time.Time

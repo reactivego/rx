@@ -45,11 +45,11 @@ func appendFullTypes(names ...string) {
 var (
 	packageArg      = kingpin.Arg("package", "Go package.").Required().String()
 	typesArg        = kingpin.Arg("types", "List of types to provide Reactive types for.").Strings()
-	commonTypesFlag = kingpin.Flag("common-types", "Define extensions for common Go types.").Action(func(*kingpin.ParseContext) error {
+	commonTypesFlag = kingpin.Flag("common-types", "Define extensions for common Go types (bool rune byte string uint int uint8 int8 uint16 int16 uint32 int32 uint64 int64 float32 float64 complex64 complex128 time.Time time.Duration []byte).").Action(func(*kingpin.ParseContext) error {
 		appendFullTypes(commonTypes...)
 		return nil
 	}).Bool()
-	baseTypesFlag = kingpin.Flag("base-types", "Define extensions for all base Go types.").Action(func(*kingpin.ParseContext) error {
+	baseTypesFlag = kingpin.Flag("base-types", "Define extensions for all base Go types (int string float32 float64).").Action(func(*kingpin.ParseContext) error {
 		appendFullTypes(baseTypes...)
 		return nil
 	}).Bool()
@@ -57,7 +57,7 @@ var (
 	outputFlag    = kingpin.Flag("output", "File to write to.").Short('o').String()
 	debugFlag     = kingpin.Flag("debug", "Debug mode.").Bool()
 	maxReplayFlag = kingpin.Flag("max-replay", "Maximum size of replayed data.").Default("16384").Int()
-	mapTypesFlag  = kingpin.Flag("map-types", "Map and FlatMap target types").PlaceHolder("<type>,...").String()
+	mapTypesFlag  = kingpin.Flag("map-types", "Limit Map and FlatMap target types to this list").PlaceHolder("<type>,...").String()
 )
 
 type Context struct {
