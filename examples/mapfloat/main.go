@@ -1,7 +1,5 @@
 package main
 
-import "rxgo/observable"
-
 ////////////////////////////////////////////////////////
 // main
 ////////////////////////////////////////////////////////
@@ -9,19 +7,18 @@ import "rxgo/observable"
 func main() {
 	println("hello")
 
-	// observable := Range(1, 10)
-	observable := observable.CreateInt(func(s observable.IntSubscriber) {
+	observable := CreateInt(func(s IntObserver) {
 		println("subscription received...")
 		for i := 0; i < 15; i++ {
 			for j := 0; j < 3; j++ {
 				if s.Unsubscribed() {
+					println("subscriber has left...")
 					return
 				}
 				s.Next(i)
 			}
 		}
 		s.Complete()
-		s.Unsubscribe()
 	})
 
 	fobservable := observable.Distinct().MapFloat64(func(v int) float64 { return float64(v) * 1.62 })
@@ -40,5 +37,6 @@ func main() {
 	} else {
 		println("subscription still alive....")
 	}
+
 	println("goodbye")
 }

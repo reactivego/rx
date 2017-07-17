@@ -68,7 +68,7 @@ type Observable{{$name}} func({{$name}}ObserverFunc, Scheduler, Unsubscriber)
 // FROM
 /////////////////////////////////////////////////////////////////////////////
 
-// Create{{$name}} calls f(observer) to produce values for a stream of ints.
+// Create{{$name}} calls f(observer) to produce values for a stream of {{$type}}s.
 func Create{{$name}}(f func({{$name}}Observer)) Observable{{$name}} {
 	observable := func(observer {{$name}}ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
 		scheduler.Schedule(func() {

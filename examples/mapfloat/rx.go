@@ -3,7 +3,7 @@
 // Package main implements ReactiveX extensions for Go.
 package main
 
-//go:generate $GOPATH/bin/rxgo main int --output=rx.go --map-types=MouseMove
+//go:generate $GOPATH/bin/rxgo main int --output=rx.go --map-types=float64
 
 import (
 	"errors"
@@ -1022,13 +1022,13 @@ func (o ObservableInt) Max() ObservableInt {
 }
 
 /////////////////////////////////////////////////////////////////////////////
-// MAP (int,MouseMove)
+// MAP (int,float64)
 /////////////////////////////////////////////////////////////////////////////
 
-func (o ObservableInt) MapMouseMove(f func(int) MouseMove) ObservableMouseMove {
-	observable := func(observer MouseMoveObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
+func (o ObservableInt) MapFloat64(f func(int) float64) ObservableFloat64 {
+	observable := func(observer Float64ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
 		operator := func(next int, err error, completed bool) {
-			var mapped MouseMove
+			var mapped float64
 			if err == nil && !completed {
 				mapped = f(next)
 			}
@@ -1040,11 +1040,11 @@ func (o ObservableInt) MapMouseMove(f func(int) MouseMove) ObservableMouseMove {
 }
 
 /////////////////////////////////////////////////////////////////////////////
-// FLATMAP (int,MouseMove)
+// FLATMAP (int,float64)
 /////////////////////////////////////////////////////////////////////////////
 
-func (o ObservableInt) FlatMapMouseMove(f func(int) ObservableMouseMove) ObservableMouseMove {
-	observable := func(observer MouseMoveObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
+func (o ObservableInt) FlatMapFloat64(f func(int) ObservableFloat64) ObservableFloat64 {
+	observable := func(observer Float64ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
 		var wait struct {
 			sync.Mutex
 			Condition *sync.Cond
@@ -1088,7 +1088,7 @@ func (o ObservableInt) FlatMapMouseMove(f func(int) ObservableMouseMove) Observa
 		}
 
 		var lock sync.Mutex
-		flatten := func(next MouseMove, err error, completed bool) {
+		flatten := func(next float64, err error, completed bool) {
 			lock.Lock()
 			defer lock.Unlock()
 			// Finally
@@ -1106,7 +1106,7 @@ func (o ObservableInt) FlatMapMouseMove(f func(int) ObservableMouseMove) Observa
 		operator := func(next int, err error, completed bool) {
 			if err != nil || completed {
 				if wait.WaitForZero() {
-					observer(zeroMouseMove, err, err == nil)
+					observer(zeroFloat64, err, err == nil)
 				}
 			} else {
 				wait.Add()
@@ -1120,56 +1120,56 @@ func (o ObservableInt) FlatMapMouseMove(f func(int) ObservableMouseMove) Observa
 }
 
 ////////////////////////////////////////////////////////
-// MouseMoveObserver
+// Float64Observer
 ////////////////////////////////////////////////////////
 
-type MouseMoveObserver interface {
-	Next(MouseMove)
+type Float64Observer interface {
+	Next(float64)
 	Error(error)
 	Complete()
 	Unsubscribed() bool
 }
 
-type MouseMoveObserverFunc func(MouseMove, error, bool)
+type Float64ObserverFunc func(float64, error, bool)
 
-var zeroMouseMove MouseMove
+var zeroFloat64 float64
 
-func (f MouseMoveObserverFunc) Next(next MouseMove) {
+func (f Float64ObserverFunc) Next(next float64) {
 	f(next, nil, false)
 }
 
-func (f MouseMoveObserverFunc) Error(err error) {
-	f(zeroMouseMove, err, err == nil)
+func (f Float64ObserverFunc) Error(err error) {
+	f(zeroFloat64, err, err == nil)
 }
 
-func (f MouseMoveObserverFunc) Complete() {
-	f(zeroMouseMove, nil, true)
+func (f Float64ObserverFunc) Complete() {
+	f(zeroFloat64, nil, true)
 }
 
 ////////////////////////////////////////////////////////
-// ObservableMouseMove
+// ObservableFloat64
 ////////////////////////////////////////////////////////
 
 // Every observable is essentially a function taking an
 // Observer function, scheduler and an unsubscriber.
-type ObservableMouseMove func(MouseMoveObserverFunc, Scheduler, Unsubscriber)
+type ObservableFloat64 func(Float64ObserverFunc, Scheduler, Unsubscriber)
 
 /////////////////////////////////////////////////////////////////////////////
 // FROM
 /////////////////////////////////////////////////////////////////////////////
 
-// CreateMouseMove calls f(observer) to produce values for a stream of MouseMoves.
-func CreateMouseMove(f func(MouseMoveObserver)) ObservableMouseMove {
-	observable := func(observer MouseMoveObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
+// CreateFloat64 calls f(observer) to produce values for a stream of float64s.
+func CreateFloat64(f func(Float64Observer)) ObservableFloat64 {
+	observable := func(observer Float64ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
 		scheduler.Schedule(func() {
 			if !unsubscriber.Unsubscribed() {
-				operation := func(next MouseMove, err error, completed bool) {
+				operation := func(next float64, err error, completed bool) {
 					if !unsubscriber.Unsubscribed() {
 						observer(next, err, completed)
 					}
 				}
 				observer := &struct {
-					MouseMoveObserverFunc
+					Float64ObserverFunc
 					Unsubscriber
 				}{operation, unsubscriber}
 				f(observer)
@@ -1179,25 +1179,25 @@ func CreateMouseMove(f func(MouseMoveObserver)) ObservableMouseMove {
 	return observable
 }
 
-func EmptyMouseMove() ObservableMouseMove {
-	return CreateMouseMove(func(observer MouseMoveObserver) {
+func EmptyFloat64() ObservableFloat64 {
+	return CreateFloat64(func(observer Float64Observer) {
 		observer.Complete()
 	})
 }
 
-func NeverMouseMove() ObservableMouseMove {
-	return CreateMouseMove(func(observer MouseMoveObserver) {
+func NeverFloat64() ObservableFloat64 {
+	return CreateFloat64(func(observer Float64Observer) {
 	})
 }
 
-func ThrowMouseMove(err error) ObservableMouseMove {
-	return CreateMouseMove(func(observer MouseMoveObserver) {
+func ThrowFloat64(err error) ObservableFloat64 {
+	return CreateFloat64(func(observer Float64Observer) {
 		observer.Error(err)
 	})
 }
 
-func FromMouseMoveArray(array []MouseMove) ObservableMouseMove {
-	return CreateMouseMove(func(observer MouseMoveObserver) {
+func FromFloat64Array(array []float64) ObservableFloat64 {
+	return CreateFloat64(func(observer Float64Observer) {
 		for _, next := range array {
 			if observer.Unsubscribed() {
 				return
@@ -1208,12 +1208,12 @@ func FromMouseMoveArray(array []MouseMove) ObservableMouseMove {
 	})
 }
 
-func FromMouseMoves(array ...MouseMove) ObservableMouseMove {
-	return FromMouseMoveArray(array)
+func FromFloat64s(array ...float64) ObservableFloat64 {
+	return FromFloat64Array(array)
 }
 
-func FromMouseMoveChannel(ch <-chan MouseMove) ObservableMouseMove {
-	return CreateMouseMove(func(observer MouseMoveObserver) {
+func FromFloat64Channel(ch <-chan float64) ObservableFloat64 {
+	return CreateFloat64(func(observer Float64Observer) {
 		for next := range ch {
 			if observer.Unsubscribed() {
 				return
@@ -1224,8 +1224,8 @@ func FromMouseMoveChannel(ch <-chan MouseMove) ObservableMouseMove {
 	})
 }
 
-func FromMouseMoveChannelWithError(data <-chan MouseMove, errs <-chan error) ObservableMouseMove {
-	return CreateMouseMove(func(observer MouseMoveObserver) {
+func FromFloat64ChannelWithError(data <-chan float64, errs <-chan error) ObservableFloat64 {
+	return CreateFloat64(func(observer Float64Observer) {
 		for {
 			select {
 			case next, ok := <-data:
@@ -1256,16 +1256,16 @@ func FromMouseMoveChannelWithError(data <-chan MouseMove, errs <-chan error) Obs
 	})
 }
 
-func JustMouseMove(element MouseMove) ObservableMouseMove {
-	return CreateMouseMove(func(observer MouseMoveObserver) {
+func JustFloat64(element float64) ObservableFloat64 {
+	return CreateFloat64(func(observer Float64Observer) {
 		observer.Next(element)
 		observer.Complete()
 	})
 }
 
 // Repeat value count times.
-func RepeatMouseMove(value MouseMove, count int) ObservableMouseMove {
-	return CreateMouseMove(func(observer MouseMoveObserver) {
+func RepeatFloat64(value float64, count int) ObservableFloat64 {
+	return CreateFloat64(func(observer Float64Observer) {
 		for i := 0; i < count; i++ {
 			if observer.Unsubscribed() {
 				return
@@ -1276,13 +1276,13 @@ func RepeatMouseMove(value MouseMove, count int) ObservableMouseMove {
 	})
 }
 
-// StartMouseMove is designed to be used with functions that return a
-// (MouseMove, error) tuple.
+// StartFloat64 is designed to be used with functions that return a
+// (float64, error) tuple.
 //
-// If the error is non-nil the returned ObservableMouseMove will be that error,
-// otherwise it will be a single-value stream of MouseMove.
-func StartMouseMove(f func() (MouseMove, error)) ObservableMouseMove {
-	return CreateMouseMove(func(observer MouseMoveObserver) {
+// If the error is non-nil the returned ObservableFloat64 will be that error,
+// otherwise it will be a single-value stream of float64.
+func StartFloat64(f func() (float64, error)) ObservableFloat64 {
+	return CreateFloat64(func(observer Float64Observer) {
 		if next, err := f(); err != nil {
 			observer.Error(err)
 		} else {
@@ -1292,16 +1292,16 @@ func StartMouseMove(f func() (MouseMove, error)) ObservableMouseMove {
 	})
 }
 
-func MergeMouseMove(observables ...ObservableMouseMove) ObservableMouseMove {
+func MergeFloat64(observables ...ObservableFloat64) ObservableFloat64 {
 	if len(observables) == 0 {
-		return EmptyMouseMove()
+		return EmptyFloat64()
 	}
 	return observables[0].Merge(observables[1:]...)
 }
 
-func MergeMouseMoveDelayError(observables ...ObservableMouseMove) ObservableMouseMove {
+func MergeFloat64DelayError(observables ...ObservableFloat64) ObservableFloat64 {
 	if len(observables) == 0 {
-		return EmptyMouseMove()
+		return EmptyFloat64()
 	}
 	return observables[0].MergeDelayError(observables[1:]...)
 }
@@ -1310,8 +1310,8 @@ func MergeMouseMoveDelayError(observables ...ObservableMouseMove) ObservableMous
 // Subscribe
 /////////////////////////////////////////////////////////////////////////////
 
-func (o ObservableMouseMove) SubscribeOn(scheduler Scheduler) ObservableMouseMove {
-	observable := func(observer MouseMoveObserverFunc, _ Scheduler, unsubscriber Unsubscriber) {
+func (o ObservableFloat64) SubscribeOn(scheduler Scheduler) ObservableFloat64 {
+	observable := func(observer Float64ObserverFunc, _ Scheduler, unsubscriber Unsubscriber) {
 		// override the scheduler
 		o(observer, scheduler, unsubscriber)
 	}
@@ -1324,9 +1324,9 @@ func (o ObservableMouseMove) SubscribeOn(scheduler Scheduler) ObservableMouseMov
 // are deallocated. If the subscription terminates naturally because
 // of an error or when the stream of data is complete then the Unsubscribe
 // method on the Unsubscriber is automatically called internally.
-func (o ObservableMouseMove) Subscribe(observer MouseMoveObserverFunc) Unsubscriber {
+func (o ObservableFloat64) Subscribe(observer Float64ObserverFunc) Unsubscriber {
 	unsubscriber := unsubscriber.New()
-	operator := func(next MouseMove, err error, completed bool) {
+	operator := func(next float64, err error, completed bool) {
 		observer(next, err, completed)
 		if err != nil || completed {
 			unsubscriber.Unsubscribe()
@@ -1336,8 +1336,8 @@ func (o ObservableMouseMove) Subscribe(observer MouseMoveObserverFunc) Unsubscri
 	return unsubscriber
 }
 
-func (o ObservableMouseMove) SubscribeNext(f func(v MouseMove)) Unsubscriber {
-	operator := func(next MouseMove, err error, completed bool) {
+func (o ObservableFloat64) SubscribeNext(f func(v float64)) Unsubscriber {
+	operator := func(next float64, err error, completed bool) {
 		if err == nil && !completed {
 			f(next)
 		}
@@ -1346,9 +1346,9 @@ func (o ObservableMouseMove) SubscribeNext(f func(v MouseMove)) Unsubscriber {
 }
 
 // Wait for completion of the stream and return any error.
-func (o ObservableMouseMove) Wait() error {
+func (o ObservableFloat64) Wait() error {
 	doneChan := make(chan error)
-	operator := func(next MouseMove, err error, completed bool) {
+	operator := func(next float64, err error, completed bool) {
 		if err != nil || completed {
 			doneChan <- err
 		}
@@ -1362,10 +1362,10 @@ func (o ObservableMouseMove) Wait() error {
 /////////////////////////////////////////////////////////////////////////////
 
 // ToOneWithError blocks until the stream emits exactly one value. Otherwise, it errors.
-func (o ObservableMouseMove) ToOneWithError() (v MouseMove, e error) {
-	v = zeroMouseMove
+func (o ObservableFloat64) ToOneWithError() (v float64, e error) {
+	v = zeroFloat64
 	errch := make(chan error, 1)
-	o.One().Subscribe(func(next MouseMove, err error, completed bool) {
+	o.One().Subscribe(func(next float64, err error, completed bool) {
 		if err != nil || completed {
 			errch <- err
 			// Close errch to make subsequent use of it panic. This will prevent
@@ -1381,17 +1381,17 @@ func (o ObservableMouseMove) ToOneWithError() (v MouseMove, e error) {
 
 // ToOne blocks and returns the only value emitted by the stream, or the zero
 // value if an error occurs.
-func (o ObservableMouseMove) ToOne() MouseMove {
+func (o ObservableFloat64) ToOne() float64 {
 	value, _ := o.ToOneWithError()
 	return value
 }
 
 // ToArrayWithError collects all values from the stream into an array,
 // returning it and any error.
-func (o ObservableMouseMove) ToArrayWithError() (a []MouseMove, e error) {
-	a = []MouseMove{}
+func (o ObservableFloat64) ToArrayWithError() (a []float64, e error) {
+	a = []float64{}
 	errch := make(chan error, 1)
-	o.Subscribe(func(next MouseMove, err error, completed bool) {
+	o.Subscribe(func(next float64, err error, completed bool) {
 		if err != nil || completed {
 			errch <- err
 			// Close errch to make subsequent use of it panic. This will prevent
@@ -1406,7 +1406,7 @@ func (o ObservableMouseMove) ToArrayWithError() (a []MouseMove, e error) {
 }
 
 // ToArray blocks and returns the values from the stream in an array.
-func (o ObservableMouseMove) ToArray() []MouseMove {
+func (o ObservableFloat64) ToArray() []float64 {
 	out, _ := o.ToArrayWithError()
 	return out
 }
@@ -1418,10 +1418,10 @@ func (o ObservableMouseMove) ToArray() []MouseMove {
 // When the error channel emits nil then the observable completed without errors, otherwise
 // the error channel emits the error. When the observable has finished both channels will be
 // closed.
-func (o ObservableMouseMove) ToChannelWithError() (<-chan MouseMove, <-chan error) {
-	nextch := make(chan MouseMove, 1)
+func (o ObservableFloat64) ToChannelWithError() (<-chan float64, <-chan error) {
+	nextch := make(chan float64, 1)
 	errch := make(chan error, 1)
-	o.Subscribe(func(next MouseMove, err error, completed bool) {
+	o.Subscribe(func(next float64, err error, completed bool) {
 		if err != nil || completed {
 			errch <- err
 			close(errch)
@@ -1433,7 +1433,7 @@ func (o ObservableMouseMove) ToChannelWithError() (<-chan MouseMove, <-chan erro
 	return nextch, errch
 }
 
-func (o ObservableMouseMove) ToChannel() <-chan MouseMove {
+func (o ObservableFloat64) ToChannel() <-chan float64 {
 	ch, _ := o.ToChannelWithError()
 	return ch
 }
@@ -1442,17 +1442,17 @@ func (o ObservableMouseMove) ToChannel() <-chan MouseMove {
 // FILTERS
 /////////////////////////////////////////////////////////////////////////////
 
-func (o ObservableMouseMove) adaptFilter(filter filters.Filter) ObservableMouseMove {
-	observable := func(sink MouseMoveObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
-		genericToMouseMoveSink := func(next interface{}, err error, completed bool) {
-			if nextMouseMove, ok := next.(MouseMove); ok {
-				sink(nextMouseMove, err, completed)
+func (o ObservableFloat64) adaptFilter(filter filters.Filter) ObservableFloat64 {
+	observable := func(sink Float64ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
+		genericToFloat64Sink := func(next interface{}, err error, completed bool) {
+			if nextFloat64, ok := next.(float64); ok {
+				sink(nextFloat64, err, completed)
 			} else {
-				sink(zeroMouseMove, err, completed)
+				sink(zeroFloat64, err, completed)
 			}
 		}
-		genericToGenericFilter := filter(genericToMouseMoveSink)
-		intToGenericSource := func(next MouseMove, err error, completed bool) {
+		genericToGenericFilter := filter(genericToFloat64Sink)
+		intToGenericSource := func(next float64, err error, completed bool) {
 			genericToGenericFilter(next, err, completed)
 		}
 		o(intToGenericSource, scheduler, unsubscriber)
@@ -1461,80 +1461,80 @@ func (o ObservableMouseMove) adaptFilter(filter filters.Filter) ObservableMouseM
 }
 
 // Distinct removes duplicate elements in the stream.
-func (o ObservableMouseMove) Distinct() ObservableMouseMove {
+func (o ObservableFloat64) Distinct() ObservableFloat64 {
 	return o.adaptFilter(filters.Distinct())
 }
 
 // ElementAt yields the Nth element of the stream.
-func (o ObservableMouseMove) ElementAt(n int) ObservableMouseMove {
+func (o ObservableFloat64) ElementAt(n int) ObservableFloat64 {
 	return o.adaptFilter(filters.ElementAt(n))
 }
 
 // Filter elements in the stream on a function.
-func (o ObservableMouseMove) Filter(f func(MouseMove) bool) ObservableMouseMove {
+func (o ObservableFloat64) Filter(f func(float64) bool) ObservableFloat64 {
 	predicate := func(v interface{}) bool {
-		return f(v.(MouseMove))
+		return f(v.(float64))
 	}
 	return o.adaptFilter(filters.Where(predicate))
 }
 
 // Last returns just the first element of the stream.
-func (o ObservableMouseMove) First() ObservableMouseMove {
+func (o ObservableFloat64) First() ObservableFloat64 {
 	return o.adaptFilter(filters.First())
 }
 
 // Last returns just the last element of the stream.
-func (o ObservableMouseMove) Last() ObservableMouseMove {
+func (o ObservableFloat64) Last() ObservableFloat64 {
 	return o.adaptFilter(filters.Last())
 }
 
 // SkipLast skips the first N elements of the stream.
-func (o ObservableMouseMove) Skip(n int) ObservableMouseMove {
+func (o ObservableFloat64) Skip(n int) ObservableFloat64 {
 	return o.adaptFilter(filters.Skip(n))
 }
 
 // SkipLast skips the last N elements of the stream.
-func (o ObservableMouseMove) SkipLast(n int) ObservableMouseMove {
+func (o ObservableFloat64) SkipLast(n int) ObservableFloat64 {
 	return o.adaptFilter(filters.SkipLast(n))
 }
 
 // Take returns just the first N elements of the stream.
-func (o ObservableMouseMove) Take(n int) ObservableMouseMove {
+func (o ObservableFloat64) Take(n int) ObservableFloat64 {
 	return o.adaptFilter(filters.Take(n))
 }
 
 // TakeLast returns just the last N elements of the stream.
-func (o ObservableMouseMove) TakeLast(n int) ObservableMouseMove {
+func (o ObservableFloat64) TakeLast(n int) ObservableFloat64 {
 	return o.adaptFilter(filters.TakeLast(n))
 }
 
 // IgnoreElements ignores elements of the stream and emits only the completion events.
-func (o ObservableMouseMove) IgnoreElements() ObservableMouseMove {
+func (o ObservableFloat64) IgnoreElements() ObservableFloat64 {
 	return o.adaptFilter(filters.IgnoreElements())
 }
 
 // IgnoreCompletion ignores the completion event of the stream and therefore returns a stream that never completes.
-func (o ObservableMouseMove) IgnoreCompletion() ObservableMouseMove {
+func (o ObservableFloat64) IgnoreCompletion() ObservableFloat64 {
 	return o.adaptFilter(filters.IgnoreCompletion())
 }
 
-func (o ObservableMouseMove) One() ObservableMouseMove {
+func (o ObservableFloat64) One() ObservableFloat64 {
 	return o.adaptFilter(filters.One())
 }
 
-func (o ObservableMouseMove) Replay(size int, duration time.Duration) ObservableMouseMove {
+func (o ObservableFloat64) Replay(size int, duration time.Duration) ObservableFloat64 {
 	if size == 0 {
 		size = MaxReplaySize
 	}
 	return o.adaptFilter(filters.Replay(size, duration))
 }
 
-func (o ObservableMouseMove) Sample(duration time.Duration) ObservableMouseMove {
+func (o ObservableFloat64) Sample(duration time.Duration) ObservableFloat64 {
 	return o.adaptFilter(filters.Sample(duration))
 }
 
 // Debounce reduces subsequent duplicates to single items during a certain duration
-func (o ObservableMouseMove) Debounce(duration time.Duration) ObservableMouseMove {
+func (o ObservableFloat64) Debounce(duration time.Duration) ObservableFloat64 {
 	return o.adaptFilter(filters.Debounce(duration))
 }
 
@@ -1542,10 +1542,10 @@ func (o ObservableMouseMove) Debounce(duration time.Duration) ObservableMouseMov
 // COUNT
 /////////////////////////////////////////////////////////////////////////////
 
-func (o ObservableMouseMove) Count() ObservableInt {
+func (o ObservableFloat64) Count() ObservableInt {
 	observable := func(observer IntObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
 		count := 0
-		operator := func(next MouseMove, err error, completed bool) {
+		operator := func(next float64, err error, completed bool) {
 			if err != nil || completed {
 				observer(count, nil, false)
 				observer(zeroInt, err, completed)
@@ -1561,15 +1561,15 @@ func (o ObservableMouseMove) Count() ObservableInt {
 // CONCAT
 /////////////////////////////////////////////////////////////////////////////
 
-func (o ObservableMouseMove) Concat(other ...ObservableMouseMove) ObservableMouseMove {
+func (o ObservableFloat64) Concat(other ...ObservableFloat64) ObservableFloat64 {
 	if len(other) == 0 {
 		return o
 	}
-	observable := func(observer MouseMoveObserverFunc, sched Scheduler, unsub Unsubscriber) {
+	observable := func(observer Float64ObserverFunc, sched Scheduler, unsub Unsubscriber) {
 		var index int
 		var maxIndex = 1 + len(other) - 1
 
-		operator := func(next MouseMove, err error, completed bool) {
+		operator := func(next float64, err error, completed bool) {
 			switch {
 			case err != nil:
 				index = maxIndex
@@ -1605,11 +1605,11 @@ func (o ObservableMouseMove) Concat(other ...ObservableMouseMove) ObservableMous
 // MERGE
 /////////////////////////////////////////////////////////////////////////////
 
-func (o ObservableMouseMove) merge(other []ObservableMouseMove, delayError bool) ObservableMouseMove {
+func (o ObservableFloat64) merge(other []ObservableFloat64, delayError bool) ObservableFloat64 {
 	if len(other) == 0 {
 		return o
 	}
-	observable := func(observer MouseMoveObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
+	observable := func(observer Float64ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
 		var (
 			olock     sync.Mutex
 			merged    int
@@ -1617,7 +1617,7 @@ func (o ObservableMouseMove) merge(other []ObservableMouseMove, delayError bool)
 			lastError error
 		)
 
-		operator := func(next MouseMove, err error, completed bool) {
+		operator := func(next float64, err error, completed bool) {
 			// Only one observable can be forwarding at any one time.
 			olock.Lock()
 			defer olock.Unlock()
@@ -1660,13 +1660,13 @@ func (o ObservableMouseMove) merge(other []ObservableMouseMove, delayError bool)
 
 // Merge an arbitrary number of observables with this one.
 // An error from any of the observables will terminate the merged stream.
-func (o ObservableMouseMove) Merge(other ...ObservableMouseMove) ObservableMouseMove {
+func (o ObservableFloat64) Merge(other ...ObservableFloat64) ObservableFloat64 {
 	return o.merge(other, false)
 }
 
 // Merge an arbitrary number of observables with this one.
 // Any error will be deferred until all observables terminate.
-func (o ObservableMouseMove) MergeDelayError(other ...ObservableMouseMove) ObservableMouseMove {
+func (o ObservableFloat64) MergeDelayError(other ...ObservableFloat64) ObservableFloat64 {
 	return o.merge(other, true)
 }
 
@@ -1674,9 +1674,9 @@ func (o ObservableMouseMove) MergeDelayError(other ...ObservableMouseMove) Obser
 // CATCH
 /////////////////////////////////////////////////////////////////////////////
 
-func (o ObservableMouseMove) Catch(catch ObservableMouseMove) ObservableMouseMove {
-	observable := func(observer MouseMoveObserverFunc, sched Scheduler, unsub Unsubscriber) {
-		operator := func(next MouseMove, err error, completed bool) {
+func (o ObservableFloat64) Catch(catch ObservableFloat64) ObservableFloat64 {
+	observable := func(observer Float64ObserverFunc, sched Scheduler, unsub Unsubscriber) {
+		operator := func(next float64, err error, completed bool) {
 			if err != nil {
 				catch(observer, scheduler.Immediate, unsub)
 			} else {
@@ -1692,12 +1692,12 @@ func (o ObservableMouseMove) Catch(catch ObservableMouseMove) ObservableMouseMov
 // RETRY
 /////////////////////////////////////////////////////////////////////////////
 
-func (o ObservableMouseMove) Retry() ObservableMouseMove {
-	observable := func(observer MouseMoveObserverFunc, sched Scheduler, unsub Unsubscriber) {
+func (o ObservableFloat64) Retry() ObservableFloat64 {
+	observable := func(observer Float64ObserverFunc, sched Scheduler, unsub Unsubscriber) {
 		sched.Schedule(func() {
 			if !unsub.Unsubscribed() {
 				var done bool
-				operator := func(next MouseMove, err error, completed bool) {
+				operator := func(next float64, err error, completed bool) {
 					if err == nil {
 						observer(next, err, completed)
 						done = completed
@@ -1717,9 +1717,9 @@ func (o ObservableMouseMove) Retry() ObservableMouseMove {
 /////////////////////////////////////////////////////////////////////////////
 
 // Do applies a function for each value passing through the stream.
-func (o ObservableMouseMove) Do(f func(next MouseMove)) ObservableMouseMove {
-	observable := func(observer MouseMoveObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
-		operator := func(next MouseMove, err error, completed bool) {
+func (o ObservableFloat64) Do(f func(next float64)) ObservableFloat64 {
+	observable := func(observer Float64ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
+		operator := func(next float64, err error, completed bool) {
 			if err == nil && !completed {
 				f(next)
 			}
@@ -1731,9 +1731,9 @@ func (o ObservableMouseMove) Do(f func(next MouseMove)) ObservableMouseMove {
 }
 
 // DoOnError applies a function for any error on the stream.
-func (o ObservableMouseMove) DoOnError(f func(err error)) ObservableMouseMove {
-	observable := func(observer MouseMoveObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
-		operator := func(next MouseMove, err error, completed bool) {
+func (o ObservableFloat64) DoOnError(f func(err error)) ObservableFloat64 {
+	observable := func(observer Float64ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
+		operator := func(next float64, err error, completed bool) {
 			if err != nil {
 				f(err)
 			}
@@ -1745,9 +1745,9 @@ func (o ObservableMouseMove) DoOnError(f func(err error)) ObservableMouseMove {
 }
 
 // DoOnComplete applies a function when the stream completes.
-func (o ObservableMouseMove) DoOnComplete(f func()) ObservableMouseMove {
-	observable := func(observer MouseMoveObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
-		operator := func(next MouseMove, err error, completed bool) {
+func (o ObservableFloat64) DoOnComplete(f func()) ObservableFloat64 {
+	observable := func(observer Float64ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
+		operator := func(next float64, err error, completed bool) {
 			if completed {
 				f()
 			}
@@ -1760,9 +1760,9 @@ func (o ObservableMouseMove) DoOnComplete(f func()) ObservableMouseMove {
 
 // Finally applies a function for any error or completion on the stream.
 // This doesn't expose whether this was an error or a completion.
-func (o ObservableMouseMove) Finally(f func()) ObservableMouseMove {
-	observable := func(observer MouseMoveObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
-		operator := func(next MouseMove, err error, completed bool) {
+func (o ObservableFloat64) Finally(f func()) ObservableFloat64 {
+	observable := func(observer Float64ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
+		operator := func(next float64, err error, completed bool) {
 			if err != nil || completed {
 				f()
 			}
@@ -1777,13 +1777,13 @@ func (o ObservableMouseMove) Finally(f func()) ObservableMouseMove {
 // REDUCE
 /////////////////////////////////////////////////////////////////////////////
 
-func (o ObservableMouseMove) Reduce(initial MouseMove, reducer func(MouseMove, MouseMove) MouseMove) ObservableMouseMove {
-	observable := func(observer MouseMoveObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
+func (o ObservableFloat64) Reduce(initial float64, reducer func(float64, float64) float64) ObservableFloat64 {
+	observable := func(observer Float64ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
 		value := initial
-		operator := func(next MouseMove, err error, completed bool) {
+		operator := func(next float64, err error, completed bool) {
 			if err != nil || completed {
 				observer(value, nil, false)
-				observer(zeroMouseMove, err, completed)
+				observer(zeroFloat64, err, completed)
 			} else {
 				value = reducer(value, next)
 			}
@@ -1797,12 +1797,12 @@ func (o ObservableMouseMove) Reduce(initial MouseMove, reducer func(MouseMove, M
 // SCAN
 /////////////////////////////////////////////////////////////////////////////
 
-func (o ObservableMouseMove) Scan(initial MouseMove, f func(MouseMove, MouseMove) MouseMove) ObservableMouseMove {
-	observable := func(observer MouseMoveObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
+func (o ObservableFloat64) Scan(initial float64, f func(float64, float64) float64) ObservableFloat64 {
+	observable := func(observer Float64ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
 		value := initial
-		operator := func(next MouseMove, err error, completed bool) {
+		operator := func(next float64, err error, completed bool) {
 			if err != nil || completed {
-				observer(zeroMouseMove, err, completed)
+				observer(zeroFloat64, err, completed)
 			} else {
 				value = f(value, next)
 				observer(value, nil, false)
@@ -1817,8 +1817,8 @@ func (o ObservableMouseMove) Scan(initial MouseMove, f func(MouseMove, MouseMove
 // TIMEOUT
 /////////////////////////////////////////////////////////////////////////////
 
-func (o ObservableMouseMove) Timeout(timeout time.Duration) ObservableMouseMove {
-	observable := func(observer MouseMoveObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
+func (o ObservableFloat64) Timeout(timeout time.Duration) ObservableFloat64 {
+	observable := func(observer Float64ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
 
 		if scheduler.Asynchronous() {
 			// Asynchronous, so all scheduled tasks are executed in parallel.
@@ -1827,7 +1827,7 @@ func (o ObservableMouseMove) Timeout(timeout time.Duration) ObservableMouseMove 
 			deadline := time.NewTimer(timeout)
 
 			var lock sync.Mutex
-			operator := func(next MouseMove, err error, completed bool) {
+			operator := func(next float64, err error, completed bool) {
 				lock.Lock()
 				defer lock.Unlock()
 
@@ -1844,7 +1844,7 @@ func (o ObservableMouseMove) Timeout(timeout time.Duration) ObservableMouseMove 
 
 			scheduler.Schedule(func() {
 				<-deadline.C
-				MouseMoveObserverFunc(operator).Error(ErrTimeout)
+				Float64ObserverFunc(operator).Error(ErrTimeout)
 			})
 
 			o(operator, scheduler, unsubscriber)
@@ -1853,7 +1853,7 @@ func (o ObservableMouseMove) Timeout(timeout time.Duration) ObservableMouseMove 
 			// Synchronous, meaning all Scheduled tasks are executed in sequence.
 			unsubscriber := unsubscriber.AddChild()
 			lastTime := time.Now()
-			operator := func(next MouseMove, err error, completed bool) {
+			operator := func(next float64, err error, completed bool) {
 				if time.Since(lastTime) > timeout {
 					unsubscriber.Unsubscribe()
 					observer.Error(ErrTimeout)
@@ -1876,35 +1876,35 @@ func (o ObservableMouseMove) Timeout(timeout time.Duration) ObservableMouseMove 
 // This allows multiple subscriptions to a single observable.
 // This only works for hot observables, cold observables may drain out to the
 // first connected observable even before a subsequent observer subscribes.
-func (o ObservableMouseMove) Fork() ObservableMouseMove {
+func (o ObservableFloat64) Fork() ObservableFloat64 {
 	fork := o.Publish()
 	// TODO: Nobody can actually Unsubscribe from this thing....
 	fork.Connect()
-	return fork.ObservableMouseMove
+	return fork.ObservableFloat64
 }
 
 /////////////////////////////////////////////////////////////////////////////
 // PUBLISH
 /////////////////////////////////////////////////////////////////////////////
 
-type ConnectableMouseMove struct {
-	ObservableMouseMove
+type ConnectableFloat64 struct {
+	ObservableFloat64
 	connect func() Unsubscriber
 }
 
 // Connect will observable to the parent observable to start receiving values.
 // All values will then be passed on to the observers that subscribed to this
 // connectable observable
-func (c ConnectableMouseMove) Connect() Unsubscriber {
+func (c ConnectableFloat64) Connect() Unsubscriber {
 	return c.connect()
 }
 
 // Publish creates a connectable observable that only starts emitting values
 // after the Connect method is called on it.
-func (o ObservableMouseMove) Publish() ConnectableMouseMove {
+func (o ObservableFloat64) Publish() ConnectableFloat64 {
 
 	type channel struct {
-		data chan MouseMove
+		data chan float64
 		errs chan error
 	}
 
@@ -1913,7 +1913,7 @@ func (o ObservableMouseMove) Publish() ConnectableMouseMove {
 		items []*channel
 	}
 
-	addChannel := func(data chan MouseMove, errs chan error) int {
+	addChannel := func(data chan float64, errs chan error) int {
 		channels.Lock()
 		defer channels.Unlock()
 		index := len(channels.items)
@@ -1946,7 +1946,7 @@ func (o ObservableMouseMove) Publish() ConnectableMouseMove {
 		}
 	}
 
-	broadcastData := func(next MouseMove) {
+	broadcastData := func(next float64) {
 		channels.Lock()
 		defer channels.Unlock()
 		for _, ch := range channels.items {
@@ -1970,7 +1970,7 @@ func (o ObservableMouseMove) Publish() ConnectableMouseMove {
 		}
 	}
 
-	operator := func(next MouseMove, err error, completed bool) {
+	operator := func(next float64, err error, completed bool) {
 		switch {
 		case err != nil:
 			broadcastError(err)
@@ -1988,27 +1988,117 @@ func (o ObservableMouseMove) Publish() ConnectableMouseMove {
 		return o.Subscribe(operator)
 	}
 
-	observable := func(observer MouseMoveObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
-		data := make(chan MouseMove, 1)
+	observable := func(observer Float64ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
+		data := make(chan float64, 1)
 		errs := make(chan error, 1)
 		index := addChannel(data, errs)
 		unsubscriber.OnUnsubscribe(func() {
 			removeChannel(index)
 		})
-		FromMouseMoveChannelWithError(data, errs)(observer, scheduler, unsubscriber)
+		FromFloat64ChannelWithError(data, errs)(observer, scheduler, unsubscriber)
 	}
 
-	return ConnectableMouseMove{ObservableMouseMove: observable, connect: connect}
+	return ConnectableFloat64{ObservableFloat64: observable, connect: connect}
 }
 
 /////////////////////////////////////////////////////////////////////////////
-// MAP (MouseMove,MouseMove)
+// MATHEMATICAL
 /////////////////////////////////////////////////////////////////////////////
 
-func (o ObservableMouseMove) MapMouseMove(f func(MouseMove) MouseMove) ObservableMouseMove {
-	observable := func(observer MouseMoveObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
-		operator := func(next MouseMove, err error, completed bool) {
-			var mapped MouseMove
+func (o ObservableFloat64) Average() ObservableFloat64 {
+	observable := func(observer Float64ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
+		var sum float64
+		var count float64
+		operator := func(next float64, err error, completed bool) {
+			if err != nil || completed {
+				observer(sum/count, nil, false)
+				observer(zeroFloat64, err, completed)
+			} else {
+				sum += next
+				count++
+			}
+		}
+		o(operator, scheduler, unsubscriber)
+	}
+	return observable
+}
+
+func (o ObservableFloat64) Sum() ObservableFloat64 {
+	observable := func(observer Float64ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
+		var sum float64
+		operator := func(next float64, err error, completed bool) {
+			if err != nil || completed {
+				observer(sum, nil, false)
+				observer(zeroFloat64, err, completed)
+			} else {
+				sum += next
+			}
+		}
+		o(operator, scheduler, unsubscriber)
+	}
+	return observable
+}
+
+func (o ObservableFloat64) Min() ObservableFloat64 {
+	observable := func(observer Float64ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
+		started := false
+		var min float64
+		operator := func(next float64, err error, completed bool) {
+			if err != nil || completed {
+				if started {
+					observer(min, nil, false)
+				}
+				observer(zeroFloat64, err, completed)
+			} else {
+				if started {
+					if min > next {
+						min = next
+					}
+				} else {
+					min = next
+					started = true
+				}
+			}
+		}
+		o(operator, scheduler, unsubscriber)
+	}
+	return observable
+}
+
+func (o ObservableFloat64) Max() ObservableFloat64 {
+	observable := func(observer Float64ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
+		started := false
+		var max float64
+		operator := func(next float64, err error, completed bool) {
+			if err != nil || completed {
+				if started {
+					observer(max, nil, false)
+				}
+				observer(zeroFloat64, err, completed)
+			} else {
+				if started {
+					if max < next {
+						max = next
+					}
+				} else {
+					max = next
+					started = true
+				}
+			}
+		}
+		o(operator, scheduler, unsubscriber)
+	}
+	return observable
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// MAP (float64,float64)
+/////////////////////////////////////////////////////////////////////////////
+
+func (o ObservableFloat64) MapFloat64(f func(float64) float64) ObservableFloat64 {
+	observable := func(observer Float64ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
+		operator := func(next float64, err error, completed bool) {
+			var mapped float64
 			if err == nil && !completed {
 				mapped = f(next)
 			}
@@ -2020,11 +2110,11 @@ func (o ObservableMouseMove) MapMouseMove(f func(MouseMove) MouseMove) Observabl
 }
 
 /////////////////////////////////////////////////////////////////////////////
-// FLATMAP (MouseMove,MouseMove)
+// FLATMAP (float64,float64)
 /////////////////////////////////////////////////////////////////////////////
 
-func (o ObservableMouseMove) FlatMapMouseMove(f func(MouseMove) ObservableMouseMove) ObservableMouseMove {
-	observable := func(observer MouseMoveObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
+func (o ObservableFloat64) FlatMapFloat64(f func(float64) ObservableFloat64) ObservableFloat64 {
+	observable := func(observer Float64ObserverFunc, scheduler Scheduler, unsubscriber Unsubscriber) {
 		var wait struct {
 			sync.Mutex
 			Condition *sync.Cond
@@ -2068,7 +2158,7 @@ func (o ObservableMouseMove) FlatMapMouseMove(f func(MouseMove) ObservableMouseM
 		}
 
 		var lock sync.Mutex
-		flatten := func(next MouseMove, err error, completed bool) {
+		flatten := func(next float64, err error, completed bool) {
 			lock.Lock()
 			defer lock.Unlock()
 			// Finally
@@ -2083,10 +2173,10 @@ func (o ObservableMouseMove) FlatMapMouseMove(f func(MouseMove) ObservableMouseM
 
 		unsubscriber.OnUnsubscribe(wait.Cancel)
 
-		operator := func(next MouseMove, err error, completed bool) {
+		operator := func(next float64, err error, completed bool) {
 			if err != nil || completed {
 				if wait.WaitForZero() {
-					observer(zeroMouseMove, err, err == nil)
+					observer(zeroFloat64, err, err == nil)
 				}
 			} else {
 				wait.Add()

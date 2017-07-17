@@ -1,4 +1,4 @@
-package observable
+package examples
 
 import (
 	"fmt"

@@ -111,6 +111,13 @@ func main() {
 		"Join": func(a []string) string { return strings.Join(a, " ") },
 	}).ParseFiles(tplFile))
 
+
+	// Note: The generated source is fed through goimports to add import paths and to format it.
+
+	// Command goimports updates your Go import lines, adding missing ones and removing unreferenced ones.
+	// $ go get golang.org/x/tools/cmd/goimports
+	// In addition to fixing imports, goimports also formats your code in the same style as gofmt so it
+	// can be used as a replacement for your editor's gofmt-on-save hook.
 	cmd := exec.Command("goimports")
 	if *debugFlag {
 		cmd = exec.Command("cat")

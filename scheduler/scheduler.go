@@ -35,11 +35,12 @@ func (s SchedulerFunc) Schedule(task func()) {
 
 // CurrentGoroutine
 // Tasks are asynchronously scheduled on the current goroutine via dispatch queue
+// TBD
 
 // NewGoroutine
 // Tasks are asynchronously scheduled on a single new goroutine via dispatch queue
+// TBD
 
 // Goroutines
 // Tasks are scheduled on new goroutines
-
 var Goroutines SchedulerFunc = func(task func()) { go task() }

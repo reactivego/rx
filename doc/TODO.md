@@ -1,5 +1,9 @@
 # TODO
 
+Rename scheduler.Scheduler to scheduler.Interface
+Rename unsubscriber.Unsubscriber to unsubscriber.Interface
+Hide unubscriber.Standard by calling it unsubscriber.unsubscriber
+
 ## Miscellaneous
 Use observable.SubscribeOn(sched).Subscribe(operator).Wait() in Concat implementation.
 Implement Subject<T> to be used alongside Create<T> where you call OnNext/OnError/OnComplete directly on the instance of the Subject.

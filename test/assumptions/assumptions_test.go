@@ -1,4 +1,4 @@
-package observable
+package assumptions
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 )
 
 func TestNilRange(t *testing.T) {
-	var items []Unsubscriber
+	var items []*struct{}
 	assert.NotPanics(t, func() {
 		for _, v := range items {
 			_ = v

@@ -1,5 +1,9 @@
 package main
 
+// For this example to work you need to first run rxgo to generate an appropriate rx.go file alongside this main.go file.
+// e.g. rxgo main int --output=rx.go --map-types=MouseMove
+// The generated file will have Map operator from observable int to observable MouseMove
+
 type MouseMove struct {
 	X float64
 	Y float64

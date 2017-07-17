@@ -5,6 +5,9 @@ import (
 	"sync/atomic"
 )
 
+// Unsubscriber is an interface returned by a subscribe function
+// that allows you to unsubscribe from the subscription that was
+// created when subscribe was called.
 type Unsubscriber interface {
 	Unsubscribe()
 	Unsubscribed() bool
@@ -14,21 +17,20 @@ type Unsubscriber interface {
 }
 
 ////////////////////////////////////////////////////////
-// Standard
+// unsubscriber
 ////////////////////////////////////////////////////////
-// Standard is the standard unsubscriber implementation
-// that can also call back to a function when unsubscribed.
-type Standard struct {
+// unsubscriber is the standard unsubscriber implementation
+type unsubscriber struct {
 	int32
 	onUnsubscribe []func()
 	sync.Mutex
 }
 
-func (r *Standard) Unsubscribed() bool {
+func (r *unsubscriber) Unsubscribed() bool {
 	return atomic.LoadInt32((*int32)(&r.int32)) == 1
 }
 
-func (r *Standard) Unsubscribe() {
+func (r *unsubscriber) Unsubscribe() {
 	r.Lock()
 	defer r.Unlock()
 	if r.Unsubscribed() {
@@ -40,7 +42,7 @@ func (r *Standard) Unsubscribe() {
 	}
 }
 
-func (r *Standard) OnUnsubscribe(f func()) {
+func (r *unsubscriber) OnUnsubscribe(f func()) {
 	r.Lock()
 	defer r.Unlock()
 	if r.Unsubscribed() {
@@ -54,10 +56,10 @@ func (r *Standard) OnUnsubscribe(f func()) {
 // method will be called when the parent's (the current object)
 // Unsubscribe method is called. Calling the Unsubscribe method
 // on the child will NOT propagate to the parent!
-func (r *Standard) AddChild() Unsubscriber {
+func (r *unsubscriber) AddChild() Unsubscriber {
 	r.Lock()
 	defer r.Unlock()
-	child := &Standard{}
+	child := &unsubscriber{}
 	if r.Unsubscribed() {
 		child.Unsubscribe()
 	} else {
@@ -66,7 +68,7 @@ func (r *Standard) AddChild() Unsubscriber {
 	return child
 }
 
-func (r *Standard) Wait() {
+func (r *unsubscriber) Wait() {
 	done := make(chan struct{})
 	r.OnUnsubscribe(func() {
 		close(done)
@@ -75,5 +77,5 @@ func (r *Standard) Wait() {
 }
 
 func New() Unsubscriber {
-	return &Standard{}
+	return &unsubscriber{}
 }

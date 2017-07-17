@@ -1,4 +1,4 @@
-package main
+package selection
 
 import (
 	"errors"
@@ -9,16 +9,15 @@ import (
 	"time"
 
 	"github.com/alecthomas/assert"
-	"rxgo/observable"
 )
 
 func TestSample(t *testing.T) {
-	a := observable.Interval(time.Millisecond * 90).Sample(time.Millisecond * 200).Take(3).ToArray()
+	a := Interval(time.Millisecond * 90).Sample(time.Millisecond * 200).Take(3).ToArray()
 	assert.Equal(t, []int{1, 3, 5}, a)
 }
 
 func TestDebounce(t *testing.T) {
-	s := observable.CreateInt(func(observer observable.IntSubscriber) {
+	s := CreateInt(func(observer IntSubscriber) {
 		time.Sleep(100 * time.Millisecond)
 		observer.Next(1)
 		time.Sleep(300 * time.Millisecond)
@@ -37,9 +36,9 @@ func TestConcat(t *testing.T) {
 	a := []int{1, 2, 3}
 	b := []int{4, 5}
 	c := []int{6, 7}
-	oa := observable.FromIntArray(a)
-	ob := observable.FromIntArray(b)
-	oc := observable.FromIntArray(c)
+	oa := FromIntArray(a)
+	ob := FromIntArray(b)
+	oc := FromIntArray(c)
 	s := oa.Concat(ob).Concat(oc).ToArray()
 	assert.Equal(t, []int{1, 2, 3, 4, 5, 6, 7}, s)
 	s = oa.Concat(ob, oc).ToArray()
@@ -47,14 +46,14 @@ func TestConcat(t *testing.T) {
 }
 
 func TestMerge(t *testing.T) {
-	sa := observable.CreateInt(func(observer observable.IntSubscriber) {
+	sa := CreateInt(func(observer IntSubscriber) {
 		time.Sleep(10 * time.Millisecond)
 		observer.Next(1)
 		time.Sleep(10 * time.Millisecond)
 		observer.Next(3)
 		observer.Complete()
 	})
-	sb := observable.CreateInt(func(observer observable.IntSubscriber) {
+	sb := CreateInt(func(observer IntSubscriber) {
 		time.Sleep(5 * time.Millisecond)
 		observer.Next(0)
 		time.Sleep(10 * time.Millisecond)
@@ -66,12 +65,12 @@ func TestMerge(t *testing.T) {
 }
 
 func TestMergeDelayError(t *testing.T) {
-	sa := observable.CreateInt(func(observer observable.IntSubscriber) {
+	sa := CreateInt(func(observer IntSubscriber) {
 		time.Sleep(10 * time.Millisecond)
 		observer.Next(1)
 		observer.Error(errors.New("error"))
 	})
-	sb := observable.CreateInt(func(observer observable.IntSubscriber) {
+	sb := CreateInt(func(observer IntSubscriber) {
 		time.Sleep(5 * time.Millisecond)
 		observer.Next(0)
 		time.Sleep(10 * time.Millisecond)
@@ -85,9 +84,9 @@ func TestMergeDelayError(t *testing.T) {
 func TestRecover(t *testing.T) {
 	// Create three different observables.
 	// They are all passive until someone subscribes to them...
-	o123 := observable.FromInts(1, 2, 3)
-	o45 := observable.FromInts(4, 5)
-	oThrowError := observable.ThrowInt(errors.New("error"))
+	o123 := FromInts(1, 2, 3)
+	o45 := FromInts(4, 5)
+	oThrowError := ThrowInt(errors.New("error"))
 
 	a, err := o123.Concat(oThrowError).Catch(o45).ToArrayWithError()
 	assert.NoError(t, err)
@@ -96,7 +95,7 @@ func TestRecover(t *testing.T) {
 
 func TestRetry(t *testing.T) {
 	errored := false
-	a := observable.CreateInt(func(observer observable.IntSubscriber) {
+	a := CreateInt(func(observer IntSubscriber) {
 		observer.Next(1)
 		observer.Next(2)
 		observer.Next(3)
@@ -116,7 +115,7 @@ func TestTimeout(t *testing.T) {
 	wg := sync.WaitGroup{}
 	start := time.Now()
 	wg.Add(1)
-	actual, err := observable.CreateInt(func(subscriber observable.IntSubscriber) {
+	actual, err := CreateInt(func(subscriber IntSubscriber) {
 		subscriber.Next(1)
 		time.Sleep(time.Millisecond * 500)
 		assert.True(t, subscriber.Unsubscribed())
@@ -126,7 +125,7 @@ func TestTimeout(t *testing.T) {
 		ToArrayWithError()
 	elapsed := time.Now().Sub(start)
 	assert.Error(t, err)
-	assert.Equal(t, observable.ErrTimeout, err)
+	assert.Equal(t, ErrTimeout, err)
 	assert.True(t, elapsed > time.Millisecond*250 && elapsed < time.Millisecond*500)
 	assert.Equal(t, []int{1}, actual)
 	wg.Wait()
@@ -134,7 +133,7 @@ func TestTimeout(t *testing.T) {
 
 func TestFork(t *testing.T) {
 	ch := make(chan int, 30)
-	s := observable.FromIntChannel(ch).Fork() // allready does a subscribe, but channel blocks.
+	s := FromIntChannel(ch).Fork() // allready does a subscribe, but channel blocks.
 	a := []int{}
 	b := []int{}
 	sub := s.SubscribeNext(func(n int) { a = append(a, n) })
@@ -157,7 +156,7 @@ func TestFork(t *testing.T) {
 }
 
 func TestFlatMap(t *testing.T) {
-	actual, err := observable.Range(1, 2).FlatMap(func(n int) observable.ObservableInt { return observable.Range(n, 2) }).ToArrayWithError()
+	actual, err := Range(1, 2).FlatMap(func(n int) ObservableInt { return Range(n, 2) }).ToArrayWithError()
 	assert.NoError(t, err)
 	sort.Ints(actual)
 	assert.Equal(t, []int{1, 2, 2, 3}, actual)
