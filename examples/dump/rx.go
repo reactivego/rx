@@ -1,6 +1,8 @@
-package main
+// This file was created by simulating what would happen if only code
+// would be added that would fix compilation errors.
+// To test the whole idea of just-in-time generic code expansion.
 
-//go:generate $GOPATH/bin/rxgo main int --output=rx.go --map-types=float64
+package main
 
 import (
 	"errors"
