@@ -15,17 +15,6 @@
 // https://github.com/reactivego/rx
 package rx
 
-// Code generated to make this rx package buildable should be written to rx.go
-
-//jig:file {{.package}}.go
-
-// Support code is code that is not parameterized on a template variable. Code
-// like that (when generated) is the same as the code already present in this
-// package and would therefore lead to symbol collisions. Disable generation
-// of support code using the jig:no-support-code-generation pragma.
-
-//jig:no-support-code-generation
-
 // foo is the first metasyntactic type. Use the jig:type pragma to tell jig that
 // Foo is the reference type name for actual type foo. Needed because we're
 // generating code into rx.go for foo.

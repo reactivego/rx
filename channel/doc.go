@@ -13,8 +13,3 @@
 package channel
 
 import _ "github.com/reactivego/channel"
-
-// Code generated to make this channel package buildable should be written
-// to channel.go
-
-//jig:file {{.package}}.go
