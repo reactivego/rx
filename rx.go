@@ -151,95 +151,6 @@ func (o ObservableFoo) MapObservableBar(project func(foo) ObservableBar) Observa
 	return observable
 }
 
-//jig:name IntObserver
-
-// IntObserver is the interface used with CreateInt when implementing a custom
-// observable.
-type IntObserver interface {
-	// Next emits the next int value.
-	Next(int)
-	// Error signals an error condition.
-	Error(error)
-	// Complete signals that no more data is to be expected.
-	Complete()
-	// Closed returns true when the subscription has been canceled.
-	Closed() bool
-}
-
-//jig:name CreateInt
-
-// CreateInt creates an Observable from scratch by calling observer methods
-// programmatically.
-func CreateInt(f func(IntObserver)) ObservableInt {
-	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		scheduler.Schedule(func() {
-			if subscriber.Closed() {
-				return
-			}
-			observer := func(next int, err error, done bool) {
-				if !subscriber.Closed() {
-					observe(next, err, done)
-				}
-			}
-			type observer_subscriber struct {
-				IntObserveFunc
-				Subscriber
-			}
-			f(&observer_subscriber{observer, subscriber})
-		})
-	}
-	return observable
-}
-
-//jig:name Observer
-
-// Observer is the interface used with Create when implementing a custom
-// observable.
-type Observer interface {
-	// Next emits the next interface{} value.
-	Next(interface{})
-	// Error signals an error condition.
-	Error(error)
-	// Complete signals that no more data is to be expected.
-	Complete()
-	// Closed returns true when the subscription has been canceled.
-	Closed() bool
-}
-
-//jig:name Create
-
-// Create creates an Observable from scratch by calling observer methods
-// programmatically.
-func Create(f func(Observer)) Observable {
-	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		scheduler.Schedule(func() {
-			if subscriber.Closed() {
-				return
-			}
-			observer := func(next interface{}, err error, done bool) {
-				if !subscriber.Closed() {
-					observe(next, err, done)
-				}
-			}
-			type observer_subscriber struct {
-				ObserveFunc
-				Subscriber
-			}
-			f(&observer_subscriber{observer, subscriber})
-		})
-	}
-	return observable
-}
-
-//jig:name Empty
-
-// Empty creates an Observable that emits no items but terminates normally.
-func Empty() Observable {
-	return Create(func(observer Observer) {
-		observer.Complete()
-	})
-}
-
 //jig:name Next
 
 // Next contains either the next interface{} value (in .Next) or an error (in .Err).
@@ -411,6 +322,109 @@ func (m *ChanFanOutNext) Close(err error) {
 	m.closed = true
 	m.err = err
 	m.Unlock()
+}
+
+//jig:name Observer
+
+// Observer is the interface used with Create when implementing a custom
+// observable.
+type Observer interface {
+	// Next emits the next interface{} value.
+	Next(interface{})
+	// Error signals an error condition.
+	Error(error)
+	// Complete signals that no more data is to be expected.
+	Complete()
+	// Closed returns true when the subscription has been canceled.
+	Closed() bool
+	// OnUnsubscribe
+	OnUnsubscribe(func())
+}
+
+//jig:name Create
+
+// Create creates an Observable from scratch by calling observer methods
+// programmatically.
+func Create(f func(Observer)) Observable {
+	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		scheduler.Schedule(func() {
+			if subscriber.Closed() {
+				return
+			}
+			observer := func(next interface{}, err error, done bool) {
+				if !subscriber.Closed() {
+					observe(next, err, done)
+				}
+			}
+			f(&_ObserverSubscriber{observer, subscriber})
+		})
+	}
+	return observable
+}
+
+type _ObserverSubscriber struct {
+	ObserveFunc
+	Subscriber
+}
+
+func (os *_ObserverSubscriber) OnUnsubscribe(callback func()) {
+	os.Add(callback)
+}
+
+//jig:name IntObserver
+
+// IntObserver is the interface used with CreateInt when implementing a custom
+// observable.
+type IntObserver interface {
+	// Next emits the next int value.
+	Next(int)
+	// Error signals an error condition.
+	Error(error)
+	// Complete signals that no more data is to be expected.
+	Complete()
+	// Closed returns true when the subscription has been canceled.
+	Closed() bool
+	// OnUnsubscribe
+	OnUnsubscribe(func())
+}
+
+//jig:name CreateInt
+
+// CreateInt creates an Observable from scratch by calling observer methods
+// programmatically.
+func CreateInt(f func(IntObserver)) ObservableInt {
+	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		scheduler.Schedule(func() {
+			if subscriber.Closed() {
+				return
+			}
+			observer := func(next int, err error, done bool) {
+				if !subscriber.Closed() {
+					observe(next, err, done)
+				}
+			}
+			f(&_IntObserverSubscriber{observer, subscriber})
+		})
+	}
+	return observable
+}
+
+type _IntObserverSubscriber struct {
+	IntObserveFunc
+	Subscriber
+}
+
+func (os *_IntObserverSubscriber) OnUnsubscribe(callback func()) {
+	os.Add(callback)
+}
+
+//jig:name Empty
+
+// Empty creates an Observable that emits no items but terminates normally.
+func Empty() Observable {
+	return Create(func(observer Observer) {
+		observer.Complete()
+	})
 }
 
 //jig:name ObservableBarObserveFunc

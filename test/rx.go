@@ -6,10 +6,9 @@ package test
 
 import (
 	"errors"
-	"math"
-	"sync"
 	"time"
 
+	"github.com/reactivego/rx/channel"
 	"github.com/reactivego/rx/schedulers"
 	"github.com/reactivego/subscriber"
 )
@@ -25,381 +24,6 @@ type Scheduler interface {
 
 // Subscriber is an alias for the subscriber.Subscriber interface type.
 type Subscriber subscriber.Subscriber
-
-//jig:name ObserveFunc
-
-// ObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type ObserveFunc func(interface{}, error, bool)
-
-var zero interface{}
-
-// Next is called by an Observable to emit the next interface{} value to the
-// observer.
-func (f ObserveFunc) Next(next interface{}) {
-	f(next, nil, false)
-}
-
-// Error is called by an Observable to report an error to the observer.
-func (f ObserveFunc) Error(err error) {
-	f(zero, err, true)
-}
-
-// Complete is called by an Observable to signal that no more data is
-// forthcoming to the observer.
-func (f ObserveFunc) Complete() {
-	f(zero, nil, true)
-}
-
-//jig:name ErrBufferOverflow
-
-// ErrMissingBackpressure is delivered to an endpoint when the channel overflows
-// because the endpoint can't keep-up with the data rate at which the sender
-// sends values. Other sibling endpoints that are fast enough won't get this
-// error and continue to operate normally.
-var ErrBufferOverflow = errors.New("buffer overflow")
-
-//jig:name NewReplayChanInt
-
-// ReplayChanInt is a fixed capacity buffer non-blocking channel where entries
-// are appended in a circular fashion. Use Send to append entries to the channel
-// buffer, use NewEndpoint to create an endpoint to receive from the channel.
-// If the channel buffer is full (contains bufferCapacity items) then the next
-// call to Send will overwrite the first entry in the channel buffer.
-//
-// The actual channel buffer capacity is 1 entry larger than the bufferCapacity
-// passed to NewBufChan. A full channel has the write position for the
-// next entry immediately adjoining the read postion of the first entry in the
-// channel buffer. This means that even in a full channel buffer, there is a
-// single emtpy slot at the write position. This single empty slot is used to
-// store a "tombstone" when the channel is closed and thus will not be updated
-// further. To close the channel, call the Close method with nil or error.
-type ReplayChanInt struct {
-	sync.RWMutex
-	send		*sync.Cond
-	recv		*sync.Cond
-	channel		[]replayMessageInt
-	tombstone	interface{}
-	read		int64
-	write		int64
-	size		int64
-	duration	time.Duration
-	endpoints	[]*ReplayEndpointInt
-	overflowhandled	func(*ReplayChanInt) bool
-}
-
-// BackpressureBlockInt strategy for handling overflow will block the calling
-// goroutine on a condition until an endpoint is connected and starts draining
-// the buffer or Close is called to cancel the active Send.
-func BackpressureBlockInt(b *ReplayChanInt) bool {
-	firstfresh := func() int64 {
-		now := time.Now()
-		for i := b.read; i < b.write; i++ {
-			entry := b.channel[i]
-			stale := !entry.stale.IsZero() && entry.stale.Before(now)
-			if !stale {
-				return i
-			}
-		}
-		return b.write
-	}
-	for b.tombstone == nil {
-		fresh := firstfresh()
-		if fresh > b.read {
-			for _, ep := range b.endpoints {
-				if fresh > ep.cursor {
-					ep.cursor = fresh
-				}
-			}
-			b.read = fresh
-			return true
-		}
-		if len(b.endpoints) != 0 {
-			cursormin := int64(math.MaxInt64)
-			for _, ep := range b.endpoints {
-				if ep.cursor < cursormin {
-					cursormin = ep.cursor
-				}
-			}
-			if b.read < cursormin {
-				b.read++
-				return true
-			}
-		}
-		b.send.Wait()
-	}
-	return false
-}
-
-// BackpressureBufferInt strategy for handling overflow will manage a fixed size
-// buffer, tracking the endpoint cursors and advancing the read index as little
-// as possible. Individual endpoints may overflow and be terminated because they
-// can't keep up with the data, while the buffer as a whole continues to operate.
-//
-// This strategy generates overflow errors in endpoints when they can't keep up
-// and for the whole channel when all endpoints overflowed.
-func BackpressureErrorInt(b *ReplayChanInt) bool {
-	firstfresh := func() int64 {
-		now := time.Now()
-		for i := b.read; i < b.write; i++ {
-			entry := b.channel[i]
-			stale := !entry.stale.IsZero() && entry.stale.Before(now)
-			if !stale {
-				return i
-			}
-		}
-		return b.write
-	}
-	fresh := firstfresh()
-	if fresh > b.read {
-		for _, ep := range b.endpoints {
-			if fresh > ep.cursor {
-				ep.cursor = fresh
-			}
-		}
-		b.read = fresh
-		return true
-	}
-	if len(b.endpoints) == 0 {
-		b.tombstone = ErrBufferOverflow
-	} else {
-		cursormax := int64(0)
-		for _, ep := range b.endpoints {
-			if ep.cursor > cursormax {
-				cursormax = ep.cursor
-			}
-			if b.read > ep.cursor {
-				ep.overflow = ErrBufferOverflow
-			}
-		}
-		if b.read > cursormax {
-			b.tombstone = ErrBufferOverflow
-		} else {
-			b.read++
-			return true
-		}
-	}
-	return false
-}
-
-// BackpressureLatestInt strategy for handling overflow will will keep the
-// latest bufferCapacity number of items in the buffer, dropping the oldest
-// ones. This never generates an error, even when holes appear in the data
-// received by the endpoints because they can't keep up with the source.
-func BackpressureLatestInt(b *ReplayChanInt) bool {
-	b.read++
-	return true
-}
-
-// NewBufChan returns a non-blocking ReplayChanInt with given buffer capacity and time
-// window. The window specifies how long items send to the channel will remain
-// fresh. After sent values become stale they are no longer returned when the
-// channel buffer is iterated with an endpoint.
-//
-// A bufferCapacity of 0 will result in a channel that cannot send data, but
-// that can signal that it has been closed. A windowDuration of 0 will make the
-// sent values remain fresh forever.
-func NewReplayChanInt(bufferCapacity int, windowDuration time.Duration) *ReplayChanInt {
-	b := &ReplayChanInt{
-		channel:		make([]replayMessageInt, bufferCapacity+1),
-		size:			int64(bufferCapacity + 1),
-		duration:		windowDuration,
-		overflowhandled:	BackpressureBlockInt,
-	}
-	b.recv = sync.NewCond(b.RLocker())
-	b.send = sync.NewCond(b)
-	return b
-}
-
-// Send will append the value at the end of the channel buffer. If the channel
-// buffer is full, the first entry in the channel buffer is overwritten and the
-// channel buffer start moved to the second entry. If the channel was closed
-// previously by calling Close, this call to Send is ignored.
-func (b *ReplayChanInt) Send(value int) bool {
-	if b.tombstone != nil {
-		return false
-	}
-
-	b.Lock()
-
-	var staleAfter time.Time
-	if b.duration != 0 {
-		staleAfter = time.Now().Add(b.duration)
-	}
-
-	if b.write < b.read+b.size-1 {
-		b.channel[b.write%b.size] = replayMessageInt{value, staleAfter}
-		b.write++
-	} else if b.overflowhandled(b) {
-		b.channel[b.write%b.size] = replayMessageInt{value, staleAfter}
-		b.write++
-	}
-
-	b.Unlock()
-	b.recv.Broadcast()
-	return b.tombstone == nil
-}
-
-// Close will mark the channel as closed. Pass either an error value to indicate
-// an error, or nil to indicate normal completion. Once the channel has been
-// closed, all calls to Send will return immediately without modifying the
-// channel buffer. A Send blocked on backpressure blocking will be canceled when
-// Close is called.
-func (b *ReplayChanInt) Close(err error) {
-	b.Lock()
-	if err != nil {
-		b.tombstone = err
-	} else {
-		b.tombstone = "closed"
-	}
-	b.endpoints = nil
-	b.Unlock()
-	b.send.Signal()
-	b.recv.Broadcast()
-}
-
-// NewEndpoint will return a receive endpoint that can be used to receive from
-// the channel. A new endpoint may also be created for a closed channel, even
-// if it was closed with an error. The buffered content of a closed channel can
-// be received normally.
-func (b *ReplayChanInt) NewEndpoint() *ReplayEndpointInt {
-	b.Lock()
-	ep := &ReplayEndpointInt{b, b.read, nil}
-	if b.tombstone == nil {
-		b.endpoints = append(b.endpoints, ep)
-	}
-	b.Unlock()
-	return ep
-}
-
-func (b *ReplayChanInt) RemoveEndpoint(ep *ReplayEndpointInt) {
-	b.Lock()
-	for i, e := range b.endpoints {
-		if e == ep {
-			b.endpoints = append(b.endpoints[:i], b.endpoints[i+1:]...)
-			b.Unlock()
-			return
-		}
-	}
-	b.Unlock()
-}
-
-// ReplayEndpointInt is a receive endpoint used for receiving from a channel buffer. A
-// newly created endpoint will start reading at the start of the channel buffer
-// at the moment NewEndpoint was called. Reading from the endpoint using Recv
-// calls will continue until the end of the channel buffer is reached.
-//
-// The channel buffer may grow while it is being iterated, the endpoint will
-// reflect that. The channel may grow too fast for an endpoint to be able to
-// keep up. This causes the end of the channel buffer to overflow the endpoint
-// current position. At that point the endpoint will have effectively dropped
-// all data. If that happens, the endpoint will fail and emit an
-// ErrMissingBackpressure error. Sibling endpoints are not affected by this, nor
-// is the channel itself.
-type ReplayEndpointInt struct {
-	*ReplayChanInt
-	cursor		int64
-	overflow	error
-}
-
-// Recv will return the next value in the channel and true. Or when at the end
-// of the channel buffer nil and false. The channel buffer can still be
-// iterated after it is finalized by calling Close. If the endpoint could not
-// keep up with the sender, then it returns nil and false. Closed will in that
-// case report ErrMissingBackpressure.
-func (ep *ReplayEndpointInt) Recv() (int, bool) {
-	ep.RLock()
-	var zeroInt int
-	if ep.overflow != nil {
-		ep.RUnlock()
-		return zeroInt, false
-	}
-	now := time.Now()
-	if ep.cursor < ep.read {
-		ep.cursor = ep.read
-	}
-	for ep.cursor != ep.write {
-		entry := ep.channel[ep.cursor%ep.size]
-		ep.cursor++
-		if entry.stale.IsZero() || entry.stale.After(now) {
-			ep.RUnlock()
-			ep.send.Signal()
-			return entry.value, true
-		}
-	}
-	ep.RUnlock()
-	return zeroInt, false
-}
-
-// Closed returns true once the channel buffer has been finalized by calling
-// Close on the channel. The returned error either has a value (the error) or
-// is nil (to indicate completion). Note, that this call is independent of how
-// far the endpoint has currently iterated the channel buffer.
-//
-// The error ErrMissingBackpressure will be delivered if the endpoint does not
-// receive data fast enough to keep up with the sender.
-func (ep *ReplayEndpointInt) Closed() (error, bool) {
-	ep.RLock()
-	if ep.overflow != nil {
-		ep.RUnlock()
-		return ep.overflow, true
-	}
-	if ep.tombstone == nil {
-		ep.RUnlock()
-		return nil, false
-	}
-	if err, ok := ep.tombstone.(error); ok {
-		ep.RUnlock()
-		return err, true
-	}
-	ep.RUnlock()
-	return nil, true
-}
-
-// Wait will wait for a Send or Close call on the channel by the sender.
-func (ep *ReplayEndpointInt) Wait() {
-	ep.RLock()
-	if ep.overflow != nil {
-		ep.RUnlock()
-		return
-	}
-	if ep.cursor != ep.write {
-		ep.RUnlock()
-		return
-	}
-	if ep.tombstone != nil {
-		ep.RUnlock()
-		return
-	}
-	ep.recv.Wait()
-	ep.RUnlock()
-}
-
-// Range will call the function for every received value and will call the
-// function one final time when the channel is closed.
-func (ep *ReplayEndpointInt) Range(f func(int, error, bool) bool) {
-	var zeroInt int
-	for more := true; more; {
-		if next, ok := ep.Recv(); ok {
-			more = f(next, nil, false)
-		} else {
-			if err, ok := ep.Closed(); ok {
-				f(zeroInt, err, true)
-				return
-			} else {
-				ep.Wait()
-			}
-		}
-	}
-}
-
-// replayMessageInt instances store the values in a ReplayChanInt. It also
-// contains a timestamp indicating when it will become stale. You will never
-// need to deal with replayMessageInt instances directly.
-type replayMessageInt struct {
-	value	int
-	stale	time.Time
-}
 
 //jig:name IntObserveFunc
 
@@ -462,11 +86,11 @@ func CreateInt(f func(IntObserver)) ObservableInt {
 					observe(next, err, done)
 				}
 			}
-			type observer_subscriber struct {
+			type ObserverSubscriber struct {
 				IntObserveFunc
 				Subscriber
 			}
-			f(&observer_subscriber{observer, subscriber})
+			f(&ObserverSubscriber{observer, subscriber})
 		})
 	}
 	return observable
@@ -503,6 +127,92 @@ func FromSliceInt(slice []int) ObservableInt {
 	})
 }
 
+//jig:name ObserveFunc
+
+// ObserveFunc is essentially the observer, a function that gets called
+// whenever the observable has something to report.
+type ObserveFunc func(interface{}, error, bool)
+
+var zero interface{}
+
+// Next is called by an Observable to emit the next interface{} value to the
+// observer.
+func (f ObserveFunc) Next(next interface{}) {
+	f(next, nil, false)
+}
+
+// Error is called by an Observable to report an error to the observer.
+func (f ObserveFunc) Error(err error) {
+	f(zero, err, true)
+}
+
+// Complete is called by an Observable to signal that no more data is
+// forthcoming to the observer.
+func (f ObserveFunc) Complete() {
+	f(zero, nil, true)
+}
+
+//jig:name Observable
+
+// Observable is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type Observable func(ObserveFunc, Scheduler, Subscriber)
+
+//jig:name Observer
+
+// Observer is the interface used with Create when implementing a custom
+// observable.
+type Observer interface {
+	// Next emits the next interface{} value.
+	Next(interface{})
+	// Error signals an error condition.
+	Error(error)
+	// Complete signals that no more data is to be expected.
+	Complete()
+	// Closed returns true when the subscription has been canceled.
+	Closed() bool
+}
+
+//jig:name Create
+
+// Create creates an Observable from scratch by calling observer methods
+// programmatically.
+func Create(f func(Observer)) Observable {
+	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		scheduler.Schedule(func() {
+			if subscriber.Closed() {
+				return
+			}
+			observer := func(next interface{}, err error, done bool) {
+				if !subscriber.Closed() {
+					observe(next, err, done)
+				}
+			}
+			type ObserverSubscriber struct {
+				ObserveFunc
+				Subscriber
+			}
+			f(&ObserverSubscriber{observer, subscriber})
+		})
+	}
+	return observable
+}
+
+//jig:name FromSlice
+
+// FromSlice creates an Observable from a slice of interface{} values passed in.
+func FromSlice(slice []interface{}) Observable {
+	return Create(func(observer Observer) {
+		for _, next := range slice {
+			if observer.Closed() {
+				return
+			}
+			observer.Next(next)
+		}
+		observer.Complete()
+	})
+}
+
 //jig:name NextInt
 
 // NextInt contains either the next int value (in .Next) or an error (in .Err).
@@ -513,77 +223,27 @@ type NextInt struct {
 	Err	error
 }
 
-//jig:name NewChanNextInt
+//jig:name FromInt
 
-// ChanNextInt is a "chan NextInt" with two additional capabilities. Firstly, it
-// can be properly canceled from the receiver side by calling the Cancel method.
-// And secondly, it can deliver an error in-band (as opposed to out-of-band) to
-// the receiver because of how NextInt is defined.
-type ChanNextInt struct {
-	// Channel can be used directly e.g. in a range statement to read NextInt
-	// items from the channel.
-	Channel	chan NextInt
-
-	cancel	chan struct{}
-	closed	bool
+// FromInt creates an ObservableInt from multiple int values passed in.
+func FromInt(slice ...int) ObservableInt {
+	return FromSliceInt(slice)
 }
 
-// NewChanNextInt creates a new ChanNextInt with given buffer capacity and
-// returns a pointer to it. The Send and Close methods are supposed to be used
-// from the sending side by a single goroutine. The Channel field and the Cancel
-// method are supposed to be used from the receiving side and may be used from
-// different goroutines. Multiple goroutines reading from a single channel will
-// fight for values though, because a channel does not multicast.
-func NewChanNextInt(capacity int) *ChanNextInt {
-	return &ChanNextInt{
-		Channel:	make(chan NextInt, capacity),
-		cancel:		make(chan struct{}),
-	}
+//jig:name FromInts
+
+// FromInts creates an ObservableInt from multiple int values passed in.
+func FromInts(slice ...int) ObservableInt {
+	return FromSliceInt(slice)
 }
 
-// Send is used from the sender side to send the next value to the channel. This
-// call only returns after delivering the value. If the channel has been closed,
-// the value is ignored and the call returns immediately.
-func (c *ChanNextInt) Send(value int) bool {
-	if c.closed {
-		return false
-	}
-	select {
-	case <-c.cancel:
-		c.closed = true
-		close(c.Channel)
-		return false
-	case c.Channel <- NextInt{Next: value}:
-		return true
-	}
-}
+//jig:name EmptyInt
 
-// Close is used from the sender side to deliver an error value before closing
-// the channel. Pass nil to indicate a normal close. If the channel has already
-// been closed then the call will return immediately.
-func (c *ChanNextInt) Close(err error) bool {
-	if c.closed {
-		return false
-	}
-	c.closed = true
-	if err != nil {
-		select {
-		case <-c.cancel:
-			return false
-		case c.Channel <- NextInt{Err: err}:
-		}
-	}
-	close(c.Channel)
-	return true
-}
-
-// Cancel can be called exactly once from the receiver side to indicate it no
-// longer is intereseted in the data or completion status. This cancelation will
-// be signaled to the sender. The sender will be correctly aborted if it is
-// already blocked on a Send or Close call to deliver a value or error to the
-// receiver.
-func (c *ChanNextInt) Cancel() {
-	close(c.cancel)
+// EmptyInt creates an Observable that emits no items but terminates normally.
+func EmptyInt() ObservableInt {
+	return CreateInt(func(observer IntObserver) {
+		observer.Complete()
+	})
 }
 
 //jig:name SubjectInt
@@ -615,221 +275,10 @@ type SubjectInt struct {
 	IntObserveFunc
 }
 
-//jig:name NewBufChan
-
-// BufChan is a fixed capacity buffer non-blocking channel where entries
-// are appended in a circular fashion. Use Send to append entries to the channel
-// buffer, use NewEndpoint to create an endpoint to receive from the channel.
-// If the channel buffer is full (contains bufferCapacity items) then the next
-// call to Send will overwrite the first entry in the channel buffer.
-//
-// The actual channel buffer capacity is 1 entry larger than the bufferCapacity
-// passed to NewBufChan. A full channel has the write position for the
-// next entry immediately adjoining the read postion of the first entry in the
-// channel buffer. This means that even in a full channel buffer, there is a
-// single emtpy slot at the write position. This single empty slot is used to
-// store a "tombstone" when the channel is closed and thus will not be updated
-// further. To close the channel, call the Close method with nil or error.
-type BufChan struct {
-	sync.RWMutex
-	recv		*sync.Cond
-	channel		[]bufChanMessage
-	read		int64
-	write		int64
-	size		int64
-	duration	time.Duration
-}
-
-// NewBufChan returns a non-blocking BufChan with given buffer capacity and time
-// window. The window specifies how long items send to the channel will remain
-// fresh. After sent values become stale they are no longer returned when the
-// channel buffer is iterated with an endpoint.
-//
-// A bufferCapacity of 0 will result in a channel that cannot send data, but
-// that can signal that it has been closed. A windowDuration of 0 will make the
-// sent values remain fresh forever.
-func NewBufChan(bufferCapacity int, windowDuration time.Duration) *BufChan {
-	b := &BufChan{
-		channel:	make([]bufChanMessage, bufferCapacity+1),
-		size:		int64(bufferCapacity + 1),
-		duration:	windowDuration,
-	}
-	b.recv = sync.NewCond(b.RLocker())
-	return b
-}
-
-// Send will append the value at the end of the channel buffer. If the channel
-// buffer is full, the first entry in the channel buffer is overwritten and the
-// channel buffer start moved to the second entry. If the channel was closed
-// previously by calling Close, this call to Send is ignored.
-func (b *BufChan) Send(value interface{}) {
-	b.Lock()
-	defer b.Unlock()
-	if b.channel[b.write%b.size].value != nil {
-		return
-	}
-	var staleAfter time.Time
-	if b.duration != 0 {
-		staleAfter = time.Now().Add(b.duration)
-	}
-	b.channel[b.write%b.size] = bufChanMessage{value, staleAfter}
-	b.write++
-	if b.write-b.read == b.size {
-		b.read++
-		b.channel[b.write%b.size] = bufChanMessage{}
-	}
-	b.recv.Broadcast()
-}
-
-// Close will mark the channel as closed. Pass either an error value to indicate
-// an error, or nil to indicate normal completion. Once the channel has been
-// closed, all calls to Send will return immediately without modifying the
-// channel buffer.
-func (b *BufChan) Close(err error) {
-	b.Lock()
-	defer b.Unlock()
-	if err != nil {
-		b.channel[b.write%b.size] = bufChanMessage{value: err}
-	} else {
-		b.channel[b.write%b.size] = bufChanMessage{value: "completion"}
-	}
-	b.recv.Broadcast()
-}
-
-// NewEndpoint will return a receive endpoint that can be used to receive from
-// the channel. A new endpoint may also be created for a closed channel, even
-// if it was closed with an error. The buffered content of a closed channel can
-// be received normally.
-func (b *BufChan) NewEndpoint() *BufEndpoint {
-	b.RLock()
-	defer b.RUnlock()
-	return &BufEndpoint{b, b.read, false}
-}
-
-// BufEndpoint is a receive endpoint used for receiving from a channel buffer. A
-// newly created endpoint will start reading at the start of the channel buffer
-// at the moment NewEndpoint was called. Reading from the endpoint using Recv
-// calls will continue until the end of the channel buffer is reached.
-//
-// The channel buffer may grow while it is being iterated, the endpoint will
-// reflect that. The channel may grow too fast for an endpoint to be able to
-// keep up. This causes the end of the channel buffer to overflow the endpoint
-// current position. At that point the endpoint will have effectively dropped
-// all data. If that happens, the endpoint will fail and emit an
-// ErrMissingBackpressure error. Sibling endpoints are not affected by this, nor
-// is the channel itself.
-type BufEndpoint struct {
-	*BufChan
-	cursor		int64
-	overflow	bool
-}
-
-// ErrMissingBackpressure is delivered to an endpoint when the channel overflows
-// because the endpoint can't keep-up with the data rate at which the sender
-// sends values. Other sibling endpoints that are fast enough won't get this
-// error and continue to operate normally.
-var ErrMissingBackpressure = errors.New("missing backpressure")
-
-// Recv will return the next value in the channel and true. Or when at the end
-// of the channel buffer nil and false. The channel buffer can still be
-// iterated after it is finalized by calling Close. If the endpoint could not
-// keep up with the sender, then it returns nil and false. Closed will in that
-// case report ErrMissingBackpressure.
-func (ep *BufEndpoint) Recv() (interface{}, bool) {
-	ep.RLock()
-	defer ep.RUnlock()
-	now := time.Now()
-	if ep.cursor < ep.read {
-		ep.overflow = true
-	}
-	if ep.overflow {
-		return nil, false
-	}
-	for ep.cursor != ep.write {
-		entry := ep.channel[ep.cursor%ep.size]
-		ep.cursor++
-		if entry.stale.IsZero() || entry.stale.After(now) {
-			return entry.value, true
-		}
-	}
-	return nil, false
-}
-
-// Closed returns true once the channel buffer has been finalized by calling
-// Close on the channel. The returned error either has a value (the error) or
-// is nil (to indicate completion). Note, that this call is independent of how
-// far the endpoint has currently iterated the channel buffer.
-//
-// The error ErrMissingBackpressure will be delivered if the endpoint does not
-// receive data fast enough to keep up with the sender.
-func (ep *BufEndpoint) Closed() (error, bool) {
-	ep.RLock()
-	defer ep.RUnlock()
-	if ep.overflow {
-		return ErrMissingBackpressure, true
-	}
-	entry := ep.channel[ep.write%ep.size]
-	if entry.value != nil {
-		if err, ok := entry.value.(error); ok {
-			return err, true
-		} else {
-			return nil, true
-		}
-	}
-	return nil, false
-}
-
-// Wait will wait for a Send or Close call on the channel by the sender.
-func (ep *BufEndpoint) Wait() {
-	ep.RLock()
-	defer ep.RUnlock()
-	if ep.overflow {
-		return
-	}
-	if ep.cursor != ep.write {
-		return
-	}
-	if ep.channel[ep.write%ep.size].value != nil {
-		return
-	}
-	ep.recv.Wait()
-}
-
-// Range will call the function for every received value and will call the
-// function one final time when the channel is closed.
-func (ep *BufEndpoint) Range(f func(interface{}, error, bool) bool) {
-	for more := true; more; {
-		if next, ok := ep.Recv(); ok {
-			more = f(next, nil, false)
-		} else {
-			if err, ok := ep.Closed(); ok {
-				f(nil, err, true)
-				return
-			} else {
-				ep.Wait()
-			}
-		}
-	}
-}
-
-// bufChanMessage instances store the values in a BufChan. It also
-// contains a timestamp indicating when it will become stale. You will never
-// need to deal with bufChanMessage instances directly.
-type bufChanMessage struct {
-	value	interface{}
-	stale	time.Time
-}
-
 //jig:name MaxReplayCapacity
 
 // MaxReplayCapacity is the maximum size of a replay buffer. Can be modified.
 var MaxReplayCapacity = 16383
-
-//jig:name ErrTypecastToInt
-
-// ErrTypecastToInt is delivered to an observer if the generic value cannot be
-// typecast to int.
-var ErrTypecastToInt = errors.New("typecast to int failed")
 
 //jig:name NewReplaySubjectInt
 
@@ -849,30 +298,35 @@ func NewReplaySubjectInt(bufferCapacity int, windowDuration time.Duration) Subje
 	if bufferCapacity == 0 {
 		bufferCapacity = MaxReplayCapacity
 	}
-	channel := NewBufChan(bufferCapacity, windowDuration)
+	ch := channel.NewChan(bufferCapacity, 16)
 
-	observable := Create(func(observer Observer) {
-		channel.NewEndpoint().Range(func(value interface{}, err error, closed bool) bool {
-			if observer.Closed() {
-				return false
+	observable := Observable(func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		ep, err := ch.NewEndpoint(channel.ReplayAll)
+		if err != nil {
+			observe(nil, err, true)
+			return
+		}
+		observable := Create(func(observer Observer) {
+			receive := func(value interface{}, err error, closed bool) bool {
+				if !closed {
+					observer.Next(value)
+				} else {
+					observer.Error(err)
+				}
+				return !observer.Closed()
 			}
-			switch {
-			case !closed:
-				observer.Next(value)
-			case err != nil:
-				observer.Error(err)
-			default:
-				observer.Complete()
-			}
-			return !observer.Closed()
+			ep.Range(receive, windowDuration)
 		})
+		observable(observe, subscribeOn, subscriber.Add(ep.Cancel))
 	})
 
 	observer := func(next int, err error, done bool) {
-		if !done {
-			channel.Send(next)
-		} else {
-			channel.Close(err)
+		if !ch.Closed() {
+			if !done {
+				ch.Send(next)
+			} else {
+				ch.Close(err)
+			}
 		}
 	}
 
@@ -939,12 +393,6 @@ type SubjectString struct {
 	StringObserveFunc
 }
 
-//jig:name ErrTypecastToString
-
-// ErrTypecastToString is delivered to an observer if the generic value cannot be
-// typecast to string.
-var ErrTypecastToString = errors.New("typecast to string failed")
-
 //jig:name NewReplaySubjectString
 
 // NewReplaySubjectString creates a new ReplaySubject. ReplaySubject ensures that
@@ -963,30 +411,35 @@ func NewReplaySubjectString(bufferCapacity int, windowDuration time.Duration) Su
 	if bufferCapacity == 0 {
 		bufferCapacity = MaxReplayCapacity
 	}
-	channel := NewBufChan(bufferCapacity, windowDuration)
+	ch := channel.NewChan(bufferCapacity, 16)
 
-	observable := Create(func(observer Observer) {
-		channel.NewEndpoint().Range(func(value interface{}, err error, closed bool) bool {
-			if observer.Closed() {
-				return false
+	observable := Observable(func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		ep, err := ch.NewEndpoint(channel.ReplayAll)
+		if err != nil {
+			observe(nil, err, true)
+			return
+		}
+		observable := Create(func(observer Observer) {
+			receive := func(value interface{}, err error, closed bool) bool {
+				if !closed {
+					observer.Next(value)
+				} else {
+					observer.Error(err)
+				}
+				return !observer.Closed()
 			}
-			switch {
-			case !closed:
-				observer.Next(value)
-			case err != nil:
-				observer.Error(err)
-			default:
-				observer.Complete()
-			}
-			return !observer.Closed()
+			ep.Range(receive, windowDuration)
 		})
+		observable(observe, subscribeOn, subscriber.Add(ep.Cancel))
 	})
 
 	observer := func(next string, err error, done bool) {
-		if !done {
-			channel.Send(next)
-		} else {
-			channel.Close(err)
+		if !ch.Closed() {
+			if !done {
+				ch.Send(next)
+			} else {
+				ch.Close(err)
+			}
 		}
 	}
 
@@ -1005,120 +458,39 @@ func NewReplaySubjectString(bufferCapacity int, windowDuration time.Duration) Su
 // goroutine is blocked until all subscribers have processed the next, error or
 // complete notification.
 func NewSubjectInt() SubjectInt {
-	channel := NewChanFanOutNext(1)
+	ch := channel.NewChan(1, 16)
 
 	observable := Observable(func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		channel, cancel := channel.NewChannel()
+		ep, err := ch.NewEndpoint(0)
+		if err != nil {
+			observe(nil, err, true)
+			return
+		}
 		observable := Create(func(observer Observer) {
-			for item := range channel {
-				if observer.Closed() {
-					return
-				}
-				if item.Err == nil {
-					observer.Next(item.Next)
+			receive := func(value interface{}, err error, closed bool) bool {
+				if !closed {
+					observer.Next(value)
 				} else {
-					observer.Error(item.Err)
-					return
+					observer.Error(err)
 				}
+				return !observer.Closed()
 			}
-			observer.Complete()
+			ep.Range(receive, 0)
 		})
-		observable(observe, subscribeOn, subscriber.Add(cancel))
+		observable(observe, subscribeOn, subscriber.Add(ep.Cancel))
 	})
 
 	observer := func(next int, err error, done bool) {
-		if !done {
-			channel.Send(next)
-		} else {
-			channel.Close(err)
+		if !ch.Closed() {
+			if !done {
+				ch.FastSend(next)
+			} else {
+				ch.Close(err)
+			}
 		}
 	}
 
 	return SubjectInt{observable.AsInt(), observer}
-}
-
-//jig:name Observable
-
-// Observable is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type Observable func(ObserveFunc, Scheduler, Subscriber)
-
-//jig:name Observer
-
-// Observer is the interface used with Create when implementing a custom
-// observable.
-type Observer interface {
-	// Next emits the next interface{} value.
-	Next(interface{})
-	// Error signals an error condition.
-	Error(error)
-	// Complete signals that no more data is to be expected.
-	Complete()
-	// Closed returns true when the subscription has been canceled.
-	Closed() bool
-}
-
-//jig:name Create
-
-// Create creates an Observable from scratch by calling observer methods
-// programmatically.
-func Create(f func(Observer)) Observable {
-	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		scheduler.Schedule(func() {
-			if subscriber.Closed() {
-				return
-			}
-			observer := func(next interface{}, err error, done bool) {
-				if !subscriber.Closed() {
-					observe(next, err, done)
-				}
-			}
-			type observer_subscriber struct {
-				ObserveFunc
-				Subscriber
-			}
-			f(&observer_subscriber{observer, subscriber})
-		})
-	}
-	return observable
-}
-
-//jig:name FromSlice
-
-// FromSlice creates an Observable from a slice of interface{} values passed in.
-func FromSlice(slice []interface{}) Observable {
-	return Create(func(observer Observer) {
-		for _, next := range slice {
-			if observer.Closed() {
-				return
-			}
-			observer.Next(next)
-		}
-		observer.Complete()
-	})
-}
-
-//jig:name FromInt
-
-// FromInt creates an ObservableInt from multiple int values passed in.
-func FromInt(slice ...int) ObservableInt {
-	return FromSliceInt(slice)
-}
-
-//jig:name FromInts
-
-// FromInts creates an ObservableInt from multiple int values passed in.
-func FromInts(slice ...int) ObservableInt {
-	return FromSliceInt(slice)
-}
-
-//jig:name EmptyInt
-
-// EmptyInt creates an Observable that emits no items but terminates normally.
-func EmptyInt() ObservableInt {
-	return CreateInt(func(observer IntObserver) {
-		observer.Complete()
-	})
 }
 
 //jig:name NewScheduler
@@ -1209,24 +581,40 @@ func (o ObservableInt) Subscribe(observe IntObserveFunc, setters ...SubscribeOpt
 	return subscriber
 }
 
-//jig:name ObservableIntToSlice
+//jig:name ObservableIntSubscribeNext
 
-// ToSlice collects all values from the ObservableInt into an slice. The
-// complete slice and any error are returned.
-//
-// This function subscribes to the source observable on the Goroutine scheduler.
-// The Goroutine scheduler works in more situations for complex chains of
-// observables, like when merging the output of multiple observables.
-func (o ObservableInt) ToSlice(setters ...SubscribeOptionSetter) (a []int, e error) {
-	scheduler := NewGoroutine()
-	o.Subscribe(func(next int, err error, done bool) {
+// SubscribeNext operates upon the emissions from an Observable only.
+// This method returns a Subscriber.
+func (o ObservableInt) SubscribeNext(f func(next int), setters ...SubscribeOptionSetter) Subscription {
+	return o.Subscribe(func(next int, err error, done bool) {
 		if !done {
-			a = append(a, next)
-		} else {
+			f(next)
+		}
+	}, setters...)
+}
+
+//jig:name ObservableStringSubscribeOn
+
+// SubscribeOn specifies the scheduler an ObservableString should use when it is
+// subscribed to.
+func (o ObservableString) SubscribeOn(subscribeOn Scheduler) ObservableString {
+	observable := func(observe StringObserveFunc, _ Scheduler, subscriber Subscriber) {
+		o(observe, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableIntWait
+
+// Wait subscribes to the Observable and waits for completion or error.
+// Returns either the error or nil when the Observable completed normally.
+func (o ObservableInt) Wait(setters ...SubscribeOptionSetter) (e error) {
+	o.Subscribe(func(next int, err error, done bool) {
+		if done {
 			e = err
 		}
-	}, SubscribeOn(scheduler, setters...)).Wait()
-	return a, e
+	}, setters...).Wait()
+	return e
 }
 
 //jig:name ObservableIntToChanNext
@@ -1258,28 +646,31 @@ func (o ObservableInt) ToChanNext(setters ...SubscribeOptionSetter) <-chan NextI
 	return nextch
 }
 
-//jig:name ObservableIntSubscribeNext
+//jig:name ObservableIntToSingle
 
-// SubscribeNext operates upon the emissions from an Observable only.
-// This method returns a Subscriber.
-func (o ObservableInt) SubscribeNext(f func(next int), setters ...SubscribeOptionSetter) Subscription {
-	return o.Subscribe(func(next int, err error, done bool) {
+// ToSingle blocks until the ObservableInt emits exactly one value or an error.
+// The value and any error are returned.
+//
+// This function subscribes to the source observable on the Goroutine scheduler.
+// The Goroutine scheduler works in more situations for complex chains of
+// observables, like when merging the output of multiple observables.
+func (o ObservableInt) ToSingle(setters ...SubscribeOptionSetter) (v int, e error) {
+	scheduler := NewGoroutine()
+	o.Single().Subscribe(func(next int, err error, done bool) {
 		if !done {
-			f(next)
+			v = next
+		} else {
+			e = err
 		}
-	}, setters...)
+	}, SubscribeOn(scheduler, setters...)).Wait()
+	return v, e
 }
 
-//jig:name ObservableStringSubscribeOn
+//jig:name ErrTypecastToInt
 
-// SubscribeOn specifies the scheduler an ObservableString should use when it is
-// subscribed to.
-func (o ObservableString) SubscribeOn(subscribeOn Scheduler) ObservableString {
-	observable := func(observe StringObserveFunc, _ Scheduler, subscriber Subscriber) {
-		o(observe, subscribeOn, subscriber)
-	}
-	return observable
-}
+// ErrTypecastToInt is delivered to an observer if the generic value cannot be
+// typecast to int.
+var ErrTypecastToInt = errors.New("typecast to int failed")
 
 //jig:name ObservableAsInt
 
@@ -1303,6 +694,12 @@ func (o Observable) AsInt() ObservableInt {
 	return observable
 }
 
+//jig:name ErrTypecastToString
+
+// ErrTypecastToString is delivered to an observer if the generic value cannot be
+// typecast to string.
+var ErrTypecastToString = errors.New("typecast to string failed")
+
 //jig:name ObservableAsString
 
 // AsString turns an Observable of interface{} into an ObservableString. If during
@@ -1323,192 +720,6 @@ func (o Observable) AsString() ObservableString {
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
-}
-
-//jig:name Next
-
-// Next contains either the next interface{} value (in .Next) or an error (in .Err).
-// If Err is nil then Next must be valid. Next is meant to be used as the
-// type of a channel allowing errors to be delivered in-band with the values.
-type Next struct {
-	Next	interface{}
-	Err	error
-}
-
-//jig:name NewChanNext
-
-// ChanNext is a "chan Next" with two additional capabilities. Firstly, it
-// can be properly canceled from the receiver side by calling the Cancel method.
-// And secondly, it can deliver an error in-band (as opposed to out-of-band) to
-// the receiver because of how Next is defined.
-type ChanNext struct {
-	// Channel can be used directly e.g. in a range statement to read Next
-	// items from the channel.
-	Channel	chan Next
-
-	cancel	chan struct{}
-	closed	bool
-}
-
-// NewChanNext creates a new ChanNext with given buffer capacity and
-// returns a pointer to it. The Send and Close methods are supposed to be used
-// from the sending side by a single goroutine. The Channel field and the Cancel
-// method are supposed to be used from the receiving side and may be used from
-// different goroutines. Multiple goroutines reading from a single channel will
-// fight for values though, because a channel does not multicast.
-func NewChanNext(capacity int) *ChanNext {
-	return &ChanNext{
-		Channel:	make(chan Next, capacity),
-		cancel:		make(chan struct{}),
-	}
-}
-
-// Send is used from the sender side to send the next value to the channel. This
-// call only returns after delivering the value. If the channel has been closed,
-// the value is ignored and the call returns immediately.
-func (c *ChanNext) Send(value interface{}) bool {
-	if c.closed {
-		return false
-	}
-	select {
-	case <-c.cancel:
-		c.closed = true
-		close(c.Channel)
-		return false
-	case c.Channel <- Next{Next: value}:
-		return true
-	}
-}
-
-// Close is used from the sender side to deliver an error value before closing
-// the channel. Pass nil to indicate a normal close. If the channel has already
-// been closed then the call will return immediately.
-func (c *ChanNext) Close(err error) bool {
-	if c.closed {
-		return false
-	}
-	c.closed = true
-	if err != nil {
-		select {
-		case <-c.cancel:
-			return false
-		case c.Channel <- Next{Err: err}:
-		}
-	}
-	close(c.Channel)
-	return true
-}
-
-// Cancel can be called exactly once from the receiver side to indicate it no
-// longer is intereseted in the data or completion status. This cancelation will
-// be signaled to the sender. The sender will be correctly aborted if it is
-// already blocked on a Send or Close call to deliver a value or error to the
-// receiver.
-func (c *ChanNext) Cancel() {
-	close(c.cancel)
-}
-
-//jig:name NewChanFanOutNext
-
-// ChanFanOutNext is a blocking fan-out implementation writing to multiple
-// ChanNext channels that implement message buffering. Use a call to
-// NewChannel to add a receiving channel. A newly created channel will start
-// receiving any messages that are send subsequently into the fan-out channel.
-//
-// This channel works by fanning out the Send calls to a slice of ChanNext
-// wrapped Go channels. When one of the channels is slow and its buffer size
-// reaches its maximum capacity, then the Send into that channel will block.
-// This provides so called blocking backpressure to the sender by blocking its
-// goroutine. Effectively the slowest channel will dictate the throughput for
-// the whole fan-out assembly.
-type ChanFanOutNext struct {
-	sync.Mutex
-	capacity	int
-	channel		[]*ChanNext
-	closed		bool
-	err		error
-}
-
-// NewChanFanOutNext creates a new ChanFanOutNext with the given buffer
-// capacity to use for the channels in the fanout
-func NewChanFanOutNext(bufferCapacity int) *ChanFanOutNext {
-	return &ChanFanOutNext{capacity: bufferCapacity}
-}
-
-// NewChannel adds a new ChanNext channel to the fan-out and returns its
-// Channel field (<- chan Next) along with a cancel function. It is critical
-// that the cancel function is called to indicate you want to stop receiving
-// data, as simply abandoning the channel will fill up its buffer and then block
-// the whole fan-out assembly from further processing messages.
-//
-// When the channel has been closed by the sender by calling Close, then the
-// cancel function does not have to be called (but doing so does not hurt).
-// But never call the cancel function more than once, because that will panic on
-// closing an internal cancel channel twice.
-//
-// It is perfectly fine to call NewChannel on a fan-out channel that was already
-// closed. The channel returned will replay the error if present and is then
-// closed immediately.
-func (m *ChanFanOutNext) NewChannel() (<-chan Next, func()) {
-	m.Lock()
-	defer m.Unlock()
-	if m.closed {
-		channel := make(chan Next, 1)
-		if m.err != nil {
-			channel <- Next{Err: m.err}
-		}
-		close(channel)
-		return channel, func() {}
-	}
-	ch := NewChanNext(m.capacity)
-	m.channel = append(m.channel, ch)
-	return ch.Channel, func() {
-		ch.Cancel()
-		m.Lock()
-		defer m.Unlock()
-		for i, c := range m.channel {
-			if c == ch {
-				m.channel = append(m.channel[:i], m.channel[i+1:]...)
-				return
-			}
-		}
-	}
-}
-
-// Send is used to multicast a value to multiple receiving channels.
-func (m *ChanFanOutNext) Send(value interface{}) {
-	m.Lock()
-	for _, c := range m.channel {
-		c.Send(value)
-	}
-	m.Unlock()
-}
-
-// Close is used to close all receiving channels in the fan-out assembly. If
-// err is not nil, then the error is send to the channels first before they
-// are closed.
-func (m *ChanFanOutNext) Close(err error) {
-	m.Lock()
-	for _, c := range m.channel {
-		c.Close(err)
-	}
-	m.channel = nil
-	m.closed = true
-	m.err = err
-	m.Unlock()
-}
-
-//jig:name ObservableIntWait
-
-// Wait subscribes to the Observable and waits for completion or error.
-// Returns either the error or nil when the Observable completed normally.
-func (o ObservableInt) Wait(setters ...SubscribeOptionSetter) (e error) {
-	o.Subscribe(func(next int, err error, done bool) {
-		if done {
-			e = err
-		}
-	}, setters...).Wait()
-	return e
 }
 
 //jig:name ObservableIntToChan
@@ -1559,16 +770,20 @@ func (o Observable) Subscribe(observe ObserveFunc, setters ...SubscribeOptionSet
 
 //jig:name ObservableToChan
 
-// ToChan returns a channel that emits interface{} values. If the source observable does
-// not emit values but emits an error or complete, then the returned channel
-// will close without emitting any values.
+// ToChan returns a channel that emits interface{} values. If the source
+// observable does not emit values but emits an error or complete, then the
+// returned channel will enit any error and then close without emitting any
+// values.
 //
-// There is no way to determine whether the observable feeding into the
-// channel terminated with an error or completed normally.
 // Because the channel is fed by subscribing to the observable, ToChan would
 // block when subscribed on the standard Trampoline scheduler which is initially
 // synchronous. That's why the subscribing is done on the Goroutine scheduler.
-// It is not possible to cancel the subscription created internally by ToChan.
+//
+// To cancel the subscription created internally by ToChan you will need access
+// to the subscription used internnally by ToChan. To get at this subscription,
+// pass the result of a call to option OnSubscribe(func(Subscription)) as a
+// parameter to ToChan. On suscription the callback will be called with the
+// subscription that was created.
 func (o Observable) ToChan(setters ...SubscribeOptionSetter) <-chan interface{} {
 	scheduler := NewGoroutine()
 	nextch := make(chan interface{}, 1)
@@ -1576,30 +791,33 @@ func (o Observable) ToChan(setters ...SubscribeOptionSetter) <-chan interface{} 
 		if !done {
 			nextch <- next
 		} else {
+			if err != nil {
+				nextch <- err
+			}
 			close(nextch)
 		}
 	}, SubscribeOn(scheduler, setters...))
 	return nextch
 }
 
-//jig:name ObservableIntToSingle
+//jig:name ObservableIntToSlice
 
-// ToSingle blocks until the ObservableInt emits exactly one value or an error.
-// The value and any error are returned.
+// ToSlice collects all values from the ObservableInt into an slice. The
+// complete slice and any error are returned.
 //
 // This function subscribes to the source observable on the Goroutine scheduler.
 // The Goroutine scheduler works in more situations for complex chains of
 // observables, like when merging the output of multiple observables.
-func (o ObservableInt) ToSingle(setters ...SubscribeOptionSetter) (v int, e error) {
+func (o ObservableInt) ToSlice(setters ...SubscribeOptionSetter) (a []int, e error) {
 	scheduler := NewGoroutine()
-	o.Single().Subscribe(func(next int, err error, done bool) {
+	o.Subscribe(func(next int, err error, done bool) {
 		if !done {
-			v = next
+			a = append(a, next)
 		} else {
 			e = err
 		}
 	}, SubscribeOn(scheduler, setters...)).Wait()
-	return v, e
+	return a, e
 }
 
 //jig:name ObservableStringSubscribe
