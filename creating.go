@@ -33,11 +33,11 @@ func CreateFoo(f func(FooObserver)) ObservableFoo {
 					observe(next, err, done)
 				}
 			}
-			type observer_subscriber struct {
+			type ObserverSubscriber struct {
 				FooObserveFunc
 				Subscriber
 			}
-			f(&observer_subscriber{observer, subscriber})
+			f(&ObserverSubscriber{observer, subscriber})
 		})
 	}
 	return observable
