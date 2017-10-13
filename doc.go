@@ -1,15 +1,17 @@
-// Library rx provides (jig) Reactive eXtensions for the Go language.
+// Library rx provides a (jig) generic implementation of Reactive eXtensions.
+// It's a generics library for composing asynchronous and event-based programs
+// using observable sequences. The library consists of more than a 100 templates
+// to enable type-safe programming with observable streams. To use it, you will
+// need the jig tool https://github.com/reactivego/jig.
 //
-// This is a 'Just-In-time Generics' library for Go. It can be used for
-// composing asynchronous and event-based programs using observable sequences.
-// This package contains more than a 100 templates to enable type-safe
-// programming with observable streams.
-//
-// Because the generics definitions in 'rx' are only recognized by
-// Just-in-time Generics for Go, you will need to install the jig tool
-// (https://github.com/reactivego/jig/). It's easy to setup and use,
-// take a look at the Quick Start guide.
-// (https://github.com/reactivego/rx/doc/quickstart.md).
+// Using the library is very simple. Import the library with the blank
+// identifier `_` as the package name:
+//	import _ "github.com/reactivego/rx"
+// The side effect of this import is that
+// generics from the library can now be accessed by the jig tool. Then start
+// using generics from the library and run jig to generate code. Take a look at
+// the Quick Start guide to see how it all fits together
+// https://github.com/reactivego/rx/doc/quickstart.md.
 //
 // For an overview of all implemented operators, see
 // https://github.com/reactivego/rx
