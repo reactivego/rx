@@ -33,5 +33,3 @@ func TestToChanNext(t *testing.T) {
 	}
 	assert.Equal(t, expected, b)
 }
-
-func Test_toChan
