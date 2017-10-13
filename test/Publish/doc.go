@@ -6,5 +6,3 @@ Operator Publish documentation and tests.
 package Publish
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

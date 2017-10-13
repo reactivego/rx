@@ -1,12 +1,16 @@
 package Publish
 
 import (
+	"runtime"
+	"testing"
+	"time"
+
 	"github.com/stretchr/testify/assert"
 )
 
 func TestFork(t *testing.T) {
 	ch := make(chan int, 30)
-	s := FromIntChannel(ch).Fork() // allready does a subscribe, but nothing in channel yet...
+	s := FromChanInt(ch).Share() // allready does a subscribe, but nothing in channel yet...
 	a := []int{}
 	b := []int{}
 	asub := s.SubscribeNext(func(n int) { a = append(a, n) })
