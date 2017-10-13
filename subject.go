@@ -1,7 +1,7 @@
 package rx
 
 import (
-	_ "github.com/reactivego/channel"
+	"github.com/reactivego/rx/channel"
 	"time"
 )
 
@@ -36,7 +36,7 @@ type SubjectFoo struct {
 }
 
 //jig:template NewSubject<Foo>
-//jig:needs Subject<Foo>, NewChanFanOutNext
+//jig:needs Subject<Foo>
 
 // NewSubjectFoo creates a new Subject. After the subject is
 // terminated, all subsequent subscriptions to the observable side will be
@@ -48,32 +48,35 @@ type SubjectFoo struct {
 // goroutine is blocked until all subscribers have processed the next, error or
 // complete notification.
 func NewSubjectFoo() SubjectFoo {
-	channel := NewChanFanOutNext(1)
+	ch := channel.NewChan(1, 16 /*max enpoints*/)
 
 	observable := Observable(func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		channel, cancel := channel.NewChannel()
+		ep, err := ch.NewEndpoint(0)
+		if err != nil {
+			observe(nil, err, true)
+			return
+		}
 		observable := Create(func(observer Observer) {
-			for item := range channel {
-				if observer.Closed() {
-					return
-				}
-				if item.Err == nil {
-					observer.Next(item.Next)
+			receive := func(value interface{}, err error, closed bool) bool {
+				if !closed {
+					observer.Next(value)
 				} else {
-					observer.Error(item.Err)
-					return
+					observer.Error(err)
 				}
+				return !observer.Closed()
 			}
-			observer.Complete()
+			ep.Range(receive, 0)
 		})
-		observable(observe, subscribeOn, subscriber.Add(cancel))
+		observable(observe, subscribeOn, subscriber.Add(ep.Cancel))
 	})
 
 	observer := func(next foo, err error, done bool) {
-		if !done {
-			channel.Send(next)
-		} else {
-			channel.Close(err)
+		if !ch.Closed() {
+			if !done {
+				ch.FastSend(next)
+			} else {
+				ch.Close(err)
+			}
 		}
 	}
 
@@ -86,7 +89,7 @@ func NewSubjectFoo() SubjectFoo {
 var MaxReplayCapacity = 16383
 
 //jig:template NewReplaySubject<Foo>
-//jig:needs Subject<Foo>, NewBufChan, MaxReplayCapacity, ErrTypecastTo<Foo>
+//jig:needs Subject<Foo>, MaxReplayCapacity
 
 // NewReplaySubjectFoo creates a new ReplaySubject. ReplaySubject ensures that
 // all observers see the same sequence of emitted items, even if they
@@ -104,30 +107,35 @@ func NewReplaySubjectFoo(bufferCapacity int, windowDuration time.Duration) Subje
 	if bufferCapacity == 0 {
 		bufferCapacity = MaxReplayCapacity
 	}
-	channel := NewBufChan(bufferCapacity, windowDuration)
+	ch := channel.NewChan(bufferCapacity, 16 /*max enpoints*/)
 
-	observable := Create(func(observer Observer) {
-		channel.NewEndpoint().Range(func(value interface{}, err error, closed bool) bool {
-			if observer.Closed() {
-				return false
+	observable := Observable(func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		ep, err := ch.NewEndpoint(channel.ReplayAll)
+		if err != nil {
+			observe(nil, err, true)
+			return
+		}
+		observable := Create(func(observer Observer) {
+			receive := func(value interface{}, err error, closed bool) bool {
+				if !closed {
+					observer.Next(value)
+				} else {
+					observer.Error(err)
+				}
+				return !observer.Closed()
 			}
-			switch {
-			case !closed:
-				observer.Next(value)
-			case err != nil:
-				observer.Error(err)
-			default:
-				observer.Complete()
-			}
-			return !observer.Closed()
+			ep.Range(receive, windowDuration)
 		})
+		observable(observe, subscribeOn, subscriber.Add(ep.Cancel))
 	})
 
 	observer := func(next foo, err error, done bool) {
-		if !done {
-			channel.Send(next)
-		} else {
-			channel.Close(err)
+		if !ch.Closed() {
+			if !done {
+				ch.Send(next)
+			} else {
+				ch.Close(err)
+			}
 		}
 	}
 
