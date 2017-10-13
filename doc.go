@@ -7,8 +7,8 @@
 //
 // Because the generics definitions in 'rx' are only recognized by
 // Just-in-time Generics for Go, you will need to install the jig tool
-// (https://github.com/reactivego/jig/). Don’t worry, it's easy to
-// setup and use, take a look at the Quick Start guide.
+// (https://github.com/reactivego/jig/). It's easy to setup and use,
+// take a look at the Quick Start guide.
 // (https://github.com/reactivego/rx/doc/quickstart.md).
 //
 // For an overview of all implemented operators, see

@@ -1,6 +1,6 @@
 # Quick Start
 
-This tutorial introduces both [**Just-In-time Generics for Go**](https://github.com/reactivego/jig) (**jig**) and the generics library [**Reactive eXtensions for Go**](https://github.com/reactivego/rx) (**rx**). It will show you how to create a reactive "Hello, World!" program, giving you a good idea of the workflow you can expect.
+This tutorial introduces both [**Just-In-time Generics for Go**](https://github.com/reactivego/jig) (**jig**) and the generics library [**Reactive eXtensions for Go**](https://github.com/reactivego/rx) (**rx**). The purpose of this tutorial is to show the workflow involved in working with *jig* and *rx*. The quickest way to do that, is by showing you how to write a simple reactive "Hello, World!" program that uses the *rx* library.
 
 ## Installation
 
@@ -41,9 +41,9 @@ Now that you have your [`main.go`](../example/helloworld/main.go) file open in y
 ![Hello World Program](helloworld.png)
 
 > What does all of this mean?
-> 1. `rx` imported as `_` for the side effect that *jig* must be able to find `rx` in order to find the generics.
+> 1. `rx` imported as `_` purely for side effect. Because *jig* must be able to find `rx` so it can access and use it.
 > 2. `jig:file` tells *jig* to generate code into file `rx.go`.
-> 3. [`FromStrings`](http://reactivex.io/documentation/operators/from.html); *jig* will specialize `From<Foo>s` on `string` and generate more code like e.g. `ObservableString`.
+> 3. [`FromStrings`](http://reactivex.io/documentation/operators/from.html); *jig* will specialize `From<Foo>s` on `string` and generate dependencies like e.g. `ObservableString`.
 > 4. [`MapString`](http://reactivex.io/documentation/operators/map.html); *jig* will figure out that it can generate `MapString` by adding a method to `ObservableString`.
 > 5. Mapping function just concatenates two strings.
 > 6. `SubscribeNext` sees only the `next` values from the observable and prints it.
@@ -84,7 +84,7 @@ Hello, World!
 Mac:helloworld $
 ```
 
-Success! *Jig* generated the code and we were able to run the program.
+Success! *Jig* generated the code into the file `rx.go` and we were able to run the program.
 Turns out the generated file `rx.go` contains less than 250 lines of [code](../example/helloworld/rx.go)
 
 If you add code to your program using more of the generics in the `rx` library, you should run *jig* again to generate the additional code.

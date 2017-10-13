@@ -1,28 +1,49 @@
 # rx
 
-    import "github.com/reactivego/rx"
+    import _ "github.com/reactivego/rx"
 
-[![](https://godoc.org/github.com/alecthomas/gorx?status.png)](http://godoc.org/github.com/alecthomas/gorx)
+[![](https://godoc.org/github.com/reactivego/rx?status.png)](http://godoc.org/github.com/reactivego/rx)
 
-Package rx (a [Go](https://golang.org/) package) provides [Reactive eXtensions](http://reactivex.io/). A library for composing asynchronous and event-based programs using observable sequences. It contains more than a 100 templates to enable type-safe programming with observable streams.
+Library `rx` provides [Reactive eXtensions](http://reactivex.io/) for [Go](https://golang.org/). It's a generics library for composing asynchronous and event-based programs using observable sequences. The library consists of more than a 100 templates to enable type-safe programming with observable streams. To use it, you will need the *jig* tool from [Just-in-time Generics for Go](https://github.com/reactivego/jig).
 
-![Hello World Program](helloworld.png) 
+Using the library is very simple. Import the library with the blank identifier `_` as the package name. The side effect of this import is that generics from the library can now be accessed by the *jig* tool. Then start using generics from the library and run *jig* to generate code. The following is a minimal *Hello, World!* program:
 
-Want to get started right away? Try the [Quick Start](doc/quickstart.md) guide.
+```go
+package main
+
+import _ "github.com/reactivego/rx"
+
+func main() {
+	FromStrings("You!", "Gophers!", "World!").
+		MapString(func(x string) string {
+			return "Hello, " + x
+		}).
+		SubscribeNext(func(next string) {
+			println(next)
+		})
+
+	// Output:
+	// Hello, You!
+	// Hello, Gophers!
+	// Hello, World!
+}
+```
+
+Take a look at the [Quick Start](doc/quickstart.md) guide to see how it all fits together.
 
 ## Why?
-ReactiveX observables are somewhat similar to Go channels but have much richer semantics. Observables can be hot or cold, can complete normally or with an error, and use subscriptions that can be cancelled from the subscriber side. Where a normal variable is just a place where you read and write values from, an observable captures how the value of this variable changes over time. Concurrency follows naturally from the fact that an observable is an ever changing stream of values.
+ReactiveX observables are somewhat similar to Go channels but have much richer semantics. Observables can be hot or cold, can complete normally or with an error, use subscriptions that can be cancelled from the subscriber side. Where a normal variable is just a place where you read and write values from, an observable captures how the value of this variable changes over time. Concurrency follows naturally from the fact that an observable is an ever changing stream of values.
 
-`rx` is a library of operators that work on one or more observables. The way in which observables can be combined using operators to form new observables is the real strength of ReactiveX. Operators specify how observables representing streams of values are e.g. merged, transformed, concatenated, split, multicasted, replayed, delayed and debounced. [RxJS 5](https://github.com/ReactiveX/rxjs) and [RxJava 2](https://github.com/ReactiveX/RxJava) have been pushing the envelope in evolving operator semantics. The whole field is still in flux, but the more Rx is applied, the more patterns are emerging. I would like Go to be a factor in this field as well, but for that to happen we need....
+`rx` is a library of operators that work on one or more observables. The way in which observables can be combined using operators to form new observables is the real strength of ReactiveX. Operators specify how observables representing streams of values are e.g. merged, transformed, concatenated, split, multicasted, replayed, delayed and debounced. My observataion is, that [RxJS 5](https://github.com/ReactiveX/rxjs) and [RxJava 2](https://github.com/ReactiveX/RxJava) have been pushing the envelope in evolving ReactiveX operator semantics. The whole field is still in flux, but the more Rx is applied, the more patterns are emerging. I would like Go to be a participant in this field as well, but for that to happen we need....
 
 ## Generic Programming
 
-`rx` is a generics library of templates compatible with [**Just-in-time Generics for Go**](https://github.com/reactivego/jig). In generic programming you need to specify place-holder types like e.g. the `T` in `Map<T>`. Because we want our generic code to build normally, we work with so called metasyntactic type names like *Foo* and *Bar* so e.g. `MapFoo` instead of `Map<T>`. To actually use the generics just replace *Foo* with the actual type you need e.g. for `int` use `MapInt` and for `string` use `MapString`.
+`rx` is a generics library of templates compatible with [Just-in-time Generics for Go](https://github.com/reactivego/jig). In generic programming you need to specify place-holder types like e.g. the `T` in `Map<T>`. Because we want our generic code to build normally, we work with so called metasyntactic type names like *Foo* and *Bar* so e.g. `MapFoo` instead of `Map<T>`. To actually use the generics just replace *Foo* with the actual type you need e.g. for `int` use `MapInt` and for `string` use `MapString`.
 
 ## Operators 
 
-![Gophers are doing experiments](doc/caution.png)
 **This implementation of ReactiveX is highly experimental!**
+![Gophers are doing experiments](doc/caution.png)
 
 Folowing is a list of [ReactiveX operators](http://reactivex.io/documentation/operators.html) that have been implemented. Operators that are most commonly used got a :star:.
 
@@ -179,6 +200,8 @@ Our intellectual powers are rather geared to master static relations and our pow
 
 ## Acknowledgements
 This library started life as the [Reactive eXtensions for Go](https://github.com/alecthomas/gorx) library by *Alec Thomas*. Although the library has been through the metaphorical meat grinder a few times, its DNA is still clearly present in this library and I owe Alec a debt of grattitude for the work he has made so generously available.
+
+The image *Gophers are doing experiments* was borrowed from the [Go on Mobile](https://github.com/golang/mobile) project and uploaded there by Google's *Hana Kim*.
 
 ## License
 This library is licensed under the terms of the MIT License. See [LICENSE](LICENSE) file in this repository for copyright notice and exact wording.

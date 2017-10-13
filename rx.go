@@ -9,37 +9,6 @@ import (
 	"sync/atomic"
 )
 
-//jig:name BarObserveFunc
-
-// BarObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type BarObserveFunc func(bar, error, bool)
-
-var zeroBar bar
-
-// Next is called by an ObservableBar to emit the next bar value to the
-// observer.
-func (f BarObserveFunc) Next(next bar) {
-	f(next, nil, false)
-}
-
-// Error is called by an ObservableBar to report an error to the observer.
-func (f BarObserveFunc) Error(err error) {
-	f(zeroBar, err, true)
-}
-
-// Complete is called by an ObservableBar to signal that no more data is
-// forthcoming to the observer.
-func (f BarObserveFunc) Complete() {
-	f(zeroBar, nil, true)
-}
-
-//jig:name ObservableBar
-
-// ObservableBar is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableBar func(BarObserveFunc, Scheduler, Subscriber)
-
 //jig:name ObserveFunc
 
 // ObserveFunc is essentially the observer, a function that gets called
@@ -70,6 +39,37 @@ func (f ObserveFunc) Complete() {
 // Observable is essentially a subscribe function taking an observe
 // function, scheduler and an subscriber.
 type Observable func(ObserveFunc, Scheduler, Subscriber)
+
+//jig:name BarObserveFunc
+
+// BarObserveFunc is essentially the observer, a function that gets called
+// whenever the observable has something to report.
+type BarObserveFunc func(bar, error, bool)
+
+var zeroBar bar
+
+// Next is called by an ObservableBar to emit the next bar value to the
+// observer.
+func (f BarObserveFunc) Next(next bar) {
+	f(next, nil, false)
+}
+
+// Error is called by an ObservableBar to report an error to the observer.
+func (f BarObserveFunc) Error(err error) {
+	f(zeroBar, err, true)
+}
+
+// Complete is called by an ObservableBar to signal that no more data is
+// forthcoming to the observer.
+func (f BarObserveFunc) Complete() {
+	f(zeroBar, nil, true)
+}
+
+//jig:name ObservableBar
+
+// ObservableBar is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type ObservableBar func(BarObserveFunc, Scheduler, Subscriber)
 
 //jig:name IntObserveFunc
 
@@ -151,179 +151,6 @@ func (o ObservableFoo) MapObservableBar(project func(foo) ObservableBar) Observa
 	return observable
 }
 
-//jig:name Next
-
-// Next contains either the next interface{} value (in .Next) or an error (in .Err).
-// If Err is nil then Next must be valid. Next is meant to be used as the
-// type of a channel allowing errors to be delivered in-band with the values.
-type Next struct {
-	Next	interface{}
-	Err	error
-}
-
-//jig:name NewChanNext
-
-// ChanNext is a "chan Next" with two additional capabilities. Firstly, it
-// can be properly canceled from the receiver side by calling the Cancel method.
-// And secondly, it can deliver an error in-band (as opposed to out-of-band) to
-// the receiver because of how Next is defined.
-type ChanNext struct {
-	// Channel can be used directly e.g. in a range statement to read Next
-	// items from the channel.
-	Channel	chan Next
-
-	cancel	chan struct{}
-	closed	bool
-}
-
-// NewChanNext creates a new ChanNext with given buffer capacity and
-// returns a pointer to it. The Send and Close methods are supposed to be used
-// from the sending side by a single goroutine. The Channel field and the Cancel
-// method are supposed to be used from the receiving side and may be used from
-// different goroutines. Multiple goroutines reading from a single channel will
-// fight for values though, because a channel does not multicast.
-func NewChanNext(capacity int) *ChanNext {
-	return &ChanNext{
-		Channel:	make(chan Next, capacity),
-		cancel:		make(chan struct{}),
-	}
-}
-
-// Send is used from the sender side to send the next value to the channel. This
-// call only returns after delivering the value. If the channel has been closed,
-// the value is ignored and the call returns immediately.
-func (c *ChanNext) Send(value interface{}) bool {
-	if c.closed {
-		return false
-	}
-	select {
-	case <-c.cancel:
-		c.closed = true
-		close(c.Channel)
-		return false
-	case c.Channel <- Next{Next: value}:
-		return true
-	}
-}
-
-// Close is used from the sender side to deliver an error value before closing
-// the channel. Pass nil to indicate a normal close. If the channel has already
-// been closed then the call will return immediately.
-func (c *ChanNext) Close(err error) bool {
-	if c.closed {
-		return false
-	}
-	c.closed = true
-	if err != nil {
-		select {
-		case <-c.cancel:
-			return false
-		case c.Channel <- Next{Err: err}:
-		}
-	}
-	close(c.Channel)
-	return true
-}
-
-// Cancel can be called exactly once from the receiver side to indicate it no
-// longer is intereseted in the data or completion status. This cancelation will
-// be signaled to the sender. The sender will be correctly aborted if it is
-// already blocked on a Send or Close call to deliver a value or error to the
-// receiver.
-func (c *ChanNext) Cancel() {
-	close(c.cancel)
-}
-
-//jig:name NewChanFanOutNext
-
-// ChanFanOutNext is a blocking fan-out implementation writing to multiple
-// ChanNext channels that implement message buffering. Use a call to
-// NewChannel to add a receiving channel. A newly created channel will start
-// receiving any messages that are send subsequently into the fan-out channel.
-//
-// This channel works by fanning out the Send calls to a slice of ChanNext
-// wrapped Go channels. When one of the channels is slow and its buffer size
-// reaches its maximum capacity, then the Send into that channel will block.
-// This provides so called blocking backpressure to the sender by blocking its
-// goroutine. Effectively the slowest channel will dictate the throughput for
-// the whole fan-out assembly.
-type ChanFanOutNext struct {
-	sync.Mutex
-	capacity	int
-	channel		[]*ChanNext
-	closed		bool
-	err		error
-}
-
-// NewChanFanOutNext creates a new ChanFanOutNext with the given buffer
-// capacity to use for the channels in the fanout
-func NewChanFanOutNext(bufferCapacity int) *ChanFanOutNext {
-	return &ChanFanOutNext{capacity: bufferCapacity}
-}
-
-// NewChannel adds a new ChanNext channel to the fan-out and returns its
-// Channel field (<- chan Next) along with a cancel function. It is critical
-// that the cancel function is called to indicate you want to stop receiving
-// data, as simply abandoning the channel will fill up its buffer and then block
-// the whole fan-out assembly from further processing messages.
-//
-// When the channel has been closed by the sender by calling Close, then the
-// cancel function does not have to be called (but doing so does not hurt).
-// But never call the cancel function more than once, because that will panic on
-// closing an internal cancel channel twice.
-//
-// It is perfectly fine to call NewChannel on a fan-out channel that was already
-// closed. The channel returned will replay the error if present and is then
-// closed immediately.
-func (m *ChanFanOutNext) NewChannel() (<-chan Next, func()) {
-	m.Lock()
-	defer m.Unlock()
-	if m.closed {
-		channel := make(chan Next, 1)
-		if m.err != nil {
-			channel <- Next{Err: m.err}
-		}
-		close(channel)
-		return channel, func() {}
-	}
-	ch := NewChanNext(m.capacity)
-	m.channel = append(m.channel, ch)
-	return ch.Channel, func() {
-		ch.Cancel()
-		m.Lock()
-		defer m.Unlock()
-		for i, c := range m.channel {
-			if c == ch {
-				m.channel = append(m.channel[:i], m.channel[i+1:]...)
-				return
-			}
-		}
-	}
-}
-
-// Send is used to multicast a value to multiple receiving channels.
-func (m *ChanFanOutNext) Send(value interface{}) {
-	m.Lock()
-	for _, c := range m.channel {
-		c.Send(value)
-	}
-	m.Unlock()
-}
-
-// Close is used to close all receiving channels in the fan-out assembly. If
-// err is not nil, then the error is send to the channels first before they
-// are closed.
-func (m *ChanFanOutNext) Close(err error) {
-	m.Lock()
-	for _, c := range m.channel {
-		c.Close(err)
-	}
-	m.channel = nil
-	m.closed = true
-	m.err = err
-	m.Unlock()
-}
-
 //jig:name Observer
 
 // Observer is the interface used with Create when implementing a custom
@@ -337,8 +164,6 @@ type Observer interface {
 	Complete()
 	// Closed returns true when the subscription has been canceled.
 	Closed() bool
-	// OnUnsubscribe
-	OnUnsubscribe(func())
 }
 
 //jig:name Create
@@ -356,19 +181,14 @@ func Create(f func(Observer)) Observable {
 					observe(next, err, done)
 				}
 			}
-			f(&_ObserverSubscriber{observer, subscriber})
+			type ObserverSubscriber struct {
+				ObserveFunc
+				Subscriber
+			}
+			f(&ObserverSubscriber{observer, subscriber})
 		})
 	}
 	return observable
-}
-
-type _ObserverSubscriber struct {
-	ObserveFunc
-	Subscriber
-}
-
-func (os *_ObserverSubscriber) OnUnsubscribe(callback func()) {
-	os.Add(callback)
 }
 
 //jig:name IntObserver
@@ -384,8 +204,6 @@ type IntObserver interface {
 	Complete()
 	// Closed returns true when the subscription has been canceled.
 	Closed() bool
-	// OnUnsubscribe
-	OnUnsubscribe(func())
 }
 
 //jig:name CreateInt
@@ -403,19 +221,14 @@ func CreateInt(f func(IntObserver)) ObservableInt {
 					observe(next, err, done)
 				}
 			}
-			f(&_IntObserverSubscriber{observer, subscriber})
+			type ObserverSubscriber struct {
+				IntObserveFunc
+				Subscriber
+			}
+			f(&ObserverSubscriber{observer, subscriber})
 		})
 	}
 	return observable
-}
-
-type _IntObserverSubscriber struct {
-	IntObserveFunc
-	Subscriber
-}
-
-func (os *_IntObserverSubscriber) OnUnsubscribe(callback func()) {
-	os.Add(callback)
 }
 
 //jig:name Empty
@@ -458,27 +271,6 @@ func (f ObservableBarObserveFunc) Complete() {
 // function, scheduler and an subscriber.
 type ObservableObservableBar func(ObservableBarObserveFunc, Scheduler, Subscriber)
 
-//jig:name ObservableSubscribe
-
-// Subscribe operates upon the emissions and notifications from an Observable.
-// This method returns a Subscriber.
-func (o Observable) Subscribe(observe ObserveFunc, setters ...SubscribeOptionSetter) Subscriber {
-	scheduler := NewTrampoline()
-	setter := SubscribeOn(scheduler, setters...)
-	options := NewSubscribeOptions(setter)
-	subscriber := options.NewSubscriber()
-	observer := func(next interface{}, err error, done bool) {
-		if !done {
-			observe(next, err, done)
-		} else {
-			observe(zero, err, true)
-			subscriber.Unsubscribe()
-		}
-	}
-	o(observer, options.SubscribeOn, subscriber)
-	return subscriber
-}
-
 //jig:name ObservableSerialize
 
 // Serialize forces an Observable to make serialized calls and to be
@@ -500,6 +292,27 @@ func (o Observable) Serialize() Observable {
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
+}
+
+//jig:name ObservableSubscribe
+
+// Subscribe operates upon the emissions and notifications from an Observable.
+// This method returns a Subscriber.
+func (o Observable) Subscribe(observe ObserveFunc, setters ...SubscribeOptionSetter) Subscriber {
+	scheduler := NewTrampoline()
+	setter := SubscribeOn(scheduler, setters...)
+	options := NewSubscribeOptions(setter)
+	subscriber := options.NewSubscriber()
+	observer := func(next interface{}, err error, done bool) {
+		if !done {
+			observe(next, err, done)
+		} else {
+			observe(zero, err, true)
+			subscriber.Unsubscribe()
+		}
+	}
+	o(observer, options.SubscribeOn, subscriber)
+	return subscriber
 }
 
 //jig:name ObservableObservableBarMergeAll
