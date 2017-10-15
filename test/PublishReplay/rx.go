@@ -2,7 +2,7 @@
 
 //go:generate jig --regen
 
-package Replay
+package PublishReplay
 
 import (
 	"errors"
