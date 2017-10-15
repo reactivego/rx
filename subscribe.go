@@ -1,7 +1,7 @@
 package rx
 
 import (
-	"github.com/reactivego/subscriber"
+	"github.com/reactivego/rx/subscriber"
 )
 
 //jig:template Subscriber
