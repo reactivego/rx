@@ -84,34 +84,31 @@ func FromChanFoo(ch <-chan foo) ObservableFoo {
 	})
 }
 
-//jig:template FromChanNext<Foo>
-//jig:needs Create<Foo>, Next<Foo>
+//jig:template FromChan
+//jig:needs Create
 
-// FromChanNextFoo creates an ObservableFoo from a Go channel of NextFoo
-// values. This allows the code feeding into the channel to send either an
-// error or the next value. The feeding code can send zero or more NextFoo
-// items and then closing the channel will be seen as completion.
-// When the feeding code sends an error into the channel, it should close
-// the channel immediately to indicate termination with error.
-func FromChanNextFoo(ch <-chan NextFoo) ObservableFoo {
-	return CreateFoo(func(observer FooObserver) {
-		for {
-			item, ok := <-ch
+// FromChan creates an Observable from a Go channel of interface{}
+// values. This allows the code feeding into the channel to send either an error
+// or the next value. The feeding code can send zero or more items and then
+// closing the channel will be seen as completion. When the feeding code sends
+// an error into the channel, it should close the channel immediately to
+// indicate termination with error.
+func FromChan(ch <-chan interface{}) Observable {
+	return Create(func(observer Observer) {
+		for item := range ch {
 			if observer.Closed() {
 				return
 			}
-			if ok {
-				if item.Err == nil {
-					observer.Next(item.Next)
-				} else {
-					observer.Error(item.Err)
-					return
-				}
-			} else {
-				observer.Complete()
+			if err, ok := item.(error); ok {
+				observer.Error(err)
 				return
 			}
+			observer.Next(item)
 		}
+		if observer.Closed() {
+			return
+		}
+		observer.Complete()
 	})
 }
 

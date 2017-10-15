@@ -5,21 +5,109 @@
 package From
 
 import (
+	"errors"
+
 	"github.com/reactivego/rx/schedulers"
-	"github.com/reactivego/subscriber"
+	"github.com/reactivego/rx/subscriber"
 )
 
-//jig:name Scheduler
+//jig:name ObserveFunc
 
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
+// ObserveFunc is essentially the observer, a function that gets called
+// whenever the observable has something to report.
+type ObserveFunc func(interface{}, error, bool)
+
+var zero interface{}
+
+// Next is called by an Observable to emit the next interface{} value to the
+// observer.
+func (f ObserveFunc) Next(next interface{}) {
+	f(next, nil, false)
 }
 
-//jig:name Subscriber
+// Error is called by an Observable to report an error to the observer.
+func (f ObserveFunc) Error(err error) {
+	f(zero, err, true)
+}
 
-// Subscriber is an alias for the subscriber.Subscriber interface type.
-type Subscriber subscriber.Subscriber
+// Complete is called by an Observable to signal that no more data is
+// forthcoming to the observer.
+func (f ObserveFunc) Complete() {
+	f(zero, nil, true)
+}
+
+//jig:name Observable
+
+// Observable is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type Observable func(ObserveFunc, Scheduler, Subscriber)
+
+//jig:name Observer
+
+// Observer is the interface used with Create when implementing a custom
+// observable.
+type Observer interface {
+	// Next emits the next interface{} value.
+	Next(interface{})
+	// Error signals an error condition.
+	Error(error)
+	// Complete signals that no more data is to be expected.
+	Complete()
+	// Closed returns true when the subscription has been canceled.
+	Closed() bool
+}
+
+//jig:name Create
+
+// Create creates an Observable from scratch by calling observer methods
+// programmatically.
+func Create(f func(Observer)) Observable {
+	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		scheduler.Schedule(func() {
+			if subscriber.Closed() {
+				return
+			}
+			observer := func(next interface{}, err error, done bool) {
+				if !subscriber.Closed() {
+					observe(next, err, done)
+				}
+			}
+			type ObserverSubscriber struct {
+				ObserveFunc
+				Subscriber
+			}
+			f(&ObserverSubscriber{observer, subscriber})
+		})
+	}
+	return observable
+}
+
+//jig:name FromChan
+
+// FromChan creates an Observable from a Go channel of interface{}
+// values. This allows the code feeding into the channel to send either an error
+// or the next value. The feeding code can send zero or more items and then
+// closing the channel will be seen as completion. When the feeding code sends
+// an error into the channel, it should close the channel immediately to
+// indicate termination with error.
+func FromChan(ch <-chan interface{}) Observable {
+	return Create(func(observer Observer) {
+		for item := range ch {
+			if observer.Closed() {
+				return
+			}
+			if err, ok := item.(error); ok {
+				observer.Error(err)
+				return
+			}
+			observer.Next(item)
+		}
+		if observer.Closed() {
+			return
+		}
+		observer.Complete()
+	})
+}
 
 //jig:name IntObserveFunc
 
@@ -82,11 +170,11 @@ func CreateInt(f func(IntObserver)) ObservableInt {
 					observe(next, err, done)
 				}
 			}
-			type observer_subscriber struct {
+			type ObserverSubscriber struct {
 				IntObserveFunc
 				Subscriber
 			}
-			f(&observer_subscriber{observer, subscriber})
+			f(&ObserverSubscriber{observer, subscriber})
 		})
 	}
 	return observable
@@ -107,46 +195,6 @@ func FromChanInt(ch <-chan int) ObservableInt {
 			observer.Next(next)
 		}
 		observer.Complete()
-	})
-}
-
-//jig:name NextInt
-
-// NextInt contains either the next int value (in .Next) or an error (in .Err).
-// If Err is nil then Next must be valid. NextInt is meant to be used as the
-// type of a channel allowing errors to be delivered in-band with the values.
-type NextInt struct {
-	Next	int
-	Err	error
-}
-
-//jig:name FromChanNextInt
-
-// FromChanNextInt creates an ObservableInt from a Go channel of NextInt
-// values. This allows the code feeding into the channel to send either an
-// error or the next value. The feeding code can send zero or more NextInt
-// items and then closing the channel will be seen as completion.
-// When the feeding code sends an error into the channel, it should close
-// the channel immediately to indicate termination with error.
-func FromChanNextInt(ch <-chan NextInt) ObservableInt {
-	return CreateInt(func(observer IntObserver) {
-		for {
-			item, ok := <-ch
-			if observer.Closed() {
-				return
-			}
-			if ok {
-				if item.Err == nil {
-					observer.Next(item.Next)
-				} else {
-					observer.Error(item.Err)
-					return
-				}
-			} else {
-				observer.Complete()
-				return
-			}
-		}
 	})
 }
 
@@ -177,6 +225,46 @@ func FromInt(slice ...int) ObservableInt {
 // FromInts creates an ObservableInt from multiple int values passed in.
 func FromInts(slice ...int) ObservableInt {
 	return FromSliceInt(slice)
+}
+
+//jig:name Scheduler
+
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler interface {
+	Schedule(task func())
+}
+
+//jig:name Subscriber
+
+// Subscriber is an alias for the subscriber.Subscriber interface type.
+type Subscriber subscriber.Subscriber
+
+//jig:name ErrTypecastToInt
+
+// ErrTypecastToInt is delivered to an observer if the generic value cannot be
+// typecast to int.
+var ErrTypecastToInt = errors.New("typecast to int failed")
+
+//jig:name ObservableAsObservableInt
+
+// AsInt turns an Observable of interface{} into an ObservableInt. If during
+// observing a typecast fails, the error ErrTypecastToInt will be emitted.
+func (o Observable) AsObservableInt() ObservableInt {
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				if nextInt, ok := next.(int); ok {
+					observe(nextInt, err, done)
+				} else {
+					observe(zeroInt, ErrTypecastToInt, true)
+				}
+			} else {
+				observe(zeroInt, err, true)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
 }
 
 //jig:name NewScheduler

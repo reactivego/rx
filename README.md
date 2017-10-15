@@ -54,7 +54,6 @@ Operators that originate new Observables.
 - [**DeferFoo**](test/Defer/) -> ObservableFoo
 - [**EmptyFoo**](test/Empty/) -> ObservableFoo
 - [**FromChanFoo**](test/From/) -> ObservableFoo
-- [**FromChanNextFoo**](test/From/) -> ObservableFoo
 - [**FromSliceFoo**](test/From/) -> ObservableFoo
 - [**FromFoos**](test/From/) -> ObservableFoo
 - [**FromFoo :star:**](test/From/) -> ObservableFoo
@@ -186,7 +185,6 @@ Subscribing breathes life into a chain of observables.
 		- ConnectableFoo -> [**AutoConnect**](test/) -> ObservableFoo
 	- ObservableFoo -> [**SubscribeNext**](test/) Subsciber
 	- ObservableFoo -> [**ToChan**](test/) -> chan foo
-	- ObservableFoo -> [**ToChanNext**](test/) -> chan NextFoo
 	- ObservableFoo -> [**ToSingle**](test/) -> (foo, error)
 	- ObservableFoo -> [**ToSlice**](test/) -> ([]foo, error)
 	- ObservableFoo -> [**Wait**](test/) -> error

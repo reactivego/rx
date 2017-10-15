@@ -9,37 +9,6 @@ import (
 	"sync/atomic"
 )
 
-//jig:name ObserveFunc
-
-// ObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type ObserveFunc func(interface{}, error, bool)
-
-var zero interface{}
-
-// Next is called by an Observable to emit the next interface{} value to the
-// observer.
-func (f ObserveFunc) Next(next interface{}) {
-	f(next, nil, false)
-}
-
-// Error is called by an Observable to report an error to the observer.
-func (f ObserveFunc) Error(err error) {
-	f(zero, err, true)
-}
-
-// Complete is called by an Observable to signal that no more data is
-// forthcoming to the observer.
-func (f ObserveFunc) Complete() {
-	f(zero, nil, true)
-}
-
-//jig:name Observable
-
-// Observable is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type Observable func(ObserveFunc, Scheduler, Subscriber)
-
 //jig:name BarObserveFunc
 
 // BarObserveFunc is essentially the observer, a function that gets called
@@ -102,6 +71,37 @@ func (f IntObserveFunc) Complete() {
 // function, scheduler and an subscriber.
 type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 
+//jig:name ObserveFunc
+
+// ObserveFunc is essentially the observer, a function that gets called
+// whenever the observable has something to report.
+type ObserveFunc func(interface{}, error, bool)
+
+var zero interface{}
+
+// Next is called by an Observable to emit the next interface{} value to the
+// observer.
+func (f ObserveFunc) Next(next interface{}) {
+	f(next, nil, false)
+}
+
+// Error is called by an Observable to report an error to the observer.
+func (f ObserveFunc) Error(err error) {
+	f(zero, err, true)
+}
+
+// Complete is called by an Observable to signal that no more data is
+// forthcoming to the observer.
+func (f ObserveFunc) Complete() {
+	f(zero, nil, true)
+}
+
+//jig:name Observable
+
+// Observable is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type Observable func(ObserveFunc, Scheduler, Subscriber)
+
 //jig:name ObservableFooObserveFunc
 
 // ObservableFooObserveFunc is essentially the observer, a function that gets called
@@ -132,6 +132,19 @@ func (f ObservableFooObserveFunc) Complete() {
 // ObservableObservableFoo is essentially a subscribe function taking an observe
 // function, scheduler and an subscriber.
 type ObservableObservableFoo func(ObservableFooObserveFunc, Scheduler, Subscriber)
+
+//jig:name ObservableFooAsObservable
+
+// AsObservable turns a typed ObservableFoo into an Observable of interface{}.
+func (o ObservableFoo) AsObservable() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next foo, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
 
 //jig:name ObservableFooMapObservableBar
 
@@ -271,6 +284,27 @@ func (f ObservableBarObserveFunc) Complete() {
 // function, scheduler and an subscriber.
 type ObservableObservableBar func(ObservableBarObserveFunc, Scheduler, Subscriber)
 
+//jig:name ObservableSubscribe
+
+// Subscribe operates upon the emissions and notifications from an Observable.
+// This method returns a Subscriber.
+func (o Observable) Subscribe(observe ObserveFunc, setters ...SubscribeOptionSetter) Subscriber {
+	scheduler := NewTrampoline()
+	setter := SubscribeOn(scheduler, setters...)
+	options := NewSubscribeOptions(setter)
+	subscriber := options.NewSubscriber()
+	observer := func(next interface{}, err error, done bool) {
+		if !done {
+			observe(next, err, done)
+		} else {
+			observe(zero, err, true)
+			subscriber.Unsubscribe()
+		}
+	}
+	o(observer, options.SubscribeOn, subscriber)
+	return subscriber
+}
+
 //jig:name ObservableSerialize
 
 // Serialize forces an Observable to make serialized calls and to be
@@ -292,27 +326,6 @@ func (o Observable) Serialize() Observable {
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
-}
-
-//jig:name ObservableSubscribe
-
-// Subscribe operates upon the emissions and notifications from an Observable.
-// This method returns a Subscriber.
-func (o Observable) Subscribe(observe ObserveFunc, setters ...SubscribeOptionSetter) Subscriber {
-	scheduler := NewTrampoline()
-	setter := SubscribeOn(scheduler, setters...)
-	options := NewSubscribeOptions(setter)
-	subscriber := options.NewSubscriber()
-	observer := func(next interface{}, err error, done bool) {
-		if !done {
-			observe(next, err, done)
-		} else {
-			observe(zero, err, true)
-			subscriber.Unsubscribe()
-		}
-	}
-	o(observer, options.SubscribeOn, subscriber)
-	return subscriber
 }
 
 //jig:name ObservableObservableBarMergeAll

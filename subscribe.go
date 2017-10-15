@@ -166,46 +166,6 @@ func (o ObservableFoo) ToChan(setters ...SubscribeOptionSetter) <-chan foo {
 	return nextch
 }
 
-//jig:template Next<Foo>
-
-// NextFoo contains either the next foo value (in .Next) or an error (in .Err).
-// If Err is nil then Next must be valid. NextFoo is meant to be used as the
-// type of a channel allowing errors to be delivered in-band with the values.
-type NextFoo struct {
-	Next foo
-	Err  error
-}
-
-//jig:template Observable<Foo> ToChanNext
-//jig:needs Observable<Foo> Subscribe, Next<Foo>
-
-// ToChanNext returns a channel that emits NextFoo values. If the source
-// observable does not emit values but emits complete, then the returned channel
-// will close without emitting anything. If the source emitted an error, then
-// that error is also emitted by the channel before closing immediately after.
-// A NextFoo has two fields Next (of type foo) and Err (error). Valid items have
-// either Next or Err set.
-//
-// Because the channel is fed by subscribing to the observable, ToChanNext would
-// block when subscribed on the standard Trampoline scheduler which is initially
-// synchronous. That's why the subscribing is done on the Goroutine scheduler.
-// It is not possible to cancel the subscription created internally by ToChanNext.
-func (o ObservableFoo) ToChanNext(setters ...SubscribeOptionSetter) <-chan NextFoo {
-	scheduler := NewGoroutine()
-	nextch := make(chan NextFoo, 1)
-	o.Subscribe(func(next foo, err error, done bool) {
-		if !done {
-			nextch <- NextFoo{Next: next}
-		} else {
-			if err != nil {
-				nextch <- NextFoo{Err: err}
-			}
-			close(nextch)
-		}
-	}, SubscribeOn(scheduler, setters...))
-	return nextch
-}
-
 //jig:template Observable<Foo> ToSingle
 //jig:needs Observable<Foo> Subscribe
 

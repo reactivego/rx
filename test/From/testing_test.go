@@ -8,6 +8,19 @@ import (
 )
 
 func TestFromChan(t *testing.T) {
+	ch := make(chan interface{}, 6)
+	for i := 0; i < 5; i++ {
+		ch <- i
+	}
+	ch <- errors.New("error")
+	close(ch)
+	result, err := FromChan(ch).AsObservableInt().ToSlice()
+	expect := []int{0, 1, 2, 3, 4}
+	assert.EqualError(t, err, "error")
+	assert.Equal(t, expect, result)
+}
+
+func TestFromChanInt(t *testing.T) {
 	ch := make(chan int, 5)
 	for i := 0; i < 5; i++ {
 		ch <- i
@@ -16,19 +29,6 @@ func TestFromChan(t *testing.T) {
 	result, err := FromChanInt(ch).ToSlice()
 	expect := []int{0, 1, 2, 3, 4}
 	assert.NoError(t, err)
-	assert.Equal(t, expect, result)
-}
-
-func TestFromChanNext(t *testing.T) {
-	ch := make(chan NextInt, 6)
-	for i := 0; i < 5; i++ {
-		ch <- NextInt{Next: i}
-	}
-	ch <- NextInt{Err: errors.New("error")}
-	close(ch)
-	result, err := FromChanNextInt(ch).ToSlice()
-	expect := []int{0, 1, 2, 3, 4}
-	assert.EqualError(t, err, "error")
 	assert.Equal(t, expect, result)
 }
 
