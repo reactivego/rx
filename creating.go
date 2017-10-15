@@ -233,7 +233,7 @@ func (o Observable) Repeat(count int) Observable {
 
 // Repeat creates an ObservableFoo that emits a sequence of items repeatedly.
 func (o ObservableFoo) Repeat(count int) ObservableFoo {
-	return o.AsAny().Repeat(count).AsFoo()
+	return o.AsObservable().Repeat(count).AsObservableFoo()
 }
 
 //jig:template Repeat<Foo>

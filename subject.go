@@ -1,8 +1,9 @@
 package rx
 
 import (
-	"github.com/reactivego/rx/channel"
 	"time"
+
+	"github.com/reactivego/rx/channel"
 )
 
 //jig:template Subject<Foo>
@@ -80,7 +81,7 @@ func NewSubjectFoo() SubjectFoo {
 		}
 	}
 
-	return SubjectFoo{observable.AsFoo(), observer}
+	return SubjectFoo{observable.AsObservableFoo(), observer}
 }
 
 //jig:template MaxReplayCapacity
@@ -139,5 +140,5 @@ func NewReplaySubjectFoo(bufferCapacity int, windowDuration time.Duration) Subje
 		}
 	}
 
-	return SubjectFoo{observable.AsFoo(), observer}
+	return SubjectFoo{observable.AsObservableFoo(), observer}
 }

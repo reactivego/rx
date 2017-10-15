@@ -58,7 +58,7 @@ func (o Observable) Debounce(duration time.Duration) Observable {
 // Debounce only emits the last item of a burst from an ObservableFoo if a
 // particular timespan has passed without it emitting another item.
 func (o ObservableFoo) Debounce(duration time.Duration) ObservableFoo {
-	return o.AsAny().Debounce(duration).AsFoo()
+	return o.AsObservable().Debounce(duration).AsObservableFoo()
 }
 
 //jig:template Observable Distinct
@@ -86,7 +86,7 @@ func (o Observable) Distinct() Observable {
 
 // Distinct suppress duplicate items emitted by an Observable
 func (o ObservableFoo) Distinct() ObservableFoo {
-	return o.AsAny().Distinct().AsFoo()
+	return o.AsObservable().Distinct().AsObservableFoo()
 }
 
 //jig:template Observable ElementAt
@@ -111,7 +111,7 @@ func (o Observable) ElementAt(n int) Observable {
 
 // ElementAt emit only item n emitted by an Observable
 func (o ObservableFoo) ElementAt(n int) ObservableFoo {
-	return o.AsAny().ElementAt(n).AsFoo()
+	return o.AsObservable().ElementAt(n).AsObservableFoo()
 }
 
 //jig:template Observable<Foo> Filter
@@ -151,7 +151,7 @@ func (o Observable) First() Observable {
 
 // First emits only the first item, or the first item that meets a condition, from an ObservableFoo.
 func (o ObservableFoo) First() ObservableFoo {
-	return o.AsAny().First().AsFoo()
+	return o.AsObservable().First().AsObservableFoo()
 }
 
 //jig:template Observable IgnoreElements
@@ -174,7 +174,7 @@ func (o Observable) IgnoreElements() Observable {
 
 // IgnoreElements does not emit any items from an ObservableFoo but mirrors its termination notification.
 func (o ObservableFoo) IgnoreElements() ObservableFoo {
-	return o.AsAny().IgnoreElements().AsFoo()
+	return o.AsObservable().IgnoreElements().AsObservableFoo()
 }
 
 //jig:template Observable IgnoreCompletion
@@ -197,7 +197,7 @@ func (o Observable) IgnoreCompletion() Observable {
 
 // IgnoreCompletion is unknown on the reactivex.io site do we need this?
 func (o ObservableFoo) IgnoreCompletion() ObservableFoo {
-	return o.AsAny().IgnoreCompletion().AsFoo()
+	return o.AsObservable().IgnoreCompletion().AsObservableFoo()
 }
 
 //jig:template Observable Last
@@ -228,7 +228,7 @@ func (o Observable) Last() Observable {
 
 // Last emits only the last item emitted by an ObservableFoo.
 func (o ObservableFoo) Last() ObservableFoo {
-	return o.AsAny().Last().AsFoo()
+	return o.AsObservable().Last().AsObservableFoo()
 }
 
 // Repeat creates an Observable that emits a particular item or sequence of items repeatedly.
@@ -291,7 +291,7 @@ func (o Observable) Sample(window time.Duration) Observable {
 // Sample emits the most recent item emitted by an ObservableFoo within periodic
 // time intervals.
 func (o ObservableFoo) Sample(window time.Duration) ObservableFoo {
-	return o.AsAny().Sample(window).AsFoo()
+	return o.AsObservable().Sample(window).AsObservableFoo()
 }
 
 //jig:template Observable Single
@@ -339,7 +339,7 @@ func (o Observable) Single() Observable {
 // completes. If the observable sends no data before completing or sends more
 // than 1 item before completing  this reported as an error to the observer.
 func (o ObservableFoo) Single() ObservableFoo {
-	return o.AsAny().Single().AsFoo()
+	return o.AsObservable().Single().AsObservableFoo()
 }
 
 //jig:template Observable Skip
@@ -363,7 +363,7 @@ func (o Observable) Skip(n int) Observable {
 
 // Skip suppresses the first n items emitted by an ObservableFoo.
 func (o ObservableFoo) Skip(n int) ObservableFoo {
-	return o.AsAny().Skip(n).AsFoo()
+	return o.AsObservable().Skip(n).AsObservableFoo()
 }
 
 //jig:template Observable SkipLast
@@ -397,7 +397,7 @@ func (o Observable) SkipLast(n int) Observable {
 
 // SkipLast suppresses the last n items emitted by an ObservableFoo.
 func (o ObservableFoo) SkipLast(n int) ObservableFoo {
-	return o.AsAny().SkipLast(n).AsFoo()
+	return o.AsObservable().SkipLast(n).AsObservableFoo()
 }
 
 //jig:template Observable Take
@@ -427,7 +427,7 @@ func (o Observable) Take(n int) Observable {
 
 // Take emits only the first n items emitted by an ObservableFoo.
 func (o ObservableFoo) Take(n int) ObservableFoo {
-	return o.AsAny().Take(n).AsFoo()
+	return o.AsObservable().Take(n).AsObservableFoo()
 }
 
 //jig:template Observable TakeLast
@@ -464,5 +464,5 @@ func (o Observable) TakeLast(n int) Observable {
 
 // TakeLast emits only the last n items emitted by an ObservableFoo.
 func (o ObservableFoo) TakeLast(n int) ObservableFoo {
-	return o.AsAny().TakeLast(n).AsFoo()
+	return o.AsObservable().TakeLast(n).AsObservableFoo()
 }

@@ -169,7 +169,7 @@ func (o Observable) Timeout(timeout time.Duration) Observable {
 // that any timeout error will be delivered on a goroutine other than the one
 // delivering the next values.
 func (o ObservableFoo) Timeout(timeout time.Duration) ObservableFoo {
-	return o.AsAny().Timeout(timeout).AsFoo()
+	return o.AsObservable().Timeout(timeout).AsObservableFoo()
 }
 
 //jig:template ErrObservableContractViolation

@@ -163,18 +163,17 @@ Change the scheduler for subscribing and observing.
 - ObservableFoo -> [**ObserveOn**](test/ObserveOn/) -> ObservableFoo
 - ObservableFoo -> [**SubscribeOn**](test/SubscribeOn/) -> ObservableFoo
 
-### Type Casting and Filtering Operators
-Operators to type cast between observable types and filter based on type.
+### Type Casting, Converting and Filtering Operators
+Operators to type cast, type convert and type filter observables.
 
-- ObservableFoo -> [**AsAny**](test/AsAny/) -> Observable
-- Observable -> [**AsFoo**](test/As/) -> ObservableFoo
-- Observable -> [**OnlyFoo**](test/Only/) -> ObservableFoo
+- (ObservableFoo) [**AsObservableBar**](test/AsObservable/)() ObservableBar
+- (Observable) [**OnlyFoo**](test/Only/)() ObservableFoo
 
 ## Subjects
 A *Subject* is both a multicasting *Observable* as well as an *Observer*. The *Observable* side allows multiple simultaneous subscribers. The *Observer* side allows you to directly feed it data or subscribe it to another *Observable*.
 
-- [**NewSubjectFoo**](test/) -> SubjectFoo
-- [**NewReplaySubjectFoo**](test/) -> SubjectFoo
+- [**NewSubjectFoo**](test/)() SubjectFoo
+- [**NewReplaySubjectFoo**](test/)() SubjectFoo
 
 ## Subscribing
 Subscribing breathes life into a chain of observables.

@@ -2,14 +2,15 @@ package rx
 
 import "errors"
 
-//jig:template Observable<Foo> AsAny
-//jig:needs Observable
+//jig:template Observable<Foo> AsObservable<Bar>
+//jig:needs Observable<Bar>
+//jig:required-vars Foo
 
-// AsAny turns a typed ObservableFoo into an Observable of interface{}.
-func (o ObservableFoo) AsAny() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+// AsObservableBar turns a typed ObservableFoo into an Observable of bar.
+func (o ObservableFoo) AsObservableBar() ObservableBar {
+	observable := func(observe BarObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next foo, err error, done bool) {
-			observe(next, err, done)
+			observe(bar(next), err, done)
 		}
 		o(observer, subscribeOn, subscriber)
 	}
@@ -22,13 +23,13 @@ func (o ObservableFoo) AsAny() Observable {
 // typecast to foo.
 var ErrTypecastToFoo = errors.New("typecast to foo failed")
 
-//jig:template Observable As<Foo>
-//jig:needs <Foo>ObserveFunc, ErrTypecastTo<Foo>
+//jig:template Observable AsObservable<Foo>
+//jig:needs Observable<Foo>, ErrTypecastTo<Foo>
 //jig:required-vars Foo
 
 // AsFoo turns an Observable of interface{} into an ObservableFoo. If during
 // observing a typecast fails, the error ErrTypecastToFoo will be emitted.
-func (o Observable) AsFoo() ObservableFoo {
+func (o Observable) AsObservableFoo() ObservableFoo {
 	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			if !done {
@@ -46,23 +47,8 @@ func (o Observable) AsFoo() ObservableFoo {
 	return observable
 }
 
-//jig:template Observable<Foo> As<Bar>
-//jig:needs Observable<Foo>
-//jig:required-vars Foo, Bar
-
-// AsAny turns a typed ObservableFoo into an Observable of interface{}.
-func (o ObservableFoo) AsBar() ObservableBar {
-	observable := func(observe BarObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next foo, err error, done bool) {
-			observe(bar(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:template Observable Only<Foo>
-//jig:needs <Foo>ObserveFunc
+//jig:needs Observable<Foo>
 //jig:required-vars Foo
 
 // OnlyFoo filters the value stream of an Observable of interface{} and outputs only the
