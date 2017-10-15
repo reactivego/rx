@@ -117,13 +117,13 @@ Operators that work with multiple source Observables to create a single Observab
 ### Multicasting Operators
 Operators that provide subscription multicasting from 1 to multiple subscribers.
 
-- ObservableFoo -> [**Multicast**](test/MultiCast/) -> ConnectableFoo
-- ObservableFoo -> [**Publish**](test/Publish/) -> ConnectableFoo
-- ObservableFoo -> [**Replay**](test/Replay/) -> ConnectableFoo
-- ConnectableFoo -> [**RefCount**](test/RefCount/) -> ObservableFoo
-- ConnectableFoo -> [**AutoConnect**](test/AutoConnect/) -> ObservableFoo
-- ObservableFoo -> [**Share :star:**](test/Share/) -> ObservableFoo
-- ObservableFoo -> [**Cache**](test/Cache/) -> ObservableFoo
+- (ObservableFoo) [**Publish**](test/Publish/)() ConnectableFoo
+- (ObservableFoo) [**PublishReplay**](test/PublishReplay/)() ConnectableFoo
+- PublishLast
+- PublishBehavior
+- (ConnectableFoo) [**RefCount**](test/RefCount/)() ObservableFoo
+- (ConnectableFoo) [**AutoConnect**](test/AutoConnect/)() ObservableFoo
+- Share :star:
 
 ### Error Handling Operators
 Operators that help to recover from error notifications from an Observable.
