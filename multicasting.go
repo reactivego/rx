@@ -23,8 +23,8 @@ type ConnectableFoo struct {
 // Connect instructs a connectable Observable to begin emitting items to its
 // subscribers. All values will then be passed on to the observers that
 // subscribed to this connectable observable
-func (c ConnectableFoo) Connect(options ...SubscribeOptionSetter) Subscription {
-	return c.connect(options)
+func (c ConnectableFoo) Connect(setters ...SubscribeOptionSetter) Subscription {
+	return c.connect(setters)
 }
 
 //jig:template Observable<Foo> Multicast
@@ -70,12 +70,14 @@ func (o ObservableFoo) Multicast(factory func() SubjectFoo) ConnectableFoo {
 		state int32
 		atomic.Value
 	}
-	connect := func(options []SubscribeOptionSetter) Subscription {
+	connect := func(setters []SubscribeOptionSetter) Subscription {
 		if atomic.CompareAndSwapInt32(&subject.state, terminated, active) {
 			subject.Store(factory())
 		}
 		if atomic.CompareAndSwapInt32(&subscriber.state, unsubscribed, subscribed) {
-			subscription := o.Subscribe(observer, options...)
+			scheduler := NewGoroutine()
+			setter := SubscribeOn(scheduler, setters...)
+			subscription := o.Subscribe(observer, setter)
 			subscriber.Store(subscription)
 			subscription.Add(func() {
 				atomic.CompareAndSwapInt32(&subscriber.state, subscribed, unsubscribed)
@@ -126,14 +128,14 @@ func (o ObservableFoo) Replay(bufferCapacity int, windowDuration time.Duration) 
 //jig:needs Connectable<Foo>, SubscribeOptions
 
 // RefCount makes a ConnectableFoo behave like an ordinary ObservableFoo.
-func (o ConnectableFoo) RefCount(options ...SubscribeOptionSetter) ObservableFoo {
+func (o ConnectableFoo) RefCount(setters ...SubscribeOptionSetter) ObservableFoo {
 	var (
 		refcount   int32
 		connection Subscription
 	)
 	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		if atomic.AddInt32(&refcount, 1) == 1 {
-			connection = o.connect(options)
+			connection = o.connect(setters)
 		}
 		o.ObservableFoo(observe, subscribeOn, subscriber.Add(func() {
 			if atomic.AddInt32(&refcount, -1) == 0 {
@@ -151,39 +153,17 @@ func (o ConnectableFoo) RefCount(options ...SubscribeOptionSetter) ObservableFoo
 // automatically connects when the specified number of clients subscribe to it.
 // If count is 0, then AutoConnect will immediately call connect on the
 // ConnectableFoo before returning the ObservableFoo part of the ConnectableFoo.
-func (o ConnectableFoo) AutoConnect(count int, options ...SubscribeOptionSetter) ObservableFoo {
+func (o ConnectableFoo) AutoConnect(count int, setters ...SubscribeOptionSetter) ObservableFoo {
 	if count == 0 {
-		o.connect(options)
+		o.connect(setters)
 		return o.ObservableFoo
 	}
 	var refcount int32
 	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		if atomic.AddInt32(&refcount, 1) == int32(count) {
-			o.connect(options)
+			o.connect(setters)
 		}
 		o.ObservableFoo(observe, subscribeOn, subscriber)
 	}
 	return observable
-}
-
-//jig:template Observable<Foo> Share
-//jig:needs Observable<Foo> Publish, Connectable<Foo> RefCount
-
-// Share is shorthand for Publish().RefCount() to automatically call connect
-// when the first subscriber arrives and to unusubscribe Publish from the
-// source observable when the last subscriber unsubscribes. In doing so it will
-// turn the connectable observable returned by Publish into a normal observable.
-func (o ObservableFoo) Share() ObservableFoo {
-	return o.Publish().RefCount()
-}
-
-//jig:template Observable<Foo> Cache
-//jig:needs Observable<Foo> Replay, Connectable<Foo> RefCount
-
-// Cache is shorthand for Replay(...).RefCount() to automatically call connect
-// when the first subscriber arrives and to unusubscribe Replay from the source
-// observable when the last subscriber unsubscribes. In doing so it will turn
-// the connectable observable returned by Replay into a normal observable.
-func (o ObservableFoo) Cache(bufferCapacity int, windowDuration time.Duration) ObservableFoo {
-	return o.Replay(bufferCapacity, windowDuration).RefCount()
 }

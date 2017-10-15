@@ -8,13 +8,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestFork(t *testing.T) {
+func TestShare(t *testing.T) {
+	scheduler := NewGoroutine()
 	ch := make(chan int, 30)
-	s := FromChanInt(ch).Share() // allready does a subscribe, but nothing in channel yet...
+	s := FromChanInt(ch).Publish().RefCount().SubscribeOn(scheduler)
 	a := []int{}
 	b := []int{}
-	asub := s.SubscribeNext(func(n int) { a = append(a, n) })
-	bsub := s.SubscribeNext(func(n int) { b = append(b, n) })
+	asub := s.SubscribeNext(func(n int) { a = append(a, n) }, SubscribeOn(scheduler))
+	bsub := s.SubscribeNext(func(n int) { b = append(b, n) }, SubscribeOn(scheduler))
 	ch <- 1
 	ch <- 2
 	ch <- 3
@@ -28,7 +29,7 @@ func TestFork(t *testing.T) {
 	ch <- 4
 	close(ch)
 	bsub.Wait()
-	assert.Equal(t, []int{1, 2, 3, 4}, b)
 	assert.Equal(t, []int{1, 2, 3}, a)
+	assert.Equal(t, []int{1, 2, 3, 4}, b)
 	//assert.True(t, false, "force fail")
 }

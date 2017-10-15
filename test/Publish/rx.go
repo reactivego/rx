@@ -84,24 +84,6 @@ func CreateInt(f func(IntObserver)) ObservableInt {
 	return observable
 }
 
-//jig:name FromChanInt
-
-// FromChanInt creates an ObservableInt from a Go channel of int values.
-// It's not possible for the code feeding into the channel to send an error.
-// The feeding code can send zero or more int items and then closing the
-// channel will be seen as completion.
-func FromChanInt(ch <-chan int) ObservableInt {
-	return CreateInt(func(observer IntObserver) {
-		for next := range ch {
-			if observer.Closed() {
-				return
-			}
-			observer.Next(next)
-		}
-		observer.Complete()
-	})
-}
-
 //jig:name FromSliceInt
 
 // FromSliceInt creates an ObservableInt from a slice of int values passed in.
@@ -122,6 +104,24 @@ func FromSliceInt(slice []int) ObservableInt {
 // FromInts creates an ObservableInt from multiple int values passed in.
 func FromInts(slice ...int) ObservableInt {
 	return FromSliceInt(slice)
+}
+
+//jig:name FromChanInt
+
+// FromChanInt creates an ObservableInt from a Go channel of int values.
+// It's not possible for the code feeding into the channel to send an error.
+// The feeding code can send zero or more int items and then closing the
+// channel will be seen as completion.
+func FromChanInt(ch <-chan int) ObservableInt {
+	return CreateInt(func(observer IntObserver) {
+		for next := range ch {
+			if observer.Closed() {
+				return
+			}
+			observer.Next(next)
+		}
+		observer.Complete()
+	})
 }
 
 //jig:name Scheduler
@@ -276,12 +276,12 @@ func (o ObservableInt) Multicast(factory func() SubjectInt) ConnectableInt {
 		state	int32
 		atomic.Value
 	}
-	connect := func(options []SubscribeOptionSetter) Subscription {
+	connect := func(setters []SubscribeOptionSetter) Subscription {
 		if atomic.CompareAndSwapInt32(&subject.state, terminated, active) {
 			subject.Store(factory())
 		}
 		if atomic.CompareAndSwapInt32(&subscriber.state, unsubscribed, subscribed) {
-			subscription := o.Subscribe(observer, options...)
+			subscription := o.Subscribe(observer, setters...)
 			subscriber.Store(subscription)
 			subscription.Add(func() {
 				atomic.CompareAndSwapInt32(&subscriber.state, subscribed, unsubscribed)
@@ -388,14 +388,14 @@ func (o ObservableInt) Publish() ConnectableInt {
 //jig:name ConnectableIntRefCount
 
 // RefCount makes a ConnectableInt behave like an ordinary ObservableInt.
-func (o ConnectableInt) RefCount(options ...SubscribeOptionSetter) ObservableInt {
+func (o ConnectableInt) RefCount(setters ...SubscribeOptionSetter) ObservableInt {
 	var (
 		refcount	int32
 		connection	Subscription
 	)
 	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		if atomic.AddInt32(&refcount, 1) == 1 {
-			connection = o.connect(options)
+			connection = o.connect(setters)
 		}
 		o.ObservableInt(observe, subscribeOn, subscriber.Add(func() {
 			if atomic.AddInt32(&refcount, -1) == 0 {
@@ -412,8 +412,8 @@ func (o ConnectableInt) RefCount(options ...SubscribeOptionSetter) ObservableInt
 // when the first subscriber arrives and to unusubscribe Publish from the
 // source observable when the last subscriber unsubscribes. In doing so it will
 // turn the connectable observable returned by Publish into a normal observable.
-func (o ObservableInt) Share() ObservableInt {
-	return o.Publish().RefCount()
+func (o ObservableInt) Share(setters ...SubscribeOptionSetter) ObservableInt {
+	return o.Publish().RefCount(setters...)
 }
 
 //jig:name ObservableIntSubscribeOn
@@ -432,8 +432,8 @@ func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
 // Connect instructs a connectable Observable to begin emitting items to its
 // subscribers. All values will then be passed on to the observers that
 // subscribed to this connectable observable
-func (c ConnectableInt) Connect(options ...SubscribeOptionSetter) Subscription {
-	return c.connect(options)
+func (c ConnectableInt) Connect(setters ...SubscribeOptionSetter) Subscription {
+	return c.connect(setters)
 }
 
 //jig:name ObserveFunc
@@ -519,34 +519,6 @@ func (o ObservableInt) SubscribeNext(f func(next int), setters ...SubscribeOptio
 	}, setters...)
 }
 
-//jig:name ErrTypecastToInt
-
-// ErrTypecastToInt is delivered to an observer if the generic value cannot be
-// typecast to int.
-var ErrTypecastToInt = errors.New("typecast to int failed")
-
-//jig:name ObservableAsInt
-
-// AsInt turns an Observable of interface{} into an ObservableInt. If during
-// observing a typecast fails, the error ErrTypecastToInt will be emitted.
-func (o Observable) AsInt() ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				if nextInt, ok := next.(int); ok {
-					observe(nextInt, err, done)
-				} else {
-					observe(zeroInt, ErrTypecastToInt, true)
-				}
-			} else {
-				observe(zeroInt, err, true)
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name ObservableIntMapString
 
 // MapString transforms the items emitted by an ObservableInt by applying a
@@ -577,6 +549,34 @@ func (o ObservableInt) MapBool(project func(int) bool) ObservableBool {
 				mapped = project(next)
 			}
 			observe(mapped, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ErrTypecastToInt
+
+// ErrTypecastToInt is delivered to an observer if the generic value cannot be
+// typecast to int.
+var ErrTypecastToInt = errors.New("typecast to int failed")
+
+//jig:name ObservableAsInt
+
+// AsInt turns an Observable of interface{} into an ObservableInt. If during
+// observing a typecast fails, the error ErrTypecastToInt will be emitted.
+func (o Observable) AsInt() ObservableInt {
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				if nextInt, ok := next.(int); ok {
+					observe(nextInt, err, done)
+				} else {
+					observe(zeroInt, ErrTypecastToInt, true)
+				}
+			} else {
+				observe(zeroInt, err, true)
+			}
 		}
 		o(observer, subscribeOn, subscriber)
 	}
