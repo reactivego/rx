@@ -6,5 +6,3 @@ Operator Debounce documentation and tests.
 package Debounce
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

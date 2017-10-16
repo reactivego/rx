@@ -6,5 +6,3 @@ Operator Sample documentation and tests.
 package Sample
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

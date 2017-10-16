@@ -6,5 +6,3 @@ Operator Map documentation and tests.
 package Map
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

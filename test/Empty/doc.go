@@ -6,5 +6,3 @@ Operator Empty documentation and tests.
 package Empty
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

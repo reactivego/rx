@@ -6,25 +6,13 @@ package PublishReplay
 
 import (
 	"errors"
-	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/reactivego/rx/channel"
 	"github.com/reactivego/rx/schedulers"
-	"github.com/reactivego/subscriber"
+	"github.com/reactivego/rx/subscriber"
 )
-
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
-}
-
-//jig:name Subscriber
-
-// Subscriber is an alias for the subscriber.Subscriber interface type.
-type Subscriber subscriber.Subscriber
 
 //jig:name IntObserveFunc
 
@@ -87,11 +75,11 @@ func CreateInt(f func(IntObserver)) ObservableInt {
 					observe(next, err, done)
 				}
 			}
-			type observer_subscriber struct {
+			type ObserverSubscriber struct {
 				IntObserveFunc
 				Subscriber
 			}
-			f(&observer_subscriber{observer, subscriber})
+			f(&ObserverSubscriber{observer, subscriber})
 		})
 	}
 	return observable
@@ -115,11 +103,23 @@ func FromChanInt(ch <-chan int) ObservableInt {
 	})
 }
 
+//jig:name Scheduler
+
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler interface {
+	Schedule(task func())
+}
+
+//jig:name Subscriber
+
+// Subscriber is an alias for the subscriber.Subscriber interface type.
+type Subscriber subscriber.Subscriber
+
 //jig:name NewScheduler
 
-func NewGoroutine() Scheduler { return &schedulers.Goroutine{} }
+func NewGoroutine() Scheduler	{ return &schedulers.Goroutine{} }
 
-func NewTrampoline() Scheduler { return &schedulers.Trampoline{} }
+func NewTrampoline() Scheduler	{ return &schedulers.Trampoline{} }
 
 //jig:name SubscribeOptions
 
@@ -129,13 +129,13 @@ type Subscription subscriber.Subscription
 // SubscribeOptions is a struct with options for Subscribe related methods.
 type SubscribeOptions struct {
 	// SubscribeOn is the scheduler to run the observable subscription on.
-	SubscribeOn Scheduler
+	SubscribeOn	Scheduler
 	// OnSubscribe is called right after the subscription is created and before
 	// subscribing continues further.
-	OnSubscribe func(subscription Subscription)
+	OnSubscribe	func(subscription Subscription)
 	// OnUnsubscribe is called by the subscription to notify the client that the
 	// subscription has been canceled.
-	OnUnsubscribe func()
+	OnUnsubscribe	func()
 }
 
 // NewSubscriber will return a newly created subscriber. Before returning the
@@ -210,7 +210,7 @@ func (o ObservableInt) Subscribe(observe IntObserveFunc, setters ...SubscribeOpt
 // all subscribers of ConnectableInt.
 type ConnectableInt struct {
 	ObservableInt
-	connect func(options []SubscribeOptionSetter) Subscription
+	connect	func(options []SubscribeOptionSetter) Subscription
 }
 
 //jig:name ObservableIntMulticast
@@ -221,25 +221,22 @@ type ConnectableInt struct {
 // new SubjectInt that implements the actual multicasting behavior.
 func (o ObservableInt) Multicast(factory func() SubjectInt) ConnectableInt {
 	const (
-		active int32 = iota
+		active	int32	= iota
 		notifying
 		terminated
 	)
 	var subject struct {
-		state int32
+		state	int32
 		atomic.Value
 	}
 	subject.Store(factory())
 	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		if s, ok := subject.Load().(SubjectInt); ok {
-			println("subscribing......")
 			s.ObservableInt(observe, subscribeOn, subscriber)
-			println("done subscribing......")
 		}
 	}
 	observer := func(next int, err error, done bool) {
 		if atomic.CompareAndSwapInt32(&subject.state, active, notifying) {
-			println("next")
 			if s, ok := subject.Load().(SubjectInt); ok {
 				s.IntObserveFunc(next, err, done)
 			}
@@ -251,19 +248,21 @@ func (o ObservableInt) Multicast(factory func() SubjectInt) ConnectableInt {
 		}
 	}
 	const (
-		unsubscribed int32 = iota
+		unsubscribed	int32	= iota
 		subscribed
 	)
 	var subscriber struct {
-		state int32
+		state	int32
 		atomic.Value
 	}
-	connect := func(options []SubscribeOptionSetter) Subscription {
+	connect := func(setters []SubscribeOptionSetter) Subscription {
 		if atomic.CompareAndSwapInt32(&subject.state, terminated, active) {
 			subject.Store(factory())
 		}
 		if atomic.CompareAndSwapInt32(&subscriber.state, unsubscribed, subscribed) {
-			subscription := o.Subscribe(observer, options...)
+			scheduler := NewGoroutine()
+			setter := SubscribeOn(scheduler, setters...)
+			subscription := o.Subscribe(observer, setter)
 			subscriber.Store(subscription)
 			subscription.Add(func() {
 				atomic.CompareAndSwapInt32(&subscriber.state, subscribed, unsubscribed)
@@ -304,221 +303,10 @@ type SubjectInt struct {
 	IntObserveFunc
 }
 
-//jig:name NewBufChan
-
-// BufChan is a fixed capacity buffer non-blocking channel where entries
-// are appended in a circular fashion. Use Send to append entries to the channel
-// buffer, use NewEndpoint to create an endpoint to receive from the channel.
-// If the channel buffer is full (contains bufferCapacity items) then the next
-// call to Send will overwrite the first entry in the channel buffer.
-//
-// The actual channel buffer capacity is 1 entry larger than the bufferCapacity
-// passed to NewBufChan. A full channel has the write position for the
-// next entry immediately adjoining the read postion of the first entry in the
-// channel buffer. This means that even in a full channel buffer, there is a
-// single emtpy slot at the write position. This single empty slot is used to
-// store a "tombstone" when the channel is closed and thus will not be updated
-// further. To close the channel, call the Close method with nil or error.
-type BufChan struct {
-	sync.RWMutex
-	cond     *sync.Cond
-	channel  []bufChanMessage
-	read     int64
-	write    int64
-	size     int64
-	duration time.Duration
-}
-
-// NewBufChan returns a non-blocking BufChan with given buffer capacity and time
-// window. The window specifies how long items send to the channel will remain
-// fresh. After sent values become stale they are no longer returned when the
-// channel buffer is iterated with an endpoint.
-//
-// A bufferCapacity of 0 will result in a channel that cannot send data, but
-// that can signal that it has been closed. A windowDuration of 0 will make the
-// sent values remain fresh forever.
-func NewBufChan(bufferCapacity int, windowDuration time.Duration) *BufChan {
-	b := &BufChan{
-		channel:  make([]bufChanMessage, bufferCapacity+1),
-		size:     int64(bufferCapacity + 1),
-		duration: windowDuration,
-	}
-	b.cond = sync.NewCond(b)
-	return b
-}
-
-// Send will append the value at the end of the channel buffer. If the channel
-// buffer is full, the first entry in the channel buffer is overwritten and the
-// channel buffer start moved to the second entry. If the channel was closed
-// previously by calling Close, this call to Send is ignored.
-func (b *BufChan) Send(value interface{}) {
-	b.Lock()
-	defer b.Unlock()
-	if b.channel[b.write%b.size].value != nil {
-		return
-	}
-	var staleAfter time.Time
-	if b.duration != 0 {
-		staleAfter = time.Now().Add(b.duration)
-	}
-	b.channel[b.write%b.size] = bufChanMessage{value, staleAfter}
-	b.write++
-	if b.write-b.read == b.size {
-		b.read++
-		b.channel[b.write%b.size] = bufChanMessage{}
-	}
-	b.cond.Broadcast()
-}
-
-// Close will mark the channel as closed. Pass either an error value to indicate
-// an error, or nil to indicate normal completion. Once the channel has been
-// closed, all calls to Send will return immediately without modifying the
-// channel buffer.
-func (b *BufChan) Close(err error) {
-	b.Lock()
-	defer b.Unlock()
-	if err != nil {
-		b.channel[b.write%b.size] = bufChanMessage{value: err}
-	} else {
-		b.channel[b.write%b.size] = bufChanMessage{value: "completion"}
-	}
-	b.cond.Broadcast()
-}
-
-// NewEndpoint will return a receive endpoint that can be used to receive from
-// the channel. A new endpoint may also be created for a closed channel, even
-// if it was closed with an error. The buffered content of a closed channel can
-// be received normally.
-func (b *BufChan) NewEndpoint() *BufEndpoint {
-	b.RLock()
-	defer b.RUnlock()
-	return &BufEndpoint{b, b.read, false}
-}
-
-// BufEndpoint is a receive endpoint used for receiving from a channel buffer. A
-// newly created endpoint will start reading at the start of the channel buffer
-// at the moment NewEndpoint was called. Reading from the endpoint using Recv
-// calls will continue until the end of the channel buffer is reached.
-//
-// The channel buffer may grow while it is being iterated, the endpoint will
-// reflect that. The channel may grow too fast for an endpoint to be able to
-// keep up. This causes the end of the channel buffer to overflow the endpoint
-// current position. At that point the endpoint will have effectively dropped
-// all data. If that happens, the endpoint will fail and emit an
-// ErrMissingBackpressure error. Sibling endpoints are not affected by this, nor
-// is the channel itself.
-type BufEndpoint struct {
-	*BufChan
-	cursor   int64
-	overflow bool
-}
-
-// ErrMissingBackpressure is delivered to an endpoint when the channel overflows
-// because the endpoint can't keep-up with the data rate at which the sender
-// sends values. Other sibling endpoints that are fast enough won't get this
-// error and continue to operate normally.
-var ErrMissingBackpressure = errors.New("missing backpressure")
-
-// Recv will return the next value in the channel and true. Or when at the end
-// of the channel buffer nil and false. The channel buffer can still be
-// iterated after it is finalized by calling Close. If the endpoint could not
-// keep up with the sender, then it returns nil and false. Closed will in that
-// case report ErrMissingBackpressure.
-func (ep *BufEndpoint) Recv() (interface{}, bool) {
-	ep.RLock()
-	defer ep.RUnlock()
-	now := time.Now()
-	if ep.cursor < ep.read {
-		ep.overflow = true
-	}
-	if ep.overflow {
-		return nil, false
-	}
-	for ep.cursor != ep.write {
-		entry := ep.channel[ep.cursor%ep.size]
-		ep.cursor++
-		if entry.stale.IsZero() || entry.stale.After(now) {
-			return entry.value, true
-		}
-	}
-	return nil, false
-}
-
-// Closed returns true once the channel buffer has been finalized by calling
-// Close on the channel. The returned error either has a value (the error) or
-// is nil (to indicate completion). Note, that this call is independent of how
-// far the endpoint has currently iterated the channel buffer.
-//
-// The error ErrMissingBackpressure will be delivered if the endpoint does not
-// receive data fast enough to keep up with the sender.
-func (ep *BufEndpoint) Closed() (error, bool) {
-	ep.RLock()
-	defer ep.RUnlock()
-	if ep.overflow {
-		return ErrMissingBackpressure, true
-	}
-	entry := ep.channel[ep.write%ep.size]
-	if entry.value != nil {
-		if err, ok := entry.value.(error); ok {
-			return err, true
-		} else {
-			return nil, true
-		}
-	}
-	return nil, false
-}
-
-// Wait will wait for a Send or Close call on the channel by the sender.
-func (ep *BufEndpoint) Wait() {
-	ep.Lock()
-	defer ep.Unlock()
-	if ep.overflow {
-		return
-	}
-	if ep.cursor != ep.write {
-		return
-	}
-	if ep.channel[ep.write%ep.size].value != nil {
-		return
-	}
-	ep.cond.Wait()
-}
-
-// Range will call the function for every received value and will call the
-// function one final time when the channel is closed.
-func (ep *BufEndpoint) Range(f func(interface{}, error, bool) bool) {
-	for more := true; more; {
-		if next, ok := ep.Recv(); ok {
-			more = f(next, nil, false)
-		} else {
-			if err, ok := ep.Closed(); ok {
-				f(nil, err, true)
-				return
-			} else {
-				ep.Wait()
-			}
-		}
-	}
-}
-
-// bufChanMessage instances store the values in a BufChan. It also
-// contains a timestamp indicating when it will become stale. You will never
-// need to deal with bufChanMessage instances directly.
-type bufChanMessage struct {
-	value interface{}
-	stale time.Time
-}
-
 //jig:name MaxReplayCapacity
 
 // MaxReplayCapacity is the maximum size of a replay buffer. Can be modified.
 var MaxReplayCapacity = 16383
-
-//jig:name ErrTypecastToInt
-
-// ErrTypecastToInt is delivered to an observer if the generic value cannot be
-// typecast to int.
-var ErrTypecastToInt = errors.New("typecast to int failed")
 
 //jig:name NewReplaySubjectInt
 
@@ -538,35 +326,39 @@ func NewReplaySubjectInt(bufferCapacity int, windowDuration time.Duration) Subje
 	if bufferCapacity == 0 {
 		bufferCapacity = MaxReplayCapacity
 	}
-	channel := NewBufChan(bufferCapacity, windowDuration)
+	ch := channel.NewChan(bufferCapacity, 16)
 
-	observable := Create(func(observer Observer) {
-		channel.NewEndpoint().Range(func(value interface{}, err error, closed bool) bool {
-			println("enumerating....")
-			if observer.Closed() {
-				return false
+	observable := Observable(func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		ep, err := ch.NewEndpoint(channel.ReplayAll)
+		if err != nil {
+			observe(nil, err, true)
+			return
+		}
+		observable := Create(func(observer Observer) {
+			receive := func(value interface{}, err error, closed bool) bool {
+				if !closed {
+					observer.Next(value)
+				} else {
+					observer.Error(err)
+				}
+				return !observer.Closed()
 			}
-			switch {
-			case !closed:
-				observer.Next(value)
-			case err != nil:
-				observer.Error(err)
-			default:
-				observer.Complete()
-			}
-			return !observer.Closed()
+			ep.Range(receive, windowDuration)
 		})
+		observable(observe, subscribeOn, subscriber.Add(ep.Cancel))
 	})
 
 	observer := func(next int, err error, done bool) {
-		if !done {
-			channel.Send(next)
-		} else {
-			channel.Close(err)
+		if !ch.Closed() {
+			if !done {
+				ch.Send(next)
+			} else {
+				ch.Close(err)
+			}
 		}
 	}
 
-	return SubjectInt{observable.AsInt(), observer}
+	return SubjectInt{observable.AsObservableInt(), observer}
 }
 
 //jig:name ObservableIntReplay
@@ -584,19 +376,6 @@ func (o ObservableInt) Replay(bufferCapacity int, windowDuration time.Duration) 
 		return NewReplaySubjectInt(bufferCapacity, windowDuration)
 	}
 	return o.Multicast(factory)
-}
-
-//jig:name ObservableIntWait
-
-// Wait subscribes to the Observable and waits for completion or error.
-// Returns either the error or nil when the Observable completed normally.
-func (o ObservableInt) Wait(setters ...SubscribeOptionSetter) (e error) {
-	o.Subscribe(func(next int, err error, done bool) {
-		if done {
-			e = err
-		}
-	}, setters...).Wait()
-	return e
 }
 
 //jig:name ObserveFunc
@@ -660,23 +439,63 @@ func Create(f func(Observer)) Observable {
 					observe(next, err, done)
 				}
 			}
-			type observer_subscriber struct {
+			type ObserverSubscriber struct {
 				ObserveFunc
 				Subscriber
 			}
-			f(&observer_subscriber{observer, subscriber})
+			f(&ObserverSubscriber{observer, subscriber})
 		})
 	}
 	return observable
 }
 
-//jig:name ConnectableIntConnect
+//jig:name ConnectableIntAutoConnect
 
-// Connect instructs a connectable Observable to begin emitting items to its
-// subscribers. All values will then be passed on to the observers that
-// subscribed to this connectable observable
-func (c ConnectableInt) Connect(options ...SubscribeOptionSetter) Subscription {
-	return c.connect(options)
+// AutoConnect makes a ConnectableInt behave like an ordinary ObservableInt that
+// automatically connects when the specified number of clients subscribe to it.
+// If count is 0, then AutoConnect will immediately call connect on the
+// ConnectableInt before returning the ObservableInt part of the ConnectableInt.
+func (o ConnectableInt) AutoConnect(count int, setters ...SubscribeOptionSetter) ObservableInt {
+	if count == 0 {
+		o.connect(setters)
+		return o.ObservableInt
+	}
+	var refcount int32
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		if atomic.AddInt32(&refcount, 1) == int32(count) {
+			o.connect(setters)
+		}
+		o.ObservableInt(observe, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ErrTypecastToInt
+
+// ErrTypecastToInt is delivered to an observer if the generic value cannot be
+// typecast to int.
+var ErrTypecastToInt = errors.New("typecast to int failed")
+
+//jig:name ObservableAsObservableInt
+
+// AsInt turns an Observable of interface{} into an ObservableInt. If during
+// observing a typecast fails, the error ErrTypecastToInt will be emitted.
+func (o Observable) AsObservableInt() ObservableInt {
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				if nextInt, ok := next.(int); ok {
+					observe(nextInt, err, done)
+				} else {
+					observe(zeroInt, ErrTypecastToInt, true)
+				}
+			} else {
+				observe(zeroInt, err, true)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
 }
 
 //jig:name ObservableIntToSlice
@@ -697,49 +516,4 @@ func (o ObservableInt) ToSlice(setters ...SubscribeOptionSetter) (a []int, e err
 		}
 	}, SubscribeOn(scheduler, setters...)).Wait()
 	return a, e
-}
-
-//jig:name ConnectableIntAutoConnect
-
-// AutoConnect makes a ConnectableInt behave like an ordinary ObservableInt that
-// automatically connects when the specified number of clients subscribe to it.
-// If count is 0, then AutoConnect will immediately call connect on the
-// ConnectableInt before returning the ObservableInt part of the ConnectableInt.
-func (o ConnectableInt) AutoConnect(count int, options ...SubscribeOptionSetter) ObservableInt {
-	if count == 0 {
-		o.connect(options)
-		return o.ObservableInt
-	}
-	var refcount int32
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		if atomic.AddInt32(&refcount, 1) == int32(count) {
-			println("connecting")
-			o.connect(options)
-			println("connected")
-		}
-		o.ObservableInt(observe, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableAsInt
-
-// AsInt turns an Observable of interface{} into an ObservableInt. If during
-// observing a typecast fails, the error ErrTypecastToInt will be emitted.
-func (o Observable) AsInt() ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				if nextInt, ok := next.(int); ok {
-					observe(nextInt, err, done)
-				} else {
-					observe(zeroInt, ErrTypecastToInt, true)
-				}
-			} else {
-				observe(zeroInt, err, true)
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
 }

@@ -6,5 +6,3 @@ Operator Merge documentation and tests.
 package Merge
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

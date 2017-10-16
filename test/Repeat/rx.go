@@ -8,20 +8,8 @@ import (
 	"errors"
 
 	"github.com/reactivego/rx/schedulers"
-	"github.com/reactivego/subscriber"
+	"github.com/reactivego/rx/subscriber"
 )
-
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
-}
-
-//jig:name Subscriber
-
-// Subscriber is an alias for the subscriber.Subscriber interface type.
-type Subscriber subscriber.Subscriber
 
 //jig:name IntObserveFunc
 
@@ -84,11 +72,11 @@ func CreateInt(f func(IntObserver)) ObservableInt {
 					observe(next, err, done)
 				}
 			}
-			type observer_subscriber struct {
+			type ObserverSubscriber struct {
 				IntObserveFunc
 				Subscriber
 			}
-			f(&observer_subscriber{observer, subscriber})
+			f(&ObserverSubscriber{observer, subscriber})
 		})
 	}
 	return observable
@@ -109,6 +97,18 @@ func RepeatInt(value int, count int) ObservableInt {
 		observer.Complete()
 	})
 }
+
+//jig:name Scheduler
+
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler interface {
+	Schedule(task func())
+}
+
+//jig:name Subscriber
+
+// Subscriber is an alias for the subscriber.Subscriber interface type.
+type Subscriber subscriber.Subscriber
 
 //jig:name NewScheduler
 
@@ -249,7 +249,7 @@ func (o Observable) Repeat(count int) Observable {
 
 // Repeat creates an ObservableInt that emits a sequence of items repeatedly.
 func (o ObservableInt) Repeat(count int) ObservableInt {
-	return o.AsAny().Repeat(count).AsInt()
+	return o.AsObservable().Repeat(count).AsObservableInt()
 }
 
 //jig:name ObserveFunc
@@ -283,13 +283,49 @@ func (f ObserveFunc) Complete() {
 // function, scheduler and an subscriber.
 type Observable func(ObserveFunc, Scheduler, Subscriber)
 
-//jig:name ObservableIntAsAny
+//jig:name ObservableTakeLast
 
-// AsAny turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsAny() Observable {
+// TakeLast emits only the last n items emitted by an Observable.
+func (o Observable) TakeLast(n int) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		read := 0
+		write := 0
+		n++
+		buffer := make([]interface{}, n)
+		observer := func(next interface{}, err error, done bool) {
+			if done {
+				for read != write {
+					observe(buffer[read], nil, false)
+					read = (read + 1) % n
+				}
+				observe(nil, err, true)
+			} else {
+				buffer[write] = next
+				write = (write + 1) % n
+				if write == read {
+					read = (read + 1) % n
+				}
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableIntTakeLast
+
+// TakeLast emits only the last n items emitted by an ObservableInt.
+func (o ObservableInt) TakeLast(n int) ObservableInt {
+	return o.AsObservable().TakeLast(n).AsObservableInt()
+}
+
+//jig:name ObservableIntAsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
 	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next int, err error, done bool) {
-			observe(next, err, done)
+			observe(interface{}(next), err, done)
 		}
 		o(observer, subscribeOn, subscriber)
 	}
@@ -326,11 +362,11 @@ func Create(f func(Observer)) Observable {
 					observe(next, err, done)
 				}
 			}
-			type observer_subscriber struct {
+			type ObserverSubscriber struct {
 				ObserveFunc
 				Subscriber
 			}
-			f(&observer_subscriber{observer, subscriber})
+			f(&ObserverSubscriber{observer, subscriber})
 		})
 	}
 	return observable
@@ -345,53 +381,17 @@ func Empty() Observable {
 	})
 }
 
-//jig:name ObservableTakeLast
-
-// TakeLast emits only the last n items emitted by an Observable.
-func (o Observable) TakeLast(n int) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		read := 0
-		write := 0
-		n++
-		buffer := make([]interface{}, n)
-		observer := func(next interface{}, err error, done bool) {
-			if done {
-				for read != write {
-					observe(buffer[read], nil, false)
-					read = (read + 1) % n
-				}
-				observe(nil, err, true)
-			} else {
-				buffer[write] = next
-				write = (write + 1) % n
-				if write == read {
-					read = (read + 1) % n
-				}
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableIntTakeLast
-
-// TakeLast emits only the last n items emitted by an ObservableInt.
-func (o ObservableInt) TakeLast(n int) ObservableInt {
-	return o.AsAny().TakeLast(n).AsInt()
-}
-
 //jig:name ErrTypecastToInt
 
 // ErrTypecastToInt is delivered to an observer if the generic value cannot be
 // typecast to int.
 var ErrTypecastToInt = errors.New("typecast to int failed")
 
-//jig:name ObservableAsInt
+//jig:name ObservableAsObservableInt
 
 // AsInt turns an Observable of interface{} into an ObservableInt. If during
 // observing a typecast fails, the error ErrTypecastToInt will be emitted.
-func (o Observable) AsInt() ObservableInt {
+func (o Observable) AsObservableInt() ObservableInt {
 	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			if !done {

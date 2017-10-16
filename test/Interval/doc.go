@@ -6,5 +6,3 @@ Operator Interval documentation and tests.
 package Interval
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

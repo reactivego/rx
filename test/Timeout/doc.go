@@ -6,5 +6,3 @@ Operator Timeout documentation and tests.
 package Timeout
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

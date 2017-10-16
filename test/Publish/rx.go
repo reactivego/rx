@@ -10,7 +10,7 @@ import (
 
 	"github.com/reactivego/rx/channel"
 	"github.com/reactivego/rx/schedulers"
-	"github.com/reactivego/subscriber"
+	"github.com/reactivego/rx/subscriber"
 )
 
 //jig:name IntObserveFunc
@@ -281,7 +281,9 @@ func (o ObservableInt) Multicast(factory func() SubjectInt) ConnectableInt {
 			subject.Store(factory())
 		}
 		if atomic.CompareAndSwapInt32(&subscriber.state, unsubscribed, subscribed) {
-			subscription := o.Subscribe(observer, setters...)
+			scheduler := NewGoroutine()
+			setter := SubscribeOn(scheduler, setters...)
+			subscription := o.Subscribe(observer, setter)
 			subscriber.Store(subscription)
 			subscription.Add(func() {
 				atomic.CompareAndSwapInt32(&subscriber.state, subscribed, unsubscribed)
@@ -366,7 +368,7 @@ func NewSubjectInt() SubjectInt {
 		}
 	}
 
-	return SubjectInt{observable.AsInt(), observer}
+	return SubjectInt{observable.AsObservableInt(), observer}
 }
 
 //jig:name ObservableIntPublish
@@ -383,37 +385,6 @@ func NewSubjectInt() SubjectInt {
 // connect on the first subscription but will never re-connect.
 func (o ObservableInt) Publish() ConnectableInt {
 	return o.Multicast(NewSubjectInt)
-}
-
-//jig:name ConnectableIntRefCount
-
-// RefCount makes a ConnectableInt behave like an ordinary ObservableInt.
-func (o ConnectableInt) RefCount(setters ...SubscribeOptionSetter) ObservableInt {
-	var (
-		refcount	int32
-		connection	Subscription
-	)
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		if atomic.AddInt32(&refcount, 1) == 1 {
-			connection = o.connect(setters)
-		}
-		o.ObservableInt(observe, subscribeOn, subscriber.Add(func() {
-			if atomic.AddInt32(&refcount, -1) == 0 {
-				connection.Unsubscribe()
-			}
-		}))
-	}
-	return observable
-}
-
-//jig:name ObservableIntShare
-
-// Share is shorthand for Publish().RefCount() to automatically call connect
-// when the first subscriber arrives and to unusubscribe Publish from the
-// source observable when the last subscriber unsubscribes. In doing so it will
-// turn the connectable observable returned by Publish into a normal observable.
-func (o ObservableInt) Share(setters ...SubscribeOptionSetter) ObservableInt {
-	return o.Publish().RefCount(setters...)
 }
 
 //jig:name ObservableIntSubscribeOn
@@ -507,6 +478,55 @@ func Create(f func(Observer)) Observable {
 	return observable
 }
 
+//jig:name ConnectableIntRefCount
+
+// RefCount makes a ConnectableInt behave like an ordinary ObservableInt.
+func (o ConnectableInt) RefCount(setters ...SubscribeOptionSetter) ObservableInt {
+	var (
+		refcount	int32
+		connection	Subscription
+	)
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		if atomic.AddInt32(&refcount, 1) == 1 {
+			connection = o.connect(setters)
+		}
+		o.ObservableInt(observe, subscribeOn, subscriber.Add(func() {
+			if atomic.AddInt32(&refcount, -1) == 0 {
+				connection.Unsubscribe()
+			}
+		}))
+	}
+	return observable
+}
+
+//jig:name ErrTypecastToInt
+
+// ErrTypecastToInt is delivered to an observer if the generic value cannot be
+// typecast to int.
+var ErrTypecastToInt = errors.New("typecast to int failed")
+
+//jig:name ObservableAsObservableInt
+
+// AsInt turns an Observable of interface{} into an ObservableInt. If during
+// observing a typecast fails, the error ErrTypecastToInt will be emitted.
+func (o Observable) AsObservableInt() ObservableInt {
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				if nextInt, ok := next.(int); ok {
+					observe(nextInt, err, done)
+				} else {
+					observe(zeroInt, ErrTypecastToInt, true)
+				}
+			} else {
+				observe(zeroInt, err, true)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name ObservableIntSubscribeNext
 
 // SubscribeNext operates upon the emissions from an Observable only.
@@ -549,34 +569,6 @@ func (o ObservableInt) MapBool(project func(int) bool) ObservableBool {
 				mapped = project(next)
 			}
 			observe(mapped, err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ErrTypecastToInt
-
-// ErrTypecastToInt is delivered to an observer if the generic value cannot be
-// typecast to int.
-var ErrTypecastToInt = errors.New("typecast to int failed")
-
-//jig:name ObservableAsInt
-
-// AsInt turns an Observable of interface{} into an ObservableInt. If during
-// observing a typecast fails, the error ErrTypecastToInt will be emitted.
-func (o Observable) AsInt() ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				if nextInt, ok := next.(int); ok {
-					observe(nextInt, err, done)
-				} else {
-					observe(zeroInt, ErrTypecastToInt, true)
-				}
-			} else {
-				observe(zeroInt, err, true)
-			}
 		}
 		o(observer, subscribeOn, subscriber)
 	}

@@ -8,5 +8,3 @@ Passthrough just passes through all output from the ObservableFoo.
 package Passthrough
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

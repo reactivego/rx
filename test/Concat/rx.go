@@ -6,20 +6,8 @@ package Concat
 
 import (
 	"github.com/reactivego/rx/schedulers"
-	"github.com/reactivego/subscriber"
+	"github.com/reactivego/rx/subscriber"
 )
-
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
-}
-
-//jig:name Subscriber
-
-// Subscriber is an alias for the subscriber.Subscriber interface type.
-type Subscriber subscriber.Subscriber
 
 //jig:name IntObserveFunc
 
@@ -82,11 +70,11 @@ func CreateInt(f func(IntObserver)) ObservableInt {
 					observe(next, err, done)
 				}
 			}
-			type observer_subscriber struct {
+			type ObserverSubscriber struct {
 				IntObserveFunc
 				Subscriber
 			}
-			f(&observer_subscriber{observer, subscriber})
+			f(&ObserverSubscriber{observer, subscriber})
 		})
 	}
 	return observable
@@ -113,6 +101,18 @@ func FromSliceInt(slice []int) ObservableInt {
 func FromInts(slice ...int) ObservableInt {
 	return FromSliceInt(slice)
 }
+
+//jig:name Scheduler
+
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler interface {
+	Schedule(task func())
+}
+
+//jig:name Subscriber
+
+// Subscriber is an alias for the subscriber.Subscriber interface type.
+type Subscriber subscriber.Subscriber
 
 //jig:name ObservableIntConcat
 
@@ -232,18 +232,6 @@ func (o ObservableInt) Subscribe(observe IntObserveFunc, setters ...SubscribeOpt
 	return subscriber
 }
 
-//jig:name ObservableIntSubscribeNext
-
-// SubscribeNext operates upon the emissions from an Observable only.
-// This method returns a Subscriber.
-func (o ObservableInt) SubscribeNext(f func(next int), setters ...SubscribeOptionSetter) Subscription {
-	return o.Subscribe(func(next int, err error, done bool) {
-		if !done {
-			f(next)
-		}
-	}, setters...)
-}
-
 //jig:name ObservableIntToSlice
 
 // ToSlice collects all values from the ObservableInt into an slice. The
@@ -262,4 +250,16 @@ func (o ObservableInt) ToSlice(setters ...SubscribeOptionSetter) (a []int, e err
 		}
 	}, SubscribeOn(scheduler, setters...)).Wait()
 	return a, e
+}
+
+//jig:name ObservableIntSubscribeNext
+
+// SubscribeNext operates upon the emissions from an Observable only.
+// This method returns a Subscriber.
+func (o ObservableInt) SubscribeNext(f func(next int), setters ...SubscribeOptionSetter) Subscription {
+	return o.Subscribe(func(next int, err error, done bool) {
+		if !done {
+			f(next)
+		}
+	}, setters...)
 }

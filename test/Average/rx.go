@@ -2,7 +2,7 @@
 
 //go:generate jig --regen
 
-package Max
+package Average
 
 import (
 	"errors"
@@ -104,6 +104,99 @@ func FromInts(slice ...int) ObservableInt {
 	return FromSliceInt(slice)
 }
 
+//jig:name Float32ObserveFunc
+
+// Float32ObserveFunc is essentially the observer, a function that gets called
+// whenever the observable has something to report.
+type Float32ObserveFunc func(float32, error, bool)
+
+var zeroFloat32 float32
+
+// Next is called by an ObservableFloat32 to emit the next float32 value to the
+// observer.
+func (f Float32ObserveFunc) Next(next float32) {
+	f(next, nil, false)
+}
+
+// Error is called by an ObservableFloat32 to report an error to the observer.
+func (f Float32ObserveFunc) Error(err error) {
+	f(zeroFloat32, err, true)
+}
+
+// Complete is called by an ObservableFloat32 to signal that no more data is
+// forthcoming to the observer.
+func (f Float32ObserveFunc) Complete() {
+	f(zeroFloat32, nil, true)
+}
+
+//jig:name ObservableFloat32
+
+// ObservableFloat32 is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type ObservableFloat32 func(Float32ObserveFunc, Scheduler, Subscriber)
+
+//jig:name Float32Observer
+
+// Float32Observer is the interface used with CreateFloat32 when implementing a custom
+// observable.
+type Float32Observer interface {
+	// Next emits the next float32 value.
+	Next(float32)
+	// Error signals an error condition.
+	Error(error)
+	// Complete signals that no more data is to be expected.
+	Complete()
+	// Closed returns true when the subscription has been canceled.
+	Closed() bool
+}
+
+//jig:name CreateFloat32
+
+// CreateFloat32 creates an Observable from scratch by calling observer methods
+// programmatically.
+func CreateFloat32(f func(Float32Observer)) ObservableFloat32 {
+	observable := func(observe Float32ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		scheduler.Schedule(func() {
+			if subscriber.Closed() {
+				return
+			}
+			observer := func(next float32, err error, done bool) {
+				if !subscriber.Closed() {
+					observe(next, err, done)
+				}
+			}
+			type ObserverSubscriber struct {
+				Float32ObserveFunc
+				Subscriber
+			}
+			f(&ObserverSubscriber{observer, subscriber})
+		})
+	}
+	return observable
+}
+
+//jig:name FromSliceFloat32
+
+// FromSliceFloat32 creates an ObservableFloat32 from a slice of float32 values passed in.
+func FromSliceFloat32(slice []float32) ObservableFloat32 {
+	return CreateFloat32(func(observer Float32Observer) {
+		for _, next := range slice {
+			if observer.Closed() {
+				return
+			}
+			observer.Next(next)
+		}
+		observer.Complete()
+	})
+}
+
+//jig:name FromFloat32s
+
+// FromFloat32s creates an ObservableFloat32 from multiple float32 values passed in.
+func FromFloat32s(slice ...float32) ObservableFloat32 {
+	return FromSliceFloat32(slice)
+}
+
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
@@ -116,31 +209,45 @@ type Scheduler interface {
 // Subscriber is an alias for the subscriber.Subscriber interface type.
 type Subscriber subscriber.Subscriber
 
-//jig:name ObservableIntMax
+//jig:name ObservableIntAverage
 
-// Max determines, and emits, the maximum-valued item emitted by an
-// ObservableInt.
-func (o ObservableInt) Max() ObservableInt {
+// Average calculates the average of numbers emitted by an ObservableInt and
+// emits this average.
+func (o ObservableInt) Average() ObservableInt {
 	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		var started bool
-		var max int
+		var sum, count int
 		observer := func(next int, err error, done bool) {
-			if started {
-				if !done {
-					if max < next {
-						max = next
-					}
-				} else {
-					observe(max, nil, false)
-					observe(zeroInt, err, done)
-				}
+			if !done {
+				sum += next
+				count++
 			} else {
-				if !done {
-					max = next
-					started = true
-				} else {
-					observe(zeroInt, err, done)
+				if count > 0 {
+					observe(sum/count, nil, false)
 				}
+				observe(zeroInt, err, done)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableFloat32Average
+
+// Average calculates the average of numbers emitted by an ObservableFloat32 and
+// emits this average.
+func (o ObservableFloat32) Average() ObservableFloat32 {
+	observable := func(observe Float32ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		var sum, count float32
+		observer := func(next float32, err error, done bool) {
+			if !done {
+				sum += next
+				count++
+			} else {
+				if count > 0 {
+					observe(sum/count, nil, false)
+				}
+				observe(zeroFloat32, err, done)
 			}
 		}
 		o(observer, subscribeOn, subscriber)
@@ -236,6 +343,51 @@ func (o ObservableInt) Subscribe(observe IntObserveFunc, setters ...SubscribeOpt
 	return subscriber
 }
 
+//jig:name ObservableIntSubscribeNext
+
+// SubscribeNext operates upon the emissions from an Observable only.
+// This method returns a Subscriber.
+func (o ObservableInt) SubscribeNext(f func(next int), setters ...SubscribeOptionSetter) Subscription {
+	return o.Subscribe(func(next int, err error, done bool) {
+		if !done {
+			f(next)
+		}
+	}, setters...)
+}
+
+//jig:name ObservableFloat32Subscribe
+
+// Subscribe operates upon the emissions and notifications from an Observable.
+// This method returns a Subscriber.
+func (o ObservableFloat32) Subscribe(observe Float32ObserveFunc, setters ...SubscribeOptionSetter) Subscriber {
+	scheduler := NewTrampoline()
+	setter := SubscribeOn(scheduler, setters...)
+	options := NewSubscribeOptions(setter)
+	subscriber := options.NewSubscriber()
+	observer := func(next float32, err error, done bool) {
+		if !done {
+			observe(next, err, done)
+		} else {
+			observe(zeroFloat32, err, true)
+			subscriber.Unsubscribe()
+		}
+	}
+	o(observer, options.SubscribeOn, subscriber)
+	return subscriber
+}
+
+//jig:name ObservableFloat32SubscribeNext
+
+// SubscribeNext operates upon the emissions from an Observable only.
+// This method returns a Subscriber.
+func (o ObservableFloat32) SubscribeNext(f func(next float32), setters ...SubscribeOptionSetter) Subscription {
+	return o.Subscribe(func(next float32, err error, done bool) {
+		if !done {
+			f(next)
+		}
+	}, setters...)
+}
+
 //jig:name ObservableIntToSingle
 
 // ToSingle blocks until the ObservableInt emits exactly one value or an error.
@@ -256,6 +408,26 @@ func (o ObservableInt) ToSingle(setters ...SubscribeOptionSetter) (v int, e erro
 	return v, e
 }
 
+//jig:name ObservableFloat32ToSingle
+
+// ToSingle blocks until the ObservableFloat32 emits exactly one value or an error.
+// The value and any error are returned.
+//
+// This function subscribes to the source observable on the Goroutine scheduler.
+// The Goroutine scheduler works in more situations for complex chains of
+// observables, like when merging the output of multiple observables.
+func (o ObservableFloat32) ToSingle(setters ...SubscribeOptionSetter) (v float32, e error) {
+	scheduler := NewGoroutine()
+	o.Single().Subscribe(func(next float32, err error, done bool) {
+		if !done {
+			v = next
+		} else {
+			e = err
+		}
+	}, SubscribeOn(scheduler, setters...)).Wait()
+	return v, e
+}
+
 //jig:name ObservableIntSingle
 
 // Single enforces that the observableInt sends exactly one data item and then
@@ -263,6 +435,15 @@ func (o ObservableInt) ToSingle(setters ...SubscribeOptionSetter) (v int, e erro
 // than 1 item before completing  this reported as an error to the observer.
 func (o ObservableInt) Single() ObservableInt {
 	return o.AsObservable().Single().AsObservableInt()
+}
+
+//jig:name ObservableFloat32Single
+
+// Single enforces that the observableFloat32 sends exactly one data item and then
+// completes. If the observable sends no data before completing or sends more
+// than 1 item before completing  this reported as an error to the observer.
+func (o ObservableFloat32) Single() ObservableFloat32 {
+	return o.AsObservable().Single().AsObservableFloat32()
 }
 
 //jig:name ObserveFunc
@@ -302,6 +483,19 @@ type Observable func(ObserveFunc, Scheduler, Subscriber)
 func (o ObservableInt) AsObservable() Observable {
 	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableFloat32AsObservable
+
+// AsObservable turns a typed ObservableFloat32 into an Observable of interface{}.
+func (o ObservableFloat32) AsObservable() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next float32, err error, done bool) {
 			observe(interface{}(next), err, done)
 		}
 		o(observer, subscribeOn, subscriber)
@@ -369,6 +563,34 @@ func (o Observable) AsObservableInt() ObservableInt {
 				}
 			} else {
 				observe(zeroInt, err, true)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ErrTypecastToFloat32
+
+// ErrTypecastToFloat32 is delivered to an observer if the generic value cannot be
+// typecast to float32.
+var ErrTypecastToFloat32 = errors.New("typecast to float32 failed")
+
+//jig:name ObservableAsObservableFloat32
+
+// AsFloat32 turns an Observable of interface{} into an ObservableFloat32. If during
+// observing a typecast fails, the error ErrTypecastToFloat32 will be emitted.
+func (o Observable) AsObservableFloat32() ObservableFloat32 {
+	observable := func(observe Float32ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				if nextFloat32, ok := next.(float32); ok {
+					observe(nextFloat32, err, done)
+				} else {
+					observe(zeroFloat32, ErrTypecastToFloat32, true)
+				}
+			} else {
+				observe(zeroFloat32, err, true)
 			}
 		}
 		o(observer, subscribeOn, subscriber)

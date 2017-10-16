@@ -6,5 +6,3 @@ Operator Never documentation and tests.
 package Never
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

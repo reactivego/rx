@@ -9,5 +9,3 @@ operator does with the observables returned from the Map project function.
 package MergeMap
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

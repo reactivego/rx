@@ -6,5 +6,3 @@ Operator Sum documentation and tests.
 package Sum
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

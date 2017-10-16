@@ -8,20 +8,8 @@ import (
 	"errors"
 
 	"github.com/reactivego/rx/schedulers"
-	"github.com/reactivego/subscriber"
+	"github.com/reactivego/rx/subscriber"
 )
-
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
-}
-
-//jig:name Subscriber
-
-// Subscriber is an alias for the subscriber.Subscriber interface type.
-type Subscriber subscriber.Subscriber
 
 //jig:name IntObserveFunc
 
@@ -84,11 +72,11 @@ func CreateInt(f func(IntObserver)) ObservableInt {
 					observe(next, err, done)
 				}
 			}
-			type observer_subscriber struct {
+			type ObserverSubscriber struct {
 				IntObserveFunc
 				Subscriber
 			}
-			f(&observer_subscriber{observer, subscriber})
+			f(&ObserverSubscriber{observer, subscriber})
 		})
 	}
 	return observable
@@ -116,6 +104,18 @@ func FromInts(slice ...int) ObservableInt {
 	return FromSliceInt(slice)
 }
 
+//jig:name Scheduler
+
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler interface {
+	Schedule(task func())
+}
+
+//jig:name Subscriber
+
+// Subscriber is an alias for the subscriber.Subscriber interface type.
+type Subscriber subscriber.Subscriber
+
 //jig:name ObservableElementAt
 
 // ElementAt emit only item n emitted by an Observable
@@ -137,7 +137,7 @@ func (o Observable) ElementAt(n int) Observable {
 
 // ElementAt emit only item n emitted by an Observable
 func (o ObservableInt) ElementAt(n int) ObservableInt {
-	return o.AsAny().ElementAt(n).AsInt()
+	return o.AsObservable().ElementAt(n).AsObservableInt()
 }
 
 //jig:name ObserveFunc
@@ -171,13 +171,13 @@ func (f ObserveFunc) Complete() {
 // function, scheduler and an subscriber.
 type Observable func(ObserveFunc, Scheduler, Subscriber)
 
-//jig:name ObservableIntAsAny
+//jig:name ObservableIntAsObservable
 
-// AsAny turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsAny() Observable {
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
 	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next int, err error, done bool) {
-			observe(next, err, done)
+			observe(interface{}(next), err, done)
 		}
 		o(observer, subscribeOn, subscriber)
 	}
@@ -298,11 +298,11 @@ func (o ObservableInt) ToSlice(setters ...SubscribeOptionSetter) (a []int, e err
 // typecast to int.
 var ErrTypecastToInt = errors.New("typecast to int failed")
 
-//jig:name ObservableAsInt
+//jig:name ObservableAsObservableInt
 
 // AsInt turns an Observable of interface{} into an ObservableInt. If during
 // observing a typecast fails, the error ErrTypecastToInt will be emitted.
-func (o Observable) AsInt() ObservableInt {
+func (o Observable) AsObservableInt() ObservableInt {
 	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			if !done {

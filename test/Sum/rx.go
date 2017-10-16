@@ -8,20 +8,8 @@ import (
 	"errors"
 
 	"github.com/reactivego/rx/schedulers"
-	"github.com/reactivego/subscriber"
+	"github.com/reactivego/rx/subscriber"
 )
-
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
-}
-
-//jig:name Subscriber
-
-// Subscriber is an alias for the subscriber.Subscriber interface type.
-type Subscriber subscriber.Subscriber
 
 //jig:name IntObserveFunc
 
@@ -84,11 +72,11 @@ func CreateInt(f func(IntObserver)) ObservableInt {
 					observe(next, err, done)
 				}
 			}
-			type observer_subscriber struct {
+			type ObserverSubscriber struct {
 				IntObserveFunc
 				Subscriber
 			}
-			f(&observer_subscriber{observer, subscriber})
+			f(&ObserverSubscriber{observer, subscriber})
 		})
 	}
 	return observable
@@ -177,11 +165,11 @@ func CreateFloat32(f func(Float32Observer)) ObservableFloat32 {
 					observe(next, err, done)
 				}
 			}
-			type observer_subscriber struct {
+			type ObserverSubscriber struct {
 				Float32ObserveFunc
 				Subscriber
 			}
-			f(&observer_subscriber{observer, subscriber})
+			f(&ObserverSubscriber{observer, subscriber})
 		})
 	}
 	return observable
@@ -208,6 +196,18 @@ func FromSliceFloat32(slice []float32) ObservableFloat32 {
 func FromFloat32(slice ...float32) ObservableFloat32 {
 	return FromSliceFloat32(slice)
 }
+
+//jig:name Scheduler
+
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler interface {
+	Schedule(task func())
+}
+
+//jig:name Subscriber
+
+// Subscriber is an alias for the subscriber.Subscriber interface type.
+type Subscriber subscriber.Subscriber
 
 //jig:name ObservableIntSum
 
@@ -402,7 +402,7 @@ func (o ObservableFloat32) ToSingle(setters ...SubscribeOptionSetter) (v float32
 // completes. If the observable sends no data before completing or sends more
 // than 1 item before completing  this reported as an error to the observer.
 func (o ObservableInt) Single() ObservableInt {
-	return o.AsAny().Single().AsInt()
+	return o.AsObservable().Single().AsObservableInt()
 }
 
 //jig:name ObservableFloat32Single
@@ -411,33 +411,7 @@ func (o ObservableInt) Single() ObservableInt {
 // completes. If the observable sends no data before completing or sends more
 // than 1 item before completing  this reported as an error to the observer.
 func (o ObservableFloat32) Single() ObservableFloat32 {
-	return o.AsAny().Single().AsFloat32()
-}
-
-//jig:name ObservableIntAsAny
-
-// AsAny turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsAny() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(next, err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableFloat32AsAny
-
-// AsAny turns a typed ObservableFloat32 into an Observable of interface{}.
-func (o ObservableFloat32) AsAny() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next float32, err error, done bool) {
-			observe(next, err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
+	return o.AsObservable().Single().AsObservableFloat32()
 }
 
 //jig:name ObserveFunc
@@ -470,6 +444,32 @@ func (f ObserveFunc) Complete() {
 // Observable is essentially a subscribe function taking an observe
 // function, scheduler and an subscriber.
 type Observable func(ObserveFunc, Scheduler, Subscriber)
+
+//jig:name ObservableIntAsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableFloat32AsObservable
+
+// AsObservable turns a typed ObservableFloat32 into an Observable of interface{}.
+func (o ObservableFloat32) AsObservable() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next float32, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
 
 //jig:name ObservableSingle
 
@@ -516,11 +516,11 @@ func (o Observable) Single() Observable {
 // typecast to int.
 var ErrTypecastToInt = errors.New("typecast to int failed")
 
-//jig:name ObservableAsInt
+//jig:name ObservableAsObservableInt
 
 // AsInt turns an Observable of interface{} into an ObservableInt. If during
 // observing a typecast fails, the error ErrTypecastToInt will be emitted.
-func (o Observable) AsInt() ObservableInt {
+func (o Observable) AsObservableInt() ObservableInt {
 	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			if !done {
@@ -544,11 +544,11 @@ func (o Observable) AsInt() ObservableInt {
 // typecast to float32.
 var ErrTypecastToFloat32 = errors.New("typecast to float32 failed")
 
-//jig:name ObservableAsFloat32
+//jig:name ObservableAsObservableFloat32
 
 // AsFloat32 turns an Observable of interface{} into an ObservableFloat32. If during
 // observing a typecast fails, the error ErrTypecastToFloat32 will be emitted.
-func (o Observable) AsFloat32() ObservableFloat32 {
+func (o Observable) AsObservableFloat32() ObservableFloat32 {
 	observable := func(observe Float32ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			if !done {

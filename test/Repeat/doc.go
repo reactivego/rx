@@ -6,5 +6,3 @@ Operator Repeat documentation and tests.
 package Repeat
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

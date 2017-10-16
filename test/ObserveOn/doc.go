@@ -8,5 +8,3 @@ ObserveOn specifies the scheduler on which an observer will observe this Observa
 package ObserveOn
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

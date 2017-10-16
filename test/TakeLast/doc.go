@@ -6,5 +6,3 @@ Operator TakeLast documentation and tests.
 package TakeLast
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

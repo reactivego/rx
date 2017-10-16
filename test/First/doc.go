@@ -6,5 +6,3 @@ Operator First documentation and tests.
 package First
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

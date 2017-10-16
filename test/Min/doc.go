@@ -6,5 +6,3 @@ Operator Min documentation and tests.
 package Min
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

@@ -6,5 +6,3 @@ Operator MergeDelayError documentation and tests.
 package MergeDelayError
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

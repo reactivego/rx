@@ -8,5 +8,3 @@ ConcatAll flattens a higher order observable by concattenating the observables i
 package ConcatAll
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

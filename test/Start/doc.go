@@ -6,5 +6,3 @@ Operator Start documentation and tests.
 package Start
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

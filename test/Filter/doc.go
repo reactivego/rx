@@ -6,5 +6,3 @@ Operator Filter documentation and tests.
 package Filter
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

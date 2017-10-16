@@ -6,5 +6,3 @@ Operator SkipLast documentation and tests.
 package SkipLast
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

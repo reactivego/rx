@@ -6,5 +6,3 @@ Operator Count documentation and tests.
 package Count
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

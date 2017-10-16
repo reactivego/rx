@@ -6,5 +6,3 @@ Operator Catch documentation and tests.
 package Catch
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

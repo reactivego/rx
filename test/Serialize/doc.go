@@ -11,5 +11,3 @@ their implementation is violating the observable contract.
 package Serialize
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

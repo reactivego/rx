@@ -9,5 +9,3 @@ and creates a fresh ObservableFoo for each observer.
 package Defer
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

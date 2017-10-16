@@ -6,5 +6,3 @@ Operator Range documentation and tests.
 package Range
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

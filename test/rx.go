@@ -13,6 +13,31 @@ import (
 	"github.com/reactivego/rx/subscriber"
 )
 
+//jig:name ObserveFunc
+
+// ObserveFunc is essentially the observer, a function that gets called
+// whenever the observable has something to report.
+type ObserveFunc func(interface{}, error, bool)
+
+var zero interface{}
+
+// Next is called by an Observable to emit the next interface{} value to the
+// observer.
+func (f ObserveFunc) Next(next interface{}) {
+	f(next, nil, false)
+}
+
+// Error is called by an Observable to report an error to the observer.
+func (f ObserveFunc) Error(err error) {
+	f(zero, err, true)
+}
+
+// Complete is called by an Observable to signal that no more data is
+// forthcoming to the observer.
+func (f ObserveFunc) Complete() {
+	f(zero, nil, true)
+}
+
 //jig:name IntObserveFunc
 
 // IntObserveFunc is essentially the observer, a function that gets called
@@ -43,100 +68,6 @@ func (f IntObserveFunc) Complete() {
 // ObservableInt is essentially a subscribe function taking an observe
 // function, scheduler and an subscriber.
 type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
-
-//jig:name IntObserver
-
-// IntObserver is the interface used with CreateInt when implementing a custom
-// observable.
-type IntObserver interface {
-	// Next emits the next int value.
-	Next(int)
-	// Error signals an error condition.
-	Error(error)
-	// Complete signals that no more data is to be expected.
-	Complete()
-	// Closed returns true when the subscription has been canceled.
-	Closed() bool
-}
-
-//jig:name CreateInt
-
-// CreateInt creates an Observable from scratch by calling observer methods
-// programmatically.
-func CreateInt(f func(IntObserver)) ObservableInt {
-	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		scheduler.Schedule(func() {
-			if subscriber.Closed() {
-				return
-			}
-			observer := func(next int, err error, done bool) {
-				if !subscriber.Closed() {
-					observe(next, err, done)
-				}
-			}
-			type ObserverSubscriber struct {
-				IntObserveFunc
-				Subscriber
-			}
-			f(&ObserverSubscriber{observer, subscriber})
-		})
-	}
-	return observable
-}
-
-//jig:name FromSliceInt
-
-// FromSliceInt creates an ObservableInt from a slice of int values passed in.
-func FromSliceInt(slice []int) ObservableInt {
-	return CreateInt(func(observer IntObserver) {
-		for _, next := range slice {
-			if observer.Closed() {
-				return
-			}
-			observer.Next(next)
-		}
-		observer.Complete()
-	})
-}
-
-//jig:name FromInt
-
-// FromInt creates an ObservableInt from multiple int values passed in.
-func FromInt(slice ...int) ObservableInt {
-	return FromSliceInt(slice)
-}
-
-//jig:name FromInts
-
-// FromInts creates an ObservableInt from multiple int values passed in.
-func FromInts(slice ...int) ObservableInt {
-	return FromSliceInt(slice)
-}
-
-//jig:name EmptyInt
-
-// EmptyInt creates an Observable that emits no items but terminates normally.
-func EmptyInt() ObservableInt {
-	return CreateInt(func(observer IntObserver) {
-		observer.Complete()
-	})
-}
-
-//jig:name Range
-
-// Range creates an ObservableInt that emits a range of sequential integers.
-func Range(start, count int) ObservableInt {
-	end := start + count
-	return CreateInt(func(observer IntObserver) {
-		for i := start; i < end; i++ {
-			if observer.Closed() {
-				return
-			}
-			observer.Next(i)
-		}
-		observer.Complete()
-	})
-}
 
 //jig:name SubjectInt
 
@@ -338,76 +269,60 @@ func NewReplaySubjectString(bufferCapacity int, windowDuration time.Duration) Su
 	return SubjectString{observable.AsObservableString(), observer}
 }
 
-//jig:name NewSubjectInt
+//jig:name IntObserver
 
-// NewSubjectInt creates a new Subject. After the subject is
-// terminated, all subsequent subscriptions to the observable side will be
-// terminated immediately with either an Error or Complete notification send to
-// the subscribing client
-//
-// Note that this implementation is blocking. When no subcribers are present
-// then the data can flow freely. But when there are subscribers, the observable
-// goroutine is blocked until all subscribers have processed the next, error or
-// complete notification.
-func NewSubjectInt() SubjectInt {
-	ch := channel.NewChan(1, 16)
+// IntObserver is the interface used with CreateInt when implementing a custom
+// observable.
+type IntObserver interface {
+	// Next emits the next int value.
+	Next(int)
+	// Error signals an error condition.
+	Error(error)
+	// Complete signals that no more data is to be expected.
+	Complete()
+	// Closed returns true when the subscription has been canceled.
+	Closed() bool
+}
 
-	observable := Observable(func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		ep, err := ch.NewEndpoint(0)
-		if err != nil {
-			observe(nil, err, true)
-			return
-		}
-		observable := Create(func(observer Observer) {
-			receive := func(value interface{}, err error, closed bool) bool {
-				if !closed {
-					observer.Next(value)
-				} else {
-					observer.Error(err)
+//jig:name CreateInt
+
+// CreateInt creates an Observable from scratch by calling observer methods
+// programmatically.
+func CreateInt(f func(IntObserver)) ObservableInt {
+	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		scheduler.Schedule(func() {
+			if subscriber.Closed() {
+				return
+			}
+			observer := func(next int, err error, done bool) {
+				if !subscriber.Closed() {
+					observe(next, err, done)
 				}
-				return !observer.Closed()
 			}
-			ep.Range(receive, 0)
+			type ObserverSubscriber struct {
+				IntObserveFunc
+				Subscriber
+			}
+			f(&ObserverSubscriber{observer, subscriber})
 		})
-		observable(observe, subscribeOn, subscriber.Add(ep.Cancel))
-	})
-
-	observer := func(next int, err error, done bool) {
-		if !ch.Closed() {
-			if !done {
-				ch.FastSend(next)
-			} else {
-				ch.Close(err)
-			}
-		}
 	}
-
-	return SubjectInt{observable.AsObservableInt(), observer}
+	return observable
 }
 
-//jig:name ObserveFunc
+//jig:name Range
 
-// ObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type ObserveFunc func(interface{}, error, bool)
-
-var zero interface{}
-
-// Next is called by an Observable to emit the next interface{} value to the
-// observer.
-func (f ObserveFunc) Next(next interface{}) {
-	f(next, nil, false)
-}
-
-// Error is called by an Observable to report an error to the observer.
-func (f ObserveFunc) Error(err error) {
-	f(zero, err, true)
-}
-
-// Complete is called by an Observable to signal that no more data is
-// forthcoming to the observer.
-func (f ObserveFunc) Complete() {
-	f(zero, nil, true)
+// Range creates an ObservableInt that emits a range of sequential integers.
+func Range(start, count int) ObservableInt {
+	end := start + count
+	return CreateInt(func(observer IntObserver) {
+		for i := start; i < end; i++ {
+			if observer.Closed() {
+				return
+			}
+			observer.Next(i)
+		}
+		observer.Complete()
+	})
 }
 
 //jig:name Observable
@@ -471,6 +386,21 @@ func FromSlice(slice []interface{}) Observable {
 	})
 }
 
+//jig:name FromSliceInt
+
+// FromSliceInt creates an ObservableInt from a slice of int values passed in.
+func FromSliceInt(slice []int) ObservableInt {
+	return CreateInt(func(observer IntObserver) {
+		for _, next := range slice {
+			if observer.Closed() {
+				return
+			}
+			observer.Next(next)
+		}
+		observer.Complete()
+	})
+}
+
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
@@ -482,6 +412,76 @@ type Scheduler interface {
 
 // Subscriber is an alias for the subscriber.Subscriber interface type.
 type Subscriber subscriber.Subscriber
+
+//jig:name NewSubjectInt
+
+// NewSubjectInt creates a new Subject. After the subject is
+// terminated, all subsequent subscriptions to the observable side will be
+// terminated immediately with either an Error or Complete notification send to
+// the subscribing client
+//
+// Note that this implementation is blocking. When no subcribers are present
+// then the data can flow freely. But when there are subscribers, the observable
+// goroutine is blocked until all subscribers have processed the next, error or
+// complete notification.
+func NewSubjectInt() SubjectInt {
+	ch := channel.NewChan(1, 16)
+
+	observable := Observable(func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		ep, err := ch.NewEndpoint(0)
+		if err != nil {
+			observe(nil, err, true)
+			return
+		}
+		observable := Create(func(observer Observer) {
+			receive := func(value interface{}, err error, closed bool) bool {
+				if !closed {
+					observer.Next(value)
+				} else {
+					observer.Error(err)
+				}
+				return !observer.Closed()
+			}
+			ep.Range(receive, 0)
+		})
+		observable(observe, subscribeOn, subscriber.Add(ep.Cancel))
+	})
+
+	observer := func(next int, err error, done bool) {
+		if !ch.Closed() {
+			if !done {
+				ch.FastSend(next)
+			} else {
+				ch.Close(err)
+			}
+		}
+	}
+
+	return SubjectInt{observable.AsObservableInt(), observer}
+}
+
+//jig:name FromInt
+
+// FromInt creates an ObservableInt from multiple int values passed in.
+func FromInt(slice ...int) ObservableInt {
+	return FromSliceInt(slice)
+}
+
+//jig:name FromInts
+
+// FromInts creates an ObservableInt from multiple int values passed in.
+func FromInts(slice ...int) ObservableInt {
+	return FromSliceInt(slice)
+}
+
+//jig:name EmptyInt
+
+// EmptyInt creates an Observable that emits no items but terminates normally.
+func EmptyInt() ObservableInt {
+	return CreateInt(func(observer IntObserver) {
+		observer.Complete()
+	})
+}
 
 //jig:name NewScheduler
 
@@ -594,17 +594,17 @@ func (o ObservableString) SubscribeOn(subscribeOn Scheduler) ObservableString {
 	return observable
 }
 
-//jig:name ObservableIntWait
+//jig:name ObservableIntAsObservable
 
-// Wait subscribes to the Observable and waits for completion or error.
-// Returns either the error or nil when the Observable completed normally.
-func (o ObservableInt) Wait(setters ...SubscribeOptionSetter) (e error) {
-	o.Subscribe(func(next int, err error, done bool) {
-		if done {
-			e = err
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
 		}
-	}, setters...).Wait()
-	return e
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
 }
 
 //jig:name ObservableIntToChan
@@ -630,37 +630,6 @@ func (o ObservableInt) ToChan(setters ...SubscribeOptionSetter) <-chan int {
 		}
 	}, SubscribeOn(scheduler, setters...))
 	return nextch
-}
-
-//jig:name ObservableIntAsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableIntMap
-
-// Map transforms the items emitted by an ObservableInt by applying a
-// function to each item.
-func (o ObservableInt) Map(project func(int) interface{}) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			var mapped interface{}
-			if !done {
-				mapped = project(next)
-			}
-			observe(mapped, err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
 }
 
 //jig:name ObservableSubscribe
@@ -714,6 +683,46 @@ func (o Observable) ToChan(setters ...SubscribeOptionSetter) <-chan interface{} 
 		}
 	}, SubscribeOn(scheduler, setters...))
 	return nextch
+}
+
+//jig:name ObservableIntToSlice
+
+// ToSlice collects all values from the ObservableInt into an slice. The
+// complete slice and any error are returned.
+//
+// This function subscribes to the source observable on the Goroutine scheduler.
+// The Goroutine scheduler works in more situations for complex chains of
+// observables, like when merging the output of multiple observables.
+func (o ObservableInt) ToSlice(setters ...SubscribeOptionSetter) (a []int, e error) {
+	scheduler := NewGoroutine()
+	o.Subscribe(func(next int, err error, done bool) {
+		if !done {
+			a = append(a, next)
+		} else {
+			e = err
+		}
+	}, SubscribeOn(scheduler, setters...)).Wait()
+	return a, e
+}
+
+//jig:name ObservableIntToSingle
+
+// ToSingle blocks until the ObservableInt emits exactly one value or an error.
+// The value and any error are returned.
+//
+// This function subscribes to the source observable on the Goroutine scheduler.
+// The Goroutine scheduler works in more situations for complex chains of
+// observables, like when merging the output of multiple observables.
+func (o ObservableInt) ToSingle(setters ...SubscribeOptionSetter) (v int, e error) {
+	scheduler := NewGoroutine()
+	o.Single().Subscribe(func(next int, err error, done bool) {
+		if !done {
+			v = next
+		} else {
+			e = err
+		}
+	}, SubscribeOn(scheduler, setters...)).Wait()
+	return v, e
 }
 
 //jig:name ErrTypecastToInt
@@ -772,44 +781,26 @@ func (o Observable) AsObservableString() ObservableString {
 	return observable
 }
 
-//jig:name ObservableIntToSingle
+//jig:name ObservableIntWait
 
-// ToSingle blocks until the ObservableInt emits exactly one value or an error.
-// The value and any error are returned.
-//
-// This function subscribes to the source observable on the Goroutine scheduler.
-// The Goroutine scheduler works in more situations for complex chains of
-// observables, like when merging the output of multiple observables.
-func (o ObservableInt) ToSingle(setters ...SubscribeOptionSetter) (v int, e error) {
-	scheduler := NewGoroutine()
-	o.Single().Subscribe(func(next int, err error, done bool) {
-		if !done {
-			v = next
-		} else {
+// Wait subscribes to the Observable and waits for completion or error.
+// Returns either the error or nil when the Observable completed normally.
+func (o ObservableInt) Wait(setters ...SubscribeOptionSetter) (e error) {
+	o.Subscribe(func(next int, err error, done bool) {
+		if done {
 			e = err
 		}
-	}, SubscribeOn(scheduler, setters...)).Wait()
-	return v, e
+	}, setters...).Wait()
+	return e
 }
 
-//jig:name ObservableIntToSlice
+//jig:name ObservableIntSingle
 
-// ToSlice collects all values from the ObservableInt into an slice. The
-// complete slice and any error are returned.
-//
-// This function subscribes to the source observable on the Goroutine scheduler.
-// The Goroutine scheduler works in more situations for complex chains of
-// observables, like when merging the output of multiple observables.
-func (o ObservableInt) ToSlice(setters ...SubscribeOptionSetter) (a []int, e error) {
-	scheduler := NewGoroutine()
-	o.Subscribe(func(next int, err error, done bool) {
-		if !done {
-			a = append(a, next)
-		} else {
-			e = err
-		}
-	}, SubscribeOn(scheduler, setters...)).Wait()
-	return a, e
+// Single enforces that the observableInt sends exactly one data item and then
+// completes. If the observable sends no data before completing or sends more
+// than 1 item before completing  this reported as an error to the observer.
+func (o ObservableInt) Single() ObservableInt {
+	return o.AsObservable().Single().AsObservableInt()
 }
 
 //jig:name ObservableStringSubscribe
@@ -843,15 +834,6 @@ func (o ObservableString) SubscribeNext(f func(next string), setters ...Subscrib
 			f(next)
 		}
 	}, setters...)
-}
-
-//jig:name ObservableIntSingle
-
-// Single enforces that the observableInt sends exactly one data item and then
-// completes. If the observable sends no data before completing or sends more
-// than 1 item before completing  this reported as an error to the observer.
-func (o ObservableInt) Single() ObservableInt {
-	return o.AsObservable().Single().AsObservableInt()
 }
 
 //jig:name ObservableSingle

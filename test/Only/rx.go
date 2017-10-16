@@ -6,20 +6,8 @@ package Only
 
 import (
 	"github.com/reactivego/rx/schedulers"
-	"github.com/reactivego/subscriber"
+	"github.com/reactivego/rx/subscriber"
 )
-
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
-}
-
-//jig:name Subscriber
-
-// Subscriber is an alias for the subscriber.Subscriber interface type.
-type Subscriber subscriber.Subscriber
 
 //jig:name ObserveFunc
 
@@ -82,15 +70,27 @@ func Create(f func(Observer)) Observable {
 					observe(next, err, done)
 				}
 			}
-			type observer_subscriber struct {
+			type ObserverSubscriber struct {
 				ObserveFunc
 				Subscriber
 			}
-			f(&observer_subscriber{observer, subscriber})
+			f(&ObserverSubscriber{observer, subscriber})
 		})
 	}
 	return observable
 }
+
+//jig:name Scheduler
+
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler interface {
+	Schedule(task func())
+}
+
+//jig:name Subscriber
+
+// Subscriber is an alias for the subscriber.Subscriber interface type.
+type Subscriber subscriber.Subscriber
 
 //jig:name StringObserveFunc
 
@@ -116,6 +116,12 @@ func (f StringObserveFunc) Error(err error) {
 func (f StringObserveFunc) Complete() {
 	f(zeroString, nil, true)
 }
+
+//jig:name ObservableString
+
+// ObservableString is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type ObservableString func(StringObserveFunc, Scheduler, Subscriber)
 
 //jig:name ObservableOnlyString
 
@@ -162,6 +168,12 @@ func (f SizeObserveFunc) Complete() {
 	f(zeroSize, nil, true)
 }
 
+//jig:name ObservableSize
+
+// ObservableSize is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type ObservableSize func(SizeObserveFunc, Scheduler, Subscriber)
+
 //jig:name ObservableOnlySize
 
 // OnlySize filters the value stream of an Observable of interface{} and outputs only the
@@ -207,6 +219,12 @@ func (f PointObserveFunc) Complete() {
 	f(zeroPoint, nil, true)
 }
 
+//jig:name ObservablePoint
+
+// ObservablePoint is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type ObservablePoint func(PointObserveFunc, Scheduler, Subscriber)
+
 //jig:name ObservableOnlyPoint
 
 // OnlyPoint filters the value stream of an Observable of interface{} and outputs only the
@@ -226,24 +244,6 @@ func (o Observable) OnlyPoint() ObservablePoint {
 	}
 	return observable
 }
-
-//jig:name ObservableString
-
-// ObservableString is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableString func(StringObserveFunc, Scheduler, Subscriber)
-
-//jig:name ObservableSize
-
-// ObservableSize is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableSize func(SizeObserveFunc, Scheduler, Subscriber)
-
-//jig:name ObservablePoint
-
-// ObservablePoint is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservablePoint func(PointObserveFunc, Scheduler, Subscriber)
 
 //jig:name NewScheduler
 

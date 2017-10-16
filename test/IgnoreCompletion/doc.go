@@ -8,5 +8,3 @@ IgnoreCompletion only emits items and never completes, neither with Error nor wi
 package IgnoreCompletion
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

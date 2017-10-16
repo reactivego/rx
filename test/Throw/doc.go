@@ -6,5 +6,3 @@ Operator Throw documentation and tests.
 package Throw
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go

@@ -9,5 +9,3 @@ Operator Do documentation and tests.
 package Do
 
 import _ "github.com/reactivego/rx"
-
-//jig:file {{.package}}.go
