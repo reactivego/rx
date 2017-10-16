@@ -4,8 +4,13 @@ import (
 	"fmt"
 )
 
+// SubscribeOn can be used to change the scheduler the Subcribe method uses to
+// subscribe to the source observable.
 func Example_goroutine() {
-	FromInts(1, 2, 3, 4, 5).SubscribeOn(NewGoroutine()).Subscribe(func(next int, err error, done bool) {
+	scheduler := NewGoroutine()
+	source := FromInts(1, 2, 3, 4, 5).SubscribeOn(scheduler)
+
+	observe := func(next int, err error, done bool) {
 		switch {
 		case err != nil:
 			fmt.Println(err)
@@ -14,9 +19,16 @@ func Example_goroutine() {
 		default:
 			fmt.Println(next)
 		}
-	}).Wait()
+	}
+
+	// scheduler is asynchronous, so Subscribe is as well.
+	subscription := source.Subscribe(observe)
+	fmt.Println("subscribed", !subscription.Closed())
+	// now need to wait for the subscription to terminate.
+	subscription.Wait()
 
 	//Output:
+	// subscribed true
 	// 1
 	// 2
 	// 3

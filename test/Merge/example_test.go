@@ -20,7 +20,7 @@ func Example_mergeInt() {
 		fmt.Println("c")
 	}).Wait()
 
-	//Output:
+	// Unordered output:
 	// a
 	// b
 	// c

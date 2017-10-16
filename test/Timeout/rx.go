@@ -2,10 +2,11 @@
 
 //go:generate jig --regen
 
-package Debounce
+package Timeout
 
 import (
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/reactivego/rx/schedulers"
@@ -95,58 +96,86 @@ type Scheduler interface {
 // Subscriber is an alias for the subscriber.Subscriber interface type.
 type Subscriber subscriber.Subscriber
 
-//jig:name ObservableDebounce
+//jig:name ObservableSerialize
 
-// Debounce only emits the last item of a burst from an Observable if a
-// particular timespan has passed without it emitting another item.
-func (o Observable) Debounce(duration time.Duration) Observable {
+// Serialize forces an Observable to make serialized calls and to be
+// well-behaved.
+func (o Observable) Serialize() Observable {
 	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		valuech := make(chan interface{})
-		donech := make(chan error)
-		debouncer := func() {
-			var nextValue interface{}
-			var timeout <-chan time.Time
-			for {
-				select {
-				case nextValue = <-valuech:
-					timeout = time.After(duration)
-				case err, subscribed := <-donech:
-					if !subscribed {
-						return
-					}
-					if timeout != nil {
-						observe(nextValue, nil, false)
-					}
-					if err != nil {
-						observe(nil, err, true)
-					} else {
-						observe(nil, nil, true)
-					}
-				case <-timeout:
-					observe(nextValue, nil, false)
-					timeout = nil
-				}
-			}
-		}
-		go debouncer()
+		var (
+			mutex		sync.Mutex
+			alreadyDone	bool
+		)
 		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				valuech <- next
-			} else {
-				donech <- err
+			mutex.Lock()
+			if !alreadyDone {
+				alreadyDone = done
+				observe(next, err, done)
 			}
+			mutex.Unlock()
 		}
-		o(observer, subscribeOn, subscriber.Add(func() { close(donech) }))
+		o(observer, subscribeOn, subscriber)
 	}
 	return observable
 }
 
-//jig:name ObservableIntDebounce
+//jig:name ObservableTimeout
 
-// Debounce only emits the last item of a burst from an ObservableInt if a
-// particular timespan has passed without it emitting another item.
-func (o ObservableInt) Debounce(duration time.Duration) ObservableInt {
-	return o.AsObservable().Debounce(duration).AsObservableInt()
+// ErrTimeout is delivered to an observer if the stream times out.
+var ErrTimeout = errors.New("timeout")
+
+// Timeout mirrors the source Observable, but issues an error notification if a
+// particular period of time elapses without any emitted items.
+//
+// This observer starts a goroutine for every subscription to monitor the
+// timeout deadline. It is guaranteed that calls to the observer for this
+// subscription will never be called concurrently. It is however almost certain
+// that any timeout error will be delivered on a goroutine other than the one
+// delivering the next values.
+func (o Observable) Timeout(timeout time.Duration) Observable {
+	observable := Observable(func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		deadline := time.NewTimer(timeout)
+		unsubscribe := make(chan struct{})
+		observer := func(next interface{}, err error, done bool) {
+			if deadline.Stop() {
+				if subscriber.Closed() {
+					return
+				}
+				observe(next, err, done)
+				if done {
+					return
+				}
+				deadline.Reset(timeout)
+			}
+		}
+		watchdog := func() {
+			select {
+			case <-deadline.C:
+				if subscriber.Closed() {
+					return
+				}
+				observe(nil, ErrTimeout, true)
+			case <-unsubscribe:
+			}
+		}
+		go watchdog()
+		o(observer, subscribeOn, subscriber.Add(func() { close(unsubscribe) }))
+	})
+	return observable.Serialize()
+}
+
+//jig:name ObservableIntTimeout
+
+// Timeout mirrors the source ObservableInt, but issues an error notification if
+// a particular period of time elapses without any emitted items.
+//
+// This observer starts a goroutine for every subscription to monitor the
+// timeout deadline. It is guaranteed that calls to the observer for this
+// subscription will never be called concurrently. It is however almost certain
+// that any timeout error will be delivered on a goroutine other than the one
+// delivering the next values.
+func (o ObservableInt) Timeout(timeout time.Duration) ObservableInt {
+	return o.AsObservable().Timeout(timeout).AsObservableInt()
 }
 
 //jig:name ObserveFunc
@@ -179,6 +208,19 @@ func (f ObserveFunc) Complete() {
 // Observable is essentially a subscribe function taking an observe
 // function, scheduler and an subscriber.
 type Observable func(ObserveFunc, Scheduler, Subscriber)
+
+//jig:name ObservableIntAsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
 
 //jig:name NewScheduler
 
@@ -268,19 +310,6 @@ func (o ObservableInt) Subscribe(observe IntObserveFunc, setters ...SubscribeOpt
 	return subscriber
 }
 
-//jig:name ObservableIntAsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name ObservableIntToSlice
 
 // ToSlice collects all values from the ObservableInt into an slice. The
@@ -327,16 +356,4 @@ func (o Observable) AsObservableInt() ObservableInt {
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
-}
-
-//jig:name ObservableIntSubscribeNext
-
-// SubscribeNext operates upon the emissions from an Observable only.
-// This method returns a Subscriber.
-func (o ObservableInt) SubscribeNext(f func(next int), setters ...SubscribeOptionSetter) Subscription {
-	return o.Subscribe(func(next int, err error, done bool) {
-		if !done {
-			f(next)
-		}
-	}, setters...)
 }

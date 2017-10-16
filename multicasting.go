@@ -106,7 +106,7 @@ func (o ObservableFoo) Publish() ConnectableFoo {
 	return o.Multicast(NewSubjectFoo)
 }
 
-//jig:template Observable<Foo> Replay
+//jig:template Observable<Foo> PublishReplay
 //jig:needs Observable<Foo> Multicast, NewReplaySubject<Foo>, Connectable<Foo>
 
 // Replay uses Multicast to control the subscription of a ReplaySubject to a
@@ -117,7 +117,7 @@ func (o ObservableFoo) Publish() ConnectableFoo {
 // If the source completed and as a result the internal ReplaySubject
 // terminated, then calling Connect again will replace the old ReplaySubject
 // with a newly created one.
-func (o ObservableFoo) Replay(bufferCapacity int, windowDuration time.Duration) ConnectableFoo {
+func (o ObservableFoo) PublishReplay(bufferCapacity int, windowDuration time.Duration) ConnectableFoo {
 	factory := func() SubjectFoo {
 		return NewReplaySubjectFoo(bufferCapacity, windowDuration)
 	}

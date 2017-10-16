@@ -2,6 +2,8 @@ package Defer
 
 import "fmt"
 
+// Defer is used to postpone creating an observable until the moment somebody
+// actually subscribes.
 func Example_defer() {
 
 	count := 0
@@ -10,13 +12,11 @@ func Example_defer() {
 		return FromInt(count)
 	})
 
-	source.SubscribeNext(func(next int) {
+	observe := func(next int) {
 		fmt.Printf("observable %d\n", next)
-	})
-
-	source.SubscribeNext(func(next int) {
-		fmt.Printf("observable %d\n", next)
-	})
+	}
+	source.SubscribeNext(observe)
+	source.SubscribeNext(observe)
 
 	// Output:
 	// observable 1

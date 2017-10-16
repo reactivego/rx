@@ -4,11 +4,25 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/reactivego/subscriber"
+	"github.com/reactivego/rx/subscriber"
 )
 
+// Shows how to use CreateString to create an observable of strings
+func Example_createString() {
+	source := CreateString(func(observer StringObserver) {
+		observer.Next("Hello")
+		observer.Next("World!")
+		observer.Complete()
+	})
+
+	source.SubscribeNext(func(value string) { fmt.Print(value) })
+
+	// Output:
+	// HelloWorld!
+}
+
 // Shows how to directly subscribe to an observable by calling it as a function.
-// Don't do this in a real application, use the Subscribe method.
+// Don't do this in production code, use the Subscribe method.
 func Example_directSubscribe() {
 	// Create an observable of int values
 	observable := CreateInt(func(observer IntObserver) {
@@ -19,20 +33,20 @@ func Example_directSubscribe() {
 		observer.Error(errors.New("error"))
 	})
 
+	// Observe function. For both error and completed, done is true.
 	observe := func(next int, err error, done bool) {
-		if !done {
+		switch {
+		case !done:
 			fmt.Println(next)
-		} else {
-			if err != nil {
-				fmt.Println(err)
-			} else {
-				fmt.Println("complete")
-			}
+		case err != nil:
+			fmt.Println(err)
+		default:
+			fmt.Println("complete")
 		}
 	}
 
-	// Non standard way of subscribing to an observable. But it shows that an
-	// observable is just a function that can be called directly.
+	// Non standard way of subscribing to an observable. But it does illustrate
+	// that an observable is just a function that can be called directly.
 	observable(observe, NewTrampoline(), subscriber.New())
 
 	// Note that this incorrectly delivers the error after complete. So don't
@@ -56,17 +70,20 @@ func Example_subscribe() {
 		observer.Error(errors.New("error"))
 	})
 
+	// Observe function. For both error and completed, done is true.
 	observe := func(next int, err error, done bool) {
-		if !done {
+		switch {
+		case !done:
 			fmt.Println(next)
-		} else {
-			if err != nil {
-				fmt.Println(err)
-			} else {
-				fmt.Println("complete")
-			}
+		case err != nil:
+			fmt.Println(err)
+		default:
+			fmt.Println("complete")
 		}
+
 	}
+
+	// Subscribe (by default) only returns when observable has completed.
 	observable.Subscribe(observe)
 
 	// Output:
