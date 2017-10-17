@@ -3,14 +3,20 @@ Operator AutoConnect documentation and tests.
 
 	AutoConnect
 
-AutoConnect is an operator on Connectable that returns a normal Observable. The
-operator takes an int argument specifying the number of subscribers that need to
-subscribe to it before it will call the Connect method on the Connectable.
-Calling Connect will subscribe the Connectable to its source Observable.
-Unlike RefCount, AutoConnect never automatically unusbscribes.
-You can pass a multiple function options; OnSubscribe(), OnUnsubscribe() and
-SubscribeOn() to the AutoConnect. The will be passed into the Connect method
-when it is called.
+AutoConnect is a declarative way of calling Connect on a Connectable. It is an
+operator on Connectable that returns a normal Observable. The operator takes an
+int argument specifying the number of subscribers that need to subscribe to it
+before it will call the Connect method on the Connectable. When AutoConnect
+calls Connect, this will subscribe the Connectable to its source Observable.
+
+Unlike RefCount, AutoConnect never automatically Connects again and also will
+never call Unsubscribe on the subscription returned by the call to Connect. So
+even when the number of subscribers to AutoConnect drops to zero, the
+subscription from the Connectable to its source will remain alive.
+
+You can pass multiple function options; OnSubscribe(), OnUnsubscribe() and
+SubscribeOn() to AutoConnect. These will be passed verbatim to the Connect
+method when it is called.
 */
 package AutoConnect
 
