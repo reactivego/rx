@@ -29,7 +29,7 @@ func main() {
 }
 ```
 
-Take a look at the [Quick Start](doc/quickstart.md) guide to see how it all fits together.
+Take a look at the [Quick Start](doc/QUICKSTART.md) guide to see how it all fits together.
 
 ## Why?
 ReactiveX observables are somewhat similar to Go channels but have much richer semantics. Observables can be hot or cold, can complete normally or with an error, use subscriptions that can be cancelled from the subscriber side. Where a normal variable is just a place where you read and write values from, an observable captures how the value of this variable changes over time. Concurrency follows naturally from the fact that an observable is an ever changing stream of values.
