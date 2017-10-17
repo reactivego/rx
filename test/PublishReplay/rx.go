@@ -117,9 +117,9 @@ type Subscriber subscriber.Subscriber
 
 //jig:name NewScheduler
 
-func NewGoroutine() Scheduler	{ return &schedulers.Goroutine{} }
+func NewGoroutine() Scheduler { return &schedulers.Goroutine{} }
 
-func NewTrampoline() Scheduler	{ return &schedulers.Trampoline{} }
+func NewTrampoline() Scheduler { return &schedulers.Trampoline{} }
 
 //jig:name SubscribeOptions
 
@@ -129,13 +129,13 @@ type Subscription subscriber.Subscription
 // SubscribeOptions is a struct with options for Subscribe related methods.
 type SubscribeOptions struct {
 	// SubscribeOn is the scheduler to run the observable subscription on.
-	SubscribeOn	Scheduler
+	SubscribeOn Scheduler
 	// OnSubscribe is called right after the subscription is created and before
 	// subscribing continues further.
-	OnSubscribe	func(subscription Subscription)
+	OnSubscribe func(subscription Subscription)
 	// OnUnsubscribe is called by the subscription to notify the client that the
 	// subscription has been canceled.
-	OnUnsubscribe	func()
+	OnUnsubscribe func()
 }
 
 // NewSubscriber will return a newly created subscriber. Before returning the
@@ -210,7 +210,7 @@ func (o ObservableInt) Subscribe(observe IntObserveFunc, setters ...SubscribeOpt
 // all subscribers of ConnectableInt.
 type ConnectableInt struct {
 	ObservableInt
-	connect	func(options []SubscribeOptionSetter) Subscription
+	connect func(options []SubscribeOptionSetter) Subscription
 }
 
 //jig:name ObservableIntMulticast
@@ -221,12 +221,12 @@ type ConnectableInt struct {
 // new SubjectInt that implements the actual multicasting behavior.
 func (o ObservableInt) Multicast(factory func() SubjectInt) ConnectableInt {
 	const (
-		active	int32	= iota
+		active int32 = iota
 		notifying
 		terminated
 	)
 	var subject struct {
-		state	int32
+		state int32
 		atomic.Value
 	}
 	subject.Store(factory())
@@ -248,11 +248,11 @@ func (o ObservableInt) Multicast(factory func() SubjectInt) ConnectableInt {
 		}
 	}
 	const (
-		unsubscribed	int32	= iota
+		unsubscribed int32 = iota
 		subscribed
 	)
 	var subscriber struct {
-		state	int32
+		state int32
 		atomic.Value
 	}
 	connect := func(setters []SubscribeOptionSetter) Subscription {
@@ -361,7 +361,7 @@ func NewReplaySubjectInt(bufferCapacity int, windowDuration time.Duration) Subje
 	return SubjectInt{observable.AsObservableInt(), observer}
 }
 
-//jig:name ObservableIntReplay
+//jig:name ObservableIntPublishReplay
 
 // Replay uses Multicast to control the subscription of a ReplaySubject to a
 // source observable and turns the subject into a connectable observable.
@@ -371,7 +371,7 @@ func NewReplaySubjectInt(bufferCapacity int, windowDuration time.Duration) Subje
 // If the source completed and as a result the internal ReplaySubject
 // terminated, then calling Connect again will replace the old ReplaySubject
 // with a newly created one.
-func (o ObservableInt) Replay(bufferCapacity int, windowDuration time.Duration) ConnectableInt {
+func (o ObservableInt) PublishReplay(bufferCapacity int, windowDuration time.Duration) ConnectableInt {
 	factory := func() SubjectInt {
 		return NewReplaySubjectInt(bufferCapacity, windowDuration)
 	}
@@ -449,6 +449,35 @@ func Create(f func(Observer)) Observable {
 	return observable
 }
 
+//jig:name ConnectableIntConnect
+
+// Connect instructs a connectable Observable to begin emitting items to its
+// subscribers. All values will then be passed on to the observers that
+// subscribed to this connectable observable
+func (c ConnectableInt) Connect(setters ...SubscribeOptionSetter) Subscription {
+	return c.connect(setters)
+}
+
+//jig:name ObservableIntToSlice
+
+// ToSlice collects all values from the ObservableInt into an slice. The
+// complete slice and any error are returned.
+//
+// This function subscribes to the source observable on the Goroutine scheduler.
+// The Goroutine scheduler works in more situations for complex chains of
+// observables, like when merging the output of multiple observables.
+func (o ObservableInt) ToSlice(setters ...SubscribeOptionSetter) (a []int, e error) {
+	scheduler := NewGoroutine()
+	o.Subscribe(func(next int, err error, done bool) {
+		if !done {
+			a = append(a, next)
+		} else {
+			e = err
+		}
+	}, SubscribeOn(scheduler, setters...)).Wait()
+	return a, e
+}
+
 //jig:name ConnectableIntAutoConnect
 
 // AutoConnect makes a ConnectableInt behave like an ordinary ObservableInt that
@@ -498,22 +527,14 @@ func (o Observable) AsObservableInt() ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntToSlice
+//jig:name ObservableIntSubscribeNext
 
-// ToSlice collects all values from the ObservableInt into an slice. The
-// complete slice and any error are returned.
-//
-// This function subscribes to the source observable on the Goroutine scheduler.
-// The Goroutine scheduler works in more situations for complex chains of
-// observables, like when merging the output of multiple observables.
-func (o ObservableInt) ToSlice(setters ...SubscribeOptionSetter) (a []int, e error) {
-	scheduler := NewGoroutine()
-	o.Subscribe(func(next int, err error, done bool) {
+// SubscribeNext operates upon the emissions from an Observable only.
+// This method returns a Subscriber.
+func (o ObservableInt) SubscribeNext(f func(next int), setters ...SubscribeOptionSetter) Subscription {
+	return o.Subscribe(func(next int, err error, done bool) {
 		if !done {
-			a = append(a, next)
-		} else {
-			e = err
+			f(next)
 		}
-	}, SubscribeOn(scheduler, setters...)).Wait()
-	return a, e
+	}, setters...)
 }
