@@ -3,7 +3,6 @@ package PublishReplay
 import (
 	"testing"
 	"time"
-	// "time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -30,7 +29,8 @@ func TestReplayBasic(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
-// Example that shows using a buffer that retains only the latest 2 values.
+// Example that shows using a buffer that retains only the latest 2 values and
+// the use of AutoConnect to declaratively call the Connect method.
 func TestReplayWithSize(t *testing.T) {
 	ch := make(chan int, 5)
 	for i := 0; i < 5; i++ {
