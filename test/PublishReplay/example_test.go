@@ -1,7 +1,5 @@
 package PublishReplay
 
-/*
-
 import (
 	"fmt"
 	"time"
@@ -18,7 +16,8 @@ func Example_channel() {
 		time.Sleep(100 * time.Millisecond)
 		close(ch)
 	}()
-	source := FromChanInt(ch).Replay(0, 500*time.Millisecond)
+	source := FromChanInt(ch).PublishReplay(0, 500*time.Millisecond)
+	source.Connect()
 
 	if err := source.Wait(); err != nil {
 		fmt.Println(err)
@@ -60,7 +59,8 @@ func Example_channel() {
 	// 4
 	// complete
 	// subscription was closed
+	// 3
+	// 4
 	// complete
 	// subscription was closed
 }
-*/

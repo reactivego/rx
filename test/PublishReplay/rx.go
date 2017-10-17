@@ -117,9 +117,9 @@ type Subscriber subscriber.Subscriber
 
 //jig:name NewScheduler
 
-func NewGoroutine() Scheduler { return &schedulers.Goroutine{} }
+func NewGoroutine() Scheduler	{ return &schedulers.Goroutine{} }
 
-func NewTrampoline() Scheduler { return &schedulers.Trampoline{} }
+func NewTrampoline() Scheduler	{ return &schedulers.Trampoline{} }
 
 //jig:name SubscribeOptions
 
@@ -129,13 +129,13 @@ type Subscription subscriber.Subscription
 // SubscribeOptions is a struct with options for Subscribe related methods.
 type SubscribeOptions struct {
 	// SubscribeOn is the scheduler to run the observable subscription on.
-	SubscribeOn Scheduler
+	SubscribeOn	Scheduler
 	// OnSubscribe is called right after the subscription is created and before
 	// subscribing continues further.
-	OnSubscribe func(subscription Subscription)
+	OnSubscribe	func(subscription Subscription)
 	// OnUnsubscribe is called by the subscription to notify the client that the
 	// subscription has been canceled.
-	OnUnsubscribe func()
+	OnUnsubscribe	func()
 }
 
 // NewSubscriber will return a newly created subscriber. Before returning the
@@ -210,7 +210,7 @@ func (o ObservableInt) Subscribe(observe IntObserveFunc, setters ...SubscribeOpt
 // all subscribers of ConnectableInt.
 type ConnectableInt struct {
 	ObservableInt
-	connect func(options []SubscribeOptionSetter) Subscription
+	connect	func(options []SubscribeOptionSetter) Subscription
 }
 
 //jig:name ObservableIntMulticast
@@ -221,12 +221,12 @@ type ConnectableInt struct {
 // new SubjectInt that implements the actual multicasting behavior.
 func (o ObservableInt) Multicast(factory func() SubjectInt) ConnectableInt {
 	const (
-		active int32 = iota
+		active	int32	= iota
 		notifying
 		terminated
 	)
 	var subject struct {
-		state int32
+		state	int32
 		atomic.Value
 	}
 	subject.Store(factory())
@@ -248,11 +248,11 @@ func (o ObservableInt) Multicast(factory func() SubjectInt) ConnectableInt {
 		}
 	}
 	const (
-		unsubscribed int32 = iota
+		unsubscribed	int32	= iota
 		subscribed
 	)
 	var subscriber struct {
-		state int32
+		state	int32
 		atomic.Value
 	}
 	connect := func(setters []SubscribeOptionSetter) Subscription {
@@ -378,6 +378,28 @@ func (o ObservableInt) PublishReplay(bufferCapacity int, windowDuration time.Dur
 	return o.Multicast(factory)
 }
 
+//jig:name ConnectableIntConnect
+
+// Connect instructs a connectable Observable to begin emitting items to its
+// subscribers. All values will then be passed on to the observers that
+// subscribed to this connectable observable
+func (c ConnectableInt) Connect(setters ...SubscribeOptionSetter) Subscription {
+	return c.connect(setters)
+}
+
+//jig:name ObservableIntWait
+
+// Wait subscribes to the Observable and waits for completion or error.
+// Returns either the error or nil when the Observable completed normally.
+func (o ObservableInt) Wait(setters ...SubscribeOptionSetter) (e error) {
+	o.Subscribe(func(next int, err error, done bool) {
+		if done {
+			e = err
+		}
+	}, setters...).Wait()
+	return e
+}
+
 //jig:name ObserveFunc
 
 // ObserveFunc is essentially the observer, a function that gets called
@@ -449,15 +471,6 @@ func Create(f func(Observer)) Observable {
 	return observable
 }
 
-//jig:name ConnectableIntConnect
-
-// Connect instructs a connectable Observable to begin emitting items to its
-// subscribers. All values will then be passed on to the observers that
-// subscribed to this connectable observable
-func (c ConnectableInt) Connect(setters ...SubscribeOptionSetter) Subscription {
-	return c.connect(setters)
-}
-
 //jig:name ObservableIntToSlice
 
 // ToSlice collects all values from the ObservableInt into an slice. The
@@ -525,16 +538,4 @@ func (o Observable) AsObservableInt() ObservableInt {
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
-}
-
-//jig:name ObservableIntSubscribeNext
-
-// SubscribeNext operates upon the emissions from an Observable only.
-// This method returns a Subscriber.
-func (o ObservableInt) SubscribeNext(f func(next int), setters ...SubscribeOptionSetter) Subscription {
-	return o.Subscribe(func(next int, err error, done bool) {
-		if !done {
-			f(next)
-		}
-	}, setters...)
 }
