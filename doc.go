@@ -11,7 +11,7 @@
 // generics from the library can now be accessed by the jig tool. Then start
 // using generics from the library and run jig to generate code. Take a look at
 // the Quick Start guide to see how it all fits together
-// https://github.com/reactivego/rx/doc/quickstart.md.
+// https://github.com/ReactiveGo/rx/blob/master/doc/QUICKSTART.md.
 //
 // For an overview of all implemented operators, see
 // https://github.com/reactivego/rx
