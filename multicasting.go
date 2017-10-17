@@ -125,9 +125,12 @@ func (o ObservableFoo) PublishReplay(bufferCapacity int, windowDuration time.Dur
 }
 
 //jig:template Connectable<Foo> RefCount
-//jig:needs Connectable<Foo>, SubscribeOptions
+//jig:needs Observable<Foo>, SubscribeOptions
 
-// RefCount makes a ConnectableFoo behave like an ordinary ObservableFoo.
+// RefCount makes a ConnectableFoo behave like an ordinary ObservableFoo. On
+// first Subscribe it will call Connect on its ConnectableFoo and when its last
+// subscriber is Unsubscribed it will cancel the connection by calling
+// Unsubscribe on the subscription returned by the call to Connect.
 func (o ConnectableFoo) RefCount(setters ...SubscribeOptionSetter) ObservableFoo {
 	var (
 		refcount   int32
@@ -147,7 +150,7 @@ func (o ConnectableFoo) RefCount(setters ...SubscribeOptionSetter) ObservableFoo
 }
 
 //jig:template Connectable<Foo> AutoConnect
-//jig:needs Connectable<Foo>, SubscribeOptions
+//jig:needs Observable<Foo>, SubscribeOptions
 
 // AutoConnect makes a ConnectableFoo behave like an ordinary ObservableFoo that
 // automatically connects when the specified number of clients subscribe to it.
