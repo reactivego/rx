@@ -19,7 +19,6 @@ Subscribing
 Converting
 
 	ToChan		http://reactivex.io/documentation/operators/to.html
-	ToChanNext	http://reactivex.io/documentation/operators/to.html
 	ToSingle	http://reactivex.io/documentation/operators/to.html
 	ToSlice		http://reactivex.io/documentation/operators/to.html
 */
