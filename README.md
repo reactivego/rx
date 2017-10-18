@@ -84,9 +84,8 @@ Operators that originate new Observables.
 - [**FromFoos**](https://godoc.org/github.com/ReactiveGo/rx/test/From/)() ObservableFoo
 - [**FromFoo**](https://godoc.org/github.com/ReactiveGo/rx/test/From/)() :star: ObservableFoo
 - [**Interval**](https://godoc.org/github.com/ReactiveGo/rx/test/Interval/)() ObservableInt
-- [**JustFoo**](https://godoc.org/github.com/ReactiveGo/rx/test/Just/)() ObservableFoo
+- [**JustFoo**](https://godoc.org/github.com/ReactiveGo/rx/test/Just/)() :star: ObservableFoo
 - [**NeverFoo**](https://godoc.org/github.com/ReactiveGo/rx/test/Never/)() ObservableFoo
-- Of :star:
 - [**Range**](https://godoc.org/github.com/ReactiveGo/rx/test/Range/)() ObservableInt
 - [**RepeatFoo**](https://godoc.org/github.com/ReactiveGo/rx/test/Repeat/)() ObservableFoo
 - (ObservableFoo) [**Repeat**](https://godoc.org/github.com/ReactiveGo/rx/test/Repeat/)() ObservableFoo
@@ -148,7 +147,6 @@ Operators that provide subscription multicasting from 1 to multiple subscribers.
 - PublishBehavior
 - (ConnectableFoo) [**RefCount**](https://godoc.org/github.com/ReactiveGo/rx/test/RefCount/)() ObservableFoo
 - (ConnectableFoo) [**AutoConnect**](https://godoc.org/github.com/ReactiveGo/rx/test/AutoConnect/)() ObservableFoo
-- Share :star:
 
 ### Error Handling Operators
 Operators that help to recover from error notifications from an Observable.
@@ -207,8 +205,8 @@ Subscribing breathes life into a chain of observables.
 	Following methods call Subscribe internally:
 	- (ConnectableFoo) [**Connect**](https://godoc.org/github.com/ReactiveGo/rx/test/)() Subscriber
 		Following operators call Connect internally:
-		- (ConnectableFoo) [**RefCount**](https://godoc.org/github.com/ReactiveGo/rx/test/)() ObservableFoo
-		- (ConnectableFoo) [**AutoConnect**](https://godoc.org/github.com/ReactiveGo/rx/test/)() ObservableFoo
+		- (ConnectableFoo) [**RefCount**](https://godoc.org/github.com/ReactiveGo/rx/test/RefCount)() ObservableFoo
+		- (ConnectableFoo) [**AutoConnect**](https://godoc.org/github.com/ReactiveGo/rx/test/AutoConnect)() ObservableFoo
 	- (ObservableFoo) [**SubscribeNext**](https://godoc.org/github.com/ReactiveGo/rx/test/) Subsciber
 	- (ObservableFoo) [**ToChan**](https://godoc.org/github.com/ReactiveGo/rx/test/)()chan foo
 	- (ObservableFoo) [**ToSingle**](https://godoc.org/github.com/ReactiveGo/rx/test/)() (foo, error)
