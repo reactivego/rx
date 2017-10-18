@@ -31,6 +31,32 @@ func main() {
 
 Take a look at the [Quick Start](doc/QUICKSTART.md) guide to see how it all fits together.
 
+## Table of Contents
+
+<!-- MarkdownTOC -->
+
+- [Why?](#why)
+- [Generic Programming](#generic-programming)
+- [Operators](#operators)
+	- [Creating Operators](#creating-operators)
+	- [Transforming Operators](#transforming-operators)
+	- [Filtering Operators](#filtering-operators)
+	- [Combining Operators](#combining-operators)
+	- [Multicasting Operators](#multicasting-operators)
+	- [Error Handling Operators](#error-handling-operators)
+	- [Utility Operators](#utility-operators)
+	- [Conditional and Boolean Operators](#conditional-and-boolean-operators)
+	- [Mathematical and Aggregate Operators](#mathematical-and-aggregate-operators)
+	- [Scheduling Operators](#scheduling-operators)
+	- [Type Casting, Converting and Filtering Operators](#type-casting-converting-and-filtering-operators)
+- [Subjects](#subjects)
+- [Subscribing](#pragma-reference)
+- [Obligatory Dijkstra Quote](#obligatory-dijkstra-quote)
+- [Acknowledgements](#acknowledgements)
+- [License](#license)
+
+<!-- /MarkdownTOC -->
+
 ## Why?
 ReactiveX observables are somewhat similar to Go channels but have much richer semantics. Observables can be hot or cold, can complete normally or with an error, use subscriptions that can be cancelled from the subscriber side. Where a normal variable is just a place where you read and write values from, an observable captures how the value of this variable changes over time. Concurrency follows naturally from the fact that an observable is an ever changing stream of values.
 
