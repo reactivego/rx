@@ -1,6 +1,6 @@
 package test
 
-// Shows subscribing to an observable using Println, printing emitted values.
+// Subscribe to an observable using Println and print all emitted values.
 func Example_println() {
 
 	Range(0, 3).Println()
