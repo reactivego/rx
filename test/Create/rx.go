@@ -80,6 +80,77 @@ func CreateInt(f func(IntObserver)) ObservableInt {
 	return observable
 }
 
+//jig:name StringObserveFunc
+
+// StringObserveFunc is essentially the observer, a function that gets called
+// whenever the observable has something to report.
+type StringObserveFunc func(string, error, bool)
+
+var zeroString string
+
+// Next is called by an ObservableString to emit the next string value to the
+// observer.
+func (f StringObserveFunc) Next(next string) {
+	f(next, nil, false)
+}
+
+// Error is called by an ObservableString to report an error to the observer.
+func (f StringObserveFunc) Error(err error) {
+	f(zeroString, err, true)
+}
+
+// Complete is called by an ObservableString to signal that no more data is
+// forthcoming to the observer.
+func (f StringObserveFunc) Complete() {
+	f(zeroString, nil, true)
+}
+
+//jig:name ObservableString
+
+// ObservableString is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type ObservableString func(StringObserveFunc, Scheduler, Subscriber)
+
+//jig:name StringObserver
+
+// StringObserver is the interface used with CreateString when implementing a custom
+// observable.
+type StringObserver interface {
+	// Next emits the next string value.
+	Next(string)
+	// Error signals an error condition.
+	Error(error)
+	// Complete signals that no more data is to be expected.
+	Complete()
+	// Closed returns true when the subscription has been canceled.
+	Closed() bool
+}
+
+//jig:name CreateString
+
+// CreateString creates an Observable from scratch by calling observer methods
+// programmatically.
+func CreateString(f func(StringObserver)) ObservableString {
+	observable := func(observe StringObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		scheduler.Schedule(func() {
+			if subscriber.Closed() {
+				return
+			}
+			observer := func(next string, err error, done bool) {
+				if !subscriber.Closed() {
+					observe(next, err, done)
+				}
+			}
+			type ObserverSubscriber struct {
+				StringObserveFunc
+				Subscriber
+			}
+			f(&ObserverSubscriber{observer, subscriber})
+		})
+	}
+	return observable
+}
+
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
@@ -159,6 +230,39 @@ func NewSubscribeOptions(setter SubscribeOptionSetter) *SubscribeOptions {
 	return options
 }
 
+//jig:name ObservableStringSubscribe
+
+// Subscribe operates upon the emissions and notifications from an Observable.
+// This method returns a Subscriber.
+func (o ObservableString) Subscribe(observe StringObserveFunc, setters ...SubscribeOptionSetter) Subscriber {
+	scheduler := NewTrampoline()
+	setter := SubscribeOn(scheduler, setters...)
+	options := NewSubscribeOptions(setter)
+	subscriber := options.NewSubscriber()
+	observer := func(next string, err error, done bool) {
+		if !done {
+			observe(next, err, done)
+		} else {
+			observe(zeroString, err, true)
+			subscriber.Unsubscribe()
+		}
+	}
+	o(observer, options.SubscribeOn, subscriber)
+	return subscriber
+}
+
+//jig:name ObservableStringSubscribeNext
+
+// SubscribeNext operates upon the emissions from an Observable only.
+// This method returns a Subscriber.
+func (o ObservableString) SubscribeNext(f func(next string), setters ...SubscribeOptionSetter) Subscription {
+	return o.Subscribe(func(next string, err error, done bool) {
+		if !done {
+			f(next)
+		}
+	}, setters...)
+}
+
 //jig:name ObservableIntSubscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
@@ -198,108 +302,4 @@ func (o ObservableInt) ToSlice(setters ...SubscribeOptionSetter) (a []int, e err
 		}
 	}, SubscribeOn(scheduler, setters...)).Wait()
 	return a, e
-}
-
-//jig:name StringObserveFunc
-
-// StringObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type StringObserveFunc func(string, error, bool)
-
-var zeroString string
-
-// Next is called by an ObservableString to emit the next string value to the
-// observer.
-func (f StringObserveFunc) Next(next string) {
-	f(next, nil, false)
-}
-
-// Error is called by an ObservableString to report an error to the observer.
-func (f StringObserveFunc) Error(err error) {
-	f(zeroString, err, true)
-}
-
-// Complete is called by an ObservableString to signal that no more data is
-// forthcoming to the observer.
-func (f StringObserveFunc) Complete() {
-	f(zeroString, nil, true)
-}
-
-//jig:name ObservableString
-
-// ObservableString is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableString func(StringObserveFunc, Scheduler, Subscriber)
-
-//jig:name StringObserver
-
-// StringObserver is the interface used with CreateString when implementing a custom
-// observable.
-type StringObserver interface {
-	// Next emits the next string value.
-	Next(string)
-	// Error signals an error condition.
-	Error(error)
-	// Complete signals that no more data is to be expected.
-	Complete()
-	// Closed returns true when the subscription has been canceled.
-	Closed() bool
-}
-
-//jig:name CreateString
-
-// CreateString creates an Observable from scratch by calling observer methods
-// programmatically.
-func CreateString(f func(StringObserver)) ObservableString {
-	observable := func(observe StringObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		scheduler.Schedule(func() {
-			if subscriber.Closed() {
-				return
-			}
-			observer := func(next string, err error, done bool) {
-				if !subscriber.Closed() {
-					observe(next, err, done)
-				}
-			}
-			type ObserverSubscriber struct {
-				StringObserveFunc
-				Subscriber
-			}
-			f(&ObserverSubscriber{observer, subscriber})
-		})
-	}
-	return observable
-}
-
-//jig:name ObservableStringSubscribe
-
-// Subscribe operates upon the emissions and notifications from an Observable.
-// This method returns a Subscriber.
-func (o ObservableString) Subscribe(observe StringObserveFunc, setters ...SubscribeOptionSetter) Subscriber {
-	scheduler := NewTrampoline()
-	setter := SubscribeOn(scheduler, setters...)
-	options := NewSubscribeOptions(setter)
-	subscriber := options.NewSubscriber()
-	observer := func(next string, err error, done bool) {
-		if !done {
-			observe(next, err, done)
-		} else {
-			observe(zeroString, err, true)
-			subscriber.Unsubscribe()
-		}
-	}
-	o(observer, options.SubscribeOn, subscriber)
-	return subscriber
-}
-
-//jig:name ObservableStringSubscribeNext
-
-// SubscribeNext operates upon the emissions from an Observable only.
-// This method returns a Subscriber.
-func (o ObservableString) SubscribeNext(f func(next string), setters ...SubscribeOptionSetter) Subscription {
-	return o.Subscribe(func(next string, err error, done bool) {
-		if !done {
-			f(next)
-		}
-	}, setters...)
 }
