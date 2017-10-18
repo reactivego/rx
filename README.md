@@ -50,7 +50,7 @@ Take a look at the [Quick Start](doc/QUICKSTART.md) guide to see how it all fits
 	- [Scheduling Operators](#scheduling-operators)
 	- [Type Casting, Converting and Filtering Operators](#type-casting-converting-and-filtering-operators)
 - [Subjects](#subjects)
-- [Subscribing](#pragma-reference)
+- [Subscribing](#subscribing)
 - [Obligatory Dijkstra Quote](#obligatory-dijkstra-quote)
 - [Acknowledgements](#acknowledgements)
 - [License](#license)
@@ -208,7 +208,8 @@ Subscribing breathes life into a chain of observables.
 		- (ConnectableFoo) [**RefCount**](https://godoc.org/github.com/ReactiveGo/rx/test/RefCount)() ObservableFoo
 		- (ConnectableFoo) [**AutoConnect**](https://godoc.org/github.com/ReactiveGo/rx/test/AutoConnect)() ObservableFoo
 	- (ObservableFoo) [**SubscribeNext**](https://godoc.org/github.com/ReactiveGo/rx/test/) Subsciber
-	- (ObservableFoo) [**ToChan**](https://godoc.org/github.com/ReactiveGo/rx/test/)()chan foo
+	- (ObservableFoo) [**Println**](https://godoc.org/github.com/ReactiveGo/rx/test/)() error
+	- (ObservableFoo) [**ToChan**](https://godoc.org/github.com/ReactiveGo/rx/test/)() chan foo
 	- (ObservableFoo) [**ToSingle**](https://godoc.org/github.com/ReactiveGo/rx/test/)() (foo, error)
 	- (ObservableFoo) [**ToSlice**](https://godoc.org/github.com/ReactiveGo/rx/test/)() ([]foo, error)
 	- (ObservableFoo) [**Wait**](https://godoc.org/github.com/ReactiveGo/rx/test/)() error

@@ -1,6 +1,8 @@
 package rx
 
 import (
+	"fmt"
+
 	"github.com/reactivego/rx/subscriber"
 )
 
@@ -104,6 +106,23 @@ func (o ObservableFoo) SubscribeNext(f func(next foo), setters ...SubscribeOptio
 			f(next)
 		}
 	}, setters...)
+}
+
+//jig:template Observable<Foo> Println
+//jig:needs Observable<Foo> Subscribe
+
+// Println subscribes to the Observable and prints every item to os.Stdout while
+// it waits for completion or error. Returns either the error or nil when the
+// Observable completed normally.
+func (o ObservableFoo) Println(setters ...SubscribeOptionSetter) (e error) {
+	o.Subscribe(func(next foo, err error, done bool) {
+		if !done {
+			fmt.Println(next)
+		} else {
+			e = err
+		}
+	}, setters...).Wait()
+	return e
 }
 
 //jig:template Observable ToChan

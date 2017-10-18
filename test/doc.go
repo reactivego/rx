@@ -5,6 +5,11 @@ Subjects, Subscribe methods and Convert methods are found in this package.
 
 For more information click on the links below:
 
+Observables & Observers
+
+	Observable 	http://reactivex.io/documentation/observable.html
+	ObserveFunc
+
 Subjects
 
 	Subject		http://reactivex.io/documentation/subject.html
@@ -15,6 +20,8 @@ Subscribing
 	Connect		http://reactivex.io/documentation/operators/connect.html
 	Subscribe	http://reactivex.io/documentation/operators/subscribe.html
 	SubscribeNext	http://reactivex.io/documentation/operators/subscribe.html
+	Println
+	Wait
 
 Converting
 

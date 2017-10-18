@@ -6,6 +6,7 @@ package test
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/reactivego/rx/channel"
@@ -873,4 +874,20 @@ func (o Observable) Single() Observable {
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
+}
+
+//jig:name ObservableIntPrintln
+
+// Println subscribes to the Observable and prints every item to os.Stdout while
+// it waits for completion or error. Returns either the error or nil when the
+// Observable completed normally.
+func (o ObservableInt) Println(setters ...SubscribeOptionSetter) (e error) {
+	o.Subscribe(func(next int, err error, done bool) {
+		if !done {
+			fmt.Println(next)
+		} else {
+			e = err
+		}
+	}, setters...).Wait()
+	return e
 }

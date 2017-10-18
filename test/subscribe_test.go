@@ -9,7 +9,7 @@ import (
 
 // Shows how to directly subscribe to an observable by calling it as a function.
 // Don't do this in production code, use the Subscribe method.
-func Example_directSubscribe() {
+func Example_subscribeDirect() {
 	// Create an observable of int values
 	observable := CreateInt(func(observer IntObserver) {
 		observer.Next(456)
