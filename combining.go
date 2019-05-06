@@ -71,6 +71,7 @@ func (o ObservableObservableFoo) ConcatAll() ObservableFoo {
 				}
 			}
 		}
+		sourceSubscriber := subscriber.Add(func() { /*unsubscribed*/})
 		concatenator := func(next ObservableFoo, err error, done bool) {
 			if !done {
 				mutex.Lock()
@@ -78,9 +79,10 @@ func (o ObservableObservableFoo) ConcatAll() ObservableFoo {
 				observables = append(observables, next)
 			} else {
 				observer(zeroFoo, err, done)
+				sourceSubscriber.Unsubscribe()
 			}
 		}
-		o(concatenator, subscribeOn, subscriber)
+		o(concatenator, subscribeOn, sourceSubscriber)
 	}
 	return observable
 }
