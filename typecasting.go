@@ -1,7 +1,5 @@
 package rx
 
-import "errors"
-
 //jig:template Observable<Foo> AsObservable<Bar>
 //jig:needs Observable<Bar>
 //jig:required-vars Foo
@@ -18,10 +16,11 @@ func (o ObservableFoo) AsObservableBar() ObservableBar {
 }
 
 //jig:template ErrTypecastTo<Foo>
+//jig:needs ConstError
 
 // ErrTypecastToFoo is delivered to an observer if the generic value cannot be
 // typecast to foo.
-var ErrTypecastToFoo = errors.New("typecast to foo failed")
+const ErrTypecastToFoo = Error("typecast to foo failed")
 
 //jig:template Observable AsObservable<Foo>
 //jig:needs Observable<Foo>, ErrTypecastTo<Foo>

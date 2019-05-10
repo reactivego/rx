@@ -1,7 +1,6 @@
 package rx
 
 import (
-	"errors"
 	"sync"
 	"time"
 )
@@ -244,7 +243,6 @@ func (o Observable) Sample(window time.Duration) Observable {
 			Fresh bool
 			Value interface{}
 		}
-
 		sampler := func() {
 			for {
 				select {
@@ -269,7 +267,6 @@ func (o Observable) Sample(window time.Duration) Observable {
 			}
 		}
 		go sampler()
-
 		observer := func(next interface{}, err error, done bool) {
 			if !done {
 				last.Lock()
@@ -295,6 +292,7 @@ func (o ObservableFoo) Sample(window time.Duration) ObservableFoo {
 }
 
 //jig:template Observable Single
+//jig:needs ConstError
 
 // Single enforces that the observable sends exactly one data item and then
 // completes. If the observable sends no data before completing or sends more
@@ -315,7 +313,7 @@ func (o Observable) Single() Observable {
 							observe(latest, nil, false)
 							observe(nil, nil, true)
 						} else {
-							observe(nil, errors.New("expected one value, got none"), true)
+							observe(nil, Error("expected one value, got none"), true)
 						}
 					}
 				} else {
@@ -323,7 +321,7 @@ func (o Observable) Single() Observable {
 					if count == 1 {
 						latest = next
 					} else {
-						observe(nil, errors.New("expected one value, got multiple"), true)
+						observe(nil, Error("expected one value, got multiple"), true)
 					}
 				}
 			}

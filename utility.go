@@ -1,11 +1,16 @@
 package rx
 
 import (
-	"errors"
 	"sync"
 	"sync/atomic"
 	"time"
 )
+
+//jig:template ConstError
+
+type Error string
+
+func (e Error) Error() string { return string(e) }
 
 //jig:template Observable<Foo> Do
 
@@ -112,10 +117,10 @@ func (o ObservableFoo) Serialize() ObservableFoo {
 }
 
 //jig:template Observable Timeout
-//jig:needs Observable Serialize
+//jig:needs ConstError, Observable Serialize
 
 // ErrTimeout is delivered to an observer if the stream times out.
-var ErrTimeout = errors.New("timeout")
+const ErrTimeout = Error("timeout")
 
 // Timeout mirrors the source Observable, but issues an error notification if a
 // particular period of time elapses without any emitted items.
@@ -173,11 +178,12 @@ func (o ObservableFoo) Timeout(timeout time.Duration) ObservableFoo {
 }
 
 //jig:template ErrObservableContractViolation
+//jig:needs ConstError
 
-var ErrObservableContractViolationConcurrentNotifications = errors.New("observable contract violation: concurrent notifications")
-var ErrObservableContractViolationNextAfterTermination = errors.New("observable contract violation: next after termination")
-var ErrObservableContractViolationErrorAfterTermination = errors.New("observable contract violation: error after termination")
-var ErrObservableContractViolationCompleteAfterTermination = errors.New("observable contract violation: complete after termination")
+const ErrObservableContractViolationConcurrentNotifications = Error("observable contract violation: concurrent notifications")
+const ErrObservableContractViolationNextAfterTermination = Error("observable contract violation: next after termination")
+const ErrObservableContractViolationErrorAfterTermination = Error("observable contract violation: error after termination")
+const ErrObservableContractViolationCompleteAfterTermination = Error("observable contract violation: complete after termination")
 
 //jig:template Observable<Foo> Validated
 //jig:needs ErrObservableContractViolation
