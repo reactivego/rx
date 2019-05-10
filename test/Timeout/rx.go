@@ -108,11 +108,11 @@ func (o Observable) Serialize() Observable {
 		)
 		observer := func(next interface{}, err error, done bool) {
 			mutex.Lock()
+			defer mutex.Unlock()
 			if !alreadyDone {
 				alreadyDone = done
 				observe(next, err, done)
 			}
-			mutex.Unlock()
 		}
 		o(observer, subscribeOn, subscriber)
 	}

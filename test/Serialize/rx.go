@@ -206,11 +206,11 @@ func (o ObservableInt) Serialize() ObservableInt {
 		)
 		observer := func(next int, err error, done bool) {
 			mutex.Lock()
+			defer mutex.Unlock()
 			if !alreadyDone {
 				alreadyDone = done
 				observe(next, err, done)
 			}
-			mutex.Unlock()
 		}
 		o(observer, subscribeOn, subscriber)
 	}

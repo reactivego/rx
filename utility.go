@@ -100,11 +100,11 @@ func (o ObservableFoo) Serialize() ObservableFoo {
 		)
 		observer := func(next foo, err error, done bool) {
 			mutex.Lock()
+			defer mutex.Unlock()
 			if !alreadyDone {
 				alreadyDone = done
 				observe(next, err, done)
 			}
-			mutex.Unlock()
 		}
 		o(observer, subscribeOn, subscriber)
 	}
