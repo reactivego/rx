@@ -26,22 +26,29 @@
 // Unsubscribe itself to indicate to the publisher it is no longer interested
 // in receiving data associated with the subscription.
 //
-// The implemenetation is designed to be used from concurrently running
+// The implementation is designed to be used from concurrently running
 // goroutines. It uses WaitGroups, Mutexes and atomic reference counting.
 package subscriber
 
 // Subscription is an interface that allows code to monitor and control a
 // subscription it received.
 type Subscription interface {
-	// Unsubscribe will cancel the subscription. So calling Closed will
-	// return true.	Subsequently it will call Unsubscribe on all subscriptions.
+	// Unsubscribe will cancel the subscription (when one is active).
+	// Subsequently it will then call Unsubscribe on all child subscriptions
+	// added through Add. After a call to Unsubscribe returns, calling
+	// Closed on the same interface or any of its child subscriptions 
+	// will return true. Unsubscribe can be safely called on a closed
+	// subscription and performs no operation.
 	Unsubscribe()
 
-	// Closed returns true when the subscription has been canceled.
+	// Closed returns true when the subscription has been canceled. There
+	// is not need to check if the subscription is closed before calling 
+	// Unsubscribe.
 	Closed() bool
 
-	// Wait will block the calling goroutine and wait for the Unsubcribe
-	// method to be called on this subscription.
+	// Wait will block the calling goroutine and wait for the Unsubscribe
+	// method to be called on this subscription. Calling Wait on a
+	// subscription that has already been closed will return immediately.
 	Wait()
 }
 
