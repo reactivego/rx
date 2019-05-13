@@ -18,10 +18,22 @@ func (o ObservableFoo) MapBar(project func(foo) bar) ObservableBar {
 	return observable
 }
 
+//jig:template Observable<Foo> SwitchMap<Bar>
+
+// SwitchMapBar transforms the items emitted by an ObservableFoo by applying a
+// function to each item an returning an ObservableBar. In doing so, it behaves much like
+// MergeMap (previously FlatMap), except that whenever a new ObservableBar is emitted
+// SwitchMap will unsubscribe from the previous ObservableBar and begin emitting items
+// from the newly emitted one.
+func (o ObservableFoo) SwitchMapBar(project func(foo) ObservableBar) ObservableBar {
+	return o.MapObservableBar(project).SwitchAll()
+}
+
 //jig:template Observable<Foo> MergeMap<Bar>
 
 // MergeMapBar transforms the items emitted by an ObservableFoo by applying a
-// function to each item.
+// function to each item an returning an ObservableBar. The stream of ObservableBar
+// items is then merged into a single stream of Bar items using the MergeAll operator.
 func (o ObservableFoo) MergeMapBar(project func(foo) ObservableBar) ObservableBar {
 	return o.MapObservableBar(project).MergeAll()
 }

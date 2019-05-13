@@ -7,6 +7,8 @@ package rx
 import (
 	"sync"
 	"sync/atomic"
+
+	"github.com/reactivego/rx/subscriber"
 )
 
 //jig:name BarObserveFunc
@@ -357,6 +359,162 @@ func (o ObservableObservableBar) MergeAll() ObservableBar {
 			}
 		}
 		o(merger, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name BarLink
+
+type BarLinkObserveFunc func(*BarLink, bar, error, bool)
+
+type BarLink struct {
+	observe		BarLinkObserveFunc
+	state		int32
+	callbackState	int32
+	callbackKind	int
+	callback	func()
+	subscriber	Subscriber
+}
+
+func NewInitialBarLink() *BarLink {
+	return &BarLink{state: linkCompleting, subscriber: subscriber.New()}
+}
+
+func NewBarLink(observe BarLinkObserveFunc, subscriber Subscriber) *BarLink {
+	return &BarLink{
+		observe:	observe,
+		subscriber:	subscriber.Add(func() {}),
+	}
+}
+
+func (o *BarLink) Observe(next bar, err error, done bool) error {
+	if !atomic.CompareAndSwapInt32(&o.state, linkIdle, linkBusy) {
+		if atomic.LoadInt32(&o.state) > linkBusy {
+			return Error("Already Done")
+		}
+		return Error("Recursion Error")
+	}
+	o.observe(o, next, err, done)
+	if done {
+		if err != nil {
+			if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkError) {
+				return Error("Internal Error: 'busy' -> 'error'")
+			}
+		} else {
+			if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkCompleting) {
+				return Error("Internal Error: 'busy' -> 'completing'")
+			}
+		}
+	} else {
+		if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkIdle) {
+			return Error("Internal Error: 'busy' -> 'idle'")
+		}
+	}
+	if atomic.LoadInt32(&o.callbackState) != callbackSet {
+		return nil
+	}
+	if atomic.CompareAndSwapInt32(&o.state, linkCompleting, linkComplete) {
+		o.callback()
+	}
+	if o.callbackKind == linkCancelOrCompleted {
+		if atomic.CompareAndSwapInt32(&o.state, linkIdle, linkCanceled) {
+			o.callback()
+		}
+	}
+	return nil
+}
+
+func (o *BarLink) SubscribeTo(observable ObservableBar, scheduler Scheduler) error {
+	if !atomic.CompareAndSwapInt32(&o.state, linkUnsubscribed, linkSubscribing) {
+		return Error("Already Subscribed")
+	}
+	observer := func(next bar, err error, done bool) {
+		o.Observe(next, err, done)
+	}
+	observable(observer, scheduler, o.subscriber)
+	if !atomic.CompareAndSwapInt32(&o.state, linkSubscribing, linkIdle) {
+		return Error("Internal Error")
+	}
+	return nil
+}
+
+func (o *BarLink) Cancel(callback func()) error {
+	if !atomic.CompareAndSwapInt32(&o.callbackState, callbackNil, settingCallback) {
+		return Error("Already Waiting")
+	}
+	o.callbackKind = linkCancelOrCompleted
+	o.callback = callback
+	if !atomic.CompareAndSwapInt32(&o.callbackState, settingCallback, callbackSet) {
+		return Error("Internal Error")
+	}
+	o.subscriber.Unsubscribe()
+	if atomic.CompareAndSwapInt32(&o.state, linkCompleting, linkComplete) {
+		o.callback()
+	}
+	if atomic.CompareAndSwapInt32(&o.state, linkIdle, linkCanceled) {
+		o.callback()
+	}
+	return nil
+}
+
+func (o *BarLink) OnComplete(callback func()) error {
+	if !atomic.CompareAndSwapInt32(&o.callbackState, callbackNil, settingCallback) {
+		return Error("Already Waiting")
+	}
+	o.callbackKind = linkCallbackOnComplete
+	o.callback = callback
+	if !atomic.CompareAndSwapInt32(&o.callbackState, settingCallback, callbackSet) {
+		return Error("Internal Error")
+	}
+	if atomic.CompareAndSwapInt32(&o.state, linkCompleting, linkComplete) {
+		o.callback()
+	}
+	return nil
+}
+
+//jig:name ObservableObservableBarSwitchAll
+
+// SwitchAll converts an Observable that emits Observables into a single Observable
+// that emits the items emitted by the most-recently-emitted of those Observables.
+func (o ObservableObservableBar) SwitchAll() ObservableBar {
+	observable := func(observe BarObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(link *BarLink, next bar, err error, done bool) {
+			if !done || err != nil {
+				observe(next, err, done)
+			} else {
+				link.subscriber.Unsubscribe()
+			}
+		}
+		currentLink := NewInitialBarLink()
+		var switcherMutex sync.Mutex
+		switcherSubscriber := subscriber.Add(func() {})
+		switcher := func(next ObservableBar, err error, done bool) {
+			switch {
+			case !done:
+				previousLink := currentLink
+				func() {
+					switcherMutex.Lock()
+					defer switcherMutex.Unlock()
+					currentLink = NewBarLink(observer, subscriber)
+				}()
+				previousLink.Cancel(func() {
+					switcherMutex.Lock()
+					defer switcherMutex.Unlock()
+					currentLink.SubscribeTo(next, subscribeOn)
+				})
+			case err != nil:
+				currentLink.Cancel(func() {
+					observe(zeroBar, err, true)
+				})
+				switcherSubscriber.Unsubscribe()
+			default:
+				currentLink.OnComplete(func() {
+					observe(zeroBar, nil, true)
+				})
+				switcherSubscriber.Unsubscribe()
+			}
+		}
+		o(switcher, subscribeOn, switcherSubscriber)
 	}
 	return observable
 }
