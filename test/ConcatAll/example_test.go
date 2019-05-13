@@ -1,17 +1,11 @@
 package ConcatAll
 
-import (
-	"fmt"
-)
+import "time"
 
 func Example_concatAll() {
-	source := Range(0, 3).MapObservableInt(func(next int) ObservableInt {
+	Interval(time.Millisecond).Take(3).MapObservableInt(func(next int) ObservableInt {
 		return Range(next, 2)
-	}).ConcatAll()
-
-	source.SubscribeNext(func(next int) {
-		fmt.Println(next)
-	})
+	}).ConcatAll().Println()
 
 	// Output:
 	// 0
