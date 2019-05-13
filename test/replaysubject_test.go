@@ -65,7 +65,7 @@ func Example_replaySubjectMultiple() {
 	// Feed the subject from the main goroutine
 	expect := make([]string, 0, 1000)
 	for i := 0; i < 1000; i++ {
-		s := fmt.Sprint("Next %d", i)
+		s := fmt.Sprintf("Next %d", i)
 		expect = append(expect, s)
 		subject.Next(s)
 	}
