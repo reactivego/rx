@@ -5,7 +5,6 @@
 package Timeout
 
 import (
-	"errors"
 	"sync"
 	"time"
 
@@ -96,6 +95,12 @@ type Scheduler interface {
 // Subscriber is an alias for the subscriber.Subscriber interface type.
 type Subscriber subscriber.Subscriber
 
+//jig:name ConstError
+
+type Error string
+
+func (e Error) Error() string	{ return string(e) }
+
 //jig:name ObservableSerialize
 
 // Serialize forces an Observable to make serialized calls and to be
@@ -122,7 +127,7 @@ func (o Observable) Serialize() Observable {
 //jig:name ObservableTimeout
 
 // ErrTimeout is delivered to an observer if the stream times out.
-var ErrTimeout = errors.New("timeout")
+const ErrTimeout = Error("timeout")
 
 // Timeout mirrors the source Observable, but issues an error notification if a
 // particular period of time elapses without any emitted items.
@@ -334,7 +339,7 @@ func (o ObservableInt) ToSlice(setters ...SubscribeOptionSetter) (a []int, e err
 
 // ErrTypecastToInt is delivered to an observer if the generic value cannot be
 // typecast to int.
-var ErrTypecastToInt = errors.New("typecast to int failed")
+const ErrTypecastToInt = Error("typecast to int failed")
 
 //jig:name ObservableAsObservableInt
 

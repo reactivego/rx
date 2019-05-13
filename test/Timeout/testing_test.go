@@ -24,6 +24,7 @@ func TestTimeout(t *testing.T) {
 	actual, err := timed.ToSlice()
 	expect := []int{1}
 	assert.EqualError(t, err, ErrTimeout.Error())
+	assert.True(t, err == ErrTimeout) // because const also identical to ErrTimeout
 
 	elapsed := time.Now().Sub(start)
 	assert.True(t, elapsed > time.Millisecond*250 && elapsed < time.Millisecond*500, "elapsed time should be between 250 and 500 ms")
