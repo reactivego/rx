@@ -183,6 +183,7 @@ A toolbox of useful Operators for working with Observables.
 - (Observable) [**Do**](https://godoc.org/github.com/ReactiveGo/rx/test/Do/)() :star: Observable
 - (Observable) [**DoOnError**](https://godoc.org/github.com/ReactiveGo/rx/test/Do/)() Observable
 - (Observable) [**DoOnComplete**](https://godoc.org/github.com/ReactiveGo/rx/test/Do/)() Observable
+- (Observable) [**Delay**](https://godoc.org/github.com/ReactiveGo/rx/test/Delay/)() Observable
 - (Observable) [**Finally**](https://godoc.org/github.com/ReactiveGo/rx/test/Do/)() Observable
 - (Observable) [**Passthrough**](https://godoc.org/github.com/ReactiveGo/rx/test/Passthrough/)() Observable
 - (Observable) [**Serialize**](https://godoc.org/github.com/ReactiveGo/rx/test/Serialize/)() Observable

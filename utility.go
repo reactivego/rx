@@ -60,6 +60,24 @@ func (o ObservableFoo) DoOnComplete(f func()) ObservableFoo {
 	return observable
 }
 
+//jig:template Observable<Foo> Delay
+
+// Delay shifts the emission from an Observable forward in time by a particular amount of time.
+func (o ObservableFoo) Delay(duration time.Duration) ObservableFoo {
+	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		firstTime := true
+		observer := func(next foo, err error, done bool) {
+			if firstTime {
+				firstTime = false
+				time.Sleep(duration)
+			}
+			observe(next, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:template Observable<Foo> Finally
 
 // Finally applies a function for any error or completion on the stream.
