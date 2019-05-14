@@ -122,7 +122,7 @@ Operators that transform items that are emitted by an Observable.
 - (Observable) [**Map**](https://godoc.org/github.com/ReactiveGo/rx/test/Map/)() :star: Observable
 - (Observable) [**MergeMap**](https://godoc.org/github.com/ReactiveGo/rx/test/MergeMap/)() :star: Observable
 - (Observable) [**Scan**](https://godoc.org/github.com/ReactiveGo/rx/test/Scan/)() :star: Observable
-- SwitchMap :star:
+- (Observable) [**SwitchMap**](https://godoc.org/github.com/ReactiveGo/rx/test/SwitchMap/)() :star: Observable
 
 ### Filtering Operators
 Operators that selectively emit items from a source Observable.
@@ -158,6 +158,7 @@ Operators that work with multiple source Observables to create a single Observab
 - [**MergeDelayError**](https://godoc.org/github.com/ReactiveGo/rx/test/MergeDelayError/)() Observable
 - (Observable) [**MergeDelayError**](https://godoc.org/github.com/ReactiveGo/rx/test/MergeDelayError/)() Observable
 - StartWith :star:
+- (Observable<sup>2</sup>) [**SwitchAll**](https://godoc.org/github.com/ReactiveGo/rx/test/SwitchAll/)() Observable
 - WithLatestFrom :star:
 
 ### Multicasting Operators
