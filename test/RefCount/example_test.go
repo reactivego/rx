@@ -2,7 +2,9 @@ package RefCount
 
 import (
 	"fmt"
+	"os"
 	"time"
+	"sync"
 )
 
 // This example is a variant of the example in the book "Introduction to Rx"
@@ -44,34 +46,42 @@ func Example_introToRx() {
 // An example showing multiple subscriptions on a multicasting Publish
 // Connectable who's Connect is controlled by a RefCount operator.
 func Example_refCountMultipleSubscriptions() {
+	var wg sync.WaitGroup
 	channel := make(chan int, 30)
 	source := FromChanInt(channel).Publish().RefCount().SubscribeOn(NewGoroutine())
 
-	printNext := func(n int) { fmt.Println(n) }
-	sub1 := source.SubscribeNext(printNext)
-	sub2 := source.SubscribeNext(printNext)
+	sub1 := source.SubscribeNext(func(n int) {
+		fmt.Println(n)
+		os.Stdout.Sync()
+		wg.Done()
+	})
+	sub2 := source.SubscribeNext(func(n int) {
+		fmt.Println(n)
+		os.Stdout.Sync()
+		wg.Done()
+	})
 
 	// 3 goroutines are now starting, 1 for publishing and 2 for subscribing.
-	time.Sleep(100 * time.Millisecond)
-
-	// goroutines should have started by now, feed the channel.
+	// in the mean time we start feeding the channel.
+	wg.Add(6)
 	channel <- 1
 	channel <- 2
 	channel <- 3
 
-	// allow data in the channel to propagate.
-	time.Sleep(100 * time.Millisecond)
+	// wait for the channel data to propagate
+	wg.Wait()
 
 	// cancel the first subscription.
 	sub1.Unsubscribe()
 
-	// more data for the second subscription
+	// more data for the second subscription, then close the
+	// channel to complete the observable and make Wait return.
+	wg.Add(1)
 	channel <- 4
-
-	// closing the channel will complete the observable and close the
-	// subscription.
 	close(channel)
+
 	sub2.Wait()
+	wg.Wait()
 
 	// Output:
 	// 1
