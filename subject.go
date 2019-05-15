@@ -49,7 +49,7 @@ type SubjectFoo struct {
 // goroutine is blocked until all subscribers have processed the next, error or
 // complete notification.
 func NewSubjectFoo() SubjectFoo {
-	ch := channel.NewChan(1, 16 /*max enpoints*/)
+	ch := channel.NewChan(1, 16 /*max endpoints*/)
 
 	observable := Observable(func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		ep, err := ch.NewEndpoint(0)
@@ -108,7 +108,7 @@ func NewReplaySubjectFoo(bufferCapacity int, windowDuration time.Duration) Subje
 	if bufferCapacity == 0 {
 		bufferCapacity = MaxReplayCapacity
 	}
-	ch := channel.NewChan(bufferCapacity, 16 /*max enpoints*/)
+	ch := channel.NewChan(bufferCapacity, 16 /*max endpoints*/)
 
 	observable := Observable(func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		ep, err := ch.NewEndpoint(channel.ReplayAll)
