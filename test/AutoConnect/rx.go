@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/reactivego/rx/channel"
+	"github.com/reactivego/channel"
 	"github.com/reactivego/rx/schedulers"
 	"github.com/reactivego/rx/subscriber"
 )

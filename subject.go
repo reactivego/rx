@@ -3,7 +3,7 @@ package rx
 import (
 	"time"
 
-	"github.com/reactivego/rx/channel"
+	"github.com/reactivego/channel"
 )
 
 //jig:template Subject<Foo>
