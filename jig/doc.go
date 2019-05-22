@@ -1,4 +1,4 @@
-// Library rx provides a Just-in-time Generics (jig) implementation of Reactive eXtensions (Rx).
+// Package rx provides a Just-in-time Generics (jig) implementation of Reactive eXtensions (Rx).
 // It's a generics library for composing asynchronous and event-based programs
 // using observable sequences. The library consists of more than a 100 templates
 // to enable type-safe programming with observable streams. To use it, you will

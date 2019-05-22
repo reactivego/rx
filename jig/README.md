@@ -1,17 +1,17 @@
 # rx
 
-    import _ "github.com/reactivego/rx"
+    import _ "github.com/reactivego/rx/jig"
 
-[![](https://godoc.org/github.com/reactivego/rx?status.png)](http://godoc.org/github.com/reactivego/rx)
+[![](https://godoc.org/github.com/reactivego/rx?status.png)](http://godoc.org/github.com/reactivego/rx/jig)
 
-Library `rx` provides [Reactive eXtensions](http://reactivex.io/) for [Go](https://golang.org/). It's a generics library for composing asynchronous and event-based programs using observable sequences. The library consists of more than a 100 templates to enable type-safe programming with observable streams. To use it, you will need the *jig* tool from [Just-in-time Generics for Go](https://github.com/reactivego/jig).
+Package `rx` provides [Reactive eXtensions](http://reactivex.io/) for [Go](https://golang.org/). It's a generics library for composing asynchronous and event-based programs using observable sequences. The library consists of more than a 100 templates to enable type-safe programming with observable streams. To use it, you will need the *jig* tool from [Just-in-time Generics for Go](https://github.com/reactivego/jig).
 
 Using the library is very simple. Import the library with the blank identifier `_` as the package name. The side effect of this import is that generics from the library can now be accessed by the *jig* tool. Then start using generics from the library and run *jig* to generate code. The following is a minimal *Hello, World!* program:
 
 ```go
 package main
 
-import _ "github.com/reactivego/rx"
+import _ "github.com/reactivego/rx/jig"
 
 func main() {
 	FromStrings("You!", "Gophers!", "World!").
@@ -28,8 +28,6 @@ func main() {
 	// Hello, World!
 }
 ```
-
-Take a look at the [Quick Start](doc/QUICKSTART.md) guide to see how it all fits together.
 
 ## Table of Contents
 
@@ -248,4 +246,4 @@ Our intellectual powers are rather geared to master static relations and our pow
 This library started life as the [Reactive eXtensions for Go](https://github.com/alecthomas/gorx) library by *Alec Thomas*. Although the library has been through the metaphorical meat grinder a few times, its DNA is still clearly present in this library and I owe Alec a debt of grattitude for the work he has made so generously available.
 
 ## License
-This library is licensed under the terms of the MIT License. See [LICENSE](LICENSE) file in this repository for copyright notice and exact wording.
+This library is licensed under the terms of the MIT License. See [LICENSE](../LICENSE) file in this repository for copyright notice and exact wording.
