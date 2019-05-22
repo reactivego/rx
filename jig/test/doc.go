@@ -1,7 +1,8 @@
 /*
-Package test provides tests for all aspects of the rx library. All operators
-have their own subdirectory named after them with multiple tests. Tests for
-Subjects, Subscribe methods and Convert methods are found in this package.
+Package test provides tests for all aspects of the generic rx package.
+All operators have their own subdirectory named after them with multiple tests.
+Tests for Subjects, Subscribe methods and Convert methods are found in this
+package.
 
 For more information click on the links below:
 
