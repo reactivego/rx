@@ -1,10 +1,7 @@
-package test
+package ToSingle
 
 import (
 	"fmt"
-	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 // ToSingle is used to make sure only a single value was produced by the
@@ -23,20 +20,4 @@ func Example_toSingle() {
 	// Output:
 	// 19
 	// expected one value, got multiple
-}
-
-func TestToSingle_errMultipleValue(t *testing.T) {
-	_, err := FromInts(1, 2).ToSingle()
-	assert.Error(t, err)
-}
-
-func TestToSingle_errNoValue(t *testing.T) {
-	_, err := EmptyInt().ToSingle()
-	assert.Error(t, err)
-}
-
-func TestToSingle_correct(t *testing.T) {
-	value, err := FromInts(3).ToSingle()
-	assert.NoError(t, err)
-	assert.Equal(t, 3, value)
 }

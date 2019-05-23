@@ -1,15 +1,9 @@
 /*
 Package test provides tests for all aspects of the generic rx package.
-All operators have their own subdirectory named after them with multiple tests.
-Tests for Subjects, Subscribe methods and Convert methods are found in this
-package.
+Every aspect of the implementation has its own subdirectory named after it
+with multiple tests.
 
 For more information click on the links below:
-
-Observables & Observers
-
-	Observable 	http://reactivex.io/documentation/observable.html
-	ObserveFunc
 
 Subjects
 
@@ -23,12 +17,6 @@ Subscribing
 	SubscribeNext	http://reactivex.io/documentation/operators/subscribe.html
 	Println
 	Wait
-
-Converting
-
-	ToChan		http://reactivex.io/documentation/operators/to.html
-	ToSingle	http://reactivex.io/documentation/operators/to.html
-	ToSlice		http://reactivex.io/documentation/operators/to.html
 */
 package test
 

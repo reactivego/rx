@@ -1,4 +1,4 @@
-package test
+package Observer
 
 import (
 	"errors"
