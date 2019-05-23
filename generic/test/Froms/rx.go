@@ -2,7 +2,7 @@
 
 //go:generate jig --regen
 
-package From
+package Froms
 
 import (
 	"github.com/reactivego/rx/schedulers"
@@ -95,10 +95,10 @@ func FromSliceInt(slice []int) ObservableInt {
 	})
 }
 
-//jig:name FromInt
+//jig:name FromInts
 
-// FromInt creates an ObservableInt from multiple int values passed in.
-func FromInt(slice ...int) ObservableInt {
+// FromInts creates an ObservableInt from multiple int values passed in.
+func FromInts(slice ...int) ObservableInt {
 	return FromSliceInt(slice)
 }
 
