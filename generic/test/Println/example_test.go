@@ -1,4 +1,4 @@
-package test
+package Println
 
 // Subscribe to an observable using Println and print all emitted values.
 func Example_println() {

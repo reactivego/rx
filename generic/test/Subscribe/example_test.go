@@ -1,4 +1,4 @@
-package test
+package Subscribe
 
 import (
 	"errors"
