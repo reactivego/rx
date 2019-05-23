@@ -2,7 +2,7 @@
 
 //go:generate jig --regen
 
-package Do
+package DoOnComplete
 
 import (
 	"github.com/reactivego/rx/schedulers"
@@ -102,6 +102,15 @@ func FromInts(slice ...int) ObservableInt {
 	return FromSliceInt(slice)
 }
 
+//jig:name EmptyInt
+
+// EmptyInt creates an Observable that emits no items but terminates normally.
+func EmptyInt() ObservableInt {
+	return CreateInt(func(observer IntObserver) {
+		observer.Complete()
+	})
+}
+
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
@@ -114,14 +123,14 @@ type Scheduler interface {
 // Subscriber is an alias for the subscriber.Subscriber interface type.
 type Subscriber subscriber.Subscriber
 
-//jig:name ObservableIntDo
+//jig:name ObservableIntDoOnComplete
 
-// Do calls a function for each next value passing through the observable.
-func (o ObservableInt) Do(f func(next int)) ObservableInt {
+// DoOnComplete calls a function when the stream completes.
+func (o ObservableInt) DoOnComplete(f func()) ObservableInt {
 	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next int, err error, done bool) {
-			if !done {
-				f(next)
+			if err == nil && done {
+				f()
 			}
 			observe(next, err, done)
 		}
@@ -216,6 +225,18 @@ func (o ObservableInt) Subscribe(observe IntObserveFunc, setters ...SubscribeOpt
 	}
 	o(observer, options.SubscribeOn, subscriber)
 	return subscriber
+}
+
+//jig:name ObservableIntSubscribeNext
+
+// SubscribeNext operates upon the emissions from an Observable only.
+// This method returns a Subscriber.
+func (o ObservableInt) SubscribeNext(f func(next int), setters ...SubscribeOptionSetter) Subscription {
+	return o.Subscribe(func(next int, err error, done bool) {
+		if !done {
+			f(next)
+		}
+	}, setters...)
 }
 
 //jig:name ObservableIntToSlice

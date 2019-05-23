@@ -2,7 +2,7 @@
 
 //go:generate jig --regen
 
-package Do
+package Finally
 
 import (
 	"github.com/reactivego/rx/schedulers"
@@ -80,26 +80,23 @@ func CreateInt(f func(IntObserver)) ObservableInt {
 	return observable
 }
 
-//jig:name FromSliceInt
+//jig:name ThrowInt
 
-// FromSliceInt creates an ObservableInt from a slice of int values passed in.
-func FromSliceInt(slice []int) ObservableInt {
+// ThrowInt creates an Observable that emits no items and terminates with an
+// error.
+func ThrowInt(err error) ObservableInt {
 	return CreateInt(func(observer IntObserver) {
-		for _, next := range slice {
-			if observer.Closed() {
-				return
-			}
-			observer.Next(next)
-		}
-		observer.Complete()
+		observer.Error(err)
 	})
 }
 
-//jig:name FromInts
+//jig:name EmptyInt
 
-// FromInts creates an ObservableInt from multiple int values passed in.
-func FromInts(slice ...int) ObservableInt {
-	return FromSliceInt(slice)
+// EmptyInt creates an Observable that emits no items but terminates normally.
+func EmptyInt() ObservableInt {
+	return CreateInt(func(observer IntObserver) {
+		observer.Complete()
+	})
 }
 
 //jig:name Scheduler
@@ -114,14 +111,15 @@ type Scheduler interface {
 // Subscriber is an alias for the subscriber.Subscriber interface type.
 type Subscriber subscriber.Subscriber
 
-//jig:name ObservableIntDo
+//jig:name ObservableIntFinally
 
-// Do calls a function for each next value passing through the observable.
-func (o ObservableInt) Do(f func(next int)) ObservableInt {
+// Finally applies a function for any error or completion on the stream.
+// This doesn't expose whether this was an error or a completion.
+func (o ObservableInt) Finally(f func()) ObservableInt {
 	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next int, err error, done bool) {
-			if !done {
-				f(next)
+			if done {
+				f()
 			}
 			observe(next, err, done)
 		}
