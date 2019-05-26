@@ -5,7 +5,7 @@
 package Subject
 
 import (
-	"github.com/reactivego/channel"
+	"github.com/reactivego/multicast"
 	"github.com/reactivego/rx/schedulers"
 	"github.com/reactivego/rx/subscriber"
 )
@@ -82,7 +82,7 @@ type SubjectInt struct {
 // goroutine is blocked until all subscribers have processed the next, error or
 // complete notification.
 func NewSubjectInt() SubjectInt {
-	ch := channel.NewChan(1, 16)
+	ch := multicast.NewChan(1, 16)
 
 	observable := Observable(func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		ep, err := ch.NewEndpoint(0)
@@ -202,9 +202,9 @@ func Create(f func(Observer)) Observable {
 
 //jig:name NewScheduler
 
-func NewGoroutine() Scheduler { return &schedulers.Goroutine{} }
+func NewGoroutine() Scheduler	{ return &schedulers.Goroutine{} }
 
-func NewTrampoline() Scheduler { return &schedulers.Trampoline{} }
+func NewTrampoline() Scheduler	{ return &schedulers.Trampoline{} }
 
 //jig:name SubscribeOptions
 
@@ -214,13 +214,13 @@ type Subscription subscriber.Subscription
 // SubscribeOptions is a struct with options for Subscribe related methods.
 type SubscribeOptions struct {
 	// SubscribeOn is the scheduler to run the observable subscription on.
-	SubscribeOn Scheduler
+	SubscribeOn	Scheduler
 	// OnSubscribe is called right after the subscription is created and before
 	// subscribing continues further.
-	OnSubscribe func(subscription Subscription)
+	OnSubscribe	func(subscription Subscription)
 	// OnUnsubscribe is called by the subscription to notify the client that the
 	// subscription has been canceled.
-	OnUnsubscribe func()
+	OnUnsubscribe	func()
 }
 
 // NewSubscriber will return a newly created subscriber. Before returning the
@@ -317,7 +317,7 @@ func (o ObservableInt) Wait(setters ...SubscribeOptionSetter) (e error) {
 
 type Error string
 
-func (e Error) Error() string { return string(e) }
+func (e Error) Error() string	{ return string(e) }
 
 //jig:name ErrTypecastToInt
 

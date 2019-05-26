@@ -5,10 +5,9 @@
 package Publish
 
 import (
-	"errors"
 	"sync/atomic"
 
-	"github.com/reactivego/channel"
+	"github.com/reactivego/multicast"
 	"github.com/reactivego/rx/schedulers"
 	"github.com/reactivego/rx/subscriber"
 )
@@ -84,6 +83,24 @@ func CreateInt(f func(IntObserver)) ObservableInt {
 	return observable
 }
 
+//jig:name FromChanInt
+
+// FromChanInt creates an ObservableInt from a Go channel of int values.
+// It's not possible for the code feeding into the channel to send an error.
+// The feeding code can send zero or more int items and then closing the
+// channel will be seen as completion.
+func FromChanInt(ch <-chan int) ObservableInt {
+	return CreateInt(func(observer IntObserver) {
+		for next := range ch {
+			if observer.Closed() {
+				return
+			}
+			observer.Next(next)
+		}
+		observer.Complete()
+	})
+}
+
 //jig:name FromSliceInt
 
 // FromSliceInt creates an ObservableInt from a slice of int values passed in.
@@ -104,24 +121,6 @@ func FromSliceInt(slice []int) ObservableInt {
 // FromInts creates an ObservableInt from multiple int values passed in.
 func FromInts(slice ...int) ObservableInt {
 	return FromSliceInt(slice)
-}
-
-//jig:name FromChanInt
-
-// FromChanInt creates an ObservableInt from a Go channel of int values.
-// It's not possible for the code feeding into the channel to send an error.
-// The feeding code can send zero or more int items and then closing the
-// channel will be seen as completion.
-func FromChanInt(ch <-chan int) ObservableInt {
-	return CreateInt(func(observer IntObserver) {
-		for next := range ch {
-			if observer.Closed() {
-				return
-			}
-			observer.Next(next)
-		}
-		observer.Complete()
-	})
 }
 
 //jig:name Scheduler
@@ -336,7 +335,7 @@ type SubjectInt struct {
 // goroutine is blocked until all subscribers have processed the next, error or
 // complete notification.
 func NewSubjectInt() SubjectInt {
-	ch := channel.NewChan(1, 16)
+	ch := multicast.NewChan(1, 16)
 
 	observable := Observable(func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		ep, err := ch.NewEndpoint(0)
@@ -387,24 +386,28 @@ func (o ObservableInt) Publish() ConnectableInt {
 	return o.Multicast(NewSubjectInt)
 }
 
-//jig:name ObservableIntSubscribeOn
+//jig:name ConnectableIntRefCount
 
-// SubscribeOn specifies the scheduler an ObservableInt should use when it is
-// subscribed to.
-func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
-	observable := func(observe IntObserveFunc, _ Scheduler, subscriber Subscriber) {
-		o(observe, subscribeOn, subscriber)
+// RefCount makes a ConnectableInt behave like an ordinary ObservableInt. On
+// first Subscribe it will call Connect on its ConnectableInt and when its last
+// subscriber is Unsubscribed it will cancel the connection by calling
+// Unsubscribe on the subscription returned by the call to Connect.
+func (o ConnectableInt) RefCount(setters ...SubscribeOptionSetter) ObservableInt {
+	var (
+		refcount	int32
+		connection	Subscription
+	)
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		if atomic.AddInt32(&refcount, 1) == 1 {
+			connection = o.connect(setters)
+		}
+		o.ObservableInt(observe, subscribeOn, subscriber.Add(func() {
+			if atomic.AddInt32(&refcount, -1) == 0 {
+				connection.Unsubscribe()
+			}
+		}))
 	}
 	return observable
-}
-
-//jig:name ConnectableIntConnect
-
-// Connect instructs a connectable Observable to begin emitting items to its
-// subscribers. All values will then be passed on to the observers that
-// subscribed to this connectable observable
-func (c ConnectableInt) Connect(setters ...SubscribeOptionSetter) Subscription {
-	return c.connect(setters)
 }
 
 //jig:name ObserveFunc
@@ -478,32 +481,37 @@ func Create(f func(Observer)) Observable {
 	return observable
 }
 
-//jig:name ConnectableIntRefCount
+//jig:name ObservableIntSubscribeOn
 
-// RefCount makes a ConnectableInt behave like an ordinary ObservableInt.
-func (o ConnectableInt) RefCount(setters ...SubscribeOptionSetter) ObservableInt {
-	var (
-		refcount	int32
-		connection	Subscription
-	)
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		if atomic.AddInt32(&refcount, 1) == 1 {
-			connection = o.connect(setters)
-		}
-		o.ObservableInt(observe, subscribeOn, subscriber.Add(func() {
-			if atomic.AddInt32(&refcount, -1) == 0 {
-				connection.Unsubscribe()
-			}
-		}))
+// SubscribeOn specifies the scheduler an ObservableInt should use when it is
+// subscribed to.
+func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
+	observable := func(observe IntObserveFunc, _ Scheduler, subscriber Subscriber) {
+		o(observe, subscribeOn, subscriber)
 	}
 	return observable
 }
+
+//jig:name ConnectableIntConnect
+
+// Connect instructs a connectable Observable to begin emitting items to its
+// subscribers. All values will then be passed on to the observers that
+// subscribed to this connectable observable
+func (c ConnectableInt) Connect(setters ...SubscribeOptionSetter) Subscription {
+	return c.connect(setters)
+}
+
+//jig:name ConstError
+
+type Error string
+
+func (e Error) Error() string	{ return string(e) }
 
 //jig:name ErrTypecastToInt
 
 // ErrTypecastToInt is delivered to an observer if the generic value cannot be
 // typecast to int.
-var ErrTypecastToInt = errors.New("typecast to int failed")
+const ErrTypecastToInt = Error("typecast to int failed")
 
 //jig:name ObservableAsObservableInt
 
@@ -525,18 +533,6 @@ func (o Observable) AsObservableInt() ObservableInt {
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
-}
-
-//jig:name ObservableIntSubscribeNext
-
-// SubscribeNext operates upon the emissions from an Observable only.
-// This method returns a Subscriber.
-func (o ObservableInt) SubscribeNext(f func(next int), setters ...SubscribeOptionSetter) Subscription {
-	return o.Subscribe(func(next int, err error, done bool) {
-		if !done {
-			f(next)
-		}
-	}, setters...)
 }
 
 //jig:name ObservableIntMapString
@@ -573,6 +569,18 @@ func (o ObservableInt) MapBool(project func(int) bool) ObservableBool {
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
+}
+
+//jig:name ObservableIntSubscribeNext
+
+// SubscribeNext operates upon the emissions from an Observable only.
+// This method returns a Subscriber.
+func (o ObservableInt) SubscribeNext(f func(next int), setters ...SubscribeOptionSetter) Subscription {
+	return o.Subscribe(func(next int, err error, done bool) {
+		if !done {
+			f(next)
+		}
+	}, setters...)
 }
 
 //jig:name StringObserveFunc

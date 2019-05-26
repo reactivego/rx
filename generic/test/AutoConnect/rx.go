@@ -5,11 +5,10 @@
 package AutoConnect
 
 import (
-	"errors"
 	"sync/atomic"
 	"time"
 
-	"github.com/reactivego/channel"
+	"github.com/reactivego/multicast"
 	"github.com/reactivego/rx/schedulers"
 	"github.com/reactivego/rx/subscriber"
 )
@@ -308,10 +307,10 @@ func NewReplaySubjectInt(bufferCapacity int, windowDuration time.Duration) Subje
 	if bufferCapacity == 0 {
 		bufferCapacity = MaxReplayCapacity
 	}
-	ch := channel.NewChan(bufferCapacity, 16)
+	ch := multicast.NewChan(bufferCapacity, 16)
 
 	observable := Observable(func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		ep, err := ch.NewEndpoint(channel.ReplayAll)
+		ep, err := ch.NewEndpoint(multicast.ReplayAll)
 		if err != nil {
 			observe(nil, err, true)
 			return
@@ -358,27 +357,6 @@ func (o ObservableInt) PublishReplay(bufferCapacity int, windowDuration time.Dur
 		return NewReplaySubjectInt(bufferCapacity, windowDuration)
 	}
 	return o.Multicast(factory)
-}
-
-//jig:name ConnectableIntAutoConnect
-
-// AutoConnect makes a ConnectableInt behave like an ordinary ObservableInt that
-// automatically connects when the specified number of clients subscribe to it.
-// If count is 0, then AutoConnect will immediately call connect on the
-// ConnectableInt before returning the ObservableInt part of the ConnectableInt.
-func (o ConnectableInt) AutoConnect(count int, setters ...SubscribeOptionSetter) ObservableInt {
-	if count == 0 {
-		o.connect(setters)
-		return o.ObservableInt
-	}
-	var refcount int32
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		if atomic.AddInt32(&refcount, 1) == int32(count) {
-			o.connect(setters)
-		}
-		o.ObservableInt(observe, subscribeOn, subscriber)
-	}
-	return observable
 }
 
 //jig:name ObserveFunc
@@ -452,23 +430,38 @@ func Create(f func(Observer)) Observable {
 	return observable
 }
 
-//jig:name ObservableIntSubscribeNext
+//jig:name ConnectableIntAutoConnect
 
-// SubscribeNext operates upon the emissions from an Observable only.
-// This method returns a Subscriber.
-func (o ObservableInt) SubscribeNext(f func(next int), setters ...SubscribeOptionSetter) Subscription {
-	return o.Subscribe(func(next int, err error, done bool) {
-		if !done {
-			f(next)
+// AutoConnect makes a ConnectableInt behave like an ordinary ObservableInt that
+// automatically connects when the specified number of clients subscribe to it.
+// If count is 0, then AutoConnect will immediately call connect on the
+// ConnectableInt before returning the ObservableInt part of the ConnectableInt.
+func (o ConnectableInt) AutoConnect(count int, setters ...SubscribeOptionSetter) ObservableInt {
+	if count == 0 {
+		o.connect(setters)
+		return o.ObservableInt
+	}
+	var refcount int32
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		if atomic.AddInt32(&refcount, 1) == int32(count) {
+			o.connect(setters)
 		}
-	}, setters...)
+		o.ObservableInt(observe, subscribeOn, subscriber)
+	}
+	return observable
 }
+
+//jig:name ConstError
+
+type Error string
+
+func (e Error) Error() string	{ return string(e) }
 
 //jig:name ErrTypecastToInt
 
 // ErrTypecastToInt is delivered to an observer if the generic value cannot be
 // typecast to int.
-var ErrTypecastToInt = errors.New("typecast to int failed")
+const ErrTypecastToInt = Error("typecast to int failed")
 
 //jig:name ObservableAsObservableInt
 

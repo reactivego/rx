@@ -5,11 +5,10 @@
 package RefCount
 
 import (
-	"errors"
 	"sync/atomic"
 	"time"
 
-	"github.com/reactivego/channel"
+	"github.com/reactivego/multicast"
 	"github.com/reactivego/rx/schedulers"
 	"github.com/reactivego/rx/subscriber"
 )
@@ -83,6 +82,40 @@ func CreateInt(f func(IntObserver)) ObservableInt {
 		})
 	}
 	return observable
+}
+
+//jig:name FromChanInt
+
+// FromChanInt creates an ObservableInt from a Go channel of int values.
+// It's not possible for the code feeding into the channel to send an error.
+// The feeding code can send zero or more int items and then closing the
+// channel will be seen as completion.
+func FromChanInt(ch <-chan int) ObservableInt {
+	return CreateInt(func(observer IntObserver) {
+		for next := range ch {
+			if observer.Closed() {
+				return
+			}
+			observer.Next(next)
+		}
+		observer.Complete()
+	})
+}
+
+//jig:name Interval
+
+// Interval creates an ObservableInt that emits a sequence of integers spaced
+// by a particular time interval.
+func Interval(interval time.Duration) ObservableInt {
+	return CreateInt(func(observer IntObserver) {
+		for i := 0; ; i++ {
+			time.Sleep(interval)
+			if observer.Closed() {
+				return
+			}
+			observer.Next(i)
+		}
+	})
 }
 
 //jig:name Scheduler
@@ -285,33 +318,22 @@ type SubjectInt struct {
 	IntObserveFunc
 }
 
-//jig:name MaxReplayCapacity
+//jig:name NewSubjectInt
 
-// MaxReplayCapacity is the maximum size of a replay buffer. Can be modified.
-var MaxReplayCapacity = 16383
-
-//jig:name NewReplaySubjectInt
-
-// NewReplaySubjectInt creates a new ReplaySubject. ReplaySubject ensures that
-// all observers see the same sequence of emitted items, even if they
-// subscribe after. When bufferCapacity argument is 0, then MaxReplayCapacity is
-// used (currently 16383). When windowDuration argument is 0, then entries added
-// to the buffer will remain fresh forever.
+// NewSubjectInt creates a new Subject. After the subject is
+// terminated, all subsequent subscriptions to the observable side will be
+// terminated immediately with either an Error or Complete notification send to
+// the subscribing client
 //
-// Note that this implementation is non-blocking. When no subscribers are
-// present the buffer fills up to bufferCapacity after which new items will
-// start overwriting the oldest ones according to the FIFO principle.
-// If a subscriber cannot keep up with the data rate of the source observable,
-// eventually the buffer for the subscriber will overflow. At that moment the
-// subscriber will receive an ErrMissingBackpressure error.
-func NewReplaySubjectInt(bufferCapacity int, windowDuration time.Duration) SubjectInt {
-	if bufferCapacity == 0 {
-		bufferCapacity = MaxReplayCapacity
-	}
-	ch := channel.NewChan(bufferCapacity, 16)
+// Note that this implementation is blocking. When no subcribers are present
+// then the data can flow freely. But when there are subscribers, the observable
+// goroutine is blocked until all subscribers have processed the next, error or
+// complete notification.
+func NewSubjectInt() SubjectInt {
+	ch := multicast.NewChan(1, 16)
 
 	observable := Observable(func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		ep, err := ch.NewEndpoint(channel.ReplayAll)
+		ep, err := ch.NewEndpoint(0)
 		if err != nil {
 			observe(nil, err, true)
 			return
@@ -325,7 +347,7 @@ func NewReplaySubjectInt(bufferCapacity int, windowDuration time.Duration) Subje
 				}
 				return !observer.Closed()
 			}
-			ep.Range(receive, windowDuration)
+			ep.Range(receive, 0)
 		})
 		observable(observe, subscribeOn, subscriber.Add(ep.Cancel))
 	})
@@ -333,7 +355,7 @@ func NewReplaySubjectInt(bufferCapacity int, windowDuration time.Duration) Subje
 	observer := func(next int, err error, done bool) {
 		if !ch.Closed() {
 			if !done {
-				ch.Send(next)
+				ch.FastSend(next)
 			} else {
 				ch.Close(err)
 			}
@@ -343,45 +365,59 @@ func NewReplaySubjectInt(bufferCapacity int, windowDuration time.Duration) Subje
 	return SubjectInt{observable.AsObservableInt(), observer}
 }
 
-//jig:name ObservableIntPublishReplay
+//jig:name ObservableIntPublish
 
-// Replay uses Multicast to control the subscription of a ReplaySubject to a
-// source observable and turns the subject into a connectable observable.
-// A ReplaySubject emits to any observer all of the items that were emitted by
-// the source observable, regardless of when the observer subscribes.
+// Publish uses Multicast to control the subscription of a Subject to a
+// source observable and turns the subject it into a connnectable observable.
+// A Subject emits to an observer only those items that are emitted by
+// the source Observable subsequent to the time of the subscription.
 //
-// If the source completed and as a result the internal ReplaySubject
-// terminated, then calling Connect again will replace the old ReplaySubject
-// with a newly created one.
-func (o ObservableInt) PublishReplay(bufferCapacity int, windowDuration time.Duration) ConnectableInt {
-	factory := func() SubjectInt {
-		return NewReplaySubjectInt(bufferCapacity, windowDuration)
-	}
-	return o.Multicast(factory)
+// If the source completed and as a result the internal Subject terminated, then
+// calling Connect again will replace the old Subject with a newly created one.
+// So this Publish operator is re-connectable, unlike the RxJS 5 behavior that
+// isn't. To simulate the RxJS 5 behavior use Publish().AutoConnect(1) this will
+// connect on the first subscription but will never re-connect.
+func (o ObservableInt) Publish() ConnectableInt {
+	return o.Multicast(NewSubjectInt)
 }
 
-//jig:name ConnectableIntRefCount
+//jig:name ObservableIntDo
 
-// RefCount makes a ConnectableInt behave like an ordinary ObservableInt. On
-// first Subscribe it will call Connect on its ConnectableInt and when its last
-// subscriber is Unsubscribed it will cancel the connection by calling
-// Unsubscribe on the subscription returned by the call to Connect.
-func (o ConnectableInt) RefCount(setters ...SubscribeOptionSetter) ObservableInt {
-	var (
-		refcount	int32
-		connection	Subscription
-	)
+// Do calls a function for each next value passing through the observable.
+func (o ObservableInt) Do(f func(next int)) ObservableInt {
 	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		if atomic.AddInt32(&refcount, 1) == 1 {
-			connection = o.connect(setters)
-		}
-		o.ObservableInt(observe, subscribeOn, subscriber.Add(func() {
-			if atomic.AddInt32(&refcount, -1) == 0 {
-				connection.Unsubscribe()
+		observer := func(next int, err error, done bool) {
+			if !done {
+				f(next)
 			}
-		}))
+			observe(next, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
 	}
 	return observable
+}
+
+//jig:name ObservableIntSubscribeOn
+
+// SubscribeOn specifies the scheduler an ObservableInt should use when it is
+// subscribed to.
+func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
+	observable := func(observe IntObserveFunc, _ Scheduler, subscriber Subscriber) {
+		o(observe, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableIntSubscribeNext
+
+// SubscribeNext operates upon the emissions from an Observable only.
+// This method returns a Subscriber.
+func (o ObservableInt) SubscribeNext(f func(next int), setters ...SubscribeOptionSetter) Subscription {
+	return o.Subscribe(func(next int, err error, done bool) {
+		if !done {
+			f(next)
+		}
+	}, setters...)
 }
 
 //jig:name ObserveFunc
@@ -455,23 +491,41 @@ func Create(f func(Observer)) Observable {
 	return observable
 }
 
-//jig:name ObservableIntSubscribeNext
+//jig:name ConnectableIntRefCount
 
-// SubscribeNext operates upon the emissions from an Observable only.
-// This method returns a Subscriber.
-func (o ObservableInt) SubscribeNext(f func(next int), setters ...SubscribeOptionSetter) Subscription {
-	return o.Subscribe(func(next int, err error, done bool) {
-		if !done {
-			f(next)
+// RefCount makes a ConnectableInt behave like an ordinary ObservableInt. On
+// first Subscribe it will call Connect on its ConnectableInt and when its last
+// subscriber is Unsubscribed it will cancel the connection by calling
+// Unsubscribe on the subscription returned by the call to Connect.
+func (o ConnectableInt) RefCount(setters ...SubscribeOptionSetter) ObservableInt {
+	var (
+		refcount	int32
+		connection	Subscription
+	)
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		if atomic.AddInt32(&refcount, 1) == 1 {
+			connection = o.connect(setters)
 		}
-	}, setters...)
+		o.ObservableInt(observe, subscribeOn, subscriber.Add(func() {
+			if atomic.AddInt32(&refcount, -1) == 0 {
+				connection.Unsubscribe()
+			}
+		}))
+	}
+	return observable
 }
+
+//jig:name ConstError
+
+type Error string
+
+func (e Error) Error() string	{ return string(e) }
 
 //jig:name ErrTypecastToInt
 
 // ErrTypecastToInt is delivered to an observer if the generic value cannot be
 // typecast to int.
-var ErrTypecastToInt = errors.New("typecast to int failed")
+const ErrTypecastToInt = Error("typecast to int failed")
 
 //jig:name ObservableAsObservableInt
 
@@ -493,128 +547,4 @@ func (o Observable) AsObservableInt() ObservableInt {
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
-}
-
-//jig:name Interval
-
-// Interval creates an ObservableInt that emits a sequence of integers spaced
-// by a particular time interval.
-func Interval(interval time.Duration) ObservableInt {
-	return CreateInt(func(observer IntObserver) {
-		for i := 0; ; i++ {
-			time.Sleep(interval)
-			if observer.Closed() {
-				return
-			}
-			observer.Next(i)
-		}
-	})
-}
-
-//jig:name ObservableIntDo
-
-// Do calls a function for each next value passing through the observable.
-func (o ObservableInt) Do(f func(next int)) ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			if !done {
-				f(next)
-			}
-			observe(next, err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name NewSubjectInt
-
-// NewSubjectInt creates a new Subject. After the subject is
-// terminated, all subsequent subscriptions to the observable side will be
-// terminated immediately with either an Error or Complete notification send to
-// the subscribing client
-//
-// Note that this implementation is blocking. When no subcribers are present
-// then the data can flow freely. But when there are subscribers, the observable
-// goroutine is blocked until all subscribers have processed the next, error or
-// complete notification.
-func NewSubjectInt() SubjectInt {
-	ch := channel.NewChan(1, 16)
-
-	observable := Observable(func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		ep, err := ch.NewEndpoint(0)
-		if err != nil {
-			observe(nil, err, true)
-			return
-		}
-		observable := Create(func(observer Observer) {
-			receive := func(value interface{}, err error, closed bool) bool {
-				if !closed {
-					observer.Next(value)
-				} else {
-					observer.Error(err)
-				}
-				return !observer.Closed()
-			}
-			ep.Range(receive, 0)
-		})
-		observable(observe, subscribeOn, subscriber.Add(ep.Cancel))
-	})
-
-	observer := func(next int, err error, done bool) {
-		if !ch.Closed() {
-			if !done {
-				ch.FastSend(next)
-			} else {
-				ch.Close(err)
-			}
-		}
-	}
-
-	return SubjectInt{observable.AsObservableInt(), observer}
-}
-
-//jig:name ObservableIntPublish
-
-// Publish uses Multicast to control the subscription of a Subject to a
-// source observable and turns the subject it into a connnectable observable.
-// A Subject emits to an observer only those items that are emitted by
-// the source Observable subsequent to the time of the subscription.
-//
-// If the source completed and as a result the internal Subject terminated, then
-// calling Connect again will replace the old Subject with a newly created one.
-// So this Publish operator is re-connectable, unlike the RxJS 5 behavior that
-// isn't. To simulate the RxJS 5 behavior use Publish().AutoConnect(1) this will
-// connect on the first subscription but will never re-connect.
-func (o ObservableInt) Publish() ConnectableInt {
-	return o.Multicast(NewSubjectInt)
-}
-
-//jig:name ObservableIntSubscribeOn
-
-// SubscribeOn specifies the scheduler an ObservableInt should use when it is
-// subscribed to.
-func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
-	observable := func(observe IntObserveFunc, _ Scheduler, subscriber Subscriber) {
-		o(observe, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name FromChanInt
-
-// FromChanInt creates an ObservableInt from a Go channel of int values.
-// It's not possible for the code feeding into the channel to send an error.
-// The feeding code can send zero or more int items and then closing the
-// channel will be seen as completion.
-func FromChanInt(ch <-chan int) ObservableInt {
-	return CreateInt(func(observer IntObserver) {
-		for next := range ch {
-			if observer.Closed() {
-				return
-			}
-			observer.Next(next)
-		}
-		observer.Complete()
-	})
 }

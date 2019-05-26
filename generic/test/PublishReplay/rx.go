@@ -5,11 +5,10 @@
 package PublishReplay
 
 import (
-	"errors"
 	"sync/atomic"
 	"time"
 
-	"github.com/reactivego/channel"
+	"github.com/reactivego/multicast"
 	"github.com/reactivego/rx/schedulers"
 	"github.com/reactivego/rx/subscriber"
 )
@@ -326,10 +325,10 @@ func NewReplaySubjectInt(bufferCapacity int, windowDuration time.Duration) Subje
 	if bufferCapacity == 0 {
 		bufferCapacity = MaxReplayCapacity
 	}
-	ch := channel.NewChan(bufferCapacity, 16)
+	ch := multicast.NewChan(bufferCapacity, 16)
 
 	observable := Observable(func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		ep, err := ch.NewEndpoint(channel.ReplayAll)
+		ep, err := ch.NewEndpoint(multicast.ReplayAll)
 		if err != nil {
 			observe(nil, err, true)
 			return
@@ -387,17 +386,45 @@ func (c ConnectableInt) Connect(setters ...SubscribeOptionSetter) Subscription {
 	return c.connect(setters)
 }
 
-//jig:name ObservableIntWait
+//jig:name ObservableIntToSlice
 
-// Wait subscribes to the Observable and waits for completion or error.
-// Returns either the error or nil when the Observable completed normally.
-func (o ObservableInt) Wait(setters ...SubscribeOptionSetter) (e error) {
+// ToSlice collects all values from the ObservableInt into an slice. The
+// complete slice and any error are returned.
+//
+// This function subscribes to the source observable on the Goroutine scheduler.
+// The Goroutine scheduler works in more situations for complex chains of
+// observables, like when merging the output of multiple observables.
+func (o ObservableInt) ToSlice(setters ...SubscribeOptionSetter) (a []int, e error) {
+	scheduler := NewGoroutine()
 	o.Subscribe(func(next int, err error, done bool) {
-		if done {
+		if !done {
+			a = append(a, next)
+		} else {
 			e = err
 		}
-	}, setters...).Wait()
-	return e
+	}, SubscribeOn(scheduler, setters...)).Wait()
+	return a, e
+}
+
+//jig:name ConnectableIntAutoConnect
+
+// AutoConnect makes a ConnectableInt behave like an ordinary ObservableInt that
+// automatically connects when the specified number of clients subscribe to it.
+// If count is 0, then AutoConnect will immediately call connect on the
+// ConnectableInt before returning the ObservableInt part of the ConnectableInt.
+func (o ConnectableInt) AutoConnect(count int, setters ...SubscribeOptionSetter) ObservableInt {
+	if count == 0 {
+		o.connect(setters)
+		return o.ObservableInt
+	}
+	var refcount int32
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		if atomic.AddInt32(&refcount, 1) == int32(count) {
+			o.connect(setters)
+		}
+		o.ObservableInt(observe, subscribeOn, subscriber)
+	}
+	return observable
 }
 
 //jig:name ObserveFunc
@@ -471,52 +498,30 @@ func Create(f func(Observer)) Observable {
 	return observable
 }
 
-//jig:name ObservableIntToSlice
+//jig:name ObservableIntWait
 
-// ToSlice collects all values from the ObservableInt into an slice. The
-// complete slice and any error are returned.
-//
-// This function subscribes to the source observable on the Goroutine scheduler.
-// The Goroutine scheduler works in more situations for complex chains of
-// observables, like when merging the output of multiple observables.
-func (o ObservableInt) ToSlice(setters ...SubscribeOptionSetter) (a []int, e error) {
-	scheduler := NewGoroutine()
+// Wait subscribes to the Observable and waits for completion or error.
+// Returns either the error or nil when the Observable completed normally.
+func (o ObservableInt) Wait(setters ...SubscribeOptionSetter) (e error) {
 	o.Subscribe(func(next int, err error, done bool) {
-		if !done {
-			a = append(a, next)
-		} else {
+		if done {
 			e = err
 		}
-	}, SubscribeOn(scheduler, setters...)).Wait()
-	return a, e
+	}, setters...).Wait()
+	return e
 }
 
-//jig:name ConnectableIntAutoConnect
+//jig:name ConstError
 
-// AutoConnect makes a ConnectableInt behave like an ordinary ObservableInt that
-// automatically connects when the specified number of clients subscribe to it.
-// If count is 0, then AutoConnect will immediately call connect on the
-// ConnectableInt before returning the ObservableInt part of the ConnectableInt.
-func (o ConnectableInt) AutoConnect(count int, setters ...SubscribeOptionSetter) ObservableInt {
-	if count == 0 {
-		o.connect(setters)
-		return o.ObservableInt
-	}
-	var refcount int32
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		if atomic.AddInt32(&refcount, 1) == int32(count) {
-			o.connect(setters)
-		}
-		o.ObservableInt(observe, subscribeOn, subscriber)
-	}
-	return observable
-}
+type Error string
+
+func (e Error) Error() string	{ return string(e) }
 
 //jig:name ErrTypecastToInt
 
 // ErrTypecastToInt is delivered to an observer if the generic value cannot be
 // typecast to int.
-var ErrTypecastToInt = errors.New("typecast to int failed")
+const ErrTypecastToInt = Error("typecast to int failed")
 
 //jig:name ObservableAsObservableInt
 
