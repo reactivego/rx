@@ -1,4 +1,3 @@
-// Package schedulers contains Scheduler implementations.
 package schedulers
 
 // Trampoline scheduler schedules a task to occur after the currently
@@ -20,15 +19,18 @@ func (s *Trampoline) Schedule(task func()) {
 	}
 }
 
-// Goroutine scheduler schedules every task asynchronously on its own
-// goroutine.
-type Goroutine struct{}
+func (s *Trampoline) Dispatch(task func()) {
+	s.Schedule(task)
+}
 
-// Schedule a task asynchronously to run concurrently as a new goroutine.
-func (s Goroutine) Schedule(task func()) { go task() }
+func (s Trampoline) IsAsynchronous() bool {
+	return true
+}
 
-// ScheduleFunc is the type of a function that can schedule tasks.
-type ScheduleFunc func(task func())
+func (s Trampoline) IsConcurrent() bool {
+	return false
+}
 
-// Schedule schedules a task using a schedule func.
-func (s ScheduleFunc) Schedule(task func()) { s(task) }
+func (s Trampoline) Wait(registerCancelCallback func(func())) {
+	// Not implemented
+}

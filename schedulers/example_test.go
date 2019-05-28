@@ -5,16 +5,15 @@ import (
 )
 
 func ExampleTrampoline() {
-
 	tramp := &Trampoline{}
 	fmt.Println("before")
-	tramp.Schedule(func() {
+	tramp.Dispatch(func() {
 		fmt.Println("1")
 
-		tramp.Schedule(func() {
+		tramp.Dispatch(func() {
 			fmt.Println("3")
 
-			tramp.Schedule(func() {
+			tramp.Dispatch(func() {
 				fmt.Println("5")
 			})
 
