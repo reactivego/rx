@@ -32,11 +32,11 @@ type SubscribeOptions struct {
 // NewSubscriber will return a newly created subscriber. Before returning the
 // subscription the OnSubscribe callback (if set) will already have been called.
 func (options SubscribeOptions) NewSubscriber() Subscriber {
-	subscription := subscriber.NewWithCallback(options.OnUnsubscribe)
+	subscriber := subscriber.NewWithCallback(options.OnUnsubscribe)
 	if options.OnSubscribe != nil {
-		options.OnSubscribe(subscription)
+		options.OnSubscribe(subscriber)
 	}
-	return subscription
+	return subscriber
 }
 
 // SubscribeOptionSetter is the type of a function for setting SubscribeOptions.
