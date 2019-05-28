@@ -99,7 +99,7 @@ func (o ObservableFoo) Subscribe(observe FooObserveFunc, setters ...SubscribeOpt
 //jig:needs Observable<Foo> Subscribe
 
 // SubscribeNext operates upon the emissions from an Observable only.
-// This method returns a Subscriber.
+// This method returns a Subscription.
 func (o ObservableFoo) SubscribeNext(f func(next foo), setters ...SubscribeOptionSetter) Subscription {
 	return o.Subscribe(func(next foo, err error, done bool) {
 		if !done {
