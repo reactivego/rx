@@ -31,6 +31,6 @@ func (s Trampoline) IsConcurrent() bool {
 	return false
 }
 
-func (s Trampoline) Wait(registerCancelCallback func(func())) {
+func (s Trampoline) Wait(onCancel func(func())) {
 	// Not implemented
 }
