@@ -5,7 +5,6 @@ import (
 )
 
 //jig:template Scheduler
-//jig:support
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
 type Scheduler interface {

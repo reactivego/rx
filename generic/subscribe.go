@@ -7,12 +7,12 @@ import (
 )
 
 //jig:template Subscriber
-//jig:support
 
 // Subscriber is an alias for the subscriber.Subscriber interface type.
 type Subscriber subscriber.Subscriber
 
 //jig:template SubscribeOptions
+//jig:needs Scheduler, Subscriber
 
 // Subscription is an alias for the subscriber.Subscription interface type.
 type Subscription subscriber.Subscription
