@@ -16,9 +16,13 @@ import (
 
 //jig:name ObserveFunc
 
-// ObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type ObserveFunc func(interface{}, error, bool)
+// ObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type ObserveFunc func(next interface{}, err error, done bool)
 
 var zero interface{}
 
@@ -45,216 +49,15 @@ func (f ObserveFunc) Complete() {
 // function, scheduler and an subscriber.
 type Observable func(ObserveFunc, Scheduler, Subscriber)
 
-//jig:name Observer
-
-// Observer is the interface used with Create when implementing a custom
-// observable.
-type Observer interface {
-	// Next emits the next interface{} value.
-	Next(interface{})
-	// Error signals an error condition.
-	Error(error)
-	// Complete signals that no more data is to be expected.
-	Complete()
-	// Closed returns true when the subscription has been canceled.
-	Closed() bool
-}
-
-//jig:name Create
-
-// Create creates an Observable from scratch by calling observer methods
-// programmatically.
-func Create(f func(Observer)) Observable {
-	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		scheduler.Schedule(func() {
-			if subscriber.Closed() {
-				return
-			}
-			observer := func(next interface{}, err error, done bool) {
-				if !subscriber.Closed() {
-					observe(next, err, done)
-				}
-			}
-			type ObserverSubscriber struct {
-				ObserveFunc
-				Subscriber
-			}
-			f(&ObserverSubscriber{observer, subscriber})
-		})
-	}
-	return observable
-}
-
-//jig:name FromSlice
-
-// FromSlice creates an Observable from a slice of interface{} values passed in.
-func FromSlice(slice []interface{}) Observable {
-	return Create(func(observer Observer) {
-		for _, next := range slice {
-			if observer.Closed() {
-				return
-			}
-			observer.Next(next)
-		}
-		observer.Complete()
-	})
-}
-
-//jig:name From
-
-// From creates an Observable from multiple interface{} values passed in.
-func From(slice ...interface{}) Observable {
-	return FromSlice(slice)
-}
-
-//jig:name FromChan
-
-// FromChan creates an Observable from a Go channel of interface{}
-// values. This allows the code feeding into the channel to send either an error
-// or the next value. The feeding code can send zero or more items and then
-// closing the channel will be seen as completion. When the feeding code sends
-// an error into the channel, it should close the channel immediately to
-// indicate termination with error.
-func FromChan(ch <-chan interface{}) Observable {
-	return Create(func(observer Observer) {
-		for item := range ch {
-			if observer.Closed() {
-				return
-			}
-			if err, ok := item.(error); ok {
-				observer.Error(err)
-				return
-			}
-			observer.Next(item)
-		}
-		if observer.Closed() {
-			return
-		}
-		observer.Complete()
-	})
-}
-
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
-}
-
-//jig:name Subscriber
-
-// Subscriber is an alias for the subscriber.Subscriber interface type.
-type Subscriber subscriber.Subscriber
-
-//jig:name NewScheduler
-
-func NewGoroutine() Scheduler	{ return &schedulers.Goroutine{} }
-
-func NewTrampoline() Scheduler	{ return &schedulers.Trampoline{} }
-
-//jig:name SubscribeOptions
-
-// Subscription is an alias for the subscriber.Subscription interface type.
-type Subscription subscriber.Subscription
-
-// SubscribeOptions is a struct with options for Subscribe related methods.
-type SubscribeOptions struct {
-	// SubscribeOn is the scheduler to run the observable subscription on.
-	SubscribeOn	Scheduler
-	// OnSubscribe is called right after the subscription is created and before
-	// subscribing continues further.
-	OnSubscribe	func(subscription Subscription)
-	// OnUnsubscribe is called by the subscription to notify the client that the
-	// subscription has been canceled.
-	OnUnsubscribe	func()
-}
-
-// NewSubscriber will return a newly created subscriber. Before returning the
-// subscription the OnSubscribe callback (if set) will already have been called.
-func (options SubscribeOptions) NewSubscriber() Subscriber {
-	subscription := subscriber.NewWithCallback(options.OnUnsubscribe)
-	if options.OnSubscribe != nil {
-		options.OnSubscribe(subscription)
-	}
-	return subscription
-}
-
-// SubscribeOptionSetter is the type of a function for setting SubscribeOptions.
-type SubscribeOptionSetter func(options *SubscribeOptions)
-
-// SubscribeOn takes the scheduler to run the observable subscription on and
-// additional setters. It will first set the SubscribeOn option before
-// calling the other setters provided as a parameter.
-func SubscribeOn(subscribeOn Scheduler, setters ...SubscribeOptionSetter) SubscribeOptionSetter {
-	return func(options *SubscribeOptions) {
-		options.SubscribeOn = subscribeOn
-		for _, setter := range setters {
-			setter(options)
-		}
-	}
-}
-
-// OnSubscribe takes a callback to be called on subscription.
-func OnSubscribe(callback func(Subscription)) SubscribeOptionSetter {
-	return func(options *SubscribeOptions) { options.OnSubscribe = callback }
-}
-
-// OnUnsubscribe takes a callback to be called on subscription cancelation.
-func OnUnsubscribe(callback func()) SubscribeOptionSetter {
-	return func(options *SubscribeOptions) { options.OnUnsubscribe = callback }
-}
-
-// NewSubscribeOptions will create a new SubscribeOptions struct and then call
-// the setter on it to recursively set all the options. It then returns a
-// pointer to the created SubscribeOptions struct.
-func NewSubscribeOptions(setter SubscribeOptionSetter) *SubscribeOptions {
-	options := &SubscribeOptions{}
-	setter(options)
-	return options
-}
-
-//jig:name ObservableSubscribe
-
-// Subscribe operates upon the emissions and notifications from an Observable.
-// This method returns a Subscriber.
-func (o Observable) Subscribe(observe ObserveFunc, setters ...SubscribeOptionSetter) Subscriber {
-	scheduler := NewTrampoline()
-	setter := SubscribeOn(scheduler, setters...)
-	options := NewSubscribeOptions(setter)
-	subscriber := options.NewSubscriber()
-	observer := func(next interface{}, err error, done bool) {
-		if !done {
-			observe(next, err, done)
-		} else {
-			observe(zero, err, true)
-			subscriber.Unsubscribe()
-		}
-	}
-	o(observer, options.SubscribeOn, subscriber)
-	return subscriber
-}
-
-//jig:name ObservablePrintln
-
-// Println subscribes to the Observable and prints every item to os.Stdout while
-// it waits for completion or error. Returns either the error or nil when the
-// Observable completed normally.
-func (o Observable) Println(setters ...SubscribeOptionSetter) (e error) {
-	o.Subscribe(func(next interface{}, err error, done bool) {
-		if !done {
-			fmt.Println(next)
-		} else {
-			e = err
-		}
-	}, setters...).Wait()
-	return e
-}
-
 //jig:name IntObserveFunc
 
-// IntObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type IntObserveFunc func(int, error, bool)
+// IntObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type IntObserveFunc func(next int, err error, done bool)
 
 var zeroInt int
 
@@ -337,13 +140,66 @@ func Interval(interval time.Duration) ObservableInt {
 	})
 }
 
-//jig:name ObservableMergeMap
+//jig:name Observer
 
-// MergeMap transforms the items emitted by an Observable by applying a
-// function to each item an returning an Observable. The stream of Observable
-// items is then merged into a single stream of  items using the MergeAll operator.
-func (o Observable) MergeMap(project func(interface{}) Observable) Observable {
-	return o.MapObservable(project).MergeAll()
+// Observer is the interface used with Create when implementing a custom
+// observable.
+type Observer interface {
+	// Next emits the next interface{} value.
+	Next(interface{})
+	// Error signals an error condition.
+	Error(error)
+	// Complete signals that no more data is to be expected.
+	Complete()
+	// Closed returns true when the subscription has been canceled.
+	Closed() bool
+}
+
+//jig:name Create
+
+// Create creates an Observable from scratch by calling observer methods
+// programmatically.
+func Create(f func(Observer)) Observable {
+	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		scheduler.Schedule(func() {
+			if subscriber.Closed() {
+				return
+			}
+			observer := func(next interface{}, err error, done bool) {
+				if !subscriber.Closed() {
+					observe(next, err, done)
+				}
+			}
+			type ObserverSubscriber struct {
+				ObserveFunc
+				Subscriber
+			}
+			f(&ObserverSubscriber{observer, subscriber})
+		})
+	}
+	return observable
+}
+
+//jig:name FromSlice
+
+// FromSlice creates an Observable from a slice of interface{} values passed in.
+func FromSlice(slice []interface{}) Observable {
+	return Create(func(observer Observer) {
+		for _, next := range slice {
+			if observer.Closed() {
+				return
+			}
+			observer.Next(next)
+		}
+		observer.Complete()
+	})
+}
+
+//jig:name From
+
+// From creates an Observable from multiple interface{} values passed in.
+func From(slice ...interface{}) Observable {
+	return FromSlice(slice)
 }
 
 //jig:name Range
@@ -362,23 +218,44 @@ func Range(start, count int) ObservableInt {
 	})
 }
 
-//jig:name ObservableMap
+//jig:name FromChan
 
-// Map transforms the items emitted by an Observable by applying a
-// function to each item.
-func (o Observable) Map(project func(interface{}) interface{}) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			var mapped interface{}
-			if !done {
-				mapped = project(next)
+// FromChan creates an Observable from a Go channel of interface{}
+// values. This allows the code feeding into the channel to send either an error
+// or the next value. The feeding code can send zero or more items and then
+// closing the channel will be seen as completion. When the feeding code sends
+// an error into the channel, it should close the channel immediately to
+// indicate termination with error.
+func FromChan(ch <-chan interface{}) Observable {
+	return Create(func(observer Observer) {
+		for item := range ch {
+			if observer.Closed() {
+				return
 			}
-			observe(mapped, err, done)
+			if err, ok := item.(error); ok {
+				observer.Error(err)
+				return
+			}
+			observer.Next(item)
 		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
+		if observer.Closed() {
+			return
+		}
+		observer.Complete()
+	})
 }
+
+//jig:name Scheduler
+
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler interface {
+	Schedule(task func())
+}
+
+//jig:name Subscriber
+
+// Subscriber is an alias for the subscriber.Subscriber interface type.
+type Subscriber subscriber.Subscriber
 
 //jig:name ObservableFilter
 
@@ -441,64 +318,126 @@ func (o Observable) Concat(other ...Observable) Observable {
 	return observable
 }
 
-//jig:name ObservableScan
+//jig:name ObservableMap
 
-// Scan applies a accumulator function to each item emitted by an
-// Observable and the previous accumulator result. The operator accepts a
-// seed argument that is passed to the accumulator for the first item emitted
-// by the Observable. Scan emits every value, both intermediate and final.
-func (o Observable) Scan(accumulator func(interface{}, interface{}) interface{}, seed interface{}) Observable {
+// Map transforms the items emitted by an Observable by applying a
+// function to each item.
+func (o Observable) Map(project func(interface{}) interface{}) Observable {
 	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		state := seed
 		observer := func(next interface{}, err error, done bool) {
+			var mapped interface{}
 			if !done {
-				state = accumulator(state, next)
-				observe(state, nil, false)
-			} else {
-				observe(zero, err, done)
+				mapped = project(next)
 			}
+			observe(mapped, err, done)
 		}
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
 }
 
-//jig:name ObservableIntAsObservable
+//jig:name NewScheduler
 
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
+func NewGoroutine() Scheduler	{ return &schedulers.Goroutine{} }
+
+func NewTrampoline() Scheduler	{ return &schedulers.Trampoline{} }
+
+//jig:name SubscribeOptions
+
+// Subscription is an alias for the subscriber.Subscription interface type.
+type Subscription subscriber.Subscription
+
+// SubscribeOptions is a struct with options for Subscribe related methods.
+type SubscribeOptions struct {
+	// SubscribeOn is the scheduler to run the observable subscription on.
+	SubscribeOn	Scheduler
+	// OnSubscribe is called right after the subscription is created and before
+	// subscribing continues further.
+	OnSubscribe	func(subscription Subscription)
+	// OnUnsubscribe is called by the subscription to notify the client that the
+	// subscription has been canceled.
+	OnUnsubscribe	func()
 }
 
-//jig:name ObservableWait
+// NewSubscriber will return a newly created subscriber. Before returning the
+// subscription the OnSubscribe callback (if set) will already have been called.
+func (options SubscribeOptions) NewSubscriber() Subscriber {
+	subscriber := subscriber.NewWithCallback(options.OnUnsubscribe)
+	if options.OnSubscribe != nil {
+		options.OnSubscribe(subscriber)
+	}
+	return subscriber
+}
 
-// Wait subscribes to the Observable and waits for completion or error.
-// Returns either the error or nil when the Observable completed normally.
-func (o Observable) Wait(setters ...SubscribeOptionSetter) (e error) {
+// SubscribeOptionSetter is the type of a function for setting SubscribeOptions.
+type SubscribeOptionSetter func(options *SubscribeOptions)
+
+// SubscribeOn takes the scheduler to run the observable subscription on and
+// additional setters. It will first set the SubscribeOn option before
+// calling the other setters provided as a parameter.
+func SubscribeOn(subscribeOn Scheduler, setters ...SubscribeOptionSetter) SubscribeOptionSetter {
+	return func(options *SubscribeOptions) {
+		options.SubscribeOn = subscribeOn
+		for _, setter := range setters {
+			setter(options)
+		}
+	}
+}
+
+// OnSubscribe takes a callback to be called on subscription.
+func OnSubscribe(callback func(Subscription)) SubscribeOptionSetter {
+	return func(options *SubscribeOptions) { options.OnSubscribe = callback }
+}
+
+// OnUnsubscribe takes a callback to be called on subscription cancelation.
+func OnUnsubscribe(callback func()) SubscribeOptionSetter {
+	return func(options *SubscribeOptions) { options.OnUnsubscribe = callback }
+}
+
+// NewSubscribeOptions will create a new SubscribeOptions struct and then call
+// the setter on it to recursively set all the options. It then returns a
+// pointer to the created SubscribeOptions struct.
+func NewSubscribeOptions(setter SubscribeOptionSetter) *SubscribeOptions {
+	options := &SubscribeOptions{}
+	setter(options)
+	return options
+}
+
+//jig:name ObservableSubscribe
+
+// Subscribe operates upon the emissions and notifications from an Observable.
+// This method returns a Subscriber.
+func (o Observable) Subscribe(observe ObserveFunc, setters ...SubscribeOptionSetter) Subscriber {
+	scheduler := NewTrampoline()
+	setter := SubscribeOn(scheduler, setters...)
+	options := NewSubscribeOptions(setter)
+	subscriber := options.NewSubscriber()
+	observer := func(next interface{}, err error, done bool) {
+		if !done {
+			observe(next, err, done)
+		} else {
+			observe(zero, err, true)
+			subscriber.Unsubscribe()
+		}
+	}
+	o(observer, options.SubscribeOn, subscriber)
+	return subscriber
+}
+
+//jig:name ObservablePrintln
+
+// Println subscribes to the Observable and prints every item to os.Stdout while
+// it waits for completion or error. Returns either the error or nil when the
+// Observable completed normally.
+func (o Observable) Println(setters ...SubscribeOptionSetter) (e error) {
 	o.Subscribe(func(next interface{}, err error, done bool) {
-		if done {
+		if !done {
+			fmt.Println(next)
+		} else {
 			e = err
 		}
 	}, setters...).Wait()
 	return e
-}
-
-//jig:name ObservableSubscribeNext
-
-// SubscribeNext operates upon the emissions from an Observable only.
-// This method returns a Subscriber.
-func (o Observable) SubscribeNext(f func(next interface{}), setters ...SubscribeOptionSetter) Subscription {
-	return o.Subscribe(func(next interface{}, err error, done bool) {
-		if !done {
-			f(next)
-		}
-	}, setters...)
 }
 
 //jig:name ObservableTake
@@ -530,6 +469,75 @@ func (o ObservableInt) Take(n int) ObservableInt {
 	return o.AsObservable().Take(n).AsObservableInt()
 }
 
+//jig:name ObservableScan
+
+// Scan applies a accumulator function to each item emitted by an
+// Observable and the previous accumulator result. The operator accepts a
+// seed argument that is passed to the accumulator for the first item emitted
+// by the Observable. Scan emits every value, both intermediate and final.
+func (o Observable) Scan(accumulator func(interface{}, interface{}) interface{}, seed interface{}) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		state := seed
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				state = accumulator(state, next)
+				observe(state, nil, false)
+			} else {
+				observe(zero, err, done)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableMergeMap
+
+// MergeMap transforms the items emitted by an Observable by applying a
+// function to each item an returning an Observable. The stream of Observable
+// items is then merged into a single stream of  items using the MergeAll operator.
+func (o Observable) MergeMap(project func(interface{}) Observable) Observable {
+	return o.MapObservable(project).MergeAll()
+}
+
+//jig:name ObservableIntAsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableWait
+
+// Wait subscribes to the Observable and waits for completion or error.
+// Returns either the error or nil when the Observable completed normally.
+func (o Observable) Wait(setters ...SubscribeOptionSetter) (e error) {
+	o.Subscribe(func(next interface{}, err error, done bool) {
+		if done {
+			e = err
+		}
+	}, setters...).Wait()
+	return e
+}
+
+//jig:name ObservableSubscribeNext
+
+// SubscribeNext operates upon the emissions from an Observable only.
+// This method returns a Subscription.
+func (o Observable) SubscribeNext(f func(next interface{}), setters ...SubscribeOptionSetter) Subscription {
+	return o.Subscribe(func(next interface{}, err error, done bool) {
+		if !done {
+			f(next)
+		}
+	}, setters...)
+}
+
 //jig:name ObservableMapObservable
 
 // MapObservable transforms the items emitted by an Observable by applying a
@@ -548,11 +556,67 @@ func (o Observable) MapObservable(project func(interface{}) Observable) Observab
 	return observable
 }
 
+//jig:name RxError
+
+type RxError string
+
+func (e RxError) Error() string	{ return string(e) }
+
+//jig:name ErrTypecastToInt
+
+// ErrTypecastToInt is delivered to an observer if the generic value cannot be
+// typecast to int.
+const ErrTypecastToInt = RxError("typecast to int failed")
+
+//jig:name ObservableAsObservableInt
+
+// AsInt turns an Observable of interface{} into an ObservableInt. If during
+// observing a typecast fails, the error ErrTypecastToInt will be emitted.
+func (o Observable) AsObservableInt() ObservableInt {
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				if nextInt, ok := next.(int); ok {
+					observe(nextInt, err, done)
+				} else {
+					observe(zeroInt, ErrTypecastToInt, true)
+				}
+			} else {
+				observe(zeroInt, err, true)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableIntMapObservable
+
+// MapObservable transforms the items emitted by an ObservableInt by applying a
+// function to each item.
+func (o ObservableInt) MapObservable(project func(int) Observable) ObservableObservable {
+	observable := func(observe ObservableObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			var mapped Observable
+			if !done {
+				mapped = project(next)
+			}
+			observe(mapped, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name ObservableObserveFunc
 
-// ObservableObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type ObservableObserveFunc func(Observable, error, bool)
+// ObservableObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type ObservableObserveFunc func(next Observable, err error, done bool)
 
 var zeroObservable Observable
 
@@ -578,58 +642,6 @@ func (f ObservableObserveFunc) Complete() {
 // ObservableObservable is essentially a subscribe function taking an observe
 // function, scheduler and an subscriber.
 type ObservableObservable func(ObservableObserveFunc, Scheduler, Subscriber)
-
-//jig:name ObservableIntMapObservable
-
-// MapObservable transforms the items emitted by an ObservableInt by applying a
-// function to each item.
-func (o ObservableInt) MapObservable(project func(int) Observable) ObservableObservable {
-	observable := func(observe ObservableObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			var mapped Observable
-			if !done {
-				mapped = project(next)
-			}
-			observe(mapped, err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ConstError
-
-type Error string
-
-func (e Error) Error() string	{ return string(e) }
-
-//jig:name ErrTypecastToInt
-
-// ErrTypecastToInt is delivered to an observer if the generic value cannot be
-// typecast to int.
-const ErrTypecastToInt = Error("typecast to int failed")
-
-//jig:name ObservableAsObservableInt
-
-// AsInt turns an Observable of interface{} into an ObservableInt. If during
-// observing a typecast fails, the error ErrTypecastToInt will be emitted.
-func (o Observable) AsObservableInt() ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				if nextInt, ok := next.(int); ok {
-					observe(nextInt, err, done)
-				} else {
-					observe(zeroInt, ErrTypecastToInt, true)
-				}
-			} else {
-				observe(zeroInt, err, true)
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
 
 //jig:name LinkEnums
 
@@ -685,24 +697,24 @@ func NewLink(observe LinkObserveFunc, subscriber Subscriber) *Link {
 func (o *Link) Observe(next interface{}, err error, done bool) error {
 	if !atomic.CompareAndSwapInt32(&o.state, linkIdle, linkBusy) {
 		if atomic.LoadInt32(&o.state) > linkBusy {
-			return Error("Already Done")
+			return RxError("Already Done")
 		}
-		return Error("Recursion Error")
+		return RxError("Recursion Error")
 	}
 	o.observe(o, next, err, done)
 	if done {
 		if err != nil {
 			if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkError) {
-				return Error("Internal Error: 'busy' -> 'error'")
+				return RxError("Internal Error: 'busy' -> 'error'")
 			}
 		} else {
 			if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkCompleting) {
-				return Error("Internal Error: 'busy' -> 'completing'")
+				return RxError("Internal Error: 'busy' -> 'completing'")
 			}
 		}
 	} else {
 		if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkIdle) {
-			return Error("Internal Error: 'busy' -> 'idle'")
+			return RxError("Internal Error: 'busy' -> 'idle'")
 		}
 	}
 	if atomic.LoadInt32(&o.callbackState) != callbackSet {
@@ -721,26 +733,26 @@ func (o *Link) Observe(next interface{}, err error, done bool) error {
 
 func (o *Link) SubscribeTo(observable Observable, scheduler Scheduler) error {
 	if !atomic.CompareAndSwapInt32(&o.state, linkUnsubscribed, linkSubscribing) {
-		return Error("Already Subscribed")
+		return RxError("Already Subscribed")
 	}
 	observer := func(next interface{}, err error, done bool) {
 		o.Observe(next, err, done)
 	}
 	observable(observer, scheduler, o.subscriber)
 	if !atomic.CompareAndSwapInt32(&o.state, linkSubscribing, linkIdle) {
-		return Error("Internal Error")
+		return RxError("Internal Error")
 	}
 	return nil
 }
 
 func (o *Link) Cancel(callback func()) error {
 	if !atomic.CompareAndSwapInt32(&o.callbackState, callbackNil, settingCallback) {
-		return Error("Already Waiting")
+		return RxError("Already Waiting")
 	}
 	o.callbackKind = linkCancelOrCompleted
 	o.callback = callback
 	if !atomic.CompareAndSwapInt32(&o.callbackState, settingCallback, callbackSet) {
-		return Error("Internal Error")
+		return RxError("Internal Error")
 	}
 	o.subscriber.Unsubscribe()
 	if atomic.CompareAndSwapInt32(&o.state, linkCompleting, linkComplete) {
@@ -754,12 +766,12 @@ func (o *Link) Cancel(callback func()) error {
 
 func (o *Link) OnComplete(callback func()) error {
 	if !atomic.CompareAndSwapInt32(&o.callbackState, callbackNil, settingCallback) {
-		return Error("Already Waiting")
+		return RxError("Already Waiting")
 	}
 	o.callbackKind = linkCallbackOnComplete
 	o.callback = callback
 	if !atomic.CompareAndSwapInt32(&o.callbackState, settingCallback, callbackSet) {
-		return Error("Internal Error")
+		return RxError("Internal Error")
 	}
 	if atomic.CompareAndSwapInt32(&o.state, linkCompleting, linkComplete) {
 		o.callback()

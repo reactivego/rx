@@ -35,7 +35,7 @@ const (
 )
 
 //jig:template <Foo>Link
-//jig:needs ConstError, LinkEnums
+//jig:needs RxError, LinkEnums
 
 type FooLinkObserveFunc func(*FooLink, foo, error, bool)
 
@@ -62,24 +62,24 @@ func NewFooLink(observe FooLinkObserveFunc, subscriber Subscriber) *FooLink {
 func (o *FooLink) Observe(next foo, err error, done bool) error {
 	if !atomic.CompareAndSwapInt32(&o.state, linkIdle, linkBusy) {
 		if atomic.LoadInt32(&o.state) > linkBusy {
-			return Error("Already Done")
+			return RxError("Already Done")
 		}
-		return Error("Recursion Error")
+		return RxError("Recursion Error")
 	}
 	o.observe(o, next, err, done)
 	if done {
 		if err != nil {
 			if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkError) {
-				return Error("Internal Error: 'busy' -> 'error'")
+				return RxError("Internal Error: 'busy' -> 'error'")
 			}
 		} else {
 			if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkCompleting) {
-				return Error("Internal Error: 'busy' -> 'completing'")
+				return RxError("Internal Error: 'busy' -> 'completing'")
 			}
 		}
 	} else {
 		if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkIdle) {
-			return Error("Internal Error: 'busy' -> 'idle'")
+			return RxError("Internal Error: 'busy' -> 'idle'")
 		}
 	}
 	if atomic.LoadInt32(&o.callbackState) != callbackSet {
@@ -98,26 +98,26 @@ func (o *FooLink) Observe(next foo, err error, done bool) error {
 
 func (o *FooLink) SubscribeTo(observable ObservableFoo, scheduler Scheduler) error {
 	if !atomic.CompareAndSwapInt32(&o.state, linkUnsubscribed, linkSubscribing) {
-		return Error("Already Subscribed")
+		return RxError("Already Subscribed")
 	}
 	observer := func(next foo, err error, done bool) {
 		o.Observe(next, err, done)
 	}
 	observable(observer, scheduler, o.subscriber)
 	if !atomic.CompareAndSwapInt32(&o.state, linkSubscribing, linkIdle) {
-		return Error("Internal Error")
+		return RxError("Internal Error")
 	}
 	return nil
 }
 
 func (o *FooLink) Cancel(callback func()) error {
 	if !atomic.CompareAndSwapInt32(&o.callbackState, callbackNil, settingCallback) {
-		return Error("Already Waiting")
+		return RxError("Already Waiting")
 	}
 	o.callbackKind = linkCancelOrCompleted
 	o.callback = callback
 	if !atomic.CompareAndSwapInt32(&o.callbackState, settingCallback, callbackSet) {
-		return Error("Internal Error")
+		return RxError("Internal Error")
 	}
 	o.subscriber.Unsubscribe()
 	if atomic.CompareAndSwapInt32(&o.state, linkCompleting, linkComplete) {
@@ -131,12 +131,12 @@ func (o *FooLink) Cancel(callback func()) error {
 
 func (o *FooLink) OnComplete(callback func()) error {
 	if !atomic.CompareAndSwapInt32(&o.callbackState, callbackNil, settingCallback) {
-		return Error("Already Waiting")
+		return RxError("Already Waiting")
 	}
 	o.callbackKind = linkCallbackOnComplete
 	o.callback = callback
 	if !atomic.CompareAndSwapInt32(&o.callbackState, settingCallback, callbackSet) {
-		return Error("Internal Error")
+		return RxError("Internal Error")
 	}
 	if atomic.CompareAndSwapInt32(&o.state, linkCompleting, linkComplete) {
 		o.callback()

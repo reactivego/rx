@@ -16,11 +16,11 @@ func (o ObservableFoo) AsObservableBar() ObservableBar {
 }
 
 //jig:template ErrTypecastTo<Foo>
-//jig:needs ConstError
+//jig:needs RxError
 
 // ErrTypecastToFoo is delivered to an observer if the generic value cannot be
 // typecast to foo.
-const ErrTypecastToFoo = Error("typecast to foo failed")
+const ErrTypecastToFoo = RxError("typecast to foo failed")
 
 //jig:template Observable AsObservable<Foo>
 //jig:needs Observable<Foo>, ErrTypecastTo<Foo>

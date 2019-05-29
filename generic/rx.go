@@ -46,41 +46,6 @@ func (f ObserveFunc) Complete() {
 // function, scheduler and an subscriber.
 type Observable func(ObserveFunc, Scheduler, Subscriber)
 
-//jig:name IntObserveFunc
-
-// IntObserveFunc is the observer, a function that gets called whenever the
-// observable has something to report. The next argument is the item value that
-// is only valid when the done argument is false. When done is true and the err
-// argument is not nil, then the observable has terminated with an error.
-// When done is true and the err argument is nil, then the observable has
-// completed normally.
-type IntObserveFunc func(next int, err error, done bool)
-
-var zeroInt int
-
-// Next is called by an ObservableInt to emit the next int value to the
-// observer.
-func (f IntObserveFunc) Next(next int) {
-	f(next, nil, false)
-}
-
-// Error is called by an ObservableInt to report an error to the observer.
-func (f IntObserveFunc) Error(err error) {
-	f(zeroInt, err, true)
-}
-
-// Complete is called by an ObservableInt to signal that no more data is
-// forthcoming to the observer.
-func (f IntObserveFunc) Complete() {
-	f(zeroInt, nil, true)
-}
-
-//jig:name ObservableInt
-
-// ObservableInt is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
-
 //jig:name BarObserveFunc
 
 // BarObserveFunc is the observer, a function that gets called whenever the
@@ -115,6 +80,41 @@ func (f BarObserveFunc) Complete() {
 // ObservableBar is essentially a subscribe function taking an observe
 // function, scheduler and an subscriber.
 type ObservableBar func(BarObserveFunc, Scheduler, Subscriber)
+
+//jig:name IntObserveFunc
+
+// IntObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type IntObserveFunc func(next int, err error, done bool)
+
+var zeroInt int
+
+// Next is called by an ObservableInt to emit the next int value to the
+// observer.
+func (f IntObserveFunc) Next(next int) {
+	f(next, nil, false)
+}
+
+// Error is called by an ObservableInt to report an error to the observer.
+func (f IntObserveFunc) Error(err error) {
+	f(zeroInt, err, true)
+}
+
+// Complete is called by an ObservableInt to signal that no more data is
+// forthcoming to the observer.
+func (f IntObserveFunc) Complete() {
+	f(zeroInt, nil, true)
+}
+
+//jig:name ObservableInt
+
+// ObservableInt is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 
 //jig:name ObservableFooObserveFunc
 
@@ -204,24 +204,6 @@ func Create(f func(Observer)) Observable {
 	return observable
 }
 
-//jig:name ObservableFooMapObservableBar
-
-// MapObservableBar transforms the items emitted by an ObservableFoo by applying a
-// function to each item.
-func (o ObservableFoo) MapObservableBar(project func(foo) ObservableBar) ObservableObservableBar {
-	observable := func(observe ObservableBarObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next foo, err error, done bool) {
-			var mapped ObservableBar
-			if !done {
-				mapped = project(next)
-			}
-			observe(mapped, err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name Empty
 
 // Empty creates an Observable that emits no items but terminates normally.
@@ -267,6 +249,24 @@ func CreateInt(f func(IntObserver)) ObservableInt {
 			}
 			f(&ObserverSubscriber{observer, subscriber})
 		})
+	}
+	return observable
+}
+
+//jig:name ObservableFooMapObservableBar
+
+// MapObservableBar transforms the items emitted by an ObservableFoo by applying a
+// function to each item.
+func (o ObservableFoo) MapObservableBar(project func(foo) ObservableBar) ObservableObservableBar {
+	observable := func(observe ObservableBarObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next foo, err error, done bool) {
+			var mapped ObservableBar
+			if !done {
+				mapped = project(next)
+			}
+			observe(mapped, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
 	}
 	return observable
 }
@@ -390,24 +390,24 @@ func NewBarLink(observe BarLinkObserveFunc, subscriber Subscriber) *BarLink {
 func (o *BarLink) Observe(next bar, err error, done bool) error {
 	if !atomic.CompareAndSwapInt32(&o.state, linkIdle, linkBusy) {
 		if atomic.LoadInt32(&o.state) > linkBusy {
-			return Error("Already Done")
+			return RxError("Already Done")
 		}
-		return Error("Recursion Error")
+		return RxError("Recursion Error")
 	}
 	o.observe(o, next, err, done)
 	if done {
 		if err != nil {
 			if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkError) {
-				return Error("Internal Error: 'busy' -> 'error'")
+				return RxError("Internal Error: 'busy' -> 'error'")
 			}
 		} else {
 			if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkCompleting) {
-				return Error("Internal Error: 'busy' -> 'completing'")
+				return RxError("Internal Error: 'busy' -> 'completing'")
 			}
 		}
 	} else {
 		if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkIdle) {
-			return Error("Internal Error: 'busy' -> 'idle'")
+			return RxError("Internal Error: 'busy' -> 'idle'")
 		}
 	}
 	if atomic.LoadInt32(&o.callbackState) != callbackSet {
@@ -426,26 +426,26 @@ func (o *BarLink) Observe(next bar, err error, done bool) error {
 
 func (o *BarLink) SubscribeTo(observable ObservableBar, scheduler Scheduler) error {
 	if !atomic.CompareAndSwapInt32(&o.state, linkUnsubscribed, linkSubscribing) {
-		return Error("Already Subscribed")
+		return RxError("Already Subscribed")
 	}
 	observer := func(next bar, err error, done bool) {
 		o.Observe(next, err, done)
 	}
 	observable(observer, scheduler, o.subscriber)
 	if !atomic.CompareAndSwapInt32(&o.state, linkSubscribing, linkIdle) {
-		return Error("Internal Error")
+		return RxError("Internal Error")
 	}
 	return nil
 }
 
 func (o *BarLink) Cancel(callback func()) error {
 	if !atomic.CompareAndSwapInt32(&o.callbackState, callbackNil, settingCallback) {
-		return Error("Already Waiting")
+		return RxError("Already Waiting")
 	}
 	o.callbackKind = linkCancelOrCompleted
 	o.callback = callback
 	if !atomic.CompareAndSwapInt32(&o.callbackState, settingCallback, callbackSet) {
-		return Error("Internal Error")
+		return RxError("Internal Error")
 	}
 	o.subscriber.Unsubscribe()
 	if atomic.CompareAndSwapInt32(&o.state, linkCompleting, linkComplete) {
@@ -459,12 +459,12 @@ func (o *BarLink) Cancel(callback func()) error {
 
 func (o *BarLink) OnComplete(callback func()) error {
 	if !atomic.CompareAndSwapInt32(&o.callbackState, callbackNil, settingCallback) {
-		return Error("Already Waiting")
+		return RxError("Already Waiting")
 	}
 	o.callbackKind = linkCallbackOnComplete
 	o.callback = callback
 	if !atomic.CompareAndSwapInt32(&o.callbackState, settingCallback, callbackSet) {
-		return Error("Internal Error")
+		return RxError("Internal Error")
 	}
 	if atomic.CompareAndSwapInt32(&o.state, linkCompleting, linkComplete) {
 		o.callback()

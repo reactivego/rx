@@ -6,12 +6,6 @@ import (
 	"time"
 )
 
-//jig:template ConstError
-
-type Error string
-
-func (e Error) Error() string { return string(e) }
-
 //jig:template Observable<Foo> Do
 
 // Do calls a function for each next value passing through the observable.
@@ -135,10 +129,10 @@ func (o ObservableFoo) Serialize() ObservableFoo {
 }
 
 //jig:template Observable Timeout
-//jig:needs ConstError, Observable Serialize
+//jig:needs RxError, Observable Serialize
 
 // ErrTimeout is delivered to an observer if the stream times out.
-const ErrTimeout = Error("timeout")
+const ErrTimeout = RxError("timeout")
 
 // Timeout mirrors the source Observable, but issues an error notification if a
 // particular period of time elapses without any emitted items.
@@ -196,12 +190,12 @@ func (o ObservableFoo) Timeout(timeout time.Duration) ObservableFoo {
 }
 
 //jig:template ErrObservableContractViolation
-//jig:needs ConstError
+//jig:needs RxError
 
-const ErrObservableContractViolationConcurrentNotifications = Error("observable contract violation: concurrent notifications")
-const ErrObservableContractViolationNextAfterTermination = Error("observable contract violation: next after termination")
-const ErrObservableContractViolationErrorAfterTermination = Error("observable contract violation: error after termination")
-const ErrObservableContractViolationCompleteAfterTermination = Error("observable contract violation: complete after termination")
+const ErrObservableContractViolationConcurrentNotifications = RxError("observable contract violation: concurrent notifications")
+const ErrObservableContractViolationNextAfterTermination = RxError("observable contract violation: next after termination")
+const ErrObservableContractViolationErrorAfterTermination = RxError("observable contract violation: error after termination")
+const ErrObservableContractViolationCompleteAfterTermination = RxError("observable contract violation: complete after termination")
 
 //jig:template Observable<Foo> Validated
 //jig:needs ErrObservableContractViolation

@@ -292,7 +292,7 @@ func (o ObservableFoo) Sample(window time.Duration) ObservableFoo {
 }
 
 //jig:template Observable Single
-//jig:needs ConstError
+//jig:needs RxError
 
 // Single enforces that the observable sends exactly one data item and then
 // completes. If the observable sends no data before completing or sends more
@@ -313,7 +313,7 @@ func (o Observable) Single() Observable {
 							observe(latest, nil, false)
 							observe(nil, nil, true)
 						} else {
-							observe(nil, Error("expected one value, got none"), true)
+							observe(nil, RxError("expected one value, got none"), true)
 						}
 					}
 				} else {
@@ -321,7 +321,7 @@ func (o Observable) Single() Observable {
 					if count == 1 {
 						latest = next
 					} else {
-						observe(nil, Error("expected one value, got multiple"), true)
+						observe(nil, RxError("expected one value, got multiple"), true)
 					}
 				}
 			}
