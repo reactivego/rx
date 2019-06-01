@@ -36,15 +36,20 @@ type Subscription interface {
 	// Unsubscribe will cancel the subscription (when one is active).
 	// Subsequently it will then call Unsubscribe on all child subscriptions
 	// added through Add. After a call to Unsubscribe returns, calling
-	// Closed on the same interface or any of its child subscriptions 
+	// Closed on the same interface or any of its child subscriptions
 	// will return true. Unsubscribe can be safely called on a closed
 	// subscription and performs no operation.
 	Unsubscribe()
 
 	// Closed returns true when the subscription has been canceled. There
-	// is not need to check if the subscription is closed before calling 
-	// Unsubscribe.
+	// is not need to check if the subscription is canceled before calling
+	// Unsubscribe. This is an alias for the Canceled() method.
 	Closed() bool
+
+	// Canceled returns true when the subscription has been canceled. There
+	// is not need to check if the subscription is canceled before calling
+	// Unsubscribe.
+	Canceled() bool
 
 	// Wait will block the calling goroutine and wait for the Unsubscribe
 	// method to be called on this subscription. Calling Wait on a
@@ -68,21 +73,25 @@ type Subscriber interface {
 	// parent! The Unsubscribe will start calling callbacks only after it has
 	// set the subscription state to canceled. Even if you call Unsubscribe
 	// multiple times, callbacks will only be invoked once.
-	Add(callback func()) Subscriber
+	Add(func()) Subscriber
+
+	// AddChild will create and return a new child Subscriber. Calling the
+	// Unsubscribe method on the child will NOT propagate to the parent!
+	// The Unsubscribe will start calling callbacks only after it has
+	// set the subscription state to canceled. Even if you call Unsubscribe
+	// multiple times, callbacks will only be invoked once.
+	AddChild() Subscriber
+
+	// OnUnsubscribe will add the given callback function to the subscriber.
+	// The callback will be called when either the Unsubscribe of the parent
+	// or of the subscriber itself is called.
+	OnUnsubscribe(func())
+
+	// OnWait will register a callback to  call when subscription Wait is called.
+	OnWait(func())
 }
 
-// New will create a new subscription and return a Subscriber interface.
+// New will create and return a new Subscriber.
 func New() Subscriber {
 	return &subscription{}
-}
-
-// NewWithCallback will create a new subscription and return a Subscriber
-// interface. The callback will be invoked when Unsubscribe is called on the
-// returned subscriber interface. Calling this with callback nil is the same
-// as calling New.
-func NewWithCallback(callback func()) Subscriber {
-	if callback == nil {
-		return New()
-	}
-	return &subscription{callbacks: []func(){callback}}
 }
