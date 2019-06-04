@@ -9,14 +9,18 @@ import (
 	"sync/atomic"
 
 	"github.com/reactivego/rx/schedulers"
-	"github.com/reactivego/rx/subscriber"
+	"github.com/reactivego/subscriber"
 )
 
 //jig:name IntObserveFunc
 
-// IntObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type IntObserveFunc func(int, error, bool)
+// IntObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type IntObserveFunc func(next int, err error, done bool)
 
 var zeroInt int
 
@@ -114,27 +118,10 @@ type Subscriber subscriber.Subscriber
 //jig:name ObservableIntMergeMapInt
 
 // MergeMapInt transforms the items emitted by an ObservableInt by applying a
-// function to each item.
+// function to each item an returning an ObservableInt. The stream of ObservableInt
+// items is then merged into a single stream of Int items using the MergeAll operator.
 func (o ObservableInt) MergeMapInt(project func(int) ObservableInt) ObservableInt {
 	return o.MapObservableInt(project).MergeAll()
-}
-
-//jig:name ObservableIntMapObservableInt
-
-// MapObservableInt transforms the items emitted by an ObservableInt by applying a
-// function to each item.
-func (o ObservableInt) MapObservableInt(project func(int) ObservableInt) ObservableObservableInt {
-	observable := func(observe ObservableIntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			var mapped ObservableInt
-			if !done {
-				mapped = project(next)
-			}
-			observe(mapped, err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
 }
 
 //jig:name NewScheduler
@@ -163,11 +150,12 @@ type SubscribeOptions struct {
 // NewSubscriber will return a newly created subscriber. Before returning the
 // subscription the OnSubscribe callback (if set) will already have been called.
 func (options SubscribeOptions) NewSubscriber() Subscriber {
-	subscription := subscriber.NewWithCallback(options.OnUnsubscribe)
+	subscriber := subscriber.New()
+	subscriber.OnUnsubscribe(options.OnUnsubscribe)
 	if options.OnSubscribe != nil {
-		options.OnSubscribe(subscription)
+		options.OnSubscribe(subscriber)
 	}
-	return subscription
+	return subscriber
 }
 
 // SubscribeOptionSetter is the type of a function for setting SubscribeOptions.
@@ -245,11 +233,33 @@ func (o ObservableInt) ToSlice(setters ...SubscribeOptionSetter) (a []int, e err
 	return a, e
 }
 
+//jig:name ObservableIntMapObservableInt
+
+// MapObservableInt transforms the items emitted by an ObservableInt by applying a
+// function to each item.
+func (o ObservableInt) MapObservableInt(project func(int) ObservableInt) ObservableObservableInt {
+	observable := func(observe ObservableIntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			var mapped ObservableInt
+			if !done {
+				mapped = project(next)
+			}
+			observe(mapped, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name ObservableIntObserveFunc
 
-// ObservableIntObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type ObservableIntObserveFunc func(ObservableInt, error, bool)
+// ObservableIntObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type ObservableIntObserveFunc func(next ObservableInt, err error, done bool)
 
 var zeroObservableInt ObservableInt
 

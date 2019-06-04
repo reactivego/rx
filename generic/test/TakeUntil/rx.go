@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/reactivego/rx/schedulers"
-	"github.com/reactivego/rx/subscriber"
+	"github.com/reactivego/subscriber"
 )
 
 //jig:name ObserveFunc
@@ -210,11 +210,11 @@ type Scheduler interface {
 // Subscriber is an alias for the subscriber.Subscriber interface type.
 type Subscriber subscriber.Subscriber
 
-//jig:name ConstError
+//jig:name RxError
 
-type Error string
+type RxError string
 
-func (e Error) Error() string	{ return string(e) }
+func (e RxError) Error() string	{ return string(e) }
 
 //jig:name ObservableSerialize
 
@@ -242,7 +242,7 @@ func (o Observable) Serialize() Observable {
 //jig:name ObservableTimeout
 
 // ErrTimeout is delivered to an observer if the stream times out.
-const ErrTimeout = Error("timeout")
+const ErrTimeout = RxError("timeout")
 
 // Timeout mirrors the source Observable, but issues an error notification if a
 // particular period of time elapses without any emitted items.
@@ -363,7 +363,8 @@ type SubscribeOptions struct {
 // NewSubscriber will return a newly created subscriber. Before returning the
 // subscription the OnSubscribe callback (if set) will already have been called.
 func (options SubscribeOptions) NewSubscriber() Subscriber {
-	subscriber := subscriber.NewWithCallback(options.OnUnsubscribe)
+	subscriber := subscriber.New()
+	subscriber.OnUnsubscribe(options.OnUnsubscribe)
 	if options.OnSubscribe != nil {
 		options.OnSubscribe(subscriber)
 	}
@@ -478,7 +479,7 @@ func (o ObservableInt) Println(setters ...SubscribeOptionSetter) (e error) {
 
 // ErrTypecastToInt is delivered to an observer if the generic value cannot be
 // typecast to int.
-const ErrTypecastToInt = Error("typecast to int failed")
+const ErrTypecastToInt = RxError("typecast to int failed")
 
 //jig:name ObservableAsObservableInt
 

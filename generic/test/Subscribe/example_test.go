@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/reactivego/rx/subscriber"
+	"github.com/reactivego/subscriber"
 )
 
 // Shows how to directly subscribe to an observable by calling it as a function.

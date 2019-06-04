@@ -5,19 +5,22 @@
 package Merge
 
 import (
-	"errors"
 	"sync"
 	"time"
 
 	"github.com/reactivego/rx/schedulers"
-	"github.com/reactivego/rx/subscriber"
+	"github.com/reactivego/subscriber"
 )
 
 //jig:name IntObserveFunc
 
-// IntObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type IntObserveFunc func(int, error, bool)
+// IntObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type IntObserveFunc func(next int, err error, done bool)
 
 var zeroInt int
 
@@ -170,76 +173,6 @@ type Scheduler interface {
 // Subscriber is an alias for the subscriber.Subscriber interface type.
 type Subscriber subscriber.Subscriber
 
-//jig:name ObservableDebounce
-
-// Debounce only emits the last item of a burst from an Observable if a
-// particular timespan has passed without it emitting another item.
-func (o Observable) Debounce(duration time.Duration) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		valuech := make(chan interface{})
-		donech := make(chan error)
-		debouncer := func() {
-			var nextValue interface{}
-			var timeout <-chan time.Time
-			for {
-				select {
-				case nextValue = <-valuech:
-					timeout = time.After(duration)
-				case err, subscribed := <-donech:
-					if !subscribed {
-						return
-					}
-					if timeout != nil {
-						observe(nextValue, nil, false)
-					}
-					if err != nil {
-						observe(nil, err, true)
-					} else {
-						observe(nil, nil, true)
-					}
-				case <-timeout:
-					observe(nextValue, nil, false)
-					timeout = nil
-				}
-			}
-		}
-		go debouncer()
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				valuech <- next
-			} else {
-				donech <- err
-			}
-		}
-		o(observer, subscribeOn, subscriber.Add(func() { close(donech) }))
-	}
-	return observable
-}
-
-//jig:name ObservableIntDebounce
-
-// Debounce only emits the last item of a burst from an ObservableInt if a
-// particular timespan has passed without it emitting another item.
-func (o ObservableInt) Debounce(duration time.Duration) ObservableInt {
-	return o.AsObservable().Debounce(duration).AsObservableInt()
-}
-
-//jig:name ObservableIntDoOnComplete
-
-// DoOnComplete calls a function when the stream completes.
-func (o ObservableInt) DoOnComplete(f func()) ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			if err == nil && done {
-				f()
-			}
-			observe(next, err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name NewScheduler
 
 func NewGoroutine() Scheduler	{ return &schedulers.Goroutine{} }
@@ -266,11 +199,12 @@ type SubscribeOptions struct {
 // NewSubscriber will return a newly created subscriber. Before returning the
 // subscription the OnSubscribe callback (if set) will already have been called.
 func (options SubscribeOptions) NewSubscriber() Subscriber {
-	subscription := subscriber.NewWithCallback(options.OnUnsubscribe)
+	subscriber := subscriber.New()
+	subscriber.OnUnsubscribe(options.OnUnsubscribe)
 	if options.OnSubscribe != nil {
-		options.OnSubscribe(subscription)
+		options.OnSubscribe(subscriber)
 	}
-	return subscription
+	return subscriber
 }
 
 // SubscribeOptionSetter is the type of a function for setting SubscribeOptions.
@@ -348,11 +282,85 @@ func (o ObservableInt) ToSlice(setters ...SubscribeOptionSetter) (a []int, e err
 	return a, e
 }
 
+//jig:name ObservableDebounce
+
+// Debounce only emits the last item of a burst from an Observable if a
+// particular timespan has passed without it emitting another item.
+func (o Observable) Debounce(duration time.Duration) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		valuech := make(chan interface{})
+		donech := make(chan error)
+		debouncer := func() {
+			var nextValue interface{}
+			var timeout <-chan time.Time
+			for {
+				select {
+				case nextValue = <-valuech:
+					timeout = time.After(duration)
+				case err, subscribed := <-donech:
+					if !subscribed {
+						return
+					}
+					if timeout != nil {
+						observe(nextValue, nil, false)
+					}
+					if err != nil {
+						observe(nil, err, true)
+					} else {
+						observe(nil, nil, true)
+					}
+				case <-timeout:
+					observe(nextValue, nil, false)
+					timeout = nil
+				}
+			}
+		}
+		go debouncer()
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				valuech <- next
+			} else {
+				donech <- err
+			}
+		}
+		o(observer, subscribeOn, subscriber.Add(func() { close(donech) }))
+	}
+	return observable
+}
+
+//jig:name ObservableIntDebounce
+
+// Debounce only emits the last item of a burst from an ObservableInt if a
+// particular timespan has passed without it emitting another item.
+func (o ObservableInt) Debounce(duration time.Duration) ObservableInt {
+	return o.AsObservable().Debounce(duration).AsObservableInt()
+}
+
+//jig:name ObservableIntDoOnComplete
+
+// DoOnComplete calls a function when the stream completes.
+func (o ObservableInt) DoOnComplete(f func()) ObservableInt {
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			if err == nil && done {
+				f()
+			}
+			observe(next, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name ObserveFunc
 
-// ObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type ObserveFunc func(interface{}, error, bool)
+// ObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type ObserveFunc func(next interface{}, err error, done bool)
 
 var zero interface{}
 
@@ -379,19 +387,6 @@ func (f ObserveFunc) Complete() {
 // function, scheduler and an subscriber.
 type Observable func(ObserveFunc, Scheduler, Subscriber)
 
-//jig:name ObservableIntWait
-
-// Wait subscribes to the Observable and waits for completion or error.
-// Returns either the error or nil when the Observable completed normally.
-func (o ObservableInt) Wait(setters ...SubscribeOptionSetter) (e error) {
-	o.Subscribe(func(next int, err error, done bool) {
-		if done {
-			e = err
-		}
-	}, setters...).Wait()
-	return e
-}
-
 //jig:name ObservableIntAsObservable
 
 // AsObservable turns a typed ObservableInt into an Observable of interface{}.
@@ -405,11 +400,30 @@ func (o ObservableInt) AsObservable() Observable {
 	return observable
 }
 
+//jig:name ObservableIntWait
+
+// Wait subscribes to the Observable and waits for completion or error.
+// Returns either the error or nil when the Observable completed normally.
+func (o ObservableInt) Wait(setters ...SubscribeOptionSetter) (e error) {
+	o.Subscribe(func(next int, err error, done bool) {
+		if done {
+			e = err
+		}
+	}, setters...).Wait()
+	return e
+}
+
+//jig:name RxError
+
+type RxError string
+
+func (e RxError) Error() string	{ return string(e) }
+
 //jig:name ErrTypecastToInt
 
 // ErrTypecastToInt is delivered to an observer if the generic value cannot be
 // typecast to int.
-var ErrTypecastToInt = errors.New("typecast to int failed")
+const ErrTypecastToInt = RxError("typecast to int failed")
 
 //jig:name ObservableAsObservableInt
 

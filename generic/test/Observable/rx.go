@@ -4,7 +4,7 @@
 
 package Observable
 
-import "github.com/reactivego/rx/subscriber"
+import "github.com/reactivego/subscriber"
 
 //jig:name ObserveFunc
 

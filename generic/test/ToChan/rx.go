@@ -6,14 +6,18 @@ package ToChan
 
 import (
 	"github.com/reactivego/rx/schedulers"
-	"github.com/reactivego/rx/subscriber"
+	"github.com/reactivego/subscriber"
 )
 
 //jig:name IntObserveFunc
 
-// IntObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type IntObserveFunc func(int, error, bool)
+// IntObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type IntObserveFunc func(next int, err error, done bool)
 
 var zeroInt int
 
@@ -97,9 +101,13 @@ func FromSliceInt(slice []int) ObservableInt {
 
 //jig:name ObserveFunc
 
-// ObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type ObserveFunc func(interface{}, error, bool)
+// ObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type ObserveFunc func(next interface{}, err error, done bool)
 
 var zero interface{}
 
@@ -211,9 +219,9 @@ type Subscriber subscriber.Subscriber
 
 //jig:name NewScheduler
 
-func NewGoroutine() Scheduler { return &schedulers.Goroutine{} }
+func NewGoroutine() Scheduler	{ return &schedulers.Goroutine{} }
 
-func NewTrampoline() Scheduler { return &schedulers.Trampoline{} }
+func NewTrampoline() Scheduler	{ return &schedulers.Trampoline{} }
 
 //jig:name SubscribeOptions
 
@@ -223,23 +231,24 @@ type Subscription subscriber.Subscription
 // SubscribeOptions is a struct with options for Subscribe related methods.
 type SubscribeOptions struct {
 	// SubscribeOn is the scheduler to run the observable subscription on.
-	SubscribeOn Scheduler
+	SubscribeOn	Scheduler
 	// OnSubscribe is called right after the subscription is created and before
 	// subscribing continues further.
-	OnSubscribe func(subscription Subscription)
+	OnSubscribe	func(subscription Subscription)
 	// OnUnsubscribe is called by the subscription to notify the client that the
 	// subscription has been canceled.
-	OnUnsubscribe func()
+	OnUnsubscribe	func()
 }
 
 // NewSubscriber will return a newly created subscriber. Before returning the
 // subscription the OnSubscribe callback (if set) will already have been called.
 func (options SubscribeOptions) NewSubscriber() Subscriber {
-	subscription := subscriber.NewWithCallback(options.OnUnsubscribe)
+	subscriber := subscriber.New()
+	subscriber.OnUnsubscribe(options.OnUnsubscribe)
 	if options.OnSubscribe != nil {
-		options.OnSubscribe(subscription)
+		options.OnSubscribe(subscriber)
 	}
-	return subscription
+	return subscriber
 }
 
 // SubscribeOptionSetter is the type of a function for setting SubscribeOptions.
@@ -274,6 +283,52 @@ func NewSubscribeOptions(setter SubscribeOptionSetter) *SubscribeOptions {
 	options := &SubscribeOptions{}
 	setter(options)
 	return options
+}
+
+//jig:name ObservableIntSubscribe
+
+// Subscribe operates upon the emissions and notifications from an Observable.
+// This method returns a Subscriber.
+func (o ObservableInt) Subscribe(observe IntObserveFunc, setters ...SubscribeOptionSetter) Subscriber {
+	scheduler := NewTrampoline()
+	setter := SubscribeOn(scheduler, setters...)
+	options := NewSubscribeOptions(setter)
+	subscriber := options.NewSubscriber()
+	observer := func(next int, err error, done bool) {
+		if !done {
+			observe(next, err, done)
+		} else {
+			observe(zeroInt, err, true)
+			subscriber.Unsubscribe()
+		}
+	}
+	o(observer, options.SubscribeOn, subscriber)
+	return subscriber
+}
+
+//jig:name ObservableIntToChan
+
+// ToChan returns a channel that emits int values. If the source observable does
+// not emit values but emits an error or complete, then the returned channel
+// will close without emitting any values.
+//
+// There is no way to determine whether the observable feeding into the
+// channel terminated with an error or completed normally.
+// Because the channel is fed by subscribing to the observable, ToChan would
+// block when subscribed on the standard Trampoline scheduler which is initially
+// synchronous. That's why the subscribing is done on the Goroutine scheduler.
+// It is not possible to cancel the subscription created internally by ToChan.
+func (o ObservableInt) ToChan(setters ...SubscribeOptionSetter) <-chan int {
+	scheduler := NewGoroutine()
+	nextch := make(chan int, 1)
+	o.Subscribe(func(next int, err error, done bool) {
+		if !done {
+			nextch <- next
+		} else {
+			close(nextch)
+		}
+	}, SubscribeOn(scheduler, setters...))
+	return nextch
 }
 
 //jig:name ObservableSubscribe
@@ -323,52 +378,6 @@ func (o Observable) ToChan(setters ...SubscribeOptionSetter) <-chan interface{} 
 			if err != nil {
 				nextch <- err
 			}
-			close(nextch)
-		}
-	}, SubscribeOn(scheduler, setters...))
-	return nextch
-}
-
-//jig:name ObservableIntSubscribe
-
-// Subscribe operates upon the emissions and notifications from an Observable.
-// This method returns a Subscriber.
-func (o ObservableInt) Subscribe(observe IntObserveFunc, setters ...SubscribeOptionSetter) Subscriber {
-	scheduler := NewTrampoline()
-	setter := SubscribeOn(scheduler, setters...)
-	options := NewSubscribeOptions(setter)
-	subscriber := options.NewSubscriber()
-	observer := func(next int, err error, done bool) {
-		if !done {
-			observe(next, err, done)
-		} else {
-			observe(zeroInt, err, true)
-			subscriber.Unsubscribe()
-		}
-	}
-	o(observer, options.SubscribeOn, subscriber)
-	return subscriber
-}
-
-//jig:name ObservableIntToChan
-
-// ToChan returns a channel that emits int values. If the source observable does
-// not emit values but emits an error or complete, then the returned channel
-// will close without emitting any values.
-//
-// There is no way to determine whether the observable feeding into the
-// channel terminated with an error or completed normally.
-// Because the channel is fed by subscribing to the observable, ToChan would
-// block when subscribed on the standard Trampoline scheduler which is initially
-// synchronous. That's why the subscribing is done on the Goroutine scheduler.
-// It is not possible to cancel the subscription created internally by ToChan.
-func (o ObservableInt) ToChan(setters ...SubscribeOptionSetter) <-chan int {
-	scheduler := NewGoroutine()
-	nextch := make(chan int, 1)
-	o.Subscribe(func(next int, err error, done bool) {
-		if !done {
-			nextch <- next
-		} else {
 			close(nextch)
 		}
 	}, SubscribeOn(scheduler, setters...))

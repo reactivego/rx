@@ -6,14 +6,18 @@ package Only
 
 import (
 	"github.com/reactivego/rx/schedulers"
-	"github.com/reactivego/rx/subscriber"
+	"github.com/reactivego/subscriber"
 )
 
 //jig:name ObserveFunc
 
-// ObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type ObserveFunc func(interface{}, error, bool)
+// ObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type ObserveFunc func(next interface{}, err error, done bool)
 
 var zero interface{}
 
@@ -94,9 +98,13 @@ type Subscriber subscriber.Subscriber
 
 //jig:name StringObserveFunc
 
-// StringObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type StringObserveFunc func(string, error, bool)
+// StringObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type StringObserveFunc func(next string, err error, done bool)
 
 var zeroString string
 
@@ -145,9 +153,13 @@ func (o Observable) OnlyString() ObservableString {
 
 //jig:name SizeObserveFunc
 
-// SizeObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type SizeObserveFunc func(Size, error, bool)
+// SizeObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type SizeObserveFunc func(next Size, err error, done bool)
 
 var zeroSize Size
 
@@ -196,9 +208,13 @@ func (o Observable) OnlySize() ObservableSize {
 
 //jig:name PointObserveFunc
 
-// PointObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type PointObserveFunc func([]point, error, bool)
+// PointObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type PointObserveFunc func(next []point, err error, done bool)
 
 var zeroPoint []point
 
@@ -271,11 +287,12 @@ type SubscribeOptions struct {
 // NewSubscriber will return a newly created subscriber. Before returning the
 // subscription the OnSubscribe callback (if set) will already have been called.
 func (options SubscribeOptions) NewSubscriber() Subscriber {
-	subscription := subscriber.NewWithCallback(options.OnUnsubscribe)
+	subscriber := subscriber.New()
+	subscriber.OnUnsubscribe(options.OnUnsubscribe)
 	if options.OnSubscribe != nil {
-		options.OnSubscribe(subscription)
+		options.OnSubscribe(subscriber)
 	}
-	return subscription
+	return subscriber
 }
 
 // SubscribeOptionSetter is the type of a function for setting SubscribeOptions.
@@ -336,7 +353,7 @@ func (o ObservableString) Subscribe(observe StringObserveFunc, setters ...Subscr
 //jig:name ObservableStringSubscribeNext
 
 // SubscribeNext operates upon the emissions from an Observable only.
-// This method returns a Subscriber.
+// This method returns a Subscription.
 func (o ObservableString) SubscribeNext(f func(next string), setters ...SubscribeOptionSetter) Subscription {
 	return o.Subscribe(func(next string, err error, done bool) {
 		if !done {
@@ -369,7 +386,7 @@ func (o ObservableSize) Subscribe(observe SizeObserveFunc, setters ...SubscribeO
 //jig:name ObservableSizeSubscribeNext
 
 // SubscribeNext operates upon the emissions from an Observable only.
-// This method returns a Subscriber.
+// This method returns a Subscription.
 func (o ObservableSize) SubscribeNext(f func(next Size), setters ...SubscribeOptionSetter) Subscription {
 	return o.Subscribe(func(next Size, err error, done bool) {
 		if !done {
@@ -402,7 +419,7 @@ func (o ObservablePoint) Subscribe(observe PointObserveFunc, setters ...Subscrib
 //jig:name ObservablePointSubscribeNext
 
 // SubscribeNext operates upon the emissions from an Observable only.
-// This method returns a Subscriber.
+// This method returns a Subscription.
 func (o ObservablePoint) SubscribeNext(f func(next []point), setters ...SubscribeOptionSetter) Subscription {
 	return o.Subscribe(func(next []point, err error, done bool) {
 		if !done {

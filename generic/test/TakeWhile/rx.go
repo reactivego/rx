@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	"github.com/reactivego/rx/schedulers"
-	"github.com/reactivego/rx/subscriber"
+	"github.com/reactivego/subscriber"
 )
 
 //jig:name IntObserveFunc
@@ -101,6 +101,13 @@ func FromSliceInt(slice []int) ObservableInt {
 	})
 }
 
+//jig:name FromInt
+
+// FromInt creates an ObservableInt from multiple int values passed in.
+func FromInt(slice ...int) ObservableInt {
+	return FromSliceInt(slice)
+}
+
 //jig:name FromInts
 
 // FromInts creates an ObservableInt from multiple int values passed in.
@@ -120,21 +127,20 @@ type Scheduler interface {
 // Subscriber is an alias for the subscriber.Subscriber interface type.
 type Subscriber subscriber.Subscriber
 
-//jig:name ObservableTake
+//jig:name ObservableTakeWhile
 
-// Take emits only the first n items emitted by an Observable.
-func (o Observable) Take(n int) Observable {
+// TakeWhile mirrors items emitted by an Observable until a specified condition becomes false.
+//
+// The TakeWhile mirrors the source Observable until such time as some condition you specify
+// becomes false, at which point TakeWhile stops mirroring the source Observable and terminates
+// its own Observable.
+func (o Observable) TakeWhile(condition func(next interface{}) bool) Observable {
 	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		taken := 0
 		observer := func(next interface{}, err error, done bool) {
-			if taken < n {
+			if done || condition(next) {
 				observe(next, err, done)
-				if !done {
-					taken++
-					if taken >= n {
-						observe(nil, nil, true)
-					}
-				}
+			} else {
+				observe(zero, nil, true)
 			}
 		}
 		o(observer, subscribeOn, subscriber)
@@ -142,11 +148,18 @@ func (o Observable) Take(n int) Observable {
 	return observable
 }
 
-//jig:name ObservableIntTake
+//jig:name ObservableIntTakeWhile
 
-// Take emits only the first n items emitted by an ObservableInt.
-func (o ObservableInt) Take(n int) ObservableInt {
-	return o.AsObservable().Take(n).AsObservableInt()
+// TakeWhile mirrors items emitted by an Observable until a specified condition becomes false.
+//
+// The TakeWhile mirrors the source Observable until such time as some condition you specify
+// becomes false, at which point TakeWhile stops mirroring the source Observable and terminates
+// its own Observable.
+func (o ObservableInt) TakeWhile(condition func(next int) bool) ObservableInt {
+	predecate := func(next interface{}) bool {
+		return condition(next.(int))
+	}
+	return o.AsObservable().TakeWhile(predecate).AsObservableInt()
 }
 
 //jig:name ObserveFunc
@@ -184,19 +197,6 @@ func (f ObserveFunc) Complete() {
 // function, scheduler and an subscriber.
 type Observable func(ObserveFunc, Scheduler, Subscriber)
 
-//jig:name ObservableIntAsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name NewScheduler
 
 func NewGoroutine() Scheduler	{ return &schedulers.Goroutine{} }
@@ -223,7 +223,8 @@ type SubscribeOptions struct {
 // NewSubscriber will return a newly created subscriber. Before returning the
 // subscription the OnSubscribe callback (if set) will already have been called.
 func (options SubscribeOptions) NewSubscriber() Subscriber {
-	subscriber := subscriber.NewWithCallback(options.OnUnsubscribe)
+	subscriber := subscriber.New()
+	subscriber.OnUnsubscribe(options.OnUnsubscribe)
 	if options.OnSubscribe != nil {
 		options.OnSubscribe(subscriber)
 	}
@@ -305,17 +306,46 @@ func (o ObservableInt) ToSlice(setters ...SubscribeOptionSetter) (a []int, e err
 	return a, e
 }
 
-//jig:name ConstError
+//jig:name ObservableIntAsObservable
 
-type Error string
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
 
-func (e Error) Error() string	{ return string(e) }
+//jig:name ObservableIntPrintln
+
+// Println subscribes to the Observable and prints every item to os.Stdout while
+// it waits for completion or error. Returns either the error or nil when the
+// Observable completed normally.
+func (o ObservableInt) Println(setters ...SubscribeOptionSetter) (e error) {
+	o.Subscribe(func(next int, err error, done bool) {
+		if !done {
+			fmt.Println(next)
+		} else {
+			e = err
+		}
+	}, setters...).Wait()
+	return e
+}
+
+//jig:name RxError
+
+type RxError string
+
+func (e RxError) Error() string	{ return string(e) }
 
 //jig:name ErrTypecastToInt
 
 // ErrTypecastToInt is delivered to an observer if the generic value cannot be
 // typecast to int.
-const ErrTypecastToInt = Error("typecast to int failed")
+const ErrTypecastToInt = RxError("typecast to int failed")
 
 //jig:name ObservableAsObservableInt
 
@@ -337,62 +367,4 @@ func (o Observable) AsObservableInt() ObservableInt {
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
-}
-
-//jig:name FromInt
-
-// FromInt creates an ObservableInt from multiple int values passed in.
-func FromInt(slice ...int) ObservableInt {
-	return FromSliceInt(slice)
-}
-
-//jig:name ObservableTakeWhile
-
-// TakeWhile mirrors items emitted by an Observable until a specified condition becomes false.
-//
-// The TakeWhile mirrors the source Observable until such time as some condition you specify
-// becomes false, at which point TakeWhile stops mirroring the source Observable and terminates
-// its own Observable.
-func (o Observable) TakeWhile(condition func(next interface{}) bool) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if done || condition(next) {
-				observe(next, err, done)
-			} else {
-				observe(zero, nil, true)
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableIntTakeWhile
-
-// TakeWhile mirrors items emitted by an Observable until a specified condition becomes false.
-//
-// The TakeWhile mirrors the source Observable until such time as some condition you specify
-// becomes false, at which point TakeWhile stops mirroring the source Observable and terminates
-// its own Observable.
-func (o ObservableInt) TakeWhile(condition func(next int) bool) ObservableInt {
-	predecate := func(next interface{}) bool {
-		return condition(next.(int))
-	}
-	return o.AsObservable().TakeWhile(predecate).AsObservableInt()
-}
-
-//jig:name ObservableIntPrintln
-
-// Println subscribes to the Observable and prints every item to os.Stdout while
-// it waits for completion or error. Returns either the error or nil when the
-// Observable completed normally.
-func (o ObservableInt) Println(setters ...SubscribeOptionSetter) (e error) {
-	o.Subscribe(func(next int, err error, done bool) {
-		if !done {
-			fmt.Println(next)
-		} else {
-			e = err
-		}
-	}, setters...).Wait()
-	return e
 }

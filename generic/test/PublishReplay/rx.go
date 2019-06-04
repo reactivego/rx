@@ -10,14 +10,18 @@ import (
 
 	"github.com/reactivego/multicast"
 	"github.com/reactivego/rx/schedulers"
-	"github.com/reactivego/rx/subscriber"
+	"github.com/reactivego/subscriber"
 )
 
 //jig:name IntObserveFunc
 
-// IntObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type IntObserveFunc func(int, error, bool)
+// IntObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type IntObserveFunc func(next int, err error, done bool)
 
 var zeroInt int
 
@@ -140,11 +144,12 @@ type SubscribeOptions struct {
 // NewSubscriber will return a newly created subscriber. Before returning the
 // subscription the OnSubscribe callback (if set) will already have been called.
 func (options SubscribeOptions) NewSubscriber() Subscriber {
-	subscription := subscriber.NewWithCallback(options.OnUnsubscribe)
+	subscriber := subscriber.New()
+	subscriber.OnUnsubscribe(options.OnUnsubscribe)
 	if options.OnSubscribe != nil {
-		options.OnSubscribe(subscription)
+		options.OnSubscribe(subscriber)
 	}
-	return subscription
+	return subscriber
 }
 
 // SubscribeOptionSetter is the type of a function for setting SubscribeOptions.
@@ -377,61 +382,15 @@ func (o ObservableInt) PublishReplay(bufferCapacity int, windowDuration time.Dur
 	return o.Multicast(factory)
 }
 
-//jig:name ConnectableIntConnect
-
-// Connect instructs a connectable Observable to begin emitting items to its
-// subscribers. All values will then be passed on to the observers that
-// subscribed to this connectable observable
-func (c ConnectableInt) Connect(setters ...SubscribeOptionSetter) Subscription {
-	return c.connect(setters)
-}
-
-//jig:name ObservableIntToSlice
-
-// ToSlice collects all values from the ObservableInt into an slice. The
-// complete slice and any error are returned.
-//
-// This function subscribes to the source observable on the Goroutine scheduler.
-// The Goroutine scheduler works in more situations for complex chains of
-// observables, like when merging the output of multiple observables.
-func (o ObservableInt) ToSlice(setters ...SubscribeOptionSetter) (a []int, e error) {
-	scheduler := NewGoroutine()
-	o.Subscribe(func(next int, err error, done bool) {
-		if !done {
-			a = append(a, next)
-		} else {
-			e = err
-		}
-	}, SubscribeOn(scheduler, setters...)).Wait()
-	return a, e
-}
-
-//jig:name ConnectableIntAutoConnect
-
-// AutoConnect makes a ConnectableInt behave like an ordinary ObservableInt that
-// automatically connects when the specified number of clients subscribe to it.
-// If count is 0, then AutoConnect will immediately call connect on the
-// ConnectableInt before returning the ObservableInt part of the ConnectableInt.
-func (o ConnectableInt) AutoConnect(count int, setters ...SubscribeOptionSetter) ObservableInt {
-	if count == 0 {
-		o.connect(setters)
-		return o.ObservableInt
-	}
-	var refcount int32
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		if atomic.AddInt32(&refcount, 1) == int32(count) {
-			o.connect(setters)
-		}
-		o.ObservableInt(observe, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name ObserveFunc
 
-// ObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type ObserveFunc func(interface{}, error, bool)
+// ObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type ObserveFunc func(next interface{}, err error, done bool)
 
 var zero interface{}
 
@@ -498,6 +457,15 @@ func Create(f func(Observer)) Observable {
 	return observable
 }
 
+//jig:name ConnectableIntConnect
+
+// Connect instructs a connectable Observable to begin emitting items to its
+// subscribers. All values will then be passed on to the observers that
+// subscribed to this connectable observable
+func (c ConnectableInt) Connect(setters ...SubscribeOptionSetter) Subscription {
+	return c.connect(setters)
+}
+
 //jig:name ObservableIntWait
 
 // Wait subscribes to the Observable and waits for completion or error.
@@ -511,17 +479,58 @@ func (o ObservableInt) Wait(setters ...SubscribeOptionSetter) (e error) {
 	return e
 }
 
-//jig:name ConstError
+//jig:name ObservableIntToSlice
 
-type Error string
+// ToSlice collects all values from the ObservableInt into an slice. The
+// complete slice and any error are returned.
+//
+// This function subscribes to the source observable on the Goroutine scheduler.
+// The Goroutine scheduler works in more situations for complex chains of
+// observables, like when merging the output of multiple observables.
+func (o ObservableInt) ToSlice(setters ...SubscribeOptionSetter) (a []int, e error) {
+	scheduler := NewGoroutine()
+	o.Subscribe(func(next int, err error, done bool) {
+		if !done {
+			a = append(a, next)
+		} else {
+			e = err
+		}
+	}, SubscribeOn(scheduler, setters...)).Wait()
+	return a, e
+}
 
-func (e Error) Error() string	{ return string(e) }
+//jig:name ConnectableIntAutoConnect
+
+// AutoConnect makes a ConnectableInt behave like an ordinary ObservableInt that
+// automatically connects when the specified number of clients subscribe to it.
+// If count is 0, then AutoConnect will immediately call connect on the
+// ConnectableInt before returning the ObservableInt part of the ConnectableInt.
+func (o ConnectableInt) AutoConnect(count int, setters ...SubscribeOptionSetter) ObservableInt {
+	if count == 0 {
+		o.connect(setters)
+		return o.ObservableInt
+	}
+	var refcount int32
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		if atomic.AddInt32(&refcount, 1) == int32(count) {
+			o.connect(setters)
+		}
+		o.ObservableInt(observe, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name RxError
+
+type RxError string
+
+func (e RxError) Error() string	{ return string(e) }
 
 //jig:name ErrTypecastToInt
 
 // ErrTypecastToInt is delivered to an observer if the generic value cannot be
 // typecast to int.
-const ErrTypecastToInt = Error("typecast to int failed")
+const ErrTypecastToInt = RxError("typecast to int failed")
 
 //jig:name ObservableAsObservableInt
 

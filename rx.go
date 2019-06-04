@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/reactivego/rx/schedulers"
-	"github.com/reactivego/rx/subscriber"
+	"github.com/reactivego/subscriber"
 )
 
 //jig:name ObserveFunc
@@ -48,6 +48,68 @@ func (f ObserveFunc) Complete() {
 // Observable is essentially a subscribe function taking an observe
 // function, scheduler and an subscriber.
 type Observable func(ObserveFunc, Scheduler, Subscriber)
+
+//jig:name Observer
+
+// Observer is the interface used with Create when implementing a custom
+// observable.
+type Observer interface {
+	// Next emits the next interface{} value.
+	Next(interface{})
+	// Error signals an error condition.
+	Error(error)
+	// Complete signals that no more data is to be expected.
+	Complete()
+	// Closed returns true when the subscription has been canceled.
+	Closed() bool
+}
+
+//jig:name Create
+
+// Create creates an Observable from scratch by calling observer methods
+// programmatically.
+func Create(f func(Observer)) Observable {
+	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		scheduler.Schedule(func() {
+			if subscriber.Closed() {
+				return
+			}
+			observer := func(next interface{}, err error, done bool) {
+				if !subscriber.Closed() {
+					observe(next, err, done)
+				}
+			}
+			type ObserverSubscriber struct {
+				ObserveFunc
+				Subscriber
+			}
+			f(&ObserverSubscriber{observer, subscriber})
+		})
+	}
+	return observable
+}
+
+//jig:name FromSlice
+
+// FromSlice creates an Observable from a slice of interface{} values passed in.
+func FromSlice(slice []interface{}) Observable {
+	return Create(func(observer Observer) {
+		for _, next := range slice {
+			if observer.Closed() {
+				return
+			}
+			observer.Next(next)
+		}
+		observer.Complete()
+	})
+}
+
+//jig:name From
+
+// From creates an Observable from multiple interface{} values passed in.
+func From(slice ...interface{}) Observable {
+	return FromSlice(slice)
+}
 
 //jig:name IntObserveFunc
 
@@ -124,84 +186,6 @@ func CreateInt(f func(IntObserver)) ObservableInt {
 	return observable
 }
 
-//jig:name Interval
-
-// Interval creates an ObservableInt that emits a sequence of integers spaced
-// by a particular time interval.
-func Interval(interval time.Duration) ObservableInt {
-	return CreateInt(func(observer IntObserver) {
-		for i := 0; ; i++ {
-			time.Sleep(interval)
-			if observer.Closed() {
-				return
-			}
-			observer.Next(i)
-		}
-	})
-}
-
-//jig:name Observer
-
-// Observer is the interface used with Create when implementing a custom
-// observable.
-type Observer interface {
-	// Next emits the next interface{} value.
-	Next(interface{})
-	// Error signals an error condition.
-	Error(error)
-	// Complete signals that no more data is to be expected.
-	Complete()
-	// Closed returns true when the subscription has been canceled.
-	Closed() bool
-}
-
-//jig:name Create
-
-// Create creates an Observable from scratch by calling observer methods
-// programmatically.
-func Create(f func(Observer)) Observable {
-	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		scheduler.Schedule(func() {
-			if subscriber.Closed() {
-				return
-			}
-			observer := func(next interface{}, err error, done bool) {
-				if !subscriber.Closed() {
-					observe(next, err, done)
-				}
-			}
-			type ObserverSubscriber struct {
-				ObserveFunc
-				Subscriber
-			}
-			f(&ObserverSubscriber{observer, subscriber})
-		})
-	}
-	return observable
-}
-
-//jig:name FromSlice
-
-// FromSlice creates an Observable from a slice of interface{} values passed in.
-func FromSlice(slice []interface{}) Observable {
-	return Create(func(observer Observer) {
-		for _, next := range slice {
-			if observer.Closed() {
-				return
-			}
-			observer.Next(next)
-		}
-		observer.Complete()
-	})
-}
-
-//jig:name From
-
-// From creates an Observable from multiple interface{} values passed in.
-func From(slice ...interface{}) Observable {
-	return FromSlice(slice)
-}
-
 //jig:name Range
 
 // Range creates an ObservableInt that emits a range of sequential integers.
@@ -215,6 +199,22 @@ func Range(start, count int) ObservableInt {
 			observer.Next(i)
 		}
 		observer.Complete()
+	})
+}
+
+//jig:name Interval
+
+// Interval creates an ObservableInt that emits a sequence of integers spaced
+// by a particular time interval.
+func Interval(interval time.Duration) ObservableInt {
+	return CreateInt(func(observer IntObserver) {
+		for i := 0; ; i++ {
+			time.Sleep(interval)
+			if observer.Closed() {
+				return
+			}
+			observer.Next(i)
+		}
 	})
 }
 
@@ -257,85 +257,6 @@ type Scheduler interface {
 // Subscriber is an alias for the subscriber.Subscriber interface type.
 type Subscriber subscriber.Subscriber
 
-//jig:name ObservableFilter
-
-// Filter emits only those items from an Observable that pass a predicate test.
-func (o Observable) Filter(predicate func(next interface{}) bool) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if done || predicate(next) {
-				observe(next, err, done)
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableDo
-
-// Do calls a function for each next value passing through the observable.
-func (o Observable) Do(f func(next interface{})) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				f(next)
-			}
-			observe(next, err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableConcat
-
-// Concat emits the emissions from two or more Observables without interleaving them.
-func (o Observable) Concat(other ...Observable) Observable {
-	if len(other) == 0 {
-		return o
-	}
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		var (
-			observables	= append([]Observable{}, other...)
-			observer	ObserveFunc
-		)
-		observer = func(next interface{}, err error, done bool) {
-			if !done || err != nil {
-				observe(next, err, done)
-			} else {
-				if len(observables) == 0 {
-					observe(zero, nil, true)
-				} else {
-					o := observables[0]
-					observables = observables[1:]
-					o(observer, subscribeOn, subscriber)
-				}
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableMap
-
-// Map transforms the items emitted by an Observable by applying a
-// function to each item.
-func (o Observable) Map(project func(interface{}) interface{}) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			var mapped interface{}
-			if !done {
-				mapped = project(next)
-			}
-			observe(mapped, err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name NewScheduler
 
 func NewGoroutine() Scheduler	{ return &schedulers.Goroutine{} }
@@ -362,7 +283,8 @@ type SubscribeOptions struct {
 // NewSubscriber will return a newly created subscriber. Before returning the
 // subscription the OnSubscribe callback (if set) will already have been called.
 func (options SubscribeOptions) NewSubscriber() Subscriber {
-	subscriber := subscriber.NewWithCallback(options.OnUnsubscribe)
+	subscriber := subscriber.New()
+	subscriber.OnUnsubscribe(options.OnUnsubscribe)
 	if options.OnSubscribe != nil {
 		options.OnSubscribe(subscriber)
 	}
@@ -440,6 +362,67 @@ func (o Observable) Println(setters ...SubscribeOptionSetter) (e error) {
 	return e
 }
 
+//jig:name ObservableFilter
+
+// Filter emits only those items from an Observable that pass a predicate test.
+func (o Observable) Filter(predicate func(next interface{}) bool) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if done || predicate(next) {
+				observe(next, err, done)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableDo
+
+// Do calls a function for each next value passing through the observable.
+func (o Observable) Do(f func(next interface{})) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				f(next)
+			}
+			observe(next, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableConcat
+
+// Concat emits the emissions from two or more Observables without interleaving them.
+func (o Observable) Concat(other ...Observable) Observable {
+	if len(other) == 0 {
+		return o
+	}
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		var (
+			observables	= append([]Observable{}, other...)
+			observer	ObserveFunc
+		)
+		observer = func(next interface{}, err error, done bool) {
+			if !done || err != nil {
+				observe(next, err, done)
+			} else {
+				if len(observables) == 0 {
+					observe(zero, nil, true)
+				} else {
+					o := observables[0]
+					observables = observables[1:]
+					o(observer, subscribeOn, subscriber)
+				}
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name ObservableTake
 
 // Take emits only the first n items emitted by an Observable.
@@ -513,29 +496,40 @@ func (o ObservableInt) AsObservable() Observable {
 	return observable
 }
 
-//jig:name ObservableWait
+//jig:name ObservableMap
 
-// Wait subscribes to the Observable and waits for completion or error.
-// Returns either the error or nil when the Observable completed normally.
-func (o Observable) Wait(setters ...SubscribeOptionSetter) (e error) {
-	o.Subscribe(func(next interface{}, err error, done bool) {
-		if done {
-			e = err
+// Map transforms the items emitted by an Observable by applying a
+// function to each item.
+func (o Observable) Map(project func(interface{}) interface{}) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			var mapped interface{}
+			if !done {
+				mapped = project(next)
+			}
+			observe(mapped, err, done)
 		}
-	}, setters...).Wait()
-	return e
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
 }
 
-//jig:name ObservableSubscribeNext
+//jig:name ObservableIntMapObservable
 
-// SubscribeNext operates upon the emissions from an Observable only.
-// This method returns a Subscription.
-func (o Observable) SubscribeNext(f func(next interface{}), setters ...SubscribeOptionSetter) Subscription {
-	return o.Subscribe(func(next interface{}, err error, done bool) {
-		if !done {
-			f(next)
+// MapObservable transforms the items emitted by an ObservableInt by applying a
+// function to each item.
+func (o ObservableInt) MapObservable(project func(int) Observable) ObservableObservable {
+	observable := func(observe ObservableObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			var mapped Observable
+			if !done {
+				mapped = project(next)
+			}
+			observe(mapped, err, done)
 		}
-	}, setters...)
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
 }
 
 //jig:name ObservableMapObservable
@@ -590,22 +584,29 @@ func (o Observable) AsObservableInt() ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntMapObservable
+//jig:name ObservableWait
 
-// MapObservable transforms the items emitted by an ObservableInt by applying a
-// function to each item.
-func (o ObservableInt) MapObservable(project func(int) Observable) ObservableObservable {
-	observable := func(observe ObservableObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			var mapped Observable
-			if !done {
-				mapped = project(next)
-			}
-			observe(mapped, err, done)
+// Wait subscribes to the Observable and waits for completion or error.
+// Returns either the error or nil when the Observable completed normally.
+func (o Observable) Wait(setters ...SubscribeOptionSetter) (e error) {
+	o.Subscribe(func(next interface{}, err error, done bool) {
+		if done {
+			e = err
 		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
+	}, setters...).Wait()
+	return e
+}
+
+//jig:name ObservableSubscribeNext
+
+// SubscribeNext operates upon the emissions from an Observable only.
+// This method returns a Subscription.
+func (o Observable) SubscribeNext(f func(next interface{}), setters ...SubscribeOptionSetter) Subscription {
+	return o.Subscribe(func(next interface{}, err error, done bool) {
+		if !done {
+			f(next)
+		}
+	}, setters...)
 }
 
 //jig:name ObservableObserveFunc

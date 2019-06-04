@@ -5,110 +5,19 @@
 package AsObservable
 
 import (
-	"errors"
-
 	"github.com/reactivego/rx/schedulers"
-	"github.com/reactivego/rx/subscriber"
+	"github.com/reactivego/subscriber"
 )
-
-//jig:name ObserveFunc
-
-// ObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type ObserveFunc func(interface{}, error, bool)
-
-var zero interface{}
-
-// Next is called by an Observable to emit the next interface{} value to the
-// observer.
-func (f ObserveFunc) Next(next interface{}) {
-	f(next, nil, false)
-}
-
-// Error is called by an Observable to report an error to the observer.
-func (f ObserveFunc) Error(err error) {
-	f(zero, err, true)
-}
-
-// Complete is called by an Observable to signal that no more data is
-// forthcoming to the observer.
-func (f ObserveFunc) Complete() {
-	f(zero, nil, true)
-}
-
-//jig:name Observable
-
-// Observable is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type Observable func(ObserveFunc, Scheduler, Subscriber)
-
-//jig:name Observer
-
-// Observer is the interface used with Create when implementing a custom
-// observable.
-type Observer interface {
-	// Next emits the next interface{} value.
-	Next(interface{})
-	// Error signals an error condition.
-	Error(error)
-	// Complete signals that no more data is to be expected.
-	Complete()
-	// Closed returns true when the subscription has been canceled.
-	Closed() bool
-}
-
-//jig:name Create
-
-// Create creates an Observable from scratch by calling observer methods
-// programmatically.
-func Create(f func(Observer)) Observable {
-	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		scheduler.Schedule(func() {
-			if subscriber.Closed() {
-				return
-			}
-			observer := func(next interface{}, err error, done bool) {
-				if !subscriber.Closed() {
-					observe(next, err, done)
-				}
-			}
-			type ObserverSubscriber struct {
-				ObserveFunc
-				Subscriber
-			}
-			f(&ObserverSubscriber{observer, subscriber})
-		})
-	}
-	return observable
-}
-
-//jig:name FromSlice
-
-// FromSlice creates an Observable from a slice of interface{} values passed in.
-func FromSlice(slice []interface{}) Observable {
-	return Create(func(observer Observer) {
-		for _, next := range slice {
-			if observer.Closed() {
-				return
-			}
-			observer.Next(next)
-		}
-		observer.Complete()
-	})
-}
-
-//jig:name From
-
-// From creates an Observable from multiple interface{} values passed in.
-func From(slice ...interface{}) Observable {
-	return FromSlice(slice)
-}
 
 //jig:name StringObserveFunc
 
-// StringObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type StringObserveFunc func(string, error, bool)
+// StringObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type StringObserveFunc func(next string, err error, done bool)
 
 var zeroString string
 
@@ -197,6 +106,103 @@ func FromString(slice ...string) ObservableString {
 	return FromSliceString(slice)
 }
 
+//jig:name ObserveFunc
+
+// ObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type ObserveFunc func(next interface{}, err error, done bool)
+
+var zero interface{}
+
+// Next is called by an Observable to emit the next interface{} value to the
+// observer.
+func (f ObserveFunc) Next(next interface{}) {
+	f(next, nil, false)
+}
+
+// Error is called by an Observable to report an error to the observer.
+func (f ObserveFunc) Error(err error) {
+	f(zero, err, true)
+}
+
+// Complete is called by an Observable to signal that no more data is
+// forthcoming to the observer.
+func (f ObserveFunc) Complete() {
+	f(zero, nil, true)
+}
+
+//jig:name Observable
+
+// Observable is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type Observable func(ObserveFunc, Scheduler, Subscriber)
+
+//jig:name Observer
+
+// Observer is the interface used with Create when implementing a custom
+// observable.
+type Observer interface {
+	// Next emits the next interface{} value.
+	Next(interface{})
+	// Error signals an error condition.
+	Error(error)
+	// Complete signals that no more data is to be expected.
+	Complete()
+	// Closed returns true when the subscription has been canceled.
+	Closed() bool
+}
+
+//jig:name Create
+
+// Create creates an Observable from scratch by calling observer methods
+// programmatically.
+func Create(f func(Observer)) Observable {
+	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		scheduler.Schedule(func() {
+			if subscriber.Closed() {
+				return
+			}
+			observer := func(next interface{}, err error, done bool) {
+				if !subscriber.Closed() {
+					observe(next, err, done)
+				}
+			}
+			type ObserverSubscriber struct {
+				ObserveFunc
+				Subscriber
+			}
+			f(&ObserverSubscriber{observer, subscriber})
+		})
+	}
+	return observable
+}
+
+//jig:name FromSlice
+
+// FromSlice creates an Observable from a slice of interface{} values passed in.
+func FromSlice(slice []interface{}) Observable {
+	return Create(func(observer Observer) {
+		for _, next := range slice {
+			if observer.Closed() {
+				return
+			}
+			observer.Next(next)
+		}
+		observer.Complete()
+	})
+}
+
+//jig:name From
+
+// From creates an Observable from multiple interface{} values passed in.
+func From(slice ...interface{}) Observable {
+	return FromSlice(slice)
+}
+
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
@@ -209,11 +215,28 @@ type Scheduler interface {
 // Subscriber is an alias for the subscriber.Subscriber interface type.
 type Subscriber subscriber.Subscriber
 
+//jig:name ObservableStringAsObservable
+
+// AsObservable turns a typed ObservableString into an Observable of interface{}.
+func (o ObservableString) AsObservable() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next string, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name Float64ObserveFunc
 
-// Float64ObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type Float64ObserveFunc func(float64, error, bool)
+// Float64ObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type Float64ObserveFunc func(next float64, err error, done bool)
 
 var zeroFloat64 float64
 
@@ -240,11 +263,17 @@ func (f Float64ObserveFunc) Complete() {
 // function, scheduler and an subscriber.
 type ObservableFloat64 func(Float64ObserveFunc, Scheduler, Subscriber)
 
+//jig:name RxError
+
+type RxError string
+
+func (e RxError) Error() string	{ return string(e) }
+
 //jig:name ErrTypecastToFloat64
 
 // ErrTypecastToFloat64 is delivered to an observer if the generic value cannot be
 // typecast to float64.
-var ErrTypecastToFloat64 = errors.New("typecast to float64 failed")
+const ErrTypecastToFloat64 = RxError("typecast to float64 failed")
 
 //jig:name ObservableAsObservableFloat64
 
@@ -262,19 +291,6 @@ func (o Observable) AsObservableFloat64() ObservableFloat64 {
 			} else {
 				observe(zeroFloat64, err, true)
 			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableStringAsObservable
-
-// AsObservable turns a typed ObservableString into an Observable of interface{}.
-func (o ObservableString) AsObservable() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next string, err error, done bool) {
-			observe(interface{}(next), err, done)
 		}
 		o(observer, subscribeOn, subscriber)
 	}
@@ -307,11 +323,12 @@ type SubscribeOptions struct {
 // NewSubscriber will return a newly created subscriber. Before returning the
 // subscription the OnSubscribe callback (if set) will already have been called.
 func (options SubscribeOptions) NewSubscriber() Subscriber {
-	subscription := subscriber.NewWithCallback(options.OnUnsubscribe)
+	subscriber := subscriber.New()
+	subscriber.OnUnsubscribe(options.OnUnsubscribe)
 	if options.OnSubscribe != nil {
-		options.OnSubscribe(subscription)
+		options.OnSubscribe(subscriber)
 	}
-	return subscription
+	return subscriber
 }
 
 // SubscribeOptionSetter is the type of a function for setting SubscribeOptions.
@@ -348,52 +365,6 @@ func NewSubscribeOptions(setter SubscribeOptionSetter) *SubscribeOptions {
 	return options
 }
 
-//jig:name ObservableFloat64Subscribe
-
-// Subscribe operates upon the emissions and notifications from an Observable.
-// This method returns a Subscriber.
-func (o ObservableFloat64) Subscribe(observe Float64ObserveFunc, setters ...SubscribeOptionSetter) Subscriber {
-	scheduler := NewTrampoline()
-	setter := SubscribeOn(scheduler, setters...)
-	options := NewSubscribeOptions(setter)
-	subscriber := options.NewSubscriber()
-	observer := func(next float64, err error, done bool) {
-		if !done {
-			observe(next, err, done)
-		} else {
-			observe(zeroFloat64, err, true)
-			subscriber.Unsubscribe()
-		}
-	}
-	o(observer, options.SubscribeOn, subscriber)
-	return subscriber
-}
-
-//jig:name ObservableFloat64SubscribeNext
-
-// SubscribeNext operates upon the emissions from an Observable only.
-// This method returns a Subscriber.
-func (o ObservableFloat64) SubscribeNext(f func(next float64), setters ...SubscribeOptionSetter) Subscription {
-	return o.Subscribe(func(next float64, err error, done bool) {
-		if !done {
-			f(next)
-		}
-	}, setters...)
-}
-
-//jig:name ObservableFloat64Wait
-
-// Wait subscribes to the Observable and waits for completion or error.
-// Returns either the error or nil when the Observable completed normally.
-func (o ObservableFloat64) Wait(setters ...SubscribeOptionSetter) (e error) {
-	o.Subscribe(func(next float64, err error, done bool) {
-		if done {
-			e = err
-		}
-	}, setters...).Wait()
-	return e
-}
-
 //jig:name ObservableSubscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
@@ -418,11 +389,57 @@ func (o Observable) Subscribe(observe ObserveFunc, setters ...SubscribeOptionSet
 //jig:name ObservableSubscribeNext
 
 // SubscribeNext operates upon the emissions from an Observable only.
-// This method returns a Subscriber.
+// This method returns a Subscription.
 func (o Observable) SubscribeNext(f func(next interface{}), setters ...SubscribeOptionSetter) Subscription {
 	return o.Subscribe(func(next interface{}, err error, done bool) {
 		if !done {
 			f(next)
 		}
 	}, setters...)
+}
+
+//jig:name ObservableFloat64Subscribe
+
+// Subscribe operates upon the emissions and notifications from an Observable.
+// This method returns a Subscriber.
+func (o ObservableFloat64) Subscribe(observe Float64ObserveFunc, setters ...SubscribeOptionSetter) Subscriber {
+	scheduler := NewTrampoline()
+	setter := SubscribeOn(scheduler, setters...)
+	options := NewSubscribeOptions(setter)
+	subscriber := options.NewSubscriber()
+	observer := func(next float64, err error, done bool) {
+		if !done {
+			observe(next, err, done)
+		} else {
+			observe(zeroFloat64, err, true)
+			subscriber.Unsubscribe()
+		}
+	}
+	o(observer, options.SubscribeOn, subscriber)
+	return subscriber
+}
+
+//jig:name ObservableFloat64SubscribeNext
+
+// SubscribeNext operates upon the emissions from an Observable only.
+// This method returns a Subscription.
+func (o ObservableFloat64) SubscribeNext(f func(next float64), setters ...SubscribeOptionSetter) Subscription {
+	return o.Subscribe(func(next float64, err error, done bool) {
+		if !done {
+			f(next)
+		}
+	}, setters...)
+}
+
+//jig:name ObservableFloat64Wait
+
+// Wait subscribes to the Observable and waits for completion or error.
+// Returns either the error or nil when the Observable completed normally.
+func (o ObservableFloat64) Wait(setters ...SubscribeOptionSetter) (e error) {
+	o.Subscribe(func(next float64, err error, done bool) {
+		if done {
+			e = err
+		}
+	}, setters...).Wait()
+	return e
 }

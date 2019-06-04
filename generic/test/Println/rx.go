@@ -8,14 +8,18 @@ import (
 	"fmt"
 
 	"github.com/reactivego/rx/schedulers"
-	"github.com/reactivego/rx/subscriber"
+	"github.com/reactivego/subscriber"
 )
 
 //jig:name IntObserveFunc
 
-// IntObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type IntObserveFunc func(int, error, bool)
+// IntObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type IntObserveFunc func(next int, err error, done bool)
 
 var zeroInt int
 
@@ -112,9 +116,9 @@ type Subscriber subscriber.Subscriber
 
 //jig:name NewScheduler
 
-func NewGoroutine() Scheduler { return &schedulers.Goroutine{} }
+func NewGoroutine() Scheduler	{ return &schedulers.Goroutine{} }
 
-func NewTrampoline() Scheduler { return &schedulers.Trampoline{} }
+func NewTrampoline() Scheduler	{ return &schedulers.Trampoline{} }
 
 //jig:name SubscribeOptions
 
@@ -124,23 +128,24 @@ type Subscription subscriber.Subscription
 // SubscribeOptions is a struct with options for Subscribe related methods.
 type SubscribeOptions struct {
 	// SubscribeOn is the scheduler to run the observable subscription on.
-	SubscribeOn Scheduler
+	SubscribeOn	Scheduler
 	// OnSubscribe is called right after the subscription is created and before
 	// subscribing continues further.
-	OnSubscribe func(subscription Subscription)
+	OnSubscribe	func(subscription Subscription)
 	// OnUnsubscribe is called by the subscription to notify the client that the
 	// subscription has been canceled.
-	OnUnsubscribe func()
+	OnUnsubscribe	func()
 }
 
 // NewSubscriber will return a newly created subscriber. Before returning the
 // subscription the OnSubscribe callback (if set) will already have been called.
 func (options SubscribeOptions) NewSubscriber() Subscriber {
-	subscription := subscriber.NewWithCallback(options.OnUnsubscribe)
+	subscriber := subscriber.New()
+	subscriber.OnUnsubscribe(options.OnUnsubscribe)
 	if options.OnSubscribe != nil {
-		options.OnSubscribe(subscription)
+		options.OnSubscribe(subscriber)
 	}
-	return subscription
+	return subscriber
 }
 
 // SubscribeOptionSetter is the type of a function for setting SubscribeOptions.

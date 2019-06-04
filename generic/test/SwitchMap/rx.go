@@ -10,14 +10,18 @@ import (
 	"time"
 
 	"github.com/reactivego/rx/schedulers"
-	"github.com/reactivego/rx/subscriber"
+	"github.com/reactivego/subscriber"
 )
 
 //jig:name ObserveFunc
 
-// ObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type ObserveFunc func(interface{}, error, bool)
+// ObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type ObserveFunc func(next interface{}, err error, done bool)
 
 var zero interface{}
 
@@ -94,9 +98,13 @@ func Never() Observable {
 
 //jig:name StringObserveFunc
 
-// StringObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type StringObserveFunc func(string, error, bool)
+// StringObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type StringObserveFunc func(next string, err error, done bool)
 
 var zeroString string
 
@@ -147,9 +155,13 @@ func From(slice ...interface{}) Observable {
 
 //jig:name IntObserveFunc
 
-// IntObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type IntObserveFunc func(int, error, bool)
+// IntObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type IntObserveFunc func(next int, err error, done bool)
 
 var zeroInt int
 
@@ -293,11 +305,11 @@ type Scheduler interface {
 // Subscriber is an alias for the subscriber.Subscriber interface type.
 type Subscriber subscriber.Subscriber
 
-//jig:name ConstError
+//jig:name RxError
 
-type Error string
+type RxError string
 
-func (e Error) Error() string	{ return string(e) }
+func (e RxError) Error() string	{ return string(e) }
 
 //jig:name ObservableSerialize
 
@@ -325,7 +337,7 @@ func (o Observable) Serialize() Observable {
 //jig:name ObservableTimeout
 
 // ErrTimeout is delivered to an observer if the stream times out.
-const ErrTimeout = Error("timeout")
+const ErrTimeout = RxError("timeout")
 
 // Timeout mirrors the source Observable, but issues an error notification if a
 // particular period of time elapses without any emitted items.
@@ -371,7 +383,7 @@ func (o Observable) Timeout(timeout time.Duration) Observable {
 
 // ErrTypecastToString is delivered to an observer if the generic value cannot be
 // typecast to string.
-const ErrTypecastToString = Error("typecast to string failed")
+const ErrTypecastToString = RxError("typecast to string failed")
 
 //jig:name ObservableAsObservableString
 
@@ -493,11 +505,12 @@ type SubscribeOptions struct {
 // NewSubscriber will return a newly created subscriber. Before returning the
 // subscription the OnSubscribe callback (if set) will already have been called.
 func (options SubscribeOptions) NewSubscriber() Subscriber {
-	subscription := subscriber.NewWithCallback(options.OnUnsubscribe)
+	subscriber := subscriber.New()
+	subscriber.OnUnsubscribe(options.OnUnsubscribe)
 	if options.OnSubscribe != nil {
-		options.OnSubscribe(subscription)
+		options.OnSubscribe(subscriber)
 	}
-	return subscription
+	return subscriber
 }
 
 // SubscribeOptionSetter is the type of a function for setting SubscribeOptions.
@@ -597,7 +610,7 @@ func (o ObservableInt) MapObservableString(project func(int) ObservableString) O
 
 // ErrTypecastToInt is delivered to an observer if the generic value cannot be
 // typecast to int.
-const ErrTypecastToInt = Error("typecast to int failed")
+const ErrTypecastToInt = RxError("typecast to int failed")
 
 //jig:name ObservableAsObservableInt
 
@@ -623,9 +636,13 @@ func (o Observable) AsObservableInt() ObservableInt {
 
 //jig:name ObservableStringObserveFunc
 
-// ObservableStringObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type ObservableStringObserveFunc func(ObservableString, error, bool)
+// ObservableStringObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type ObservableStringObserveFunc func(next ObservableString, err error, done bool)
 
 var zeroObservableString ObservableString
 
@@ -706,24 +723,24 @@ func NewStringLink(observe StringLinkObserveFunc, subscriber Subscriber) *String
 func (o *StringLink) Observe(next string, err error, done bool) error {
 	if !atomic.CompareAndSwapInt32(&o.state, linkIdle, linkBusy) {
 		if atomic.LoadInt32(&o.state) > linkBusy {
-			return Error("Already Done")
+			return RxError("Already Done")
 		}
-		return Error("Recursion Error")
+		return RxError("Recursion Error")
 	}
 	o.observe(o, next, err, done)
 	if done {
 		if err != nil {
 			if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkError) {
-				return Error("Internal Error: 'busy' -> 'error'")
+				return RxError("Internal Error: 'busy' -> 'error'")
 			}
 		} else {
 			if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkCompleting) {
-				return Error("Internal Error: 'busy' -> 'completing'")
+				return RxError("Internal Error: 'busy' -> 'completing'")
 			}
 		}
 	} else {
 		if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkIdle) {
-			return Error("Internal Error: 'busy' -> 'idle'")
+			return RxError("Internal Error: 'busy' -> 'idle'")
 		}
 	}
 	if atomic.LoadInt32(&o.callbackState) != callbackSet {
@@ -742,26 +759,26 @@ func (o *StringLink) Observe(next string, err error, done bool) error {
 
 func (o *StringLink) SubscribeTo(observable ObservableString, scheduler Scheduler) error {
 	if !atomic.CompareAndSwapInt32(&o.state, linkUnsubscribed, linkSubscribing) {
-		return Error("Already Subscribed")
+		return RxError("Already Subscribed")
 	}
 	observer := func(next string, err error, done bool) {
 		o.Observe(next, err, done)
 	}
 	observable(observer, scheduler, o.subscriber)
 	if !atomic.CompareAndSwapInt32(&o.state, linkSubscribing, linkIdle) {
-		return Error("Internal Error")
+		return RxError("Internal Error")
 	}
 	return nil
 }
 
 func (o *StringLink) Cancel(callback func()) error {
 	if !atomic.CompareAndSwapInt32(&o.callbackState, callbackNil, settingCallback) {
-		return Error("Already Waiting")
+		return RxError("Already Waiting")
 	}
 	o.callbackKind = linkCancelOrCompleted
 	o.callback = callback
 	if !atomic.CompareAndSwapInt32(&o.callbackState, settingCallback, callbackSet) {
-		return Error("Internal Error")
+		return RxError("Internal Error")
 	}
 	o.subscriber.Unsubscribe()
 	if atomic.CompareAndSwapInt32(&o.state, linkCompleting, linkComplete) {
@@ -775,12 +792,12 @@ func (o *StringLink) Cancel(callback func()) error {
 
 func (o *StringLink) OnComplete(callback func()) error {
 	if !atomic.CompareAndSwapInt32(&o.callbackState, callbackNil, settingCallback) {
-		return Error("Already Waiting")
+		return RxError("Already Waiting")
 	}
 	o.callbackKind = linkCallbackOnComplete
 	o.callback = callback
 	if !atomic.CompareAndSwapInt32(&o.callbackState, settingCallback, callbackSet) {
-		return Error("Internal Error")
+		return RxError("Internal Error")
 	}
 	if atomic.CompareAndSwapInt32(&o.state, linkCompleting, linkComplete) {
 		o.callback()

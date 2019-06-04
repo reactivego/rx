@@ -5,17 +5,19 @@
 package Reduce
 
 import (
-	"errors"
-
 	"github.com/reactivego/rx/schedulers"
-	"github.com/reactivego/rx/subscriber"
+	"github.com/reactivego/subscriber"
 )
 
 //jig:name IntObserveFunc
 
-// IntObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type IntObserveFunc func(int, error, bool)
+// IntObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type IntObserveFunc func(next int, err error, done bool)
 
 var zeroInt int
 
@@ -173,9 +175,13 @@ func (o ObservableInt) Reduce(reducer func(interface{}, int) interface{}, seed i
 
 //jig:name Float32ObserveFunc
 
-// Float32ObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type Float32ObserveFunc func(float32, error, bool)
+// Float32ObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type Float32ObserveFunc func(next float32, err error, done bool)
 
 var zeroFloat32 float32
 
@@ -204,9 +210,13 @@ type ObservableFloat32 func(Float32ObserveFunc, Scheduler, Subscriber)
 
 //jig:name ObserveFunc
 
-// ObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type ObserveFunc func(interface{}, error, bool)
+// ObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type ObserveFunc func(next interface{}, err error, done bool)
 
 var zero interface{}
 
@@ -259,11 +269,12 @@ type SubscribeOptions struct {
 // NewSubscriber will return a newly created subscriber. Before returning the
 // subscription the OnSubscribe callback (if set) will already have been called.
 func (options SubscribeOptions) NewSubscriber() Subscriber {
-	subscription := subscriber.NewWithCallback(options.OnUnsubscribe)
+	subscriber := subscriber.New()
+	subscriber.OnUnsubscribe(options.OnUnsubscribe)
 	if options.OnSubscribe != nil {
-		options.OnSubscribe(subscription)
+		options.OnSubscribe(subscriber)
 	}
-	return subscription
+	return subscriber
 }
 
 // SubscribeOptionSetter is the type of a function for setting SubscribeOptions.
@@ -300,39 +311,6 @@ func NewSubscribeOptions(setter SubscribeOptionSetter) *SubscribeOptions {
 	return options
 }
 
-//jig:name ObservableFloat32Subscribe
-
-// Subscribe operates upon the emissions and notifications from an Observable.
-// This method returns a Subscriber.
-func (o ObservableFloat32) Subscribe(observe Float32ObserveFunc, setters ...SubscribeOptionSetter) Subscriber {
-	scheduler := NewTrampoline()
-	setter := SubscribeOn(scheduler, setters...)
-	options := NewSubscribeOptions(setter)
-	subscriber := options.NewSubscriber()
-	observer := func(next float32, err error, done bool) {
-		if !done {
-			observe(next, err, done)
-		} else {
-			observe(zeroFloat32, err, true)
-			subscriber.Unsubscribe()
-		}
-	}
-	o(observer, options.SubscribeOn, subscriber)
-	return subscriber
-}
-
-//jig:name ObservableFloat32SubscribeNext
-
-// SubscribeNext operates upon the emissions from an Observable only.
-// This method returns a Subscriber.
-func (o ObservableFloat32) SubscribeNext(f func(next float32), setters ...SubscribeOptionSetter) Subscription {
-	return o.Subscribe(func(next float32, err error, done bool) {
-		if !done {
-			f(next)
-		}
-	}, setters...)
-}
-
 //jig:name ObservableSubscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
@@ -357,9 +335,42 @@ func (o Observable) Subscribe(observe ObserveFunc, setters ...SubscribeOptionSet
 //jig:name ObservableSubscribeNext
 
 // SubscribeNext operates upon the emissions from an Observable only.
-// This method returns a Subscriber.
+// This method returns a Subscription.
 func (o Observable) SubscribeNext(f func(next interface{}), setters ...SubscribeOptionSetter) Subscription {
 	return o.Subscribe(func(next interface{}, err error, done bool) {
+		if !done {
+			f(next)
+		}
+	}, setters...)
+}
+
+//jig:name ObservableFloat32Subscribe
+
+// Subscribe operates upon the emissions and notifications from an Observable.
+// This method returns a Subscriber.
+func (o ObservableFloat32) Subscribe(observe Float32ObserveFunc, setters ...SubscribeOptionSetter) Subscriber {
+	scheduler := NewTrampoline()
+	setter := SubscribeOn(scheduler, setters...)
+	options := NewSubscribeOptions(setter)
+	subscriber := options.NewSubscriber()
+	observer := func(next float32, err error, done bool) {
+		if !done {
+			observe(next, err, done)
+		} else {
+			observe(zeroFloat32, err, true)
+			subscriber.Unsubscribe()
+		}
+	}
+	o(observer, options.SubscribeOn, subscriber)
+	return subscriber
+}
+
+//jig:name ObservableFloat32SubscribeNext
+
+// SubscribeNext operates upon the emissions from an Observable only.
+// This method returns a Subscription.
+func (o ObservableFloat32) SubscribeNext(f func(next float32), setters ...SubscribeOptionSetter) Subscription {
+	return o.Subscribe(func(next float32, err error, done bool) {
 		if !done {
 			f(next)
 		}
@@ -408,6 +419,12 @@ func (o ObservableFloat32) AsObservable() Observable {
 	return observable
 }
 
+//jig:name RxError
+
+type RxError string
+
+func (e RxError) Error() string	{ return string(e) }
+
 //jig:name ObservableSingle
 
 // Single enforces that the observable sends exactly one data item and then
@@ -429,7 +446,7 @@ func (o Observable) Single() Observable {
 							observe(latest, nil, false)
 							observe(nil, nil, true)
 						} else {
-							observe(nil, errors.New("expected one value, got none"), true)
+							observe(nil, RxError("expected one value, got none"), true)
 						}
 					}
 				} else {
@@ -437,7 +454,7 @@ func (o Observable) Single() Observable {
 					if count == 1 {
 						latest = next
 					} else {
-						observe(nil, errors.New("expected one value, got multiple"), true)
+						observe(nil, RxError("expected one value, got multiple"), true)
 					}
 				}
 			}
@@ -451,7 +468,7 @@ func (o Observable) Single() Observable {
 
 // ErrTypecastToFloat32 is delivered to an observer if the generic value cannot be
 // typecast to float32.
-var ErrTypecastToFloat32 = errors.New("typecast to float32 failed")
+const ErrTypecastToFloat32 = RxError("typecast to float32 failed")
 
 //jig:name ObservableAsObservableFloat32
 
