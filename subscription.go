@@ -43,14 +43,12 @@ func (s *subscription) Wait() {
 	s.Unlock()
 	if wait != nil {
 		wait()
+	} else {
+		var wg sync.WaitGroup
+		wg.Add(1)
+		s.Add(wg.Done)
+		wg.Wait()		
 	}
-}
-
-func (s *subscription) WaitForUnsubscribe() {
-	var wg sync.WaitGroup
-	wg.Add(1)
-	s.Add(wg.Done)
-	wg.Wait()
 }
 
 func (s *subscription) Add(callback func()) Subscriber {
