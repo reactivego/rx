@@ -6,8 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestSubscription(t *testing.T) {
-	var s subscription
+func TestSubscriber(t *testing.T) {
+	var s subscriber
 	assert.False(t, s.Closed())
 	s.Unsubscribe()
 	assert.True(t, s.Closed())
@@ -15,7 +15,7 @@ func TestSubscription(t *testing.T) {
 
 
 func TestSubscriberLoop(t *testing.T) {
-	parent := &subscription{}
+	parent := &subscriber{}
 
 	child1 := parent.Add(parent.Unsubscribe)
 	child2 := parent.Add(parent.Unsubscribe)

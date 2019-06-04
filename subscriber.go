@@ -1,34 +1,9 @@
-// Package subscriber provides a subscription tree implementation.
-//
-// The New function creates a subscription and returns a Subscriber interface.
-// It allows a publisher and subscribing client to communicate about a
-// subscription. The publisher can see whether the client is still subscribed
-// by polling the Closed method. The client can control the subscription
-// by either calling Unsubscribe itself or when it has defered subscription
-// management to other code call Wait to wait for other code to cancel the
-// subscription.
-//
-// Once the client has called Unsubscribe on the subscription, that subscription
-// will then call Unsubscribe on all of its children created through the Add
-// method. After that it will become lifeless, meaning no events will ever be
-// triggered by it anymore.
-//
-// In case the publisher decides it wants to stop publishing, it MUST NEVER
-// call Unsubscribe itself on a subscriber, but should indicate the desire
-// through other (out-of-band) means to the subscribing client who must then
-// call Unsubscribe itself.
-//
-// The client that receives a Subcriber interface can call Wait to wait for
-// the subscription to be canceled. That may be done by the code that e.g.
-// created the subscription in responese to some external event.
-//
-// The client can also keep a reference to the subscription and call
-// Unsubscribe itself to indicate to the publisher it is no longer interested
-// in receiving data associated with the subscription.
-//
-// The implementation is designed to be used from concurrently running
-// goroutines. It uses WaitGroups, Mutexes and atomic reference counting.
 package subscriber
+
+import (
+	"sync"
+	"sync/atomic"
+)
 
 // Subscription is an interface that allows code to monitor and control a
 // subscription it received.
@@ -93,5 +68,92 @@ type Subscriber interface {
 
 // New will create and return a new Subscriber.
 func New() Subscriber {
-	return &subscription{}
+	return &subscriber{}
+}
+
+const (
+	subscribed = iota
+	unsubscribed
+)
+
+type subscriber struct {
+	state int32
+
+	sync.Mutex
+	callbacks []func()
+	onWait    func()
+}
+
+func (s *subscriber) Unsubscribe() {
+	if atomic.CompareAndSwapInt32(&s.state, subscribed, unsubscribed) {
+		s.Lock()
+		for _, cb := range s.callbacks {
+			cb()
+		}
+		s.callbacks = nil
+		s.Unlock()
+	}
+}
+
+func (s *subscriber) Closed() bool {
+	return atomic.LoadInt32(&s.state) != subscribed
+}
+
+func (s *subscriber) Canceled() bool {
+	return atomic.LoadInt32(&s.state) != subscribed
+}
+
+func (s *subscriber) Wait() {
+	s.Lock()
+	wait := s.onWait
+	s.Unlock()
+	if wait != nil {
+		wait()
+	} else {
+		var wg sync.WaitGroup
+		wg.Add(1)
+		s.Add(wg.Done)
+		wg.Wait()		
+	}
+}
+
+func (s *subscriber) Add(callback func()) Subscriber {
+	child := &subscriber{callbacks: []func(){callback}}
+	s.Lock()
+	if atomic.LoadInt32(&s.state) != subscribed {
+		child.Unsubscribe()
+	} else {
+		s.callbacks = append(s.callbacks, child.Unsubscribe)
+	}
+	s.Unlock()
+	return child
+}
+
+func (s *subscriber) AddChild() Subscriber {
+	child := &subscriber{}
+	s.Lock()
+	if atomic.LoadInt32(&s.state) != subscribed {
+		child.Unsubscribe()
+	} else {
+		s.callbacks = append(s.callbacks, child.Unsubscribe)
+	}
+	s.Unlock()
+	return child
+}
+
+func (s *subscriber) OnUnsubscribe(callback func()) {
+	if callback == nil {
+		return
+	}
+	s.Lock()
+	if atomic.LoadInt32(&s.state) == subscribed {
+		s.callbacks = append(s.callbacks, callback)
+	}
+	s.Unlock()
+}
+
+func (s *subscriber) OnWait(callback func()) {
+	s.Lock()
+	s.onWait = callback
+	s.Unlock()
 }
