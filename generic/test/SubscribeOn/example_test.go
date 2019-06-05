@@ -7,7 +7,7 @@ import (
 // SubscribeOn can be used to change the scheduler the Subcribe method uses to
 // subscribe to the source observable.
 func Example_goroutine() {
-	scheduler := NewGoroutine()
+	scheduler := NewGoroutineScheduler()
 	source := FromInts(1, 2, 3, 4, 5).SubscribeOn(scheduler)
 
 	observe := func(next int, err error, done bool) {

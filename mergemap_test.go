@@ -1,7 +1,7 @@
 package rx
 
 func ExampleObservable_MergeMap() {
-	scheduler := NewGoroutine()
+	scheduler := NewGoroutineScheduler()
 
 	if err := From(1, 2).MergeMap(func(n any) Observable {
 		return Range(n.(int), 2).AsObservable()

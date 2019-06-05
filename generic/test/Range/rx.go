@@ -5,7 +5,9 @@
 package Range
 
 import (
-	"github.com/reactivego/rx/schedulers"
+	"fmt"
+
+	"github.com/reactivego/scheduler"
 	"github.com/reactivego/subscriber"
 )
 
@@ -114,9 +116,9 @@ type Subscriber subscriber.Subscriber
 
 //jig:name NewScheduler
 
-func NewGoroutine() Scheduler	{ return &schedulers.Goroutine{} }
+func NewGoroutineScheduler() Scheduler	{ return &scheduler.Goroutine{} }
 
-func NewTrampoline() Scheduler	{ return &schedulers.Trampoline{} }
+func NewTrampolineScheduler() Scheduler	{ return &scheduler.Trampoline{} }
 
 //jig:name SubscribeOptions
 
@@ -185,7 +187,7 @@ func NewSubscribeOptions(setter SubscribeOptionSetter) *SubscribeOptions {
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscriber.
 func (o ObservableInt) Subscribe(observe IntObserveFunc, setters ...SubscribeOptionSetter) Subscriber {
-	scheduler := NewTrampoline()
+	scheduler := NewTrampolineScheduler()
 	setter := SubscribeOn(scheduler, setters...)
 	options := NewSubscribeOptions(setter)
 	subscriber := options.NewSubscriber()
@@ -210,7 +212,7 @@ func (o ObservableInt) Subscribe(observe IntObserveFunc, setters ...SubscribeOpt
 // The Goroutine scheduler works in more situations for complex chains of
 // observables, like when merging the output of multiple observables.
 func (o ObservableInt) ToSlice(setters ...SubscribeOptionSetter) (a []int, e error) {
-	scheduler := NewGoroutine()
+	scheduler := NewGoroutineScheduler()
 	o.Subscribe(func(next int, err error, done bool) {
 		if !done {
 			a = append(a, next)
@@ -219,4 +221,53 @@ func (o ObservableInt) ToSlice(setters ...SubscribeOptionSetter) (a []int, e err
 		}
 	}, SubscribeOn(scheduler, setters...)).Wait()
 	return a, e
+}
+
+//jig:name ObservableIntFilter
+
+// Filter emits only those items from an ObservableInt that pass a predicate test.
+func (o ObservableInt) Filter(predicate func(next int) bool) ObservableInt {
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			if done || predicate(next) {
+				observe(next, err, done)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableIntMapInt
+
+// MapInt transforms the items emitted by an ObservableInt by applying a
+// function to each item.
+func (o ObservableInt) MapInt(project func(int) int) ObservableInt {
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			var mapped int
+			if !done {
+				mapped = project(next)
+			}
+			observe(mapped, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableIntPrintln
+
+// Println subscribes to the Observable and prints every item to os.Stdout while
+// it waits for completion or error. Returns either the error or nil when the
+// Observable completed normally.
+func (o ObservableInt) Println(setters ...SubscribeOptionSetter) (e error) {
+	o.Subscribe(func(next int, err error, done bool) {
+		if !done {
+			fmt.Println(next)
+		} else {
+			e = err
+		}
+	}, setters...).Wait()
+	return e
 }

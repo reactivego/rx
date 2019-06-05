@@ -3,13 +3,13 @@ package ObserveOn
 import (
 	"fmt"
 
-	"github.com/reactivego/rx/schedulers"
+	"github.com/reactivego/scheduler"
 )
 
 func Example_observeOn() {
 	// Simple custom task scheduler
 	var tasks []func()
-	taskScheduler := schedulers.ScheduleFunc(func(task func()) {
+	taskScheduler := scheduler.ScheduleFunc(func(task func()) {
 		tasks = append(tasks, task)
 	})
 

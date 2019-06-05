@@ -12,7 +12,7 @@ func Example_publish() {
 	pub := source.Publish()
 
 	// scheduler will run a task asynchronously on a new goroutine.
-	scheduler := NewGoroutine()
+	scheduler := NewGoroutineScheduler()
 
 	// First subscriber (asynchronous)
 	sub1 := pub.SubscribeOn(scheduler).

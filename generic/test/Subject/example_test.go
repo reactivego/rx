@@ -13,7 +13,7 @@ func Example_subject() {
 
 	subscription := subject.SubscribeNext(func(next int) {
 		fmt.Println(next)
-	}, SubscribeOn(NewGoroutine()))
+	}, SubscribeOn(NewGoroutineScheduler()))
 
 	subject.Next(123)
 	subject.Next(456)
@@ -45,7 +45,7 @@ func Example_subjectError() {
 // Subject has an observable side that provides multicasting. This means that
 // two subscribers will receive the same data at approximately the same time.
 func Example_subjectMultiple() {
-	scheduler := NewGoroutine()
+	scheduler := NewGoroutineScheduler()
 	subject := NewSubjectInt()
 
 	var messages struct {

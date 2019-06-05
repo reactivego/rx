@@ -8,7 +8,7 @@ import (
 )
 
 func TestSwitchAllGoroutine(t *testing.T) {
-	scheduler := NewGoroutine()
+	scheduler := NewGoroutineScheduler()
 	items,err := Interval(42 * time.Millisecond).
 		Take(4).
 		MapObservableInt(func(i int) ObservableInt {
@@ -23,7 +23,7 @@ func TestSwitchAllGoroutine(t *testing.T) {
 }
 
 func TestSwitchAllTrampoline(t *testing.T) {
-	scheduler := NewTrampoline()
+	scheduler := NewTrampolineScheduler()
 	items, err := Interval(42 * time.Millisecond).
 		Take(4).
 		MapObservableInt(func(i int) ObservableInt {

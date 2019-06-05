@@ -80,7 +80,7 @@ func NewSubscribeOptions(setter SubscribeOptionSetter) *SubscribeOptions {
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscriber.
 func (o ObservableFoo) Subscribe(observe FooObserveFunc, setters ...SubscribeOptionSetter) Subscriber {
-	scheduler := NewTrampoline()
+	scheduler := NewTrampolineScheduler()
 	setter := SubscribeOn(scheduler, setters...)
 	options := NewSubscribeOptions(setter)
 	subscriber := options.NewSubscriber()
@@ -144,7 +144,7 @@ func (o ObservableFoo) Println(setters ...SubscribeOptionSetter) (e error) {
 // parameter to ToChan. On suscription the callback will be called with the
 // subscription that was created.
 func (o Observable) ToChan(setters ...SubscribeOptionSetter) <-chan interface{} {
-	scheduler := NewGoroutine()
+	scheduler := NewGoroutineScheduler()
 	nextch := make(chan interface{}, 1)
 	o.Subscribe(func(next interface{}, err error, done bool) {
 		if !done {
@@ -174,7 +174,7 @@ func (o Observable) ToChan(setters ...SubscribeOptionSetter) <-chan interface{} 
 // synchronous. That's why the subscribing is done on the Goroutine scheduler.
 // It is not possible to cancel the subscription created internally by ToChan.
 func (o ObservableFoo) ToChan(setters ...SubscribeOptionSetter) <-chan foo {
-	scheduler := NewGoroutine()
+	scheduler := NewGoroutineScheduler()
 	nextch := make(chan foo, 1)
 	o.Subscribe(func(next foo, err error, done bool) {
 		if !done {
@@ -196,7 +196,7 @@ func (o ObservableFoo) ToChan(setters ...SubscribeOptionSetter) <-chan foo {
 // The Goroutine scheduler works in more situations for complex chains of
 // observables, like when merging the output of multiple observables.
 func (o ObservableFoo) ToSingle(setters ...SubscribeOptionSetter) (v foo, e error) {
-	scheduler := NewGoroutine()
+	scheduler := NewGoroutineScheduler()
 	o.Single().Subscribe(func(next foo, err error, done bool) {
 		if !done {
 			v = next
@@ -217,7 +217,7 @@ func (o ObservableFoo) ToSingle(setters ...SubscribeOptionSetter) (v foo, e erro
 // The Goroutine scheduler works in more situations for complex chains of
 // observables, like when merging the output of multiple observables.
 func (o ObservableFoo) ToSlice(setters ...SubscribeOptionSetter) (a []foo, e error) {
-	scheduler := NewGoroutine()
+	scheduler := NewGoroutineScheduler()
 	o.Subscribe(func(next foo, err error, done bool) {
 		if !done {
 			a = append(a, next)

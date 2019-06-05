@@ -5,7 +5,7 @@
 package AsObservable
 
 import (
-	"github.com/reactivego/rx/schedulers"
+	"github.com/reactivego/scheduler"
 	"github.com/reactivego/subscriber"
 )
 
@@ -299,9 +299,9 @@ func (o Observable) AsObservableFloat64() ObservableFloat64 {
 
 //jig:name NewScheduler
 
-func NewGoroutine() Scheduler	{ return &schedulers.Goroutine{} }
+func NewGoroutineScheduler() Scheduler	{ return &scheduler.Goroutine{} }
 
-func NewTrampoline() Scheduler	{ return &schedulers.Trampoline{} }
+func NewTrampolineScheduler() Scheduler	{ return &scheduler.Trampoline{} }
 
 //jig:name SubscribeOptions
 
@@ -370,7 +370,7 @@ func NewSubscribeOptions(setter SubscribeOptionSetter) *SubscribeOptions {
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscriber.
 func (o Observable) Subscribe(observe ObserveFunc, setters ...SubscribeOptionSetter) Subscriber {
-	scheduler := NewTrampoline()
+	scheduler := NewTrampolineScheduler()
 	setter := SubscribeOn(scheduler, setters...)
 	options := NewSubscribeOptions(setter)
 	subscriber := options.NewSubscriber()
@@ -403,7 +403,7 @@ func (o Observable) SubscribeNext(f func(next interface{}), setters ...Subscribe
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscriber.
 func (o ObservableFloat64) Subscribe(observe Float64ObserveFunc, setters ...SubscribeOptionSetter) Subscriber {
-	scheduler := NewTrampoline()
+	scheduler := NewTrampolineScheduler()
 	setter := SubscribeOn(scheduler, setters...)
 	options := NewSubscribeOptions(setter)
 	subscriber := options.NewSubscriber()

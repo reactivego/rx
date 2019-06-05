@@ -19,7 +19,7 @@ func TestDoOnCompleteSubscribeNext(t *testing.T) {
 	result := []int{}
 	_ = FromInts(1, 2, 3, 4, 5).
 		DoOnComplete(func() { close(wait) }).
-		SubscribeNext(func(v int) { result = append(result, v) }, SubscribeOn(NewGoroutine()))
+		SubscribeNext(func(v int) { result = append(result, v) }, SubscribeOn(NewGoroutineScheduler()))
 	<-wait
 	assert.Equal(t, []int{1, 2, 3, 4, 5}, result)
 }

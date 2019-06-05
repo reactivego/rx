@@ -1,7 +1,7 @@
 package rx
 
 import (
-	"github.com/reactivego/rx/schedulers"
+	"github.com/reactivego/scheduler"
 )
 
 //jig:template Scheduler
@@ -13,8 +13,8 @@ type Scheduler interface {
 
 //jig:template NewScheduler
 
-func NewGoroutine() Scheduler  { return &schedulers.Goroutine{} }
-func NewTrampoline() Scheduler { return &schedulers.Trampoline{} }
+func NewGoroutineScheduler() Scheduler  { return &scheduler.Goroutine{} }
+func NewTrampolineScheduler() Scheduler { return &scheduler.Trampoline{} }
 
 //jig:template Observable<Foo> ObserveOn
 //jig:needs NewScheduler

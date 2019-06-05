@@ -18,7 +18,7 @@ func Example_interval() {
 	}
 
 	// Subscribe asynchronously and print ms since start
-	sub := interval.SubscribeNext(printSinceStart, SubscribeOn(NewGoroutine()))
+	sub := interval.SubscribeNext(printSinceStart, SubscribeOn(NewGoroutineScheduler()))
 
 	time.Sleep(100 * time.Millisecond)
 	sub.Unsubscribe()

@@ -18,7 +18,7 @@ func Example_introToRx() {
 	observable = observable.Publish().RefCount()
 
 	// Make all subscriptions to observable asynchronous
-	observable = observable.SubscribeOn(NewGoroutine())
+	observable = observable.SubscribeOn(NewGoroutineScheduler())
 
 	fmt.Println(">> Subscribing")
 	subscription := observable.SubscribeNext(func(next int) { fmt.Printf("subscription : %d\n", next) })
@@ -48,7 +48,7 @@ func Example_introToRx() {
 func Example_refCountMultipleSubscriptions() {
 	var wg sync.WaitGroup
 	channel := make(chan int, 30)
-	source := FromChanInt(channel).Publish().RefCount().SubscribeOn(NewGoroutine())
+	source := FromChanInt(channel).Publish().RefCount().SubscribeOn(NewGoroutineScheduler())
 
 	sub1 := source.SubscribeNext(func(n int) {
 		fmt.Println(n)

@@ -47,7 +47,7 @@ func Example_replaySubjectMultiple() {
 	subject := NewReplaySubjectString(1000, time.Hour)
 
 	// Subscribe to subject on a goroutine
-	source := subject.SubscribeOn(NewGoroutine())
+	source := subject.SubscribeOn(NewGoroutineScheduler())
 
 	var results []*[]string
 	var subscriptions []Subscription

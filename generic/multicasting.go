@@ -75,7 +75,7 @@ func (o ObservableFoo) Multicast(factory func() SubjectFoo) ConnectableFoo {
 			subject.Store(factory())
 		}
 		if atomic.CompareAndSwapInt32(&subscriber.state, unsubscribed, subscribed) {
-			scheduler := NewGoroutine()
+			scheduler := NewGoroutineScheduler()
 			setter := SubscribeOn(scheduler, setters...)
 			subscription := o.Subscribe(observer, setter)
 			subscriber.Store(subscription)

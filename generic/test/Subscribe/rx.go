@@ -5,7 +5,7 @@
 package Subscribe
 
 import (
-	"github.com/reactivego/rx/schedulers"
+	"github.com/reactivego/scheduler"
 	"github.com/reactivego/subscriber"
 )
 
@@ -98,9 +98,9 @@ type Subscriber subscriber.Subscriber
 
 //jig:name NewScheduler
 
-func NewGoroutine() Scheduler	{ return &schedulers.Goroutine{} }
+func NewGoroutineScheduler() Scheduler	{ return &scheduler.Goroutine{} }
 
-func NewTrampoline() Scheduler	{ return &schedulers.Trampoline{} }
+func NewTrampolineScheduler() Scheduler	{ return &scheduler.Trampoline{} }
 
 //jig:name SubscribeOptions
 
@@ -169,7 +169,7 @@ func NewSubscribeOptions(setter SubscribeOptionSetter) *SubscribeOptions {
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscriber.
 func (o ObservableInt) Subscribe(observe IntObserveFunc, setters ...SubscribeOptionSetter) Subscriber {
-	scheduler := NewTrampoline()
+	scheduler := NewTrampolineScheduler()
 	setter := SubscribeOn(scheduler, setters...)
 	options := NewSubscribeOptions(setter)
 	subscriber := options.NewSubscriber()

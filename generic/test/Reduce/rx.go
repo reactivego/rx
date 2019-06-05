@@ -5,7 +5,7 @@
 package Reduce
 
 import (
-	"github.com/reactivego/rx/schedulers"
+	"github.com/reactivego/scheduler"
 	"github.com/reactivego/subscriber"
 )
 
@@ -245,9 +245,9 @@ type Observable func(ObserveFunc, Scheduler, Subscriber)
 
 //jig:name NewScheduler
 
-func NewGoroutine() Scheduler	{ return &schedulers.Goroutine{} }
+func NewGoroutineScheduler() Scheduler	{ return &scheduler.Goroutine{} }
 
-func NewTrampoline() Scheduler	{ return &schedulers.Trampoline{} }
+func NewTrampolineScheduler() Scheduler	{ return &scheduler.Trampoline{} }
 
 //jig:name SubscribeOptions
 
@@ -316,7 +316,7 @@ func NewSubscribeOptions(setter SubscribeOptionSetter) *SubscribeOptions {
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscriber.
 func (o Observable) Subscribe(observe ObserveFunc, setters ...SubscribeOptionSetter) Subscriber {
-	scheduler := NewTrampoline()
+	scheduler := NewTrampolineScheduler()
 	setter := SubscribeOn(scheduler, setters...)
 	options := NewSubscribeOptions(setter)
 	subscriber := options.NewSubscriber()
@@ -349,7 +349,7 @@ func (o Observable) SubscribeNext(f func(next interface{}), setters ...Subscribe
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscriber.
 func (o ObservableFloat32) Subscribe(observe Float32ObserveFunc, setters ...SubscribeOptionSetter) Subscriber {
-	scheduler := NewTrampoline()
+	scheduler := NewTrampolineScheduler()
 	setter := SubscribeOn(scheduler, setters...)
 	options := NewSubscribeOptions(setter)
 	subscriber := options.NewSubscriber()
@@ -386,7 +386,7 @@ func (o ObservableFloat32) SubscribeNext(f func(next float32), setters ...Subscr
 // The Goroutine scheduler works in more situations for complex chains of
 // observables, like when merging the output of multiple observables.
 func (o ObservableFloat32) ToSingle(setters ...SubscribeOptionSetter) (v float32, e error) {
-	scheduler := NewGoroutine()
+	scheduler := NewGoroutineScheduler()
 	o.Single().Subscribe(func(next float32, err error, done bool) {
 		if !done {
 			v = next

@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/reactivego/rx/schedulers"
+	"github.com/reactivego/scheduler"
 	"github.com/reactivego/subscriber"
 )
 
@@ -202,22 +202,6 @@ func Range(start, count int) ObservableInt {
 	})
 }
 
-//jig:name Interval
-
-// Interval creates an ObservableInt that emits a sequence of integers spaced
-// by a particular time interval.
-func Interval(interval time.Duration) ObservableInt {
-	return CreateInt(func(observer IntObserver) {
-		for i := 0; ; i++ {
-			time.Sleep(interval)
-			if observer.Closed() {
-				return
-			}
-			observer.Next(i)
-		}
-	})
-}
-
 //jig:name FromChan
 
 // FromChan creates an Observable from a Go channel of interface{}
@@ -245,6 +229,22 @@ func FromChan(ch <-chan interface{}) Observable {
 	})
 }
 
+//jig:name Interval
+
+// Interval creates an ObservableInt that emits a sequence of integers spaced
+// by a particular time interval.
+func Interval(interval time.Duration) ObservableInt {
+	return CreateInt(func(observer IntObserver) {
+		for i := 0; ; i++ {
+			time.Sleep(interval)
+			if observer.Closed() {
+				return
+			}
+			observer.Next(i)
+		}
+	})
+}
+
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
@@ -257,11 +257,33 @@ type Scheduler interface {
 // Subscriber is an alias for the subscriber.Subscriber interface type.
 type Subscriber subscriber.Subscriber
 
+//jig:name ObservableMergeMap
+
+// MergeMap transforms the items emitted by an Observable by applying a
+// function to each item an returning an Observable. The stream of Observable
+// items is then merged into a single stream of  items using the MergeAll operator.
+func (o Observable) MergeMap(project func(interface{}) Observable) Observable {
+	return o.MapObservable(project).MergeAll()
+}
+
+//jig:name ObservableIntAsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name NewScheduler
 
-func NewGoroutine() Scheduler	{ return &schedulers.Goroutine{} }
+func NewGoroutineScheduler() Scheduler	{ return &scheduler.Goroutine{} }
 
-func NewTrampoline() Scheduler	{ return &schedulers.Trampoline{} }
+func NewTrampolineScheduler() Scheduler	{ return &scheduler.Trampoline{} }
 
 //jig:name SubscribeOptions
 
@@ -330,7 +352,7 @@ func NewSubscribeOptions(setter SubscribeOptionSetter) *SubscribeOptions {
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscriber.
 func (o Observable) Subscribe(observe ObserveFunc, setters ...SubscribeOptionSetter) Subscriber {
-	scheduler := NewTrampoline()
+	scheduler := NewTrampolineScheduler()
 	setter := SubscribeOn(scheduler, setters...)
 	options := NewSubscribeOptions(setter)
 	subscriber := options.NewSubscriber()
@@ -371,22 +393,6 @@ func (o Observable) Filter(predicate func(next interface{}) bool) Observable {
 			if done || predicate(next) {
 				observe(next, err, done)
 			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableDo
-
-// Do calls a function for each next value passing through the observable.
-func (o Observable) Do(f func(next interface{})) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				f(next)
-			}
-			observe(next, err, done)
 		}
 		o(observer, subscribeOn, subscriber)
 	}
@@ -474,28 +480,6 @@ func (o Observable) Scan(accumulator func(interface{}, interface{}) interface{},
 	return observable
 }
 
-//jig:name ObservableMergeMap
-
-// MergeMap transforms the items emitted by an Observable by applying a
-// function to each item an returning an Observable. The stream of Observable
-// items is then merged into a single stream of  items using the MergeAll operator.
-func (o Observable) MergeMap(project func(interface{}) Observable) Observable {
-	return o.MapObservable(project).MergeAll()
-}
-
-//jig:name ObservableIntAsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name ObservableMap
 
 // Map transforms the items emitted by an Observable by applying a
@@ -508,6 +492,22 @@ func (o Observable) Map(project func(interface{}) interface{}) Observable {
 				mapped = project(next)
 			}
 			observe(mapped, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableDo
+
+// Do calls a function for each next value passing through the observable.
+func (o Observable) Do(f func(next interface{})) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				f(next)
+			}
+			observe(next, err, done)
 		}
 		o(observer, subscribeOn, subscriber)
 	}
@@ -532,22 +532,29 @@ func (o ObservableInt) MapObservable(project func(int) Observable) ObservableObs
 	return observable
 }
 
-//jig:name ObservableMapObservable
+//jig:name ObservableWait
 
-// MapObservable transforms the items emitted by an Observable by applying a
-// function to each item.
-func (o Observable) MapObservable(project func(interface{}) Observable) ObservableObservable {
-	observable := func(observe ObservableObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			var mapped Observable
-			if !done {
-				mapped = project(next)
-			}
-			observe(mapped, err, done)
+// Wait subscribes to the Observable and waits for completion or error.
+// Returns either the error or nil when the Observable completed normally.
+func (o Observable) Wait(setters ...SubscribeOptionSetter) (e error) {
+	o.Subscribe(func(next interface{}, err error, done bool) {
+		if done {
+			e = err
 		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
+	}, setters...).Wait()
+	return e
+}
+
+//jig:name ObservableSubscribeNext
+
+// SubscribeNext operates upon the emissions from an Observable only.
+// This method returns a Subscription.
+func (o Observable) SubscribeNext(f func(next interface{}), setters ...SubscribeOptionSetter) Subscription {
+	return o.Subscribe(func(next interface{}, err error, done bool) {
+		if !done {
+			f(next)
+		}
+	}, setters...)
 }
 
 //jig:name RxError
@@ -584,29 +591,22 @@ func (o Observable) AsObservableInt() ObservableInt {
 	return observable
 }
 
-//jig:name ObservableWait
+//jig:name ObservableMapObservable
 
-// Wait subscribes to the Observable and waits for completion or error.
-// Returns either the error or nil when the Observable completed normally.
-func (o Observable) Wait(setters ...SubscribeOptionSetter) (e error) {
-	o.Subscribe(func(next interface{}, err error, done bool) {
-		if done {
-			e = err
+// MapObservable transforms the items emitted by an Observable by applying a
+// function to each item.
+func (o Observable) MapObservable(project func(interface{}) Observable) ObservableObservable {
+	observable := func(observe ObservableObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			var mapped Observable
+			if !done {
+				mapped = project(next)
+			}
+			observe(mapped, err, done)
 		}
-	}, setters...).Wait()
-	return e
-}
-
-//jig:name ObservableSubscribeNext
-
-// SubscribeNext operates upon the emissions from an Observable only.
-// This method returns a Subscription.
-func (o Observable) SubscribeNext(f func(next interface{}), setters ...SubscribeOptionSetter) Subscription {
-	return o.Subscribe(func(next interface{}, err error, done bool) {
-		if !done {
-			f(next)
-		}
-	}, setters...)
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
 }
 
 //jig:name ObservableObserveFunc
@@ -643,6 +643,39 @@ func (f ObservableObserveFunc) Complete() {
 // ObservableObservable is essentially a subscribe function taking an observe
 // function, scheduler and an subscriber.
 type ObservableObservable func(ObservableObserveFunc, Scheduler, Subscriber)
+
+//jig:name ObservableObservableMergeAll
+
+// MergeAll flattens a higher order observable by merging the observables it emits.
+func (o ObservableObservable) MergeAll() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		var (
+			mutex	sync.Mutex
+			count	int32	= 1
+		)
+		observer := func(next interface{}, err error, done bool) {
+			mutex.Lock()
+			defer mutex.Unlock()
+			if !done || err != nil {
+				observe(next, err, done)
+			} else {
+				if atomic.AddInt32(&count, -1) == 0 {
+					observe(zero, nil, true)
+				}
+			}
+		}
+		merger := func(next Observable, err error, done bool) {
+			if !done {
+				atomic.AddInt32(&count, 1)
+				next(observer, subscribeOn, subscriber)
+			} else {
+				observer(zero, err, true)
+			}
+		}
+		o(merger, subscribeOn, subscriber)
+	}
+	return observable
+}
 
 //jig:name LinkEnums
 
@@ -823,39 +856,6 @@ func (o ObservableObservable) SwitchAll() Observable {
 			}
 		}
 		o(switcher, subscribeOn, switcherSubscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableObservableMergeAll
-
-// MergeAll flattens a higher order observable by merging the observables it emits.
-func (o ObservableObservable) MergeAll() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		var (
-			mutex	sync.Mutex
-			count	int32	= 1
-		)
-		observer := func(next interface{}, err error, done bool) {
-			mutex.Lock()
-			defer mutex.Unlock()
-			if !done || err != nil {
-				observe(next, err, done)
-			} else {
-				if atomic.AddInt32(&count, -1) == 0 {
-					observe(zero, nil, true)
-				}
-			}
-		}
-		merger := func(next Observable, err error, done bool) {
-			if !done {
-				atomic.AddInt32(&count, 1)
-				next(observer, subscribeOn, subscriber)
-			} else {
-				observer(zero, err, true)
-			}
-		}
-		o(merger, subscribeOn, subscriber)
 	}
 	return observable
 }
