@@ -151,6 +151,16 @@ func (o ObservableInt) Concat(other ...ObservableInt) ObservableInt {
 	return observable
 }
 
+//jig:name ConcatInt
+
+// ConcatInt emits the emissions from two or more ObservableInts without interleaving them.
+func ConcatInt(observables ...ObservableInt) ObservableInt {
+	if len(observables) == 0 {
+		return EmptyInt()
+	}
+	return observables[0].Concat(observables[1:]...)
+}
+
 //jig:name NewScheduler
 
 func NewGoroutineScheduler() Scheduler	{ return &scheduler.Goroutine{} }
@@ -262,6 +272,15 @@ func (o ObservableInt) ToSlice(options ...SubscribeOption) (a []int, e error) {
 		}
 	}, SubscribeOn(scheduler, options...)).Wait()
 	return a, e
+}
+
+//jig:name EmptyInt
+
+// EmptyInt creates an Observable that emits no items but terminates normally.
+func EmptyInt() ObservableInt {
+	return CreateInt(func(observer IntObserver) {
+		observer.Complete()
+	})
 }
 
 //jig:name ObservableIntSubscribeNext

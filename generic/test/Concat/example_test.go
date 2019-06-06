@@ -9,7 +9,7 @@ func Example_concat() {
 	ob := FromInts(4, 5)
 	oc := FromInts(6)
 	od := FromInts(7, 8, 9)
-	oa.Concat(ob, oc).Concat(od).SubscribeNext(func(next int) {
+	ConcatInt(oa, ob, oc).Concat(od).SubscribeNext(func(next int) {
 		fmt.Printf("%d,", next)
 	})
 
