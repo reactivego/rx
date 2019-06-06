@@ -30,7 +30,7 @@ func (f FooObserveFunc) Complete() {
 }
 
 //jig:template Observable<Foo>
-//jig:needs <Foo>ObserveFunc
+//jig:needs Scheduler, Subscriber, <Foo>ObserveFunc
 
 // ObservableFoo is essentially a subscribe function taking an observe
 // function, scheduler and an subscriber.

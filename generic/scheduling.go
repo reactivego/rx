@@ -12,12 +12,12 @@ type Scheduler interface {
 }
 
 //jig:template NewScheduler
+//jig:needs Scheduler
 
 func NewGoroutineScheduler() Scheduler  { return &scheduler.Goroutine{} }
 func NewTrampolineScheduler() Scheduler { return &scheduler.Trampoline{} }
 
 //jig:template Observable<Foo> ObserveOn
-//jig:needs NewScheduler
 
 // ObserveOn specifies the scheduler on which an observer will observe this
 // ObservableFoo.
@@ -34,7 +34,6 @@ func (o ObservableFoo) ObserveOn(observeOn Scheduler) ObservableFoo {
 }
 
 //jig:template Observable<Foo> SubscribeOn
-//jig:needs NewScheduler
 
 // SubscribeOn specifies the scheduler an ObservableFoo should use when it is
 // subscribed to.

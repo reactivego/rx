@@ -3,18 +3,20 @@ package rx
 import (
 	"sync/atomic"
 	"time"
+
+	"github.com/reactivego/subscriber"
 )
 
 //jig:template Connectable<Foo>
 //jig:embeds Observable<Foo>
-//jig:needs SubscribeOptions
+//jig:needs SubscribeOption
 
 // ConnectableFoo is an ObservableFoo that has an additional method Connect()
 // used to Subscribe to the parent observable and then multicasting values to
 // all subscribers of ConnectableFoo.
 type ConnectableFoo struct {
 	ObservableFoo
-	connect func(options []SubscribeOptionSetter) Subscription
+	connect func(options []SubscribeOption) Subscription
 }
 
 //jig:template Connectable<Foo> Connect
@@ -23,12 +25,12 @@ type ConnectableFoo struct {
 // Connect instructs a connectable Observable to begin emitting items to its
 // subscribers. All values will then be passed on to the observers that
 // subscribed to this connectable observable
-func (c ConnectableFoo) Connect(setters ...SubscribeOptionSetter) Subscription {
-	return c.connect(setters)
+func (c ConnectableFoo) Connect(options ...SubscribeOption) Subscription {
+	return c.connect(options)
 }
 
 //jig:template Observable<Foo> Multicast
-//jig:needs Observable<Foo> Subscribe, Connectable<Foo>
+//jig:needs Observable<Foo> Subscribe, Connectable<Foo>, NewScheduler
 
 // Multicast converts an ordinary Observable into a connectable Observable.
 // A connectable observable will only start emitting values after its Connect
@@ -40,25 +42,25 @@ func (o ObservableFoo) Multicast(factory func() SubjectFoo) ConnectableFoo {
 		notifying
 		terminated
 	)
-	var subject struct {
+	var subjectValue struct {
 		state int32
 		atomic.Value
 	}
-	subject.Store(factory())
+	subjectValue.Store(factory())
 	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		if s, ok := subject.Load().(SubjectFoo); ok {
+		if s, ok := subjectValue.Load().(SubjectFoo); ok {
 			s.ObservableFoo(observe, subscribeOn, subscriber)
 		}
 	}
 	observer := func(next foo, err error, done bool) {
-		if atomic.CompareAndSwapInt32(&subject.state, active, notifying) {
-			if s, ok := subject.Load().(SubjectFoo); ok {
+		if atomic.CompareAndSwapInt32(&subjectValue.state, active, notifying) {
+			if s, ok := subjectValue.Load().(SubjectFoo); ok {
 				s.FooObserveFunc(next, err, done)
 			}
 			if !done {
-				atomic.CompareAndSwapInt32(&subject.state, notifying, active)
+				atomic.CompareAndSwapInt32(&subjectValue.state, notifying, active)
 			} else {
-				atomic.CompareAndSwapInt32(&subject.state, notifying, terminated)
+				atomic.CompareAndSwapInt32(&subjectValue.state, notifying, terminated)
 			}
 		}
 	}
@@ -66,24 +68,24 @@ func (o ObservableFoo) Multicast(factory func() SubjectFoo) ConnectableFoo {
 		unsubscribed int32 = iota
 		subscribed
 	)
-	var subscriber struct {
+	var subscriberValue struct {
 		state int32
 		atomic.Value
 	}
-	connect := func(setters []SubscribeOptionSetter) Subscription {
-		if atomic.CompareAndSwapInt32(&subject.state, terminated, active) {
-			subject.Store(factory())
+	connect := func(options []SubscribeOption) Subscription {
+		if atomic.CompareAndSwapInt32(&subjectValue.state, terminated, active) {
+			subjectValue.Store(factory())
 		}
-		if atomic.CompareAndSwapInt32(&subscriber.state, unsubscribed, subscribed) {
+		if atomic.CompareAndSwapInt32(&subscriberValue.state, unsubscribed, subscribed) {
 			scheduler := NewGoroutineScheduler()
-			setter := SubscribeOn(scheduler, setters...)
-			subscription := o.Subscribe(observer, setter)
-			subscriber.Store(subscription)
-			subscription.Add(func() {
-				atomic.CompareAndSwapInt32(&subscriber.state, subscribed, unsubscribed)
+			subscriber := subscriber.New()
+			o.Subscribe(observer, SubscribeOn(scheduler, options...), WithSubscriber(subscriber))
+			subscriberValue.Store(subscriber)
+			subscriber.OnUnsubscribe(func() {
+				atomic.CompareAndSwapInt32(&subscriberValue.state, subscribed, unsubscribed)
 			})
 		}
-		subscription := subscriber.Load().(Subscriber)
+		subscription := subscriberValue.Load().(Subscriber)
 		return subscription.Add(func() { subscription.Unsubscribe() })
 	}
 	return ConnectableFoo{ObservableFoo: observable, connect: connect}
@@ -125,20 +127,20 @@ func (o ObservableFoo) PublishReplay(bufferCapacity int, windowDuration time.Dur
 }
 
 //jig:template Connectable<Foo> RefCount
-//jig:needs Observable<Foo>, SubscribeOptions
+//jig:needs Observable<Foo>, SubscribeOption
 
 // RefCount makes a ConnectableFoo behave like an ordinary ObservableFoo. On
 // first Subscribe it will call Connect on its ConnectableFoo and when its last
 // subscriber is Unsubscribed it will cancel the connection by calling
 // Unsubscribe on the subscription returned by the call to Connect.
-func (o ConnectableFoo) RefCount(setters ...SubscribeOptionSetter) ObservableFoo {
+func (o ConnectableFoo) RefCount(options ...SubscribeOption) ObservableFoo {
 	var (
 		refcount   int32
 		connection Subscription
 	)
 	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		if atomic.AddInt32(&refcount, 1) == 1 {
-			connection = o.connect(setters)
+			connection = o.connect(options)
 		}
 		subscriber.OnUnsubscribe(func() {
 			if atomic.AddInt32(&refcount, -1) == 0 {
@@ -151,21 +153,21 @@ func (o ConnectableFoo) RefCount(setters ...SubscribeOptionSetter) ObservableFoo
 }
 
 //jig:template Connectable<Foo> AutoConnect
-//jig:needs Observable<Foo>, SubscribeOptions
+//jig:needs Observable<Foo>, SubscribeOption
 
 // AutoConnect makes a ConnectableFoo behave like an ordinary ObservableFoo that
 // automatically connects when the specified number of clients subscribe to it.
 // If count is 0, then AutoConnect will immediately call connect on the
 // ConnectableFoo before returning the ObservableFoo part of the ConnectableFoo.
-func (o ConnectableFoo) AutoConnect(count int, setters ...SubscribeOptionSetter) ObservableFoo {
+func (o ConnectableFoo) AutoConnect(count int, options ...SubscribeOption) ObservableFoo {
 	if count == 0 {
-		o.connect(setters)
+		o.connect(options)
 		return o.ObservableFoo
 	}
 	var refcount int32
 	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		if atomic.AddInt32(&refcount, 1) == int32(count) {
-			o.connect(setters)
+			o.connect(options)
 		}
 		o.ObservableFoo(observe, subscribeOn, subscriber)
 	}
