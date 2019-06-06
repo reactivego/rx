@@ -2,6 +2,58 @@ package rx
 
 import "sync/atomic"
 
+//jig:template Observable All
+
+// All determines whether all items emitted by an Observable meet some
+// criteria.
+//
+// Pass a predicate function to the All operator that accepts an item emitted
+// by the source Observable and returns a boolean value based on an
+// evaluation of that item. All returns an ObservableBool that emits a single
+// boolean value: true if and only if the source Observable terminates
+// normally and every item emitted by the source Observable evaluated as
+// true according to this predicate; false if any item emitted by the source
+// Observable evaluates as false according to this predicate.
+func (o Observable) All(predicate func(next interface{}) bool) ObservableBool {
+	observable := func(observe BoolObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			switch {
+			case !done:
+				if !predicate(next) {
+					observe(false, nil, false)
+					observe(zeroBool, nil, true)
+				}
+			case err!=nil:
+				observe(zeroBool, err, true)
+			default:
+				observe(true, nil, false)
+				observe(zeroBool, nil, true)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:template Observable<Foo> All
+
+// All determines whether all items emitted by an ObservableFoo meet some
+// criteria.
+//
+// Pass a predicate function to the All operator that accepts an item emitted
+// by the source ObservableFoo and returns a boolean value based on an
+// evaluation of that item. All returns an ObservableBool that emits a single
+// boolean value: true if and only if the source ObservableFoo terminates
+// normally and every item emitted by the source ObservableFoo evaluated as
+// true according to this predicate; false if any item emitted by the source
+// ObservableFoo evaluates as false according to this predicate.
+func (o ObservableFoo) All(predicate func(next foo) bool) ObservableBool {
+	condition := func(next interface{}) bool {
+		return predicate(next.(foo))
+	}
+	return o.AsObservable().All(condition)
+}
+
 //jig:template Observable TakeWhile
 
 // TakeWhile mirrors items emitted by an Observable until a specified condition becomes false.
