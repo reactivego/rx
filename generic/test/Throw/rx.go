@@ -109,6 +109,12 @@ func ThrowInt(err error) ObservableInt {
 	})
 }
 
+//jig:name RxError
+
+type RxError string
+
+func (e RxError) Error() string	{ return string(e) }
+
 //jig:name NewScheduler
 
 func NewGoroutineScheduler() Scheduler	{ return &scheduler.Goroutine{} }
