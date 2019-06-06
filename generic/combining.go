@@ -55,7 +55,7 @@ func NewInitialFooLink() *FooLink {
 func NewFooLink(observe FooLinkObserveFunc, subscriber Subscriber) *FooLink {
 	return &FooLink{
 		observe:    observe,
-		subscriber: subscriber.Add(func() {}),
+		subscriber: subscriber.AddChild(),
 	}
 }
 
@@ -160,7 +160,7 @@ func (o ObservableObservableFoo) SwitchAll() ObservableFoo {
 		}
 		currentLink := NewInitialFooLink()
 		var switcherMutex sync.Mutex
-		switcherSubscriber := subscriber.Add(func() {})
+		switcherSubscriber := subscriber.AddChild()
 		switcher := func(next ObservableFoo, err error, done bool) {
 			switch {
 			case !done:
@@ -258,7 +258,7 @@ func (o ObservableObservableFoo) ConcatAll() ObservableFoo {
 				}
 			}
 		}
-		sourceSubscriber := subscriber.Add(func() { /*unsubscribed*/ })
+		sourceSubscriber := subscriber.AddChild()
 		concatenator := func(next ObservableFoo, err error, done bool) {
 			if !done {
 				mutex.Lock()

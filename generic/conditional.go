@@ -44,7 +44,7 @@ func (o ObservableFoo) TakeWhile(condition func(next foo) bool) ObservableFoo {
 func (o Observable) TakeUntil(other Observable) Observable {
 	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		var watcherNext int32
-		watcherSubscriber := subscriber.Add(func(){})
+		watcherSubscriber := subscriber.AddChild()
 		watcher := func (next interface{}, err error, done bool) {
 			if !done {
 				atomic.StoreInt32(&watcherNext, 1)

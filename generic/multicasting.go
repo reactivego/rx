@@ -140,11 +140,12 @@ func (o ConnectableFoo) RefCount(setters ...SubscribeOptionSetter) ObservableFoo
 		if atomic.AddInt32(&refcount, 1) == 1 {
 			connection = o.connect(setters)
 		}
-		o.ObservableFoo(observe, subscribeOn, subscriber.Add(func() {
+		subscriber.OnUnsubscribe(func() {
 			if atomic.AddInt32(&refcount, -1) == 0 {
 				connection.Unsubscribe()
 			}
-		}))
+		})
+		o.ObservableFoo(observe, subscribeOn, subscriber)
 	}
 	return observable
 }

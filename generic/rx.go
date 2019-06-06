@@ -383,7 +383,7 @@ func NewInitialBarLink() *BarLink {
 func NewBarLink(observe BarLinkObserveFunc, subscriber Subscriber) *BarLink {
 	return &BarLink{
 		observe:	observe,
-		subscriber:	subscriber.Add(func() {}),
+		subscriber:	subscriber.AddChild(),
 	}
 }
 
@@ -487,7 +487,7 @@ func (o ObservableObservableBar) SwitchAll() ObservableBar {
 		}
 		currentLink := NewInitialBarLink()
 		var switcherMutex sync.Mutex
-		switcherSubscriber := subscriber.Add(func() {})
+		switcherSubscriber := subscriber.AddChild()
 		switcher := func(next ObservableBar, err error, done bool) {
 			switch {
 			case !done:
