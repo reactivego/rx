@@ -12,6 +12,21 @@ import (
 	"github.com/reactivego/subscriber"
 )
 
+//jig:name Scheduler
+
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler interface {
+	Schedule(task func())
+}
+
+//jig:name Subscriber
+
+// Subscriber is an alias for the subscriber.Subscriber interface type.
+type Subscriber subscriber.Subscriber
+
+// Subscription is an alias for the subscriber.Subscription interface type.
+type Subscription subscriber.Subscription
+
 //jig:name IntObserveFunc
 
 // IntObserveFunc is the observer, a function that gets called whenever the
@@ -127,95 +142,87 @@ func FromInts(slice ...int) ObservableInt {
 	return FromSliceInt(slice)
 }
 
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
-}
-
-//jig:name Subscriber
-
-// Subscriber is an alias for the subscriber.Subscriber interface type.
-type Subscriber subscriber.Subscriber
-
 //jig:name NewScheduler
 
 func NewGoroutineScheduler() Scheduler	{ return &scheduler.Goroutine{} }
 
 func NewTrampolineScheduler() Scheduler	{ return &scheduler.Trampoline{} }
 
-//jig:name SubscribeOptions
+//jig:name SubscribeOption
 
-// Subscription is an alias for the subscriber.Subscription interface type.
-type Subscription subscriber.Subscription
+// SubscribeOption is an option that can be passed to the Subscribe method.
+type SubscribeOption func(options *subscribeOptions)
 
-// SubscribeOptions is a struct with options for Subscribe related methods.
-type SubscribeOptions struct {
-	// SubscribeOn is the scheduler to run the observable subscription on.
-	SubscribeOn	Scheduler
-	// OnSubscribe is called right after the subscription is created and before
-	// subscribing continues further.
-	OnSubscribe	func(subscription Subscription)
-	// OnUnsubscribe is called by the subscription to notify the client that the
-	// subscription has been canceled.
-	OnUnsubscribe	func()
+type subscribeOptions struct {
+	scheduler	Scheduler
+	subscriber	Subscriber
+	onSubscribe	func(subscription Subscription)
+	onUnsubscribe	func()
 }
 
-// NewSubscriber will return a newly created subscriber. Before returning the
-// subscription the OnSubscribe callback (if set) will already have been called.
-func (options SubscribeOptions) NewSubscriber() Subscriber {
-	subscriber := subscriber.New()
-	subscriber.OnUnsubscribe(options.OnUnsubscribe)
-	if options.OnSubscribe != nil {
-		options.OnSubscribe(subscriber)
-	}
-	return subscriber
-}
-
-// SubscribeOptionSetter is the type of a function for setting SubscribeOptions.
-type SubscribeOptionSetter func(options *SubscribeOptions)
-
-// SubscribeOn takes the scheduler to run the observable subscription on and
-// additional setters. It will first set the SubscribeOn option before
-// calling the other setters provided as a parameter.
-func SubscribeOn(subscribeOn Scheduler, setters ...SubscribeOptionSetter) SubscribeOptionSetter {
-	return func(options *SubscribeOptions) {
-		options.SubscribeOn = subscribeOn
-		for _, setter := range setters {
+// SubscribeOn returns an option that can be passed to the Subscribe method.
+// It takes the scheduler to subscribe the observable on. The tasks that
+// actually perform the observable functionality are scheduled on this
+// scheduler. The other options that can be passed here are applied after the
+// scheduler was set so any schedulers passed in via other will override
+// the scheduler passed here.
+func SubscribeOn(scheduler Scheduler, other ...SubscribeOption) SubscribeOption {
+	return func(options *subscribeOptions) {
+		options.scheduler = scheduler
+		for _, setter := range other {
 			setter(options)
 		}
 	}
 }
 
-// OnSubscribe takes a callback to be called on subscription.
-func OnSubscribe(callback func(Subscription)) SubscribeOptionSetter {
-	return func(options *SubscribeOptions) { options.OnSubscribe = callback }
+// WithSubscriber returns an option that can be passed to the Subscribe method.
+// The Subscribe method will use the subscriber passed here instead of creating
+// a new one.
+func WithSubscriber(subscriber Subscriber) SubscribeOption {
+	return func(options *subscribeOptions) {
+		options.subscriber = subscriber
+	}
 }
 
-// OnUnsubscribe takes a callback to be called on subscription cancelation.
-func OnUnsubscribe(callback func()) SubscribeOptionSetter {
-	return func(options *SubscribeOptions) { options.OnUnsubscribe = callback }
+// OnSubscribe returns an option that can be passed to the Subscribe method.
+// It takes a callback that is called from the Subscribe method just before
+// subscribing continues further.
+func OnSubscribe(callback func(Subscription)) SubscribeOption {
+	return func(options *subscribeOptions) { options.onSubscribe = callback }
 }
 
-// NewSubscribeOptions will create a new SubscribeOptions struct and then call
-// the setter on it to recursively set all the options. It then returns a
-// pointer to the created SubscribeOptions struct.
-func NewSubscribeOptions(setter SubscribeOptionSetter) *SubscribeOptions {
-	options := &SubscribeOptions{}
-	setter(options)
-	return options
+// OnUnsubscribe returns an option that can be passed to the Subscribe method.
+// It takes a callback that is called by the Subscribe method to notify the
+// client that the subscription has been canceled.
+func OnUnsubscribe(callback func()) SubscribeOption {
+	return func(options *subscribeOptions) { options.onUnsubscribe = callback }
+}
+
+// newSchedulerAndSubscriber will return either return the scheduler and subscriber
+// passed in through the SubscribeOn() and WithSubscriber() options or it will
+// return newly created scheduler and subscriber. Before returning the callback
+// passed in through OnSubscribe() will already have been called.
+func newSchedulerAndSubscriber(setters []SubscribeOption) (Scheduler, Subscriber) {
+	options := &subscribeOptions{scheduler: NewTrampolineScheduler()}
+	for _, setter := range setters {
+		setter(options)
+	}
+	if options.subscriber == nil {
+		options.subscriber = subscriber.New()
+	}
+	options.subscriber.OnUnsubscribe(options.onUnsubscribe)
+	if options.onSubscribe != nil {
+		options.onSubscribe(options.subscriber)
+	}
+	return options.scheduler, options.subscriber
 }
 
 //jig:name ObservableIntSubscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
-// This method returns a Subscriber.
-func (o ObservableInt) Subscribe(observe IntObserveFunc, setters ...SubscribeOptionSetter) Subscriber {
-	scheduler := NewTrampolineScheduler()
-	setter := SubscribeOn(scheduler, setters...)
-	options := NewSubscribeOptions(setter)
-	subscriber := options.NewSubscriber()
+// This method returns a Subscription.
+func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOption) Subscription {
+	scheduler, subscriber := newSchedulerAndSubscriber(options)
 	observer := func(next int, err error, done bool) {
 		if !done {
 			observe(next, err, done)
@@ -224,7 +231,7 @@ func (o ObservableInt) Subscribe(observe IntObserveFunc, setters ...SubscribeOpt
 			subscriber.Unsubscribe()
 		}
 	}
-	o(observer, options.SubscribeOn, subscriber)
+	o(observer, scheduler, subscriber)
 	return subscriber
 }
 
@@ -235,7 +242,7 @@ func (o ObservableInt) Subscribe(observe IntObserveFunc, setters ...SubscribeOpt
 // all subscribers of ConnectableInt.
 type ConnectableInt struct {
 	ObservableInt
-	connect	func(options []SubscribeOptionSetter) Subscription
+	connect	func(options []SubscribeOption) Subscription
 }
 
 //jig:name ObservableIntMulticast
@@ -250,25 +257,25 @@ func (o ObservableInt) Multicast(factory func() SubjectInt) ConnectableInt {
 		notifying
 		terminated
 	)
-	var subject struct {
+	var subjectValue struct {
 		state	int32
 		atomic.Value
 	}
-	subject.Store(factory())
+	subjectValue.Store(factory())
 	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		if s, ok := subject.Load().(SubjectInt); ok {
+		if s, ok := subjectValue.Load().(SubjectInt); ok {
 			s.ObservableInt(observe, subscribeOn, subscriber)
 		}
 	}
 	observer := func(next int, err error, done bool) {
-		if atomic.CompareAndSwapInt32(&subject.state, active, notifying) {
-			if s, ok := subject.Load().(SubjectInt); ok {
+		if atomic.CompareAndSwapInt32(&subjectValue.state, active, notifying) {
+			if s, ok := subjectValue.Load().(SubjectInt); ok {
 				s.IntObserveFunc(next, err, done)
 			}
 			if !done {
-				atomic.CompareAndSwapInt32(&subject.state, notifying, active)
+				atomic.CompareAndSwapInt32(&subjectValue.state, notifying, active)
 			} else {
-				atomic.CompareAndSwapInt32(&subject.state, notifying, terminated)
+				atomic.CompareAndSwapInt32(&subjectValue.state, notifying, terminated)
 			}
 		}
 	}
@@ -276,24 +283,24 @@ func (o ObservableInt) Multicast(factory func() SubjectInt) ConnectableInt {
 		unsubscribed	int32	= iota
 		subscribed
 	)
-	var subscriber struct {
+	var subscriberValue struct {
 		state	int32
 		atomic.Value
 	}
-	connect := func(setters []SubscribeOptionSetter) Subscription {
-		if atomic.CompareAndSwapInt32(&subject.state, terminated, active) {
-			subject.Store(factory())
+	connect := func(options []SubscribeOption) Subscription {
+		if atomic.CompareAndSwapInt32(&subjectValue.state, terminated, active) {
+			subjectValue.Store(factory())
 		}
-		if atomic.CompareAndSwapInt32(&subscriber.state, unsubscribed, subscribed) {
+		if atomic.CompareAndSwapInt32(&subscriberValue.state, unsubscribed, subscribed) {
 			scheduler := NewGoroutineScheduler()
-			setter := SubscribeOn(scheduler, setters...)
-			subscription := o.Subscribe(observer, setter)
-			subscriber.Store(subscription)
-			subscription.Add(func() {
-				atomic.CompareAndSwapInt32(&subscriber.state, subscribed, unsubscribed)
+			subscriber := subscriber.New()
+			o.Subscribe(observer, SubscribeOn(scheduler, options...), WithSubscriber(subscriber))
+			subscriberValue.Store(subscriber)
+			subscriber.OnUnsubscribe(func() {
+				atomic.CompareAndSwapInt32(&subscriberValue.state, subscribed, unsubscribed)
 			})
 		}
-		subscription := subscriber.Load().(Subscriber)
+		subscription := subscriberValue.Load().(Subscriber)
 		return subscription.Add(func() { subscription.Unsubscribe() })
 	}
 	return ConnectableInt{ObservableInt: observable, connect: connect}
@@ -397,20 +404,21 @@ func (o ObservableInt) Publish() ConnectableInt {
 // first Subscribe it will call Connect on its ConnectableInt and when its last
 // subscriber is Unsubscribed it will cancel the connection by calling
 // Unsubscribe on the subscription returned by the call to Connect.
-func (o ConnectableInt) RefCount(setters ...SubscribeOptionSetter) ObservableInt {
+func (o ConnectableInt) RefCount(options ...SubscribeOption) ObservableInt {
 	var (
 		refcount	int32
 		connection	Subscription
 	)
 	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		if atomic.AddInt32(&refcount, 1) == 1 {
-			connection = o.connect(setters)
+			connection = o.connect(options)
 		}
-		o.ObservableInt(observe, subscribeOn, subscriber.Add(func() {
+		subscriber.OnUnsubscribe(func() {
 			if atomic.AddInt32(&refcount, -1) == 0 {
 				connection.Unsubscribe()
 			}
-		}))
+		})
+		o.ObservableInt(observe, subscribeOn, subscriber)
 	}
 	return observable
 }
@@ -506,54 +514,8 @@ func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
 // Connect instructs a connectable Observable to begin emitting items to its
 // subscribers. All values will then be passed on to the observers that
 // subscribed to this connectable observable
-func (c ConnectableInt) Connect(setters ...SubscribeOptionSetter) Subscription {
-	return c.connect(setters)
-}
-
-//jig:name ObservableIntSubscribeNext
-
-// SubscribeNext operates upon the emissions from an Observable only.
-// This method returns a Subscription.
-func (o ObservableInt) SubscribeNext(f func(next int), setters ...SubscribeOptionSetter) Subscription {
-	return o.Subscribe(func(next int, err error, done bool) {
-		if !done {
-			f(next)
-		}
-	}, setters...)
-}
-
-//jig:name RxError
-
-type RxError string
-
-func (e RxError) Error() string	{ return string(e) }
-
-//jig:name ErrTypecastToInt
-
-// ErrTypecastToInt is delivered to an observer if the generic value cannot be
-// typecast to int.
-const ErrTypecastToInt = RxError("typecast to int failed")
-
-//jig:name ObservableAsObservableInt
-
-// AsInt turns an Observable of interface{} into an ObservableInt. If during
-// observing a typecast fails, the error ErrTypecastToInt will be emitted.
-func (o Observable) AsObservableInt() ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				if nextInt, ok := next.(int); ok {
-					observe(nextInt, err, done)
-				} else {
-					observe(zeroInt, ErrTypecastToInt, true)
-				}
-			} else {
-				observe(zeroInt, err, true)
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
+func (c ConnectableInt) Connect(options ...SubscribeOption) Subscription {
+	return c.connect(options)
 }
 
 //jig:name ObservableIntMapString
@@ -586,6 +548,52 @@ func (o ObservableInt) MapBool(project func(int) bool) ObservableBool {
 				mapped = project(next)
 			}
 			observe(mapped, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableIntSubscribeNext
+
+// SubscribeNext operates upon the emissions from an Observable only.
+// This method returns a Subscription.
+func (o ObservableInt) SubscribeNext(f func(next int), options ...SubscribeOption) Subscription {
+	return o.Subscribe(func(next int, err error, done bool) {
+		if !done {
+			f(next)
+		}
+	}, options...)
+}
+
+//jig:name RxError
+
+type RxError string
+
+func (e RxError) Error() string	{ return string(e) }
+
+//jig:name ErrTypecastToInt
+
+// ErrTypecastToInt is delivered to an observer if the generic value cannot be
+// typecast to int.
+const ErrTypecastToInt = RxError("typecast to int failed")
+
+//jig:name ObservableAsObservableInt
+
+// AsInt turns an Observable of interface{} into an ObservableInt. If during
+// observing a typecast fails, the error ErrTypecastToInt will be emitted.
+func (o Observable) AsObservableInt() ObservableInt {
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				if nextInt, ok := next.(int); ok {
+					observe(nextInt, err, done)
+				} else {
+					observe(zeroInt, ErrTypecastToInt, true)
+				}
+			} else {
+				observe(zeroInt, err, true)
+			}
 		}
 		o(observer, subscribeOn, subscriber)
 	}
@@ -665,12 +673,9 @@ type ObservableBool func(BoolObserveFunc, Scheduler, Subscriber)
 //jig:name ObservableStringSubscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
-// This method returns a Subscriber.
-func (o ObservableString) Subscribe(observe StringObserveFunc, setters ...SubscribeOptionSetter) Subscriber {
-	scheduler := NewTrampolineScheduler()
-	setter := SubscribeOn(scheduler, setters...)
-	options := NewSubscribeOptions(setter)
-	subscriber := options.NewSubscriber()
+// This method returns a Subscription.
+func (o ObservableString) Subscribe(observe StringObserveFunc, options ...SubscribeOption) Subscription {
+	scheduler, subscriber := newSchedulerAndSubscriber(options)
 	observer := func(next string, err error, done bool) {
 		if !done {
 			observe(next, err, done)
@@ -679,19 +684,16 @@ func (o ObservableString) Subscribe(observe StringObserveFunc, setters ...Subscr
 			subscriber.Unsubscribe()
 		}
 	}
-	o(observer, options.SubscribeOn, subscriber)
+	o(observer, scheduler, subscriber)
 	return subscriber
 }
 
 //jig:name ObservableBoolSubscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
-// This method returns a Subscriber.
-func (o ObservableBool) Subscribe(observe BoolObserveFunc, setters ...SubscribeOptionSetter) Subscriber {
-	scheduler := NewTrampolineScheduler()
-	setter := SubscribeOn(scheduler, setters...)
-	options := NewSubscribeOptions(setter)
-	subscriber := options.NewSubscriber()
+// This method returns a Subscription.
+func (o ObservableBool) Subscribe(observe BoolObserveFunc, options ...SubscribeOption) Subscription {
+	scheduler, subscriber := newSchedulerAndSubscriber(options)
 	observer := func(next bool, err error, done bool) {
 		if !done {
 			observe(next, err, done)
@@ -700,6 +702,6 @@ func (o ObservableBool) Subscribe(observe BoolObserveFunc, setters ...SubscribeO
 			subscriber.Unsubscribe()
 		}
 	}
-	o(observer, options.SubscribeOn, subscriber)
+	o(observer, scheduler, subscriber)
 	return subscriber
 }

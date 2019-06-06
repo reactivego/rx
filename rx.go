@@ -14,6 +14,21 @@ import (
 	"github.com/reactivego/subscriber"
 )
 
+//jig:name Scheduler
+
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler interface {
+	Schedule(task func())
+}
+
+//jig:name Subscriber
+
+// Subscriber is an alias for the subscriber.Subscriber interface type.
+type Subscriber subscriber.Subscriber
+
+// Subscription is an alias for the subscriber.Subscription interface type.
+type Subscription subscriber.Subscription
+
 //jig:name ObserveFunc
 
 // ObserveFunc is the observer, a function that gets called whenever the
@@ -213,22 +228,6 @@ func CreateInt(f func(IntObserver)) ObservableInt {
 	return observable
 }
 
-//jig:name Interval
-
-// Interval creates an ObservableInt that emits a sequence of integers spaced
-// by a particular time interval.
-func Interval(interval time.Duration) ObservableInt {
-	return CreateInt(func(observer IntObserver) {
-		for i := 0; ; i++ {
-			time.Sleep(interval)
-			if observer.Closed() {
-				return
-			}
-			observer.Next(i)
-		}
-	})
-}
-
 //jig:name Range
 
 // Range creates an ObservableInt that emits a range of sequential integers.
@@ -245,38 +244,175 @@ func Range(start, count int) ObservableInt {
 	})
 }
 
-//jig:name Scheduler
+//jig:name Interval
 
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
+// Interval creates an ObservableInt that emits a sequence of integers spaced
+// by a particular time interval.
+func Interval(interval time.Duration) ObservableInt {
+	return CreateInt(func(observer IntObserver) {
+		for i := 0; ; i++ {
+			time.Sleep(interval)
+			if observer.Closed() {
+				return
+			}
+			observer.Next(i)
+		}
+	})
 }
 
-//jig:name Subscriber
+//jig:name ObservableDo
 
-// Subscriber is an alias for the subscriber.Subscriber interface type.
-type Subscriber subscriber.Subscriber
-
-//jig:name ObservableScan
-
-// Scan applies a accumulator function to each item emitted by an
-// Observable and the previous accumulator result. The operator accepts a
-// seed argument that is passed to the accumulator for the first item emitted
-// by the Observable. Scan emits every value, both intermediate and final.
-func (o Observable) Scan(accumulator func(interface{}, interface{}) interface{}, seed interface{}) Observable {
+// Do calls a function for each next value passing through the observable.
+func (o Observable) Do(f func(next interface{})) Observable {
 	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		state := seed
 		observer := func(next interface{}, err error, done bool) {
 			if !done {
-				state = accumulator(state, next)
-				observe(state, nil, false)
+				f(next)
+			}
+			observe(next, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableConcat
+
+// Concat emits the emissions from two or more Observables without interleaving them.
+func (o Observable) Concat(other ...Observable) Observable {
+	if len(other) == 0 {
+		return o
+	}
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		var (
+			observables	= append([]Observable{}, other...)
+			observer	ObserveFunc
+		)
+		observer = func(next interface{}, err error, done bool) {
+			if !done || err != nil {
+				observe(next, err, done)
 			} else {
-				observe(zero, err, done)
+				if len(observables) == 0 {
+					observe(zero, nil, true)
+				} else {
+					o := observables[0]
+					observables = observables[1:]
+					o(observer, subscribeOn, subscriber)
+				}
 			}
 		}
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
+}
+
+//jig:name NewScheduler
+
+func NewGoroutineScheduler() Scheduler	{ return &scheduler.Goroutine{} }
+
+func NewTrampolineScheduler() Scheduler	{ return &scheduler.Trampoline{} }
+
+//jig:name SubscribeOption
+
+// SubscribeOption is an option that can be passed to the Subscribe method.
+type SubscribeOption func(options *subscribeOptions)
+
+type subscribeOptions struct {
+	scheduler	Scheduler
+	subscriber	Subscriber
+	onSubscribe	func(subscription Subscription)
+	onUnsubscribe	func()
+}
+
+// SubscribeOn returns an option that can be passed to the Subscribe method.
+// It takes the scheduler to subscribe the observable on. The tasks that
+// actually perform the observable functionality are scheduled on this
+// scheduler. The other options that can be passed here are applied after the
+// scheduler was set so any schedulers passed in via other will override
+// the scheduler passed here.
+func SubscribeOn(scheduler Scheduler, other ...SubscribeOption) SubscribeOption {
+	return func(options *subscribeOptions) {
+		options.scheduler = scheduler
+		for _, setter := range other {
+			setter(options)
+		}
+	}
+}
+
+// WithSubscriber returns an option that can be passed to the Subscribe method.
+// The Subscribe method will use the subscriber passed here instead of creating
+// a new one.
+func WithSubscriber(subscriber Subscriber) SubscribeOption {
+	return func(options *subscribeOptions) {
+		options.subscriber = subscriber
+	}
+}
+
+// OnSubscribe returns an option that can be passed to the Subscribe method.
+// It takes a callback that is called from the Subscribe method just before
+// subscribing continues further.
+func OnSubscribe(callback func(Subscription)) SubscribeOption {
+	return func(options *subscribeOptions) { options.onSubscribe = callback }
+}
+
+// OnUnsubscribe returns an option that can be passed to the Subscribe method.
+// It takes a callback that is called by the Subscribe method to notify the
+// client that the subscription has been canceled.
+func OnUnsubscribe(callback func()) SubscribeOption {
+	return func(options *subscribeOptions) { options.onUnsubscribe = callback }
+}
+
+// newSchedulerAndSubscriber will return either return the scheduler and subscriber
+// passed in through the SubscribeOn() and WithSubscriber() options or it will
+// return newly created scheduler and subscriber. Before returning the callback
+// passed in through OnSubscribe() will already have been called.
+func newSchedulerAndSubscriber(setters []SubscribeOption) (Scheduler, Subscriber) {
+	options := &subscribeOptions{scheduler: NewTrampolineScheduler()}
+	for _, setter := range setters {
+		setter(options)
+	}
+	if options.subscriber == nil {
+		options.subscriber = subscriber.New()
+	}
+	options.subscriber.OnUnsubscribe(options.onUnsubscribe)
+	if options.onSubscribe != nil {
+		options.onSubscribe(options.subscriber)
+	}
+	return options.scheduler, options.subscriber
+}
+
+//jig:name ObservableSubscribe
+
+// Subscribe operates upon the emissions and notifications from an Observable.
+// This method returns a Subscription.
+func (o Observable) Subscribe(observe ObserveFunc, options ...SubscribeOption) Subscription {
+	scheduler, subscriber := newSchedulerAndSubscriber(options)
+	observer := func(next interface{}, err error, done bool) {
+		if !done {
+			observe(next, err, done)
+		} else {
+			observe(zero, err, true)
+			subscriber.Unsubscribe()
+		}
+	}
+	o(observer, scheduler, subscriber)
+	return subscriber
+}
+
+//jig:name ObservablePrintln
+
+// Println subscribes to the Observable and prints every item to os.Stdout while
+// it waits for completion or error. Returns either the error or nil when the
+// Observable completed normally.
+func (o Observable) Println(options ...SubscribeOption) (e error) {
+	o.Subscribe(func(next interface{}, err error, done bool) {
+		if !done {
+			fmt.Println(next)
+		} else {
+			e = err
+		}
+	}, options...).Wait()
+	return e
 }
 
 //jig:name ObservableMergeMap
@@ -334,36 +470,6 @@ func (o Observable) Filter(predicate func(next interface{}) bool) Observable {
 	return observable
 }
 
-//jig:name ObservableConcat
-
-// Concat emits the emissions from two or more Observables without interleaving them.
-func (o Observable) Concat(other ...Observable) Observable {
-	if len(other) == 0 {
-		return o
-	}
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		var (
-			observables	= append([]Observable{}, other...)
-			observer	ObserveFunc
-		)
-		observer = func(next interface{}, err error, done bool) {
-			if !done || err != nil {
-				observe(next, err, done)
-			} else {
-				if len(observables) == 0 {
-					observe(zero, nil, true)
-				} else {
-					o := observables[0]
-					observables = observables[1:]
-					o(observer, subscribeOn, subscriber)
-				}
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name ObservableTake
 
 // Take emits only the first n items emitted by an Observable.
@@ -393,150 +499,51 @@ func (o ObservableInt) Take(n int) ObservableInt {
 	return o.AsObservable().Take(n).AsObservableInt()
 }
 
-//jig:name NewScheduler
+//jig:name ObservableScan
 
-func NewGoroutineScheduler() Scheduler	{ return &scheduler.Goroutine{} }
-
-func NewTrampolineScheduler() Scheduler	{ return &scheduler.Trampoline{} }
-
-//jig:name SubscribeOptions
-
-// Subscription is an alias for the subscriber.Subscription interface type.
-type Subscription subscriber.Subscription
-
-// SubscribeOptions is a struct with options for Subscribe related methods.
-type SubscribeOptions struct {
-	// SubscribeOn is the scheduler to run the observable subscription on.
-	SubscribeOn	Scheduler
-	// OnSubscribe is called right after the subscription is created and before
-	// subscribing continues further.
-	OnSubscribe	func(subscription Subscription)
-	// OnUnsubscribe is called by the subscription to notify the client that the
-	// subscription has been canceled.
-	OnUnsubscribe	func()
-}
-
-// NewSubscriber will return a newly created subscriber. Before returning the
-// subscription the OnSubscribe callback (if set) will already have been called.
-func (options SubscribeOptions) NewSubscriber() Subscriber {
-	subscriber := subscriber.New()
-	subscriber.OnUnsubscribe(options.OnUnsubscribe)
-	if options.OnSubscribe != nil {
-		options.OnSubscribe(subscriber)
-	}
-	return subscriber
-}
-
-// SubscribeOptionSetter is the type of a function for setting SubscribeOptions.
-type SubscribeOptionSetter func(options *SubscribeOptions)
-
-// SubscribeOn takes the scheduler to run the observable subscription on and
-// additional setters. It will first set the SubscribeOn option before
-// calling the other setters provided as a parameter.
-func SubscribeOn(subscribeOn Scheduler, setters ...SubscribeOptionSetter) SubscribeOptionSetter {
-	return func(options *SubscribeOptions) {
-		options.SubscribeOn = subscribeOn
-		for _, setter := range setters {
-			setter(options)
-		}
-	}
-}
-
-// OnSubscribe takes a callback to be called on subscription.
-func OnSubscribe(callback func(Subscription)) SubscribeOptionSetter {
-	return func(options *SubscribeOptions) { options.OnSubscribe = callback }
-}
-
-// OnUnsubscribe takes a callback to be called on subscription cancelation.
-func OnUnsubscribe(callback func()) SubscribeOptionSetter {
-	return func(options *SubscribeOptions) { options.OnUnsubscribe = callback }
-}
-
-// NewSubscribeOptions will create a new SubscribeOptions struct and then call
-// the setter on it to recursively set all the options. It then returns a
-// pointer to the created SubscribeOptions struct.
-func NewSubscribeOptions(setter SubscribeOptionSetter) *SubscribeOptions {
-	options := &SubscribeOptions{}
-	setter(options)
-	return options
-}
-
-//jig:name ObservableSubscribe
-
-// Subscribe operates upon the emissions and notifications from an Observable.
-// This method returns a Subscriber.
-func (o Observable) Subscribe(observe ObserveFunc, setters ...SubscribeOptionSetter) Subscriber {
-	scheduler := NewTrampolineScheduler()
-	setter := SubscribeOn(scheduler, setters...)
-	options := NewSubscribeOptions(setter)
-	subscriber := options.NewSubscriber()
-	observer := func(next interface{}, err error, done bool) {
-		if !done {
-			observe(next, err, done)
-		} else {
-			observe(zero, err, true)
-			subscriber.Unsubscribe()
-		}
-	}
-	o(observer, options.SubscribeOn, subscriber)
-	return subscriber
-}
-
-//jig:name ObservablePrintln
-
-// Println subscribes to the Observable and prints every item to os.Stdout while
-// it waits for completion or error. Returns either the error or nil when the
-// Observable completed normally.
-func (o Observable) Println(setters ...SubscribeOptionSetter) (e error) {
-	o.Subscribe(func(next interface{}, err error, done bool) {
-		if !done {
-			fmt.Println(next)
-		} else {
-			e = err
-		}
-	}, setters...).Wait()
-	return e
-}
-
-//jig:name ObservableDo
-
-// Do calls a function for each next value passing through the observable.
-func (o Observable) Do(f func(next interface{})) Observable {
+// Scan applies a accumulator function to each item emitted by an
+// Observable and the previous accumulator result. The operator accepts a
+// seed argument that is passed to the accumulator for the first item emitted
+// by the Observable. Scan emits every value, both intermediate and final.
+func (o Observable) Scan(accumulator func(interface{}, interface{}) interface{}, seed interface{}) Observable {
 	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		state := seed
 		observer := func(next interface{}, err error, done bool) {
 			if !done {
-				f(next)
+				state = accumulator(state, next)
+				observe(state, nil, false)
+			} else {
+				observe(zero, err, done)
 			}
-			observe(next, err, done)
 		}
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
 }
 
-//jig:name ObservableWait
-
-// Wait subscribes to the Observable and waits for completion or error.
-// Returns either the error or nil when the Observable completed normally.
-func (o Observable) Wait(setters ...SubscribeOptionSetter) (e error) {
-	o.Subscribe(func(next interface{}, err error, done bool) {
-		if done {
-			e = err
-		}
-	}, setters...).Wait()
-	return e
-}
-
 //jig:name ObservableSubscribeNext
 
 // SubscribeNext operates upon the emissions from an Observable only.
 // This method returns a Subscription.
-func (o Observable) SubscribeNext(f func(next interface{}), setters ...SubscribeOptionSetter) Subscription {
+func (o Observable) SubscribeNext(f func(next interface{}), options ...SubscribeOption) Subscription {
 	return o.Subscribe(func(next interface{}, err error, done bool) {
 		if !done {
 			f(next)
 		}
-	}, setters...)
+	}, options...)
+}
+
+//jig:name ObservableWait
+
+// Wait subscribes to the Observable and waits for completion or error.
+// Returns either the error or nil when the Observable completed normally.
+func (o Observable) Wait(options ...SubscribeOption) (e error) {
+	o.Subscribe(func(next interface{}, err error, done bool) {
+		if done {
+			e = err
+		}
+	}, options...).Wait()
+	return e
 }
 
 //jig:name ObservableIntMapObservable

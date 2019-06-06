@@ -6,9 +6,13 @@ package Observer
 
 //jig:name ObserveFunc
 
-// ObserveFunc is essentially the observer, a function that gets called
-// whenever the observable has something to report.
-type ObserveFunc func(interface{}, error, bool)
+// ObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type ObserveFunc func(next interface{}, err error, done bool)
 
 var zero interface{}
 
