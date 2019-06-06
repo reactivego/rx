@@ -1,8 +1,33 @@
+# Functions
+
+- Amb(observable Observable, observables ...Observable) Observable
+- CombineLatest(f FunctionN, observable Observable, observables ...Observable) Observable
+Concat
+Create
+Defer
+Empty
+Error
+From
+FromChan
+- FromEventSource(ch chan interface{}, opts ...options.Option) Observable
+- FromIterable(it Iterable) Observable
+- FromIterator(it Iterator) Observable
+FromSlice
+Froms
+Interval
+Just
+Merge
+Never
+Range
+Repeat
+Start
+Throw
+
 # Operators
 
-- All(predicate Predicate) Single
-AsObservable() Observable
-AutoConnect() ConnectableObservable
+All
+AsObservable
+AutoConnect
 Average
 - BufferWithCount(count, skip int) Observable
 - BufferWithTime(timespan, timeshift Duration) Observable
@@ -67,32 +92,9 @@ SwitchMap
 Take
 TakeLast
 TakeUntil
-- TakeWhile(apply Predicate) Observable
-Throw
+TakeWhile
 Timeout
 ToChan
 ToSingle
 ToSlice
 - ZipFromObservable(publisher Observable, zipper Function2) Observable
-
-
-
-- Amb(observable Observable, observables ...Observable) Observable
-- CombineLatest(f FunctionN, observable Observable, observables ...Observable) Observable
-- Concat(observable1 Observable, observables ...Observable) Observable
-Create
-Defer
-Empty
-- Error(err error) Observable
-From
-FromChan
-- FromEventSource(ch chan interface{}, opts ...options.Option) Observable
-- FromIterable(it Iterable) Observable
-- FromIterator(it Iterator) Observable
-FromSlice
-Froms
-Interval
-Just
-Never
-Range
-Start
