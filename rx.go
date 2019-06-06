@@ -126,33 +126,6 @@ func From(slice ...interface{}) Observable {
 	return FromSlice(slice)
 }
 
-//jig:name FromChan
-
-// FromChan creates an Observable from a Go channel of interface{}
-// values. This allows the code feeding into the channel to send either an error
-// or the next value. The feeding code can send zero or more items and then
-// closing the channel will be seen as completion. When the feeding code sends
-// an error into the channel, it should close the channel immediately to
-// indicate termination with error.
-func FromChan(ch <-chan interface{}) Observable {
-	return Create(func(observer Observer) {
-		for item := range ch {
-			if observer.Closed() {
-				return
-			}
-			if err, ok := item.(error); ok {
-				observer.Error(err)
-				return
-			}
-			observer.Next(item)
-		}
-		if observer.Closed() {
-			return
-		}
-		observer.Complete()
-	})
-}
-
 //jig:name IntObserveFunc
 
 // IntObserveFunc is the observer, a function that gets called whenever the
@@ -244,6 +217,33 @@ func Range(start, count int) ObservableInt {
 	})
 }
 
+//jig:name FromChan
+
+// FromChan creates an Observable from a Go channel of interface{}
+// values. This allows the code feeding into the channel to send either an error
+// or the next value. The feeding code can send zero or more items and then
+// closing the channel will be seen as completion. When the feeding code sends
+// an error into the channel, it should close the channel immediately to
+// indicate termination with error.
+func FromChan(ch <-chan interface{}) Observable {
+	return Create(func(observer Observer) {
+		for item := range ch {
+			if observer.Closed() {
+				return
+			}
+			if err, ok := item.(error); ok {
+				observer.Error(err)
+				return
+			}
+			observer.Next(item)
+		}
+		if observer.Closed() {
+			return
+		}
+		observer.Complete()
+	})
+}
+
 //jig:name Interval
 
 // Interval creates an ObservableInt that emits a sequence of integers spaced
@@ -260,46 +260,106 @@ func Interval(interval time.Duration) ObservableInt {
 	})
 }
 
-//jig:name ObservableDo
+//jig:name ObservableTake
 
-// Do calls a function for each next value passing through the observable.
-func (o Observable) Do(f func(next interface{})) Observable {
+// Take emits only the first n items emitted by an Observable.
+func (o Observable) Take(n int) Observable {
 	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		taken := 0
 		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				f(next)
+			if taken < n {
+				observe(next, err, done)
+				if !done {
+					taken++
+					if taken >= n {
+						observe(nil, nil, true)
+					}
+				}
 			}
-			observe(next, err, done)
 		}
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
 }
 
-//jig:name ObservableConcat
+//jig:name ObservableIntTake
 
-// Concat emits the emissions from two or more Observables without interleaving them.
-func (o Observable) Concat(other ...Observable) Observable {
-	if len(other) == 0 {
-		return o
-	}
+// Take emits only the first n items emitted by an ObservableInt.
+func (o ObservableInt) Take(n int) ObservableInt {
+	return o.AsObservable().Take(n).AsObservableInt()
+}
+
+//jig:name ObservableScan
+
+// Scan applies a accumulator function to each item emitted by an
+// Observable and the previous accumulator result. The operator accepts a
+// seed argument that is passed to the accumulator for the first item emitted
+// by the Observable. Scan emits every value, both intermediate and final.
+func (o Observable) Scan(accumulator func(interface{}, interface{}) interface{}, seed interface{}) Observable {
 	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		var (
-			observables	= append([]Observable{}, other...)
-			observer	ObserveFunc
-		)
-		observer = func(next interface{}, err error, done bool) {
-			if !done || err != nil {
-				observe(next, err, done)
+		state := seed
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				state = accumulator(state, next)
+				observe(state, nil, false)
 			} else {
-				if len(observables) == 0 {
-					observe(zero, nil, true)
-				} else {
-					o := observables[0]
-					observables = observables[1:]
-					o(observer, subscribeOn, subscriber)
-				}
+				observe(zero, err, done)
 			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableFilter
+
+// Filter emits only those items from an Observable that pass a predicate test.
+func (o Observable) Filter(predicate func(next interface{}) bool) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if done || predicate(next) {
+				observe(next, err, done)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableMergeMap
+
+// MergeMap transforms the items emitted by an Observable by applying a
+// function to each item an returning an Observable. The stream of Observable
+// items is then merged into a single stream of  items using the MergeAll operator.
+func (o Observable) MergeMap(project func(interface{}) Observable) Observable {
+	return o.MapObservable(project).MergeAll()
+}
+
+//jig:name ObservableIntAsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableMap
+
+// Map transforms the items emitted by an Observable by applying a
+// function to each item.
+func (o Observable) Map(project func(interface{}) interface{}) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			var mapped interface{}
+			if !done {
+				mapped = project(next)
+			}
+			observe(mapped, err, done)
 		}
 		o(observer, subscribeOn, subscriber)
 	}
@@ -415,122 +475,50 @@ func (o Observable) Println(options ...SubscribeOption) (e error) {
 	return e
 }
 
-//jig:name ObservableMergeMap
+//jig:name ObservableDo
 
-// MergeMap transforms the items emitted by an Observable by applying a
-// function to each item an returning an Observable. The stream of Observable
-// items is then merged into a single stream of  items using the MergeAll operator.
-func (o Observable) MergeMap(project func(interface{}) Observable) Observable {
-	return o.MapObservable(project).MergeAll()
-}
-
-//jig:name ObservableIntAsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableMap
-
-// Map transforms the items emitted by an Observable by applying a
-// function to each item.
-func (o Observable) Map(project func(interface{}) interface{}) Observable {
+// Do calls a function for each next value passing through the observable.
+func (o Observable) Do(f func(next interface{})) Observable {
 	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
-			var mapped interface{}
 			if !done {
-				mapped = project(next)
+				f(next)
 			}
-			observe(mapped, err, done)
+			observe(next, err, done)
 		}
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
 }
 
-//jig:name ObservableFilter
+//jig:name ObservableConcat
 
-// Filter emits only those items from an Observable that pass a predicate test.
-func (o Observable) Filter(predicate func(next interface{}) bool) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if done || predicate(next) {
-				observe(next, err, done)
-			}
-		}
-		o(observer, subscribeOn, subscriber)
+// Concat emits the emissions from two or more Observables without interleaving them.
+func (o Observable) Concat(other ...Observable) Observable {
+	if len(other) == 0 {
+		return o
 	}
-	return observable
-}
-
-//jig:name ObservableTake
-
-// Take emits only the first n items emitted by an Observable.
-func (o Observable) Take(n int) Observable {
 	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		taken := 0
-		observer := func(next interface{}, err error, done bool) {
-			if taken < n {
+		var (
+			observables	= append([]Observable{}, other...)
+			observer	ObserveFunc
+		)
+		observer = func(next interface{}, err error, done bool) {
+			if !done || err != nil {
 				observe(next, err, done)
-				if !done {
-					taken++
-					if taken >= n {
-						observe(nil, nil, true)
-					}
+			} else {
+				if len(observables) == 0 {
+					observe(zero, nil, true)
+				} else {
+					o := observables[0]
+					observables = observables[1:]
+					o(observer, subscribeOn, subscriber)
 				}
 			}
 		}
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
-}
-
-//jig:name ObservableIntTake
-
-// Take emits only the first n items emitted by an ObservableInt.
-func (o ObservableInt) Take(n int) ObservableInt {
-	return o.AsObservable().Take(n).AsObservableInt()
-}
-
-//jig:name ObservableScan
-
-// Scan applies a accumulator function to each item emitted by an
-// Observable and the previous accumulator result. The operator accepts a
-// seed argument that is passed to the accumulator for the first item emitted
-// by the Observable. Scan emits every value, both intermediate and final.
-func (o Observable) Scan(accumulator func(interface{}, interface{}) interface{}, seed interface{}) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		state := seed
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				state = accumulator(state, next)
-				observe(state, nil, false)
-			} else {
-				observe(zero, err, done)
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableSubscribeNext
-
-// SubscribeNext operates upon the emissions from an Observable only.
-// This method returns a Subscription.
-func (o Observable) SubscribeNext(f func(next interface{}), options ...SubscribeOption) Subscription {
-	return o.Subscribe(func(next interface{}, err error, done bool) {
-		if !done {
-			f(next)
-		}
-	}, options...)
 }
 
 //jig:name ObservableWait
@@ -546,13 +534,25 @@ func (o Observable) Wait(options ...SubscribeOption) (e error) {
 	return e
 }
 
-//jig:name ObservableIntMapObservable
+//jig:name ObservableSubscribeNext
 
-// MapObservable transforms the items emitted by an ObservableInt by applying a
+// SubscribeNext operates upon the emissions from an Observable only.
+// This method returns a Subscription.
+func (o Observable) SubscribeNext(f func(next interface{}), options ...SubscribeOption) Subscription {
+	return o.Subscribe(func(next interface{}, err error, done bool) {
+		if !done {
+			f(next)
+		}
+	}, options...)
+}
+
+//jig:name ObservableMapObservable
+
+// MapObservable transforms the items emitted by an Observable by applying a
 // function to each item.
-func (o ObservableInt) MapObservable(project func(int) Observable) ObservableObservable {
+func (o Observable) MapObservable(project func(interface{}) Observable) ObservableObservable {
 	observable := func(observe ObservableObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
+		observer := func(next interface{}, err error, done bool) {
 			var mapped Observable
 			if !done {
 				mapped = project(next)
@@ -598,13 +598,13 @@ func (o Observable) AsObservableInt() ObservableInt {
 	return observable
 }
 
-//jig:name ObservableMapObservable
+//jig:name ObservableIntMapObservable
 
-// MapObservable transforms the items emitted by an Observable by applying a
+// MapObservable transforms the items emitted by an ObservableInt by applying a
 // function to each item.
-func (o Observable) MapObservable(project func(interface{}) Observable) ObservableObservable {
+func (o ObservableInt) MapObservable(project func(int) Observable) ObservableObservable {
 	observable := func(observe ObservableObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
+		observer := func(next int, err error, done bool) {
 			var mapped Observable
 			if !done {
 				mapped = project(next)
