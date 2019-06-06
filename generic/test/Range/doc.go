@@ -1,5 +1,5 @@
 /*
-Operator Range documentation and tests.
+Function Range documentation and tests.
 
 	Range	http://reactivex.io/documentation/operators/range.html
 */

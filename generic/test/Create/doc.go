@@ -1,5 +1,5 @@
 /*
-Operator Create documentation and tests.
+Function Create documentation and tests.
 
 	Create	http://reactivex.io/documentation/operators/create.html
 */

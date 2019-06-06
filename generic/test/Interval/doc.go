@@ -1,5 +1,5 @@
 /*
-Operator Interval documentation and tests.
+Function Interval documentation and tests.
 
 	Interval	http://reactivex.io/documentation/operators/interval.html
 */
