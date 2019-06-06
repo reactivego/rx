@@ -10,22 +10,25 @@ import (
 // This example is a variant of the example in the book "Introduction to Rx"
 // about using RefCount.
 func Example_introToRx() {
-	observable := Interval(27 * time.Millisecond)
+	// Subscribe on concurrent scheduler
+	scheduler := NewGoroutineScheduler()
+
+	observable := Interval(50 * time.Millisecond)
 
 	// Print when a value is published.
-	observable = observable.Do(func(next int) { fmt.Printf("Publishing %d\n", next) })
+	observable = observable.Do(func(next int) { fmt.Printf("published: %d\n", next) })
 
 	observable = observable.Publish().RefCount()
 
-	// Make all subscriptions to observable asynchronous
-	observable = observable.SubscribeOn(NewGoroutineScheduler())
+	// Make all subscriptions to observable concurrent
+	observable = observable.SubscribeOn(scheduler)
 
 	fmt.Println(">> Subscribing")
 	subscription := observable.SubscribeNext(func(next int) { fmt.Printf("subscription : %d\n", next) })
 
 	// The observable is hot for the next 100 milliseconds. It then will go
 	// cold, unless another observer subscribes in that period.
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(175 * time.Millisecond)
 
 	fmt.Println(">> Unsubscribing")
 	subscription.Unsubscribe()
@@ -33,11 +36,11 @@ func Example_introToRx() {
 
 	// Output:
 	// >> Subscribing
-	// Publishing 0
+	// published: 0
 	// subscription : 0
-	// Publishing 1
+	// published: 1
 	// subscription : 1
-	// Publishing 2
+	// published: 2
 	// subscription : 2
 	// >> Unsubscribing
 	// >> Finished
@@ -46,9 +49,12 @@ func Example_introToRx() {
 // An example showing multiple subscriptions on a multicasting Publish
 // Connectable who's Connect is controlled by a RefCount operator.
 func Example_refCountMultipleSubscriptions() {
+	// Subscribe on concurrent scheduler
+	scheduler := NewGoroutineScheduler()
+
 	var wg sync.WaitGroup
 	channel := make(chan int, 30)
-	source := FromChanInt(channel).Publish().RefCount().SubscribeOn(NewGoroutineScheduler())
+	source := FromChanInt(channel).Publish().RefCount().SubscribeOn(scheduler)
 
 	sub1 := source.SubscribeNext(func(n int) {
 		fmt.Println(n)
