@@ -15,7 +15,7 @@ type Subscriber subscriber.Subscriber
 type Subscription subscriber.Subscription
 
 //jig:template SubscribeOption
-//jig:needs NewScheduler, Subscriber
+//jig:needs Schedulers, Subscriber
 
 // SubscribeOption is an option that can be passed to the Subscribe method.
 type SubscribeOption func(options *subscribeOptions)
@@ -70,7 +70,7 @@ func OnUnsubscribe(callback func()) SubscribeOption {
 // return newly created scheduler and subscriber. Before returning the callback
 // passed in through OnSubscribe() will already have been called.
 func newSchedulerAndSubscriber(setters []SubscribeOption) (Scheduler, Subscriber) {
-	options := &subscribeOptions{scheduler: NewTrampolineScheduler()}
+	options := &subscribeOptions{scheduler: CurrentGoroutineScheduler()}
 	for _, setter := range setters {
 		setter(options)
 	}
