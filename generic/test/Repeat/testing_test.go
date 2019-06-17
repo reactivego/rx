@@ -32,7 +32,7 @@ func TestRepeatTrampoline(t *testing.T) {
 		observer.Next(3)
 		observer.Complete()
 	})
-	result, err := source.Repeat(_1M).TakeLast(9).ToSlice(SubscribeOn(NewTrampolineScheduler()))
+	result, err := source.Repeat(_1M).TakeLast(9).ToSlice(SubscribeOn(CurrentGoroutineScheduler()))
 	expect := []int{1, 2, 3, 1, 2, 3, 1, 2, 3}
 	assert.NoError(t, err)
 	assert.Equal(t, expect, result)

@@ -30,7 +30,7 @@ func (c ConnectableFoo) Connect(options ...SubscribeOption) Subscription {
 }
 
 //jig:template Observable<Foo> Multicast
-//jig:needs Observable<Foo> Subscribe, Connectable<Foo>, NewScheduler
+//jig:needs Observable<Foo> Subscribe, Connectable<Foo>, Schedulers
 
 // Multicast converts an ordinary Observable into a connectable Observable.
 // A connectable observable will only start emitting values after its Connect

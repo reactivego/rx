@@ -20,7 +20,7 @@ func TestRetryTrampoline(t *testing.T) {
 			observer.Error(errors.New("error"))
 			errored = true
 		}
-	}).SubscribeOn(NewTrampolineScheduler())
+	}).SubscribeOn(CurrentGoroutineScheduler())
 	b, e := a.Retry().ToSlice()
 	assert.NoError(t, e)
 	assert.Equal(t, []int{1, 2, 3, 1, 2, 3}, b)

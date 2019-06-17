@@ -192,9 +192,9 @@ type Observable func(ObserveFunc, Scheduler, Subscriber)
 
 //jig:name NewScheduler
 
-func NewGoroutineScheduler() Scheduler	{ return &scheduler.Goroutine{} }
+func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
 
-func NewTrampolineScheduler() Scheduler	{ return &scheduler.Trampoline{} }
+func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
 
 //jig:name SubscribeOption
 
@@ -251,7 +251,7 @@ func OnUnsubscribe(callback func()) SubscribeOption {
 // return newly created scheduler and subscriber. Before returning the callback
 // passed in through OnSubscribe() will already have been called.
 func newSchedulerAndSubscriber(setters []SubscribeOption) (Scheduler, Subscriber) {
-	options := &subscribeOptions{scheduler: NewTrampolineScheduler()}
+	options := &subscribeOptions{scheduler: CurrentGoroutineScheduler()}
 	for _, setter := range setters {
 		setter(options)
 	}
