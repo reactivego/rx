@@ -17,9 +17,7 @@ import (
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
-}
+type Scheduler scheduler.Scheduler
 
 //jig:name Subscriber
 
@@ -201,20 +199,48 @@ func CreateInt(f func(IntObserver)) ObservableInt {
 	return observable
 }
 
-//jig:name Range
+//jig:name Interval
 
-// Range creates an ObservableInt that emits a range of sequential integers.
-func Range(start, count int) ObservableInt {
-	end := start + count
+// Interval creates an ObservableInt that emits a sequence of integers spaced
+// by a particular time interval.
+func Interval(interval time.Duration) ObservableInt {
 	return CreateInt(func(observer IntObserver) {
-		for i := start; i < end; i++ {
+		for i := 0; ; i++ {
+			time.Sleep(interval)
 			if observer.Closed() {
 				return
 			}
 			observer.Next(i)
 		}
-		observer.Complete()
 	})
+}
+
+//jig:name Range
+
+// Range creates an ObservableInt that emits a range of sequential integers.
+func Range(start, count int) ObservableInt {
+	end := start + count
+	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		i := start
+		scheduler.ScheduleRecursive(func(self func()) {
+			if subscriber.Closed() {
+				return
+			}
+			if i < end {
+				observe(i, nil, false)
+			}
+			if subscriber.Closed() {
+				return
+			}
+			i++
+			if i >= end {
+				observe(zeroInt, nil, true)
+				return
+			}
+			self()
+		})
+	}
+	return observable
 }
 
 //jig:name FromChan
@@ -241,22 +267,6 @@ func FromChan(ch <-chan interface{}) Observable {
 			return
 		}
 		observer.Complete()
-	})
-}
-
-//jig:name Interval
-
-// Interval creates an ObservableInt that emits a sequence of integers spaced
-// by a particular time interval.
-func Interval(interval time.Duration) ObservableInt {
-	return CreateInt(func(observer IntObserver) {
-		for i := 0; ; i++ {
-			time.Sleep(interval)
-			if observer.Closed() {
-				return
-			}
-			observer.Next(i)
-		}
 	})
 }
 
@@ -287,43 +297,6 @@ func (o Observable) Take(n int) Observable {
 // Take emits only the first n items emitted by an ObservableInt.
 func (o ObservableInt) Take(n int) ObservableInt {
 	return o.AsObservable().Take(n).AsObservableInt()
-}
-
-//jig:name ObservableScan
-
-// Scan applies a accumulator function to each item emitted by an
-// Observable and the previous accumulator result. The operator accepts a
-// seed argument that is passed to the accumulator for the first item emitted
-// by the Observable. Scan emits every value, both intermediate and final.
-func (o Observable) Scan(accumulator func(interface{}, interface{}) interface{}, seed interface{}) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		state := seed
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				state = accumulator(state, next)
-				observe(state, nil, false)
-			} else {
-				observe(zero, err, done)
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableFilter
-
-// Filter emits only those items from an Observable that pass a predicate test.
-func (o Observable) Filter(predicate func(next interface{}) bool) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if done || predicate(next) {
-				observe(next, err, done)
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
 }
 
 //jig:name ObservableMergeMap
@@ -366,11 +339,13 @@ func (o Observable) Map(project func(interface{}) interface{}) Observable {
 	return observable
 }
 
-//jig:name NewScheduler
+//jig:name Schedulers
 
-func NewGoroutineScheduler() Scheduler	{ return &scheduler.Goroutine{} }
+func ImmediateScheduler() Scheduler	{ return scheduler.Immediate }
 
-func NewTrampolineScheduler() Scheduler	{ return &scheduler.Trampoline{} }
+func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
+
+func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
 
 //jig:name SubscribeOption
 
@@ -427,7 +402,7 @@ func OnUnsubscribe(callback func()) SubscribeOption {
 // return newly created scheduler and subscriber. Before returning the callback
 // passed in through OnSubscribe() will already have been called.
 func newSchedulerAndSubscriber(setters []SubscribeOption) (Scheduler, Subscriber) {
-	options := &subscribeOptions{scheduler: NewTrampolineScheduler()}
+	options := &subscribeOptions{scheduler: CurrentGoroutineScheduler()}
 	for _, setter := range setters {
 		setter(options)
 	}
@@ -475,16 +450,15 @@ func (o Observable) Println(options ...SubscribeOption) (e error) {
 	return e
 }
 
-//jig:name ObservableDo
+//jig:name ObservableFilter
 
-// Do calls a function for each next value passing through the observable.
-func (o Observable) Do(f func(next interface{})) Observable {
+// Filter emits only those items from an Observable that pass a predicate test.
+func (o Observable) Filter(predicate func(next interface{}) bool) Observable {
 	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				f(next)
+			if done || predicate(next) {
+				observe(next, err, done)
 			}
-			observe(next, err, done)
 		}
 		o(observer, subscribeOn, subscriber)
 	}
@@ -521,6 +495,44 @@ func (o Observable) Concat(other ...Observable) Observable {
 	return observable
 }
 
+//jig:name ObservableScan
+
+// Scan applies a accumulator function to each item emitted by an
+// Observable and the previous accumulator result. The operator accepts a
+// seed argument that is passed to the accumulator for the first item emitted
+// by the Observable. Scan emits every value, both intermediate and final.
+func (o Observable) Scan(accumulator func(interface{}, interface{}) interface{}, seed interface{}) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		state := seed
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				state = accumulator(state, next)
+				observe(state, nil, false)
+			} else {
+				observe(zero, err, done)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableDo
+
+// Do calls a function for each next value passing through the observable.
+func (o Observable) Do(f func(next interface{})) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				f(next)
+			}
+			observe(next, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name ObservableWait
 
 // Wait subscribes to the Observable and waits for completion or error.
@@ -532,18 +544,6 @@ func (o Observable) Wait(options ...SubscribeOption) (e error) {
 		}
 	}, options...).Wait()
 	return e
-}
-
-//jig:name ObservableSubscribeNext
-
-// SubscribeNext operates upon the emissions from an Observable only.
-// This method returns a Subscription.
-func (o Observable) SubscribeNext(f func(next interface{}), options ...SubscribeOption) Subscription {
-	return o.Subscribe(func(next interface{}, err error, done bool) {
-		if !done {
-			f(next)
-		}
-	}, options...)
 }
 
 //jig:name ObservableMapObservable
@@ -596,6 +596,18 @@ func (o Observable) AsObservableInt() ObservableInt {
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
+}
+
+//jig:name ObservableSubscribeNext
+
+// SubscribeNext operates upon the emissions from an Observable only.
+// This method returns a Subscription.
+func (o Observable) SubscribeNext(f func(next interface{}), options ...SubscribeOption) Subscription {
+	return o.Subscribe(func(next interface{}, err error, done bool) {
+		if !done {
+			f(next)
+		}
+	}, options...)
 }
 
 //jig:name ObservableIntMapObservable

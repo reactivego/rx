@@ -14,9 +14,7 @@ import (
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
-}
+type Scheduler scheduler.Scheduler
 
 //jig:name Subscriber
 
@@ -106,22 +104,32 @@ func CreateInt(f func(IntObserver)) ObservableInt {
 // Range creates an ObservableInt that emits a range of sequential integers.
 func Range(start, count int) ObservableInt {
 	end := start + count
-	return CreateInt(func(observer IntObserver) {
-		for i := start; i < end; i++ {
-			if observer.Closed() {
-				return
+	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		i := start
+		scheduler.ScheduleRecursive(func(self func()) {
+			if !subscriber.Closed() {
+				if i < end {
+					observe(i, nil, false)
+					if !subscriber.Closed() {
+						i++
+						self()
+					}
+				} else {
+					observe(zeroInt, nil, true)
+				}
 			}
-			observer.Next(i)
-		}
-		observer.Complete()
-	})
+		})
+	}
+	return observable
 }
 
-//jig:name NewScheduler
+//jig:name Schedulers
 
-func NewGoroutineScheduler() Scheduler	{ return &scheduler.Goroutine{} }
+func ImmediateScheduler() Scheduler	{ return scheduler.Immediate }
 
-func NewTrampolineScheduler() Scheduler	{ return &scheduler.Trampoline{} }
+func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
+
+func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
 
 //jig:name SubscribeOption
 
@@ -178,7 +186,7 @@ func OnUnsubscribe(callback func()) SubscribeOption {
 // return newly created scheduler and subscriber. Before returning the callback
 // passed in through OnSubscribe() will already have been called.
 func newSchedulerAndSubscriber(setters []SubscribeOption) (Scheduler, Subscriber) {
-	options := &subscribeOptions{scheduler: NewTrampolineScheduler()}
+	options := &subscribeOptions{scheduler: CurrentGoroutineScheduler()}
 	for _, setter := range setters {
 		setter(options)
 	}
@@ -210,21 +218,6 @@ func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOpt
 	return subscriber
 }
 
-//jig:name ObservableIntFilter
-
-// Filter emits only those items from an ObservableInt that pass a predicate test.
-func (o ObservableInt) Filter(predicate func(next int) bool) ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			if done || predicate(next) {
-				observe(next, err, done)
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name ObservableIntToSlice
 
 // ToSlice collects all values from the ObservableInt into an slice. The
@@ -243,6 +236,21 @@ func (o ObservableInt) ToSlice(options ...SubscribeOption) (a []int, e error) {
 		}
 	}, SubscribeOn(scheduler, options...)).Wait()
 	return a, e
+}
+
+//jig:name ObservableIntFilter
+
+// Filter emits only those items from an ObservableInt that pass a predicate test.
+func (o ObservableInt) Filter(predicate func(next int) bool) ObservableInt {
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			if done || predicate(next) {
+				observe(next, err, done)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
 }
 
 //jig:name ObservableIntMapInt
