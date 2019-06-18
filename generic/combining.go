@@ -5,6 +5,73 @@ import (
 	"sync/atomic"
 )
 
+//jig:template ObservableObservable<Foo> CombineAll
+
+type FooSlice []foo
+
+func (o ObservableObservableFoo) CombineAll() ObservableFooSlice {
+	observable := func(observe FooSliceObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observables := []ObservableFoo(nil)
+		var observers struct {
+			sync.Mutex
+			values []foo
+			initialized int
+			active int
+		}
+		makeObserver := func(index int) FooObserveFunc {
+			observer := func(next foo, err error, done bool) {
+				observers.Lock()
+				defer observers.Unlock()
+				if observers.active > 0 {
+					switch {
+					case !done:
+						if observers.values[index] == zeroFoo {
+							observers.initialized++
+						}
+						observers.values[index] = next
+						if observers.initialized == len(observers.values) {
+							observe(observers.values, nil, false)
+						}
+					case err != nil:
+						observers.active = 0
+						observe(zeroFooSlice, err, true)
+					default:
+						if observers.active--; observers.active == 0 {
+							observe(zeroFooSlice, nil, true)
+						}
+					}
+				}
+			}
+			return observer
+		}
+
+		observer := func(next ObservableFoo, err error, done bool) {
+			switch {
+			case !done:
+				observables = append(observables, next)
+			case err != nil:
+				observe(zeroFooSlice, err, true)
+			default:
+				subscribeOn.Schedule(func() {
+					if !subscriber.Canceled() {
+						numObservables := len(observables)
+						observers.values = make([]foo, numObservables)
+						observers.active = numObservables
+						for i, v := range observables {
+							if subscriber.Canceled() {
+								return
+							}
+							v(makeObserver(i), subscribeOn, subscriber)
+						}
+					}
+				})
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:template Concat<Foo>
 //jig:needs Observable<Foo> Concat
 

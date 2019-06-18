@@ -583,3 +583,38 @@ func (o ObservableObservableBar) MergeAll() ObservableBar {
 	}
 	return observable
 }
+
+//jig:name FooSliceObserveFunc
+
+// FooSliceObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type FooSliceObserveFunc func(next FooSlice, err error, done bool)
+
+var zeroFooSlice FooSlice
+
+// Next is called by an ObservableFooSlice to emit the next FooSlice value to the
+// observer.
+func (f FooSliceObserveFunc) Next(next FooSlice) {
+	f(next, nil, false)
+}
+
+// Error is called by an ObservableFooSlice to report an error to the observer.
+func (f FooSliceObserveFunc) Error(err error) {
+	f(zeroFooSlice, err, true)
+}
+
+// Complete is called by an ObservableFooSlice to signal that no more data is
+// forthcoming to the observer.
+func (f FooSliceObserveFunc) Complete() {
+	f(zeroFooSlice, nil, true)
+}
+
+//jig:name ObservableFooSlice
+
+// ObservableFooSlice is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type ObservableFooSlice func(FooSliceObserveFunc, Scheduler, Subscriber)
