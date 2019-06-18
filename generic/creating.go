@@ -219,12 +219,12 @@ func JustFoo(element foo) ObservableFoo {
 }
 
 //jig:template Never<Foo>
-//jig:needs Create<Foo>
+//jig:needs Observable<Foo>
 
 // NeverFoo creates an ObservableFoo that emits no items and does't terminate.
 func NeverFoo() ObservableFoo {
-	return CreateFoo(func(observer FooObserver) {
-	})
+	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {}
+	return observable
 }
 
 //jig:template Range
