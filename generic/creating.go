@@ -73,13 +73,18 @@ func DeferFoo(factory func() ObservableFoo) ObservableFoo {
 }
 
 //jig:template Empty<Foo>
-//jig:needs Create<Foo>
+//jig:needs Observable<Foo>
 
 // EmptyFoo creates an Observable that emits no items but terminates normally.
 func EmptyFoo() ObservableFoo {
-	return CreateFoo(func(observer FooObserver) {
-		observer.Complete()
-	})
+	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		subscribeOn.Schedule(func() {
+			if !subscriber.Canceled() {
+				observe(zeroFoo, nil, true)
+			}
+		})
+	}
+	return observable
 }
 
 //jig:template Error<Foo>
