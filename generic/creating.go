@@ -191,20 +191,30 @@ func FromSliceFoo(slice []foo) ObservableFoo {
 }
 
 //jig:template Interval
-//jig:needs CreateInt
+//jig:needs ObservableInt
 
 // Interval creates an ObservableInt that emits a sequence of integers spaced
 // by a particular time interval.
 func Interval(interval time.Duration) ObservableInt {
-	return CreateInt(func(observer IntObserver) {
-		for i := 0; ; i++ {
-			time.Sleep(interval)
-			if observer.Closed() {
+	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		i := 0
+		scheduler.ScheduleRecursive(func(self func()) {
+			if subscriber.Canceled() {
 				return
 			}
-			observer.Next(i)
-		}
-	})
+			time.Sleep(interval)
+			if subscriber.Canceled() {
+				return
+			}
+			observe(i, nil, false)
+			if subscriber.Canceled() {
+				return
+			}
+			i++
+			self()
+		})
+	}
+	return observable
 }
 
 //jig:template Just<Foo>
