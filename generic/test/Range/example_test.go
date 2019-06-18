@@ -20,13 +20,7 @@ func Example_range() {
 }
 
 func Example_subscribe() {
-	Range(1, 5).Subscribe(func(next int, err error, done bool) {
-		if !done {
-			fmt.Println(next)
-		} else {
-			fmt.Println("done")
-		}
-	})
+	Range(1, 5).DoOnComplete(func(){fmt.Println("done")}).Println()
 
 	//Output:
 	// 1

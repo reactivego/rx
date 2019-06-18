@@ -242,7 +242,7 @@ func NeverFoo() ObservableFoo {
 }
 
 //jig:template Range
-//jig:needs CreateInt
+//jig:needs ObservableInt
 
 // Range creates an ObservableInt that emits a range of sequential integers.
 func Range(start, count int) ObservableInt {
@@ -250,10 +250,10 @@ func Range(start, count int) ObservableInt {
 	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := start
 		scheduler.ScheduleRecursive(func(self func()) {
-			if !subscriber.Closed() {
+			if !subscriber.Canceled() {
 				if i < end {
 					observe(i, nil, false)
-					if !subscriber.Closed() {
+					if !subscriber.Canceled() {
 						i++
 						self()
 					}
