@@ -14,7 +14,7 @@ type Subscriber subscriber.Subscriber
 // Subscription is an alias for the subscriber.Subscription interface type.
 type Subscription subscriber.Subscription
 
-//jig:template Observable<Foo> Print
+//jig:template Observable<Foo> Println
 //jig:needs Schedulers, Subscriber
 
 // Println subscribes to the Observable and prints every item to os.Stdout

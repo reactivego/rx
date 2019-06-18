@@ -250,23 +250,23 @@ func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
 
 func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
 
-//jig:name ObservableVectorPrint
+//jig:name ObservableVectorPrintln
 
-// Print subscribes to the Observable and prints every item to os.Stdout while
-// it waits for completion or error. Returns either the error or nil when the
-// Observable completed normally.
-func (o ObservableVector) Print() (e error) {
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+func (o ObservableVector) Println() (err error) {
 	subscriber := subscriber.New()
 	scheduler := CurrentGoroutineScheduler()
-	observer := func(next Vector, err error, done bool) {
+	observer := func(next Vector, e error, done bool) {
 		if !done {
 			fmt.Println(next)
 		} else {
-			e = err
+			err = e
 			subscriber.Unsubscribe()
 		}
 	}
 	o(observer, scheduler, subscriber)
 	subscriber.Wait()
-	return e
+	return
 }

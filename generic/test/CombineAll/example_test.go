@@ -8,7 +8,7 @@ func Example_combineAll() {
 
 	FromObservableInt(a,b).CombineAll().MapVector(func(next IntSlice) Vector {
 		return Vector{next[0], next[1]}
-	}).Print()
+	}).Println()
 
 	// Output:
 	// {1 4}
