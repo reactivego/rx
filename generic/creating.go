@@ -208,14 +208,27 @@ func Interval(interval time.Duration) ObservableInt {
 }
 
 //jig:template Just<Foo>
-//jig:needs Create<Foo>
+//jig:needs Observable<Foo>
 
 // JustFoo creates an ObservableFoo that emits a particular item.
 func JustFoo(element foo) ObservableFoo {
-	return CreateFoo(func(observer FooObserver) {
-		observer.Next(element)
-		observer.Complete()
-	})
+	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		done := false
+		subscribeOn.ScheduleRecursive(func(self func()) {
+			if !subscriber.Canceled() {
+				if !done {
+					observe(element, nil, false)
+					if !subscriber.Canceled() {
+						done = true
+						self()
+					}
+				} else {
+					observe(zeroFoo, nil, true)
+				}
+			}
+		})
+	}
+	return observable
 }
 
 //jig:template Never<Foo>
