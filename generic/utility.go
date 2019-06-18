@@ -158,7 +158,7 @@ func (o Observable) Timeout(timeout time.Duration) Observable {
 				deadline.Reset(timeout)
 			}
 		}
-		watchdog := func() {
+		timeouter := func() {
 			select {
 			case <-deadline.C:
 				if subscriber.Closed() {
@@ -168,7 +168,7 @@ func (o Observable) Timeout(timeout time.Duration) Observable {
 			case <-unsubscribe:
 			}
 		}
-		go watchdog()
+		go timeouter()
 		o(observer, subscribeOn, subscriber.Add(func() { close(unsubscribe) }))
 	})
 	return observable.Serialize()
