@@ -14,9 +14,7 @@ import (
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
-}
+type Scheduler scheduler.Scheduler
 
 //jig:name Subscriber
 
@@ -38,6 +36,14 @@ type IntObserveFunc func(next int, err error, done bool)
 
 var zeroInt int
 
+//jig:name ObservableInt
+
+// ObservableInt is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
+
+//jig:name IntObserver
+
 // Next is called by an ObservableInt to emit the next int value to the
 // observer.
 func (f IntObserveFunc) Next(next int) {
@@ -54,14 +60,6 @@ func (f IntObserveFunc) Error(err error) {
 func (f IntObserveFunc) Complete() {
 	f(zeroInt, nil, true)
 }
-
-//jig:name ObservableInt
-
-// ObservableInt is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
-
-//jig:name IntObserver
 
 // IntObserver is the interface used with CreateInt when implementing a custom
 // observable.
@@ -110,38 +108,48 @@ func (o ObservableInt) MergeDelayError(other ...ObservableInt) ObservableInt {
 		return o
 	}
 	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		var (
-			mutex		sync.Mutex
-			count		= 1 + len(other)
-			delayedErr	error
-		)
+		var observers struct {
+			sync.Mutex
+			len	int
+			err	error
+		}
 		observer := func(next int, err error, done bool) {
-			mutex.Lock()
-			defer mutex.Unlock()
+			observers.Lock()
+			defer observers.Unlock()
 			if !done {
 				observe(next, nil, false)
 			} else {
 				if err != nil {
-					delayedErr = err
+					observers.err = err
 				}
-				if count--; count == 0 {
-					observe(zeroInt, delayedErr, true)
+				if observers.len--; observers.len == 0 {
+					observe(zeroInt, observers.err, true)
 				}
 			}
 		}
-		o(observer, subscribeOn, subscriber)
-		for _, o := range other {
-			o(observer, subscribeOn, subscriber)
-		}
+		subscribeOn.Schedule(func() {
+			if !subscriber.Canceled() {
+				observers.len = 1 + len(other)
+				o(observer, subscribeOn, subscriber)
+				for _, o := range other {
+					if subscriber.Canceled() {
+						return
+					}
+					o(observer, subscribeOn, subscriber)
+				}
+			}
+		})
 	}
 	return observable
 }
 
-//jig:name NewScheduler
+//jig:name Schedulers
 
-func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
+func ImmediateScheduler() Scheduler	{ return scheduler.Immediate }
 
 func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
+
+func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
 
 //jig:name SubscribeOption
 

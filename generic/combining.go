@@ -175,25 +175,40 @@ func (o ObservableFoo) Merge(other ...ObservableFoo) ObservableFoo {
 		return o
 	}
 	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		var (
-			mutex sync.Mutex
-			count = 1 + len(other)
-		)
+		var observers struct {
+			sync.Mutex
+			done bool
+			len  int
+		}
 		observer := func(next foo, err error, done bool) {
-			mutex.Lock()
-			defer mutex.Unlock()
-			if !done || err != nil {
-				observe(next, err, done)
-			} else {
-				if count--; count == 0 {
-					observe(zeroFoo, nil, true)
+			observers.Lock()
+			defer observers.Unlock()
+			if !observers.done {
+				switch {
+				case !done:
+					observe(next, nil, false)
+				case err != nil:
+					observers.done = true
+					observe(zeroFoo, err, true)
+				default:
+					if observers.len--; observers.len == 0 {
+						observe(zeroFoo, nil, true)
+					}
 				}
 			}
 		}
-		o(observer, subscribeOn, subscriber)
-		for _, o := range other {
-			o(observer, subscribeOn, subscriber)
-		}
+		subscribeOn.Schedule(func() {
+			if !subscriber.Canceled() {
+				observers.len = 1 + len(other)
+				o(observer, subscribeOn, subscriber)
+				for _, o := range other {
+					if subscriber.Canceled() {
+						return
+					}
+					o(observer, subscribeOn, subscriber)
+				}
+			}
+		})
 	}
 	return observable
 }
@@ -203,30 +218,42 @@ func (o ObservableFoo) Merge(other ...ObservableFoo) ObservableFoo {
 // MergeAll flattens a higher order observable by merging the observables it emits.
 func (o ObservableObservableFoo) MergeAll() ObservableFoo {
 	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		var (
-			mutex sync.Mutex
-			count int32 = 1
-		)
+		var observers struct {
+			sync.Mutex
+			done bool
+			len  int32
+		}
 		observer := func(next foo, err error, done bool) {
-			mutex.Lock()
-			defer mutex.Unlock()
-			if !done || err != nil {
-				observe(next, err, done)
-			} else {
-				if atomic.AddInt32(&count, -1) == 0 {
-					observe(zeroFoo, nil, true)
+			observers.Lock()
+			defer observers.Unlock()
+			if !observers.done {
+				switch {
+				case !done:
+					observe(next, nil, false)
+				case err != nil:
+					observers.done = true
+					observe(zeroFoo, err, true)
+				default:
+					if atomic.AddInt32(&observers.len, -1) == 0 {
+						observe(zeroFoo, nil, true)
+					}
 				}
 			}
 		}
 		merger := func(next ObservableFoo, err error, done bool) {
 			if !done {
-				atomic.AddInt32(&count, 1)
+				atomic.AddInt32(&observers.len, 1)
 				next(observer, subscribeOn, subscriber)
 			} else {
 				observer(zeroFoo, err, true)
 			}
 		}
-		o(merger, subscribeOn, subscriber)
+		subscribeOn.Schedule(func() {
+			if !subscriber.Canceled() {
+				observers.len = 1
+				o(merger, subscribeOn, subscriber)
+			}
+		})
 	}
 	return observable
 }
@@ -252,29 +279,37 @@ func (o ObservableFoo) MergeDelayError(other ...ObservableFoo) ObservableFoo {
 		return o
 	}
 	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		var (
-			mutex      sync.Mutex
-			count      = 1 + len(other)
-			delayedErr error
-		)
+		var observers struct {
+			sync.Mutex
+			len int
+			err error
+		}
 		observer := func(next foo, err error, done bool) {
-			mutex.Lock()
-			defer mutex.Unlock()
+			observers.Lock()
+			defer observers.Unlock()
 			if !done {
 				observe(next, nil, false)
 			} else {
 				if err != nil {
-					delayedErr = err
+					observers.err = err
 				}
-				if count--; count == 0 {
-					observe(zeroFoo, delayedErr, true)
+				if observers.len--; observers.len == 0 {
+					observe(zeroFoo, observers.err, true)
 				}
 			}
 		}
-		o(observer, subscribeOn, subscriber)
-		for _, o := range other {
-			o(observer, subscribeOn, subscriber)
-		}
+		subscribeOn.Schedule(func() {
+			if !subscriber.Canceled() {
+				observers.len = 1 + len(other)
+				o(observer, subscribeOn, subscriber)
+				for _, o := range other {
+					if subscriber.Canceled() {
+						return
+					}
+					o(observer, subscribeOn, subscriber)
+				}
+			}
+		})
 	}
 	return observable
 }

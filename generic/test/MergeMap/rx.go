@@ -15,9 +15,7 @@ import (
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
-}
+type Scheduler scheduler.Scheduler
 
 //jig:name Subscriber
 
@@ -39,6 +37,14 @@ type IntObserveFunc func(next int, err error, done bool)
 
 var zeroInt int
 
+//jig:name ObservableInt
+
+// ObservableInt is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
+
+//jig:name IntObserver
+
 // Next is called by an ObservableInt to emit the next int value to the
 // observer.
 func (f IntObserveFunc) Next(next int) {
@@ -55,14 +61,6 @@ func (f IntObserveFunc) Error(err error) {
 func (f IntObserveFunc) Complete() {
 	f(zeroInt, nil, true)
 }
-
-//jig:name ObservableInt
-
-// ObservableInt is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
-
-//jig:name IntObserver
 
 // IntObserver is the interface used with CreateInt when implementing a custom
 // observable.
@@ -107,15 +105,23 @@ func CreateInt(f func(IntObserver)) ObservableInt {
 // Range creates an ObservableInt that emits a range of sequential integers.
 func Range(start, count int) ObservableInt {
 	end := start + count
-	return CreateInt(func(observer IntObserver) {
-		for i := start; i < end; i++ {
-			if observer.Closed() {
-				return
+	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		i := start
+		scheduler.ScheduleRecursive(func(self func()) {
+			if !subscriber.Closed() {
+				if i < end {
+					observe(i, nil, false)
+					if !subscriber.Closed() {
+						i++
+						self()
+					}
+				} else {
+					observe(zeroInt, nil, true)
+				}
 			}
-			observer.Next(i)
-		}
-		observer.Complete()
-	})
+		})
+	}
+	return observable
 }
 
 //jig:name ObservableIntMergeMapInt
@@ -127,11 +133,13 @@ func (o ObservableInt) MergeMapInt(project func(int) ObservableInt) ObservableIn
 	return o.MapObservableInt(project).MergeAll()
 }
 
-//jig:name NewScheduler
+//jig:name Schedulers
 
-func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
+func ImmediateScheduler() Scheduler	{ return scheduler.Immediate }
 
 func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
+
+func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
 
 //jig:name SubscribeOption
 
@@ -270,23 +278,6 @@ type ObservableIntObserveFunc func(next ObservableInt, err error, done bool)
 
 var zeroObservableInt ObservableInt
 
-// Next is called by an ObservableObservableInt to emit the next ObservableInt value to the
-// observer.
-func (f ObservableIntObserveFunc) Next(next ObservableInt) {
-	f(next, nil, false)
-}
-
-// Error is called by an ObservableObservableInt to report an error to the observer.
-func (f ObservableIntObserveFunc) Error(err error) {
-	f(zeroObservableInt, err, true)
-}
-
-// Complete is called by an ObservableObservableInt to signal that no more data is
-// forthcoming to the observer.
-func (f ObservableIntObserveFunc) Complete() {
-	f(zeroObservableInt, nil, true)
-}
-
 //jig:name ObservableObservableInt
 
 // ObservableObservableInt is essentially a subscribe function taking an observe
@@ -298,30 +289,42 @@ type ObservableObservableInt func(ObservableIntObserveFunc, Scheduler, Subscribe
 // MergeAll flattens a higher order observable by merging the observables it emits.
 func (o ObservableObservableInt) MergeAll() ObservableInt {
 	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		var (
-			mutex	sync.Mutex
-			count	int32	= 1
-		)
+		var observers struct {
+			sync.Mutex
+			done	bool
+			len	int32
+		}
 		observer := func(next int, err error, done bool) {
-			mutex.Lock()
-			defer mutex.Unlock()
-			if !done || err != nil {
-				observe(next, err, done)
-			} else {
-				if atomic.AddInt32(&count, -1) == 0 {
-					observe(zeroInt, nil, true)
+			observers.Lock()
+			defer observers.Unlock()
+			if !observers.done {
+				switch {
+				case !done:
+					observe(next, nil, false)
+				case err != nil:
+					observers.done = true
+					observe(zeroInt, err, true)
+				default:
+					if atomic.AddInt32(&observers.len, -1) == 0 {
+						observe(zeroInt, nil, true)
+					}
 				}
 			}
 		}
 		merger := func(next ObservableInt, err error, done bool) {
 			if !done {
-				atomic.AddInt32(&count, 1)
+				atomic.AddInt32(&observers.len, 1)
 				next(observer, subscribeOn, subscriber)
 			} else {
 				observer(zeroInt, err, true)
 			}
 		}
-		o(merger, subscribeOn, subscriber)
+		subscribeOn.Schedule(func() {
+			if !subscriber.Canceled() {
+				observers.len = 1
+				o(merger, subscribeOn, subscriber)
+			}
+		})
 	}
 	return observable
 }

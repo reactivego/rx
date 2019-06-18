@@ -15,9 +15,7 @@ import (
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
-}
+type Scheduler scheduler.Scheduler
 
 //jig:name Subscriber
 
@@ -39,6 +37,14 @@ type ObservableStringObserveFunc func(next ObservableString, err error, done boo
 
 var zeroObservableString ObservableString
 
+//jig:name ObservableObservableString
+
+// ObservableObservableString is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type ObservableObservableString func(ObservableStringObserveFunc, Scheduler, Subscriber)
+
+//jig:name ObservableStringObserver
+
 // Next is called by an ObservableObservableString to emit the next ObservableString value to the
 // observer.
 func (f ObservableStringObserveFunc) Next(next ObservableString) {
@@ -55,14 +61,6 @@ func (f ObservableStringObserveFunc) Error(err error) {
 func (f ObservableStringObserveFunc) Complete() {
 	f(zeroObservableString, nil, true)
 }
-
-//jig:name ObservableObservableString
-
-// ObservableObservableString is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableObservableString func(ObservableStringObserveFunc, Scheduler, Subscriber)
-
-//jig:name ObservableStringObserver
 
 // ObservableStringObserver is the interface used with CreateObservableString when implementing a custom
 // observable.
@@ -114,6 +112,14 @@ type StringObserveFunc func(next string, err error, done bool)
 
 var zeroString string
 
+//jig:name ObservableString
+
+// ObservableString is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type ObservableString func(StringObserveFunc, Scheduler, Subscriber)
+
+//jig:name StringObserver
+
 // Next is called by an ObservableString to emit the next string value to the
 // observer.
 func (f StringObserveFunc) Next(next string) {
@@ -130,14 +136,6 @@ func (f StringObserveFunc) Error(err error) {
 func (f StringObserveFunc) Complete() {
 	f(zeroString, nil, true)
 }
-
-//jig:name ObservableString
-
-// ObservableString is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableString func(StringObserveFunc, Scheduler, Subscriber)
-
-//jig:name StringObserver
 
 // StringObserver is the interface used with CreateString when implementing a custom
 // observable.
@@ -192,39 +190,53 @@ func JustString(element string) ObservableString {
 // MergeAll flattens a higher order observable by merging the observables it emits.
 func (o ObservableObservableString) MergeAll() ObservableString {
 	observable := func(observe StringObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		var (
-			mutex	sync.Mutex
-			count	int32	= 1
-		)
+		var observers struct {
+			sync.Mutex
+			done	bool
+			len	int32
+		}
 		observer := func(next string, err error, done bool) {
-			mutex.Lock()
-			defer mutex.Unlock()
-			if !done || err != nil {
-				observe(next, err, done)
-			} else {
-				if atomic.AddInt32(&count, -1) == 0 {
-					observe(zeroString, nil, true)
+			observers.Lock()
+			defer observers.Unlock()
+			if !observers.done {
+				switch {
+				case !done:
+					observe(next, nil, false)
+				case err != nil:
+					observers.done = true
+					observe(zeroString, err, true)
+				default:
+					if atomic.AddInt32(&observers.len, -1) == 0 {
+						observe(zeroString, nil, true)
+					}
 				}
 			}
 		}
 		merger := func(next ObservableString, err error, done bool) {
 			if !done {
-				atomic.AddInt32(&count, 1)
+				atomic.AddInt32(&observers.len, 1)
 				next(observer, subscribeOn, subscriber)
 			} else {
 				observer(zeroString, err, true)
 			}
 		}
-		o(merger, subscribeOn, subscriber)
+		subscribeOn.Schedule(func() {
+			if !subscriber.Canceled() {
+				observers.len = 1
+				o(merger, subscribeOn, subscriber)
+			}
+		})
 	}
 	return observable
 }
 
-//jig:name NewScheduler
+//jig:name Schedulers
 
-func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
+func ImmediateScheduler() Scheduler	{ return scheduler.Immediate }
 
 func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
+
+func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
 
 //jig:name SubscribeOption
 
