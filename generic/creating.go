@@ -61,7 +61,7 @@ func CreateFoo(f func(FooObserver)) ObservableFoo {
 }
 
 //jig:template Defer<Foo>
-//jig:needs Create<Foo>
+//jig:needs Observable<Foo>
 
 // DeferFoo does not create the ObservableFoo until the observer subscribes,
 // and creates a fresh ObservableFoo for each observer.

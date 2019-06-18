@@ -11,12 +11,13 @@ func Example_defer() {
 		count++
 		return FromInt(count)
 	})
+	mapped := source.MapString(func(next int) string {
+		return fmt.Sprintf("observable %d", next)
+	})
 
-	observe := func(next int) {
-		fmt.Printf("observable %d\n", next)
-	}
-	source.SubscribeNext(observe)
-	source.SubscribeNext(observe)
+	// Println will subscribe to the observable
+	mapped.Println()
+	mapped.Println()
 
 	// Output:
 	// observable 1
