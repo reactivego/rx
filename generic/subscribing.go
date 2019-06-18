@@ -14,6 +14,28 @@ type Subscriber subscriber.Subscriber
 // Subscription is an alias for the subscriber.Subscription interface type.
 type Subscription subscriber.Subscription
 
+//jig:template Observable<Foo> Print
+//jig:needs Schedulers, Subscriber
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+func (o ObservableFoo) Println() (err error) {
+	subscriber := subscriber.New()
+	scheduler := CurrentGoroutineScheduler()
+	observer := func(next foo, e error, done bool) {
+		if !done {
+			fmt.Println(next)
+		} else {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
+}
+
 //jig:template SubscribeOption
 //jig:needs Schedulers, Subscriber
 
@@ -114,23 +136,6 @@ func (o ObservableFoo) SubscribeNext(f func(next foo), options ...SubscribeOptio
 			f(next)
 		}
 	}, options...)
-}
-
-//jig:template Observable<Foo> Println
-//jig:needs Observable<Foo> Subscribe
-
-// Println subscribes to the Observable and prints every item to os.Stdout while
-// it waits for completion or error. Returns either the error or nil when the
-// Observable completed normally.
-func (o ObservableFoo) Println(options ...SubscribeOption) (e error) {
-	o.Subscribe(func(next foo, err error, done bool) {
-		if !done {
-			fmt.Println(next)
-		} else {
-			e = err
-		}
-	}, options...).Wait()
-	return e
 }
 
 //jig:template Observable ToChan
