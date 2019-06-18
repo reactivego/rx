@@ -323,12 +323,17 @@ func StartFoo(f func() (foo, error)) ObservableFoo {
 }
 
 //jig:template Throw<Foo>
-//jig:needs Create<Foo>
+//jig:needs Observable<Foo>
 
 // ThrowFoo creates an Observable that emits no items and terminates with an
 // error.
 func ThrowFoo(err error) ObservableFoo {
-	return CreateFoo(func(observer FooObserver) {
-		observer.Error(err)
-	})
+	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		subscribeOn.Schedule(func() {
+			if !subscriber.Canceled() {
+				observe(zeroFoo, err, true)
+			}
+		})
+	}
+	return observable
 }

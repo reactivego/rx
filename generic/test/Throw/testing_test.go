@@ -6,9 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestThrow(t *testing.T) {
-	result, err := ThrowInt(RxError("throw")).ToSlice()
-	expect := []int(nil)
+func TestError_println(t *testing.T) {
+	err := ErrorInt(RxError("throw")).Println()
 	assert.EqualError(t, err, "throw")
-	assert.Equal(t, expect, result)
 }
