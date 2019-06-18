@@ -12,23 +12,6 @@ type FooObserveFunc func(next foo, err error, done bool)
 
 var zeroFoo foo
 
-// Next is called by an ObservableFoo to emit the next foo value to the
-// observer.
-func (f FooObserveFunc) Next(next foo) {
-	f(next, nil, false)
-}
-
-// Error is called by an ObservableFoo to report an error to the observer.
-func (f FooObserveFunc) Error(err error) {
-	f(zeroFoo, err, true)
-}
-
-// Complete is called by an ObservableFoo to signal that no more data is
-// forthcoming to the observer.
-func (f FooObserveFunc) Complete() {
-	f(zeroFoo, nil, true)
-}
-
 //jig:template Observable<Foo>
 //jig:needs Scheduler, Subscriber, <Foo>ObserveFunc
 

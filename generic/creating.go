@@ -4,6 +4,23 @@ import "time"
 
 //jig:template <Foo>Observer
 
+// Next is called by an ObservableFoo to emit the next foo value to the
+// observer.
+func (f FooObserveFunc) Next(next foo) {
+	f(next, nil, false)
+}
+
+// Error is called by an ObservableFoo to report an error to the observer.
+func (f FooObserveFunc) Error(err error) {
+	f(zeroFoo, err, true)
+}
+
+// Complete is called by an ObservableFoo to signal that no more data is
+// forthcoming to the observer.
+func (f FooObserveFunc) Complete() {
+	f(zeroFoo, nil, true)
+}
+
 // FooObserver is the interface used with CreateFoo when implementing a custom
 // observable.
 type FooObserver interface {
@@ -140,19 +157,27 @@ func FromFoos(slice ...foo) ObservableFoo {
 }
 
 //jig:template FromSlice<Foo>
-//jig:needs Create<Foo>
+//jig:needs Observable<Foo>
 
 // FromSliceFoo creates an ObservableFoo from a slice of foo values passed in.
 func FromSliceFoo(slice []foo) ObservableFoo {
-	return CreateFoo(func(observer FooObserver) {
-		for _, next := range slice {
-			if observer.Closed() {
-				return
+	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		i := 0
+		subscribeOn.ScheduleRecursive(func(self func()) {
+			if !subscriber.Canceled() {
+				if i < len(slice) {
+					observe(slice[i], nil, false)
+					if !subscriber.Canceled() {
+						i++
+						self()
+					}
+				} else {
+					observe(zeroFoo, nil, true)
+				}
 			}
-			observer.Next(next)
-		}
-		observer.Complete()
-	})
+		})
+	}
+	return observable
 }
 
 //jig:template Interval
