@@ -305,21 +305,34 @@ func RepeatFoo(value foo, count int) ObservableFoo {
 }
 
 //jig:template Start<Foo>
-//jig:needs Create<Foo>
+//jig:needs Observable<Foo>
 
 // StartFoo creates an ObservableFoo that emits the return value of a function.
 // It is designed to be used with a function that returns a (foo, error) tuple.
 // If the error is non-nil the returned ObservableFoo will be that error,
 // otherwise it will be a single-value stream of foo.
 func StartFoo(f func() (foo, error)) ObservableFoo {
-	return CreateFoo(func(observer FooObserver) {
-		if next, err := f(); err == nil {
-			observer.Next(next)
-			observer.Complete()
-		} else {
-			observer.Error(err)
-		}
-	})
+	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		var done bool
+		subscribeOn.ScheduleRecursive(func(self func()) {
+			if !subscriber.Canceled() {
+				if !done {
+					if next, err := f(); err == nil {
+						observe(next, nil, false)
+						if !subscriber.Canceled() {
+							done = true
+							self()
+						}
+					} else {
+						observe(zeroFoo, err, true)	
+					}
+				} else {
+					observe(zeroFoo, nil, true)
+				}
+			}
+		})
+	}
+	return observable
 }
 
 //jig:template Throw<Foo>

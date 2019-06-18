@@ -1,7 +1,6 @@
 package Start
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,8 +18,8 @@ func TestStart(t *testing.T) {
 }
 
 func TestStartWithError(t *testing.T) {
-	result, err := StartInt(func() (int, error) { return 0, errors.New("error") }).ToSlice()
+	result, err := StartInt(func() (int, error) { return 0, RxError("start-with-error") }).ToSlice()
 	expect := []int(nil)
-	assert.EqualError(t, err, "error")
+	assert.EqualError(t, err, "start-with-error")
 	assert.Equal(t, expect, result)
 }
