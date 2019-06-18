@@ -312,20 +312,28 @@ func (o ObservableFoo) Repeat(count int) ObservableFoo {
 }
 
 //jig:template Repeat<Foo>
-//jig:needs Create<Foo>
+//jig:needs Observable<Foo>
 
 // RepeatFoo creates an ObservableFoo that emits a particular item or sequence
 // of items repeatedly.
 func RepeatFoo(value foo, count int) ObservableFoo {
-	return CreateFoo(func(observer FooObserver) {
-		for i := 0; i < count; i++ {
-			if observer.Closed() {
-				return
+	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		i := 0
+		subscribeOn.ScheduleRecursive(func(self func()) {
+			if !subscriber.Canceled() {
+				if i < count {
+					observe(value, nil, false)
+					if !subscriber.Canceled() {
+						i++
+						self()
+					}
+				} else {
+					observe(zeroFoo, nil, true)
+				}
 			}
-			observer.Next(value)
-		}
-		observer.Complete()
-	})
+		})
+	}
+	return observable
 }
 
 //jig:template Start<Foo>
