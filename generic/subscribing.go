@@ -147,11 +147,12 @@ func (o ObservableFoo) SubscribeNext(f func(next foo), options ...SubscribeOptio
 // values.
 //
 // Because the channel is fed by subscribing to the observable, ToChan would
-// block when subscribed on the standard Trampoline scheduler which is initially
-// synchronous. That's why the subscribing is done on the Goroutine scheduler.
+// block when subscribed on the standard Trampoline scheduler which is
+// initially synchronous. That's why the subscribing is done on the
+// NewGoroutine scheduler.
 //
 // To cancel the subscription created internally by ToChan you will need access
-// to the subscription used internnally by ToChan. To get at this subscription,
+// to the subscription used internally by ToChan. To get at this subscription,
 // pass the result of a call to option OnSubscribe(func(Subscription)) as a
 // parameter to ToChan. On suscription the callback will be called with the
 // subscription that was created.
@@ -182,9 +183,10 @@ func (o Observable) ToChan(options ...SubscribeOption) <-chan interface{} {
 // There is no way to determine whether the observable feeding into the
 // channel terminated with an error or completed normally.
 // Because the channel is fed by subscribing to the observable, ToChan would
-// block when subscribed on the standard Trampoline scheduler which is initially
-// synchronous. That's why the subscribing is done on the Goroutine scheduler.
-// It is not possible to cancel the subscription created internally by ToChan.
+// block when subscribed on the standard Trampoline scheduler which is
+// initially synchronous. That's why the subscribing is done on the
+// NewGoroutine scheduler. It is not possible to cancel the subscription
+// created internally by ToChan.
 func (o ObservableFoo) ToChan(options ...SubscribeOption) <-chan foo {
 	scheduler := NewGoroutineScheduler()
 	nextch := make(chan foo, 1)
@@ -204,19 +206,20 @@ func (o ObservableFoo) ToChan(options ...SubscribeOption) <-chan foo {
 // ToSingle blocks until the ObservableFoo emits exactly one value or an error.
 // The value and any error are returned.
 //
-// This function subscribes to the source observable on the Goroutine scheduler.
-// The Goroutine scheduler works in more situations for complex chains of
-// observables, like when merging the output of multiple observables.
-func (o ObservableFoo) ToSingle(options ...SubscribeOption) (v foo, e error) {
+// This function subscribes to the source observable on the NewGoroutine
+// scheduler. The NewGoroutine scheduler works in more situations for
+// complex chains of observables, like when merging the output of multiple
+// observables.
+func (o ObservableFoo) ToSingle(options ...SubscribeOption) (entry foo, err error) {
 	scheduler := NewGoroutineScheduler()
-	o.Single().Subscribe(func(next foo, err error, done bool) {
+	o.Single().Subscribe(func(next foo, e error, done bool) {
 		if !done {
-			v = next
+			entry = next
 		} else {
-			e = err
+			err = e
 		}
 	}, SubscribeOn(scheduler, options...)).Wait()
-	return v, e
+	return
 }
 
 //jig:template Observable<Foo> ToSlice
@@ -225,19 +228,20 @@ func (o ObservableFoo) ToSingle(options ...SubscribeOption) (v foo, e error) {
 // ToSlice collects all values from the ObservableFoo into an slice. The
 // complete slice and any error are returned.
 //
-// This function subscribes to the source observable on the Goroutine scheduler.
-// The Goroutine scheduler works in more situations for complex chains of
-// observables, like when merging the output of multiple observables.
-func (o ObservableFoo) ToSlice(options ...SubscribeOption) (a []foo, e error) {
+// This function subscribes to the source observable on the NewGoroutine
+// scheduler. The NewGoroutine scheduler works in more situations for
+// complex chains of observables, like when merging the output of multiple
+// observables.
+func (o ObservableFoo) ToSlice(options ...SubscribeOption) (slice []foo, err error) {
 	scheduler := NewGoroutineScheduler()
-	o.Subscribe(func(next foo, err error, done bool) {
+	o.Subscribe(func(next foo, e error, done bool) {
 		if !done {
-			a = append(a, next)
+			slice = append(slice, next)
 		} else {
-			e = err
+			err = e
 		}
 	}, SubscribeOn(scheduler, options...)).Wait()
-	return a, e
+	return
 }
 
 //jig:template Observable<Foo> Wait
@@ -245,11 +249,12 @@ func (o ObservableFoo) ToSlice(options ...SubscribeOption) (a []foo, e error) {
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
-func (o ObservableFoo) Wait(options ...SubscribeOption) (e error) {
-	o.Subscribe(func(next foo, err error, done bool) {
+// Subscription is performed on the normal CurrentGoroutine scheduler.
+func (o ObservableFoo) Wait(options ...SubscribeOption) (err error) {
+	o.Subscribe(func(next foo, e error, done bool) {
 		if done {
-			e = err
+			err = e
 		}
 	}, options...).Wait()
-	return e
+	return
 }

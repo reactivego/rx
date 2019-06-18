@@ -223,7 +223,8 @@ func JustFoo(element foo) ObservableFoo {
 
 // NeverFoo creates an ObservableFoo that emits no items and does't terminate.
 func NeverFoo() ObservableFoo {
-	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {}
+	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+	}
 	return observable
 }
 
@@ -313,7 +314,7 @@ func RepeatFoo(value foo, count int) ObservableFoo {
 // otherwise it will be a single-value stream of foo.
 func StartFoo(f func() (foo, error)) ObservableFoo {
 	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		var done bool
+		done := false
 		subscribeOn.ScheduleRecursive(func(self func()) {
 			if !subscriber.Canceled() {
 				if !done {
@@ -324,7 +325,7 @@ func StartFoo(f func() (foo, error)) ObservableFoo {
 							self()
 						}
 					} else {
-						observe(zeroFoo, err, true)	
+						observe(zeroFoo, err, true)
 					}
 				} else {
 					observe(zeroFoo, nil, true)
