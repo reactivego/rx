@@ -83,14 +83,19 @@ func EmptyFoo() ObservableFoo {
 }
 
 //jig:template Error<Foo>
-//jig:needs Create<Foo>
+//jig:needs Observable<Foo>
 
 // ErrorFoo creates an Observable that emits no items and terminates with an
 // error.
 func ErrorFoo(err error) ObservableFoo {
-	return CreateFoo(func(observer FooObserver) {
-		observer.Error(err)
-	})
+	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		subscribeOn.Schedule(func() {
+			if !subscriber.Canceled() {
+				observe(zeroFoo, err, true)
+			}
+		})
+	}
+	return observable
 }
 
 //jig:template FromChan<Foo>

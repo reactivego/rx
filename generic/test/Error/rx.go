@@ -5,6 +5,8 @@
 package Error
 
 import (
+	"fmt"
+
 	"github.com/reactivego/scheduler"
 	"github.com/reactivego/subscriber"
 )
@@ -12,9 +14,7 @@ import (
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
-}
+type Scheduler scheduler.Scheduler
 
 //jig:name Subscriber
 
@@ -36,77 +36,25 @@ type IntObserveFunc func(next int, err error, done bool)
 
 var zeroInt int
 
-// Next is called by an ObservableInt to emit the next int value to the
-// observer.
-func (f IntObserveFunc) Next(next int) {
-	f(next, nil, false)
-}
-
-// Error is called by an ObservableInt to report an error to the observer.
-func (f IntObserveFunc) Error(err error) {
-	f(zeroInt, err, true)
-}
-
-// Complete is called by an ObservableInt to signal that no more data is
-// forthcoming to the observer.
-func (f IntObserveFunc) Complete() {
-	f(zeroInt, nil, true)
-}
-
 //jig:name ObservableInt
 
 // ObservableInt is essentially a subscribe function taking an observe
 // function, scheduler and an subscriber.
 type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 
-//jig:name IntObserver
-
-// IntObserver is the interface used with CreateInt when implementing a custom
-// observable.
-type IntObserver interface {
-	// Next emits the next int value.
-	Next(int)
-	// Error signals an error condition.
-	Error(error)
-	// Complete signals that no more data is to be expected.
-	Complete()
-	// Closed returns true when the subscription has been canceled.
-	Closed() bool
-}
-
-//jig:name CreateInt
-
-// CreateInt creates an Observable from scratch by calling observer methods
-// programmatically.
-func CreateInt(f func(IntObserver)) ObservableInt {
-	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		scheduler.Schedule(func() {
-			if subscriber.Closed() {
-				return
-			}
-			observer := func(next int, err error, done bool) {
-				if !subscriber.Closed() {
-					observe(next, err, done)
-				}
-			}
-			type ObserverSubscriber struct {
-				IntObserveFunc
-				Subscriber
-			}
-			f(&ObserverSubscriber{observer, subscriber})
-		})
-	}
-	return observable
-}
-
 //jig:name ErrorInt
 
 // ErrorInt creates an Observable that emits no items and terminates with an
 // error.
 func ErrorInt(err error) ObservableInt {
-	return CreateInt(func(observer IntObserver) {
-		observer.Error(err)
-	})
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		subscribeOn.Schedule(func() {
+			if !subscriber.Canceled() {
+				observe(zeroInt, err, true)
+			}
+		})
+	}
+	return observable
 }
 
 //jig:name RxError
@@ -115,11 +63,34 @@ type RxError string
 
 func (e RxError) Error() string	{ return string(e) }
 
-//jig:name NewScheduler
+//jig:name Schedulers
+
+func ImmediateScheduler() Scheduler	{ return scheduler.Immediate }
+
+func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
 
 func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
 
-func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
+//jig:name ObservableIntPrintln
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+func (o ObservableInt) Println() (err error) {
+	subscriber := subscriber.New()
+	scheduler := CurrentGoroutineScheduler()
+	observer := func(next int, e error, done bool) {
+		if !done {
+			fmt.Println(next)
+		} else {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
+}
 
 //jig:name SubscribeOption
 
