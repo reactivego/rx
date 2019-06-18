@@ -111,19 +111,19 @@ func (o ObservableFoo) Passthrough() ObservableFoo {
 // well-behaved.
 func (o ObservableFoo) Serialize() ObservableFoo {
 	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		var (
-			mutex       sync.Mutex
-			alreadyDone bool
-		)
-		observer := func(next foo, err error, done bool) {
-			mutex.Lock()
-			defer mutex.Unlock()
-			if !alreadyDone {
-				alreadyDone = done
+		var observer struct {
+			sync.Mutex
+			done bool
+		}
+		serializer := func(next foo, err error, done bool) {
+			observer.Lock()
+			defer observer.Unlock()
+			if !observer.done {
+				observer.done = done
 				observe(next, err, done)
 			}
 		}
-		o(observer, subscribeOn, subscriber)
+		o(serializer, subscribeOn, subscriber)
 	}
 	return observable
 }
