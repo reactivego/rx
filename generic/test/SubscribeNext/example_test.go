@@ -1,7 +1,6 @@
 package SubscribeNext
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -14,7 +13,7 @@ func Example_subscribeNext() {
 		observer.Complete()
 		// Error will not be delivered by Subscribe, because when Subscribe got
 		// the Complete it immediately canceled the subscription.
-		observer.Error(errors.New("error"))
+		observer.Error(RxError("error"))
 	})
 
 	// ObserveNext function only called for next values not for error or complete.

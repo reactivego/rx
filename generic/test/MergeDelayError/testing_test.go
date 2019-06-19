@@ -1,7 +1,6 @@
 package MergeDelayError
 
 import (
-	"errors"
 	"testing"
 	"time"
 
@@ -12,7 +11,7 @@ func TestMergeDelayError(t *testing.T) {
 	sourceA := CreateInt(func(observer IntObserver) {
 		time.Sleep(10 * time.Millisecond)
 		observer.Next(1)
-		observer.Error(errors.New("error.sourceA"))
+		observer.Error(RxError("error.sourceA"))
 	})
 
 	sourceB := CreateInt(func(observer IntObserver) {

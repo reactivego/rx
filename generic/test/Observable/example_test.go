@@ -1,7 +1,6 @@
 package Observable
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -10,7 +9,7 @@ import (
 func Example_observable() {
 	observable := func(observe ObserveFunc, s Scheduler, u Subscriber) {
 		observe.Next(123)
-		observe.Error(errors.New("error"))
+		observe.Error(RxError("error"))
 		observe.Complete()
 	}
 

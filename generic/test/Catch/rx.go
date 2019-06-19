@@ -292,3 +292,9 @@ func (o ObservableInt) ToSlice(options ...SubscribeOption) (a []int, e error) {
 	}, SubscribeOn(scheduler, options...)).Wait()
 	return a, e
 }
+
+//jig:name RxError
+
+type RxError string
+
+func (e RxError) Error() string	{ return string(e) }

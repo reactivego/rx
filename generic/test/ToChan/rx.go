@@ -400,3 +400,9 @@ func (o ObservableInt) AsObservable() Observable {
 	}
 	return observable
 }
+
+//jig:name RxError
+
+type RxError string
+
+func (e RxError) Error() string	{ return string(e) }

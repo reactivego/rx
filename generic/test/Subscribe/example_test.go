@@ -1,7 +1,6 @@
 package Subscribe
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/reactivego/subscriber"
@@ -16,7 +15,7 @@ func Example_subscribeDirect() {
 		observer.Complete()
 		// Error will be delivered because we are not using the Subscribe method
 		// to subscribe to the observable.
-		observer.Error(errors.New("error"))
+		observer.Error(RxError("error"))
 	})
 
 	// Observe function. For both error and completed, done is true.
@@ -53,7 +52,7 @@ func Example_subscribe() {
 		observer.Complete()
 		// Error will not be delivered by Subscribe, because when Subscribe got
 		// the Complete it immediately canceled the subscription.
-		observer.Error(errors.New("error"))
+		observer.Error(RxError("error"))
 	})
 
 	// Observe function. For both error and completed, done is true.

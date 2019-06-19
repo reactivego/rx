@@ -191,3 +191,9 @@ func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOpt
 	o(observer, scheduler, subscriber)
 	return subscriber
 }
+
+//jig:name RxError
+
+type RxError string
+
+func (e RxError) Error() string	{ return string(e) }

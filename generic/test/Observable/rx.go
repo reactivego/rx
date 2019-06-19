@@ -49,3 +49,9 @@ type Subscriber subscriber.Subscriber
 
 // Subscription is an alias for the subscriber.Subscription interface type.
 type Subscription subscriber.Subscription
+
+//jig:name RxError
+
+type RxError string
+
+func (e RxError) Error() string	{ return string(e) }

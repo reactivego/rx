@@ -1,7 +1,6 @@
 package Observer
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -21,7 +20,7 @@ func Example_observeFunc() {
 	}
 
 	observe.Next(123)
-	observe.Error(errors.New("error"))
+	observe.Error(RxError("error"))
 	observe.Complete()
 
 	// Output:

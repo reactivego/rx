@@ -1,7 +1,6 @@
 package IgnoreCompletion
 
 import (
-	"errors"
 	"fmt"
 	"time"
 )
@@ -35,7 +34,7 @@ func Example_ignoreCompletionError() {
 		for i := 1; i < 6; i++ {
 			observer.Next(i)
 		}
-		observer.Error(errors.New("error"))
+		observer.Error(RxError("error"))
 	}).IgnoreCompletion()
 
 	// Subscribe asynchronously

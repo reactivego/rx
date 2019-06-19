@@ -203,3 +203,9 @@ func (o ObservableInt) SubscribeNext(f func(next int), options ...SubscribeOptio
 		}
 	}, options...)
 }
+
+//jig:name RxError
+
+type RxError string
+
+func (e RxError) Error() string	{ return string(e) }

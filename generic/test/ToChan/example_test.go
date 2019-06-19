@@ -1,7 +1,6 @@
 package ToChan
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -46,7 +45,7 @@ func Example_toChanError() {
 		for i := 1; i < 9; i++ {
 			observer.Next(i)
 		}
-		observer.Error(errors.New("sad"))
+		observer.Error(RxError("sad"))
 	})
 
 	for value := range source.ToChan() {

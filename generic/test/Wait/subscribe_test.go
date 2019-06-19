@@ -1,7 +1,6 @@
 package Wait
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -14,7 +13,7 @@ func Example_wait() {
 		observer.Complete()
 		// Error will not be delivered by Subscribe, because when Subscribe got
 		// the Complete it immediately canceled the subscription.
-		observer.Error(errors.New("error"))
+		observer.Error(RxError("error"))
 	})
 
 	// Subscribe (by default) only returns when observable has completed.

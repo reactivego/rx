@@ -1,7 +1,6 @@
 package Retry
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,7 +16,7 @@ func TestRetryTrampoline(t *testing.T) {
 			observer.Complete()
 		} else {
 			// Error triggers subscribe and subscribe is scheduled on trampoline....
-			observer.Error(errors.New("error"))
+			observer.Error(RxError("error"))
 			errored = true
 		}
 	}).SubscribeOn(CurrentGoroutineScheduler())
@@ -36,7 +35,7 @@ func TestRetryGoroutine(t *testing.T) {
 		if errored {
 			observer.Complete()
 		} else {
-			observer.Error(errors.New("error"))
+			observer.Error(RxError("error"))
 			errored = true
 		}
 	}).SubscribeOn(NewGoroutineScheduler())

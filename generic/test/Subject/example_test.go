@@ -1,7 +1,6 @@
 package Subject
 
 import (
-	"errors"
 	"fmt"
 	"sort"
 	"sync"
@@ -32,7 +31,7 @@ func Example_subjectError() {
 
 	// feed the subject...
 	go func() {
-		subject.Error(errors.New("something bad happened"))
+		subject.Error(RxError("something bad happened"))
 	}()
 
 	err := subject.Wait()

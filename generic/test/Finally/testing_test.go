@@ -1,7 +1,6 @@
 package Finally
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,7 +8,7 @@ import (
 
 func TestFinally(t *testing.T) {
 	finally := false
-	_, err := ThrowInt(errors.New("error")).Finally(func() { finally = true }).ToSlice()
+	_, err := ThrowInt(RxError("error")).Finally(func() { finally = true }).ToSlice()
 	assert.True(t, finally)
 	assert.Error(t, err)
 
