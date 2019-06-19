@@ -104,26 +104,37 @@ func ErrorFoo(err error) ObservableFoo {
 }
 
 //jig:template FromChan<Foo>
-//jig:needs Create<Foo>
+//jig:needs Observable<Foo>
 
 // FromChanFoo creates an ObservableFoo from a Go channel of foo values.
 // It's not possible for the code feeding into the channel to send an error.
 // The feeding code can send zero or more foo items and then closing the
 // channel will be seen as completion.
 func FromChanFoo(ch <-chan foo) ObservableFoo {
-	return CreateFoo(func(observer FooObserver) {
-		for next := range ch {
-			if observer.Closed() {
+	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		subscribeOn.ScheduleRecursive(func(self func()) {
+			if subscriber.Canceled() {
 				return
 			}
-			observer.Next(next)
-		}
-		observer.Complete()
-	})
+			next, ok := <-ch;
+			if subscriber.Canceled() {
+				return
+			}
+			if ok {
+				observe(next, nil, false)
+				if !subscriber.Canceled() {
+					self()
+				}
+			} else {			
+				observe(zeroFoo, nil, true)
+			}
+		})
+	}
+	return observable
 }
 
 //jig:template FromChan
-//jig:needs Create
+//jig:needs Observable
 
 // FromChan creates an Observable from a Go channel of interface{}
 // values. This allows the code feeding into the channel to send either an error
@@ -132,22 +143,31 @@ func FromChanFoo(ch <-chan foo) ObservableFoo {
 // an error into the channel, it should close the channel immediately to
 // indicate termination with error.
 func FromChan(ch <-chan interface{}) Observable {
-	return Create(func(observer Observer) {
-		for item := range ch {
-			if observer.Closed() {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		subscribeOn.ScheduleRecursive(func(self func()) {
+			if subscriber.Canceled() {
 				return
 			}
-			if err, ok := item.(error); ok {
-				observer.Error(err)
+			next, ok := <-ch
+			if subscriber.Canceled() {
 				return
 			}
-			observer.Next(item)
-		}
-		if observer.Closed() {
-			return
-		}
-		observer.Complete()
-	})
+			if ok {
+				err, ok := next.(error)
+				if !ok {
+					observe(next, nil, false)
+					if !subscriber.Canceled() {
+						self()
+					}
+				} else {
+					observe(zero, err, true)
+				}
+			} else {
+				observe(zero, nil, true)
+			}
+		})
+	}
+	return observable
 }
 
 //jig:template From<Foo>

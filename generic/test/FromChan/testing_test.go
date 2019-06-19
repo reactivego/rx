@@ -1,7 +1,6 @@
 package FromChan
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,7 +11,7 @@ func TestFromChan(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		ch <- i
 	}
-	ch <- errors.New("error")
+	ch <- RxError("error")
 	close(ch)
 	result, err := FromChan(ch).AsObservableInt().ToSlice()
 	expect := []int{0, 1, 2, 3, 4}
