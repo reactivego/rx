@@ -40,13 +40,13 @@ func main() {
 	- [Transforming Operators](#transforming-operators)
 	- [Filtering Operators](#filtering-operators)
 	- [Combining Operators](#combining-operators)
-	- [Multicasting Operators](#multicasting-operators)
 	- [Error Handling Operators](#error-handling-operators)
 	- [Utility Operators](#utility-operators)
 	- [Conditional and Boolean Operators](#conditional-and-boolean-operators)
 	- [Mathematical and Aggregate Operators](#mathematical-and-aggregate-operators)
+	- [Type Casting, Type Filtering Operators](#type-casting-and-type-filtering-operators)
 	- [Scheduling Operators](#scheduling-operators)
-	- [Type Casting, Converting and Filtering Operators](#type-casting-converting-and-filtering-operators)
+	- [Multicasting Operators](#multicasting-operators)
 - [Subjects](#subjects)
 - [Subscribing](#subscribing)
 - [Obligatory Dijkstra Quote](#obligatory-dijkstra-quote)
@@ -156,6 +156,7 @@ Operators that selectively emit items from a source Observable.
 ### Combining Operators
 Operators that work with multiple source Observables to create a single Observable.
 
+- (Observable<sup>2</sup>) [**ConbineAll**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/CombineAll/)() Observable
 - CombineLatest :star:
 - [**Concat**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Concat/)() :star: Observable
 - (Observable) [**Concat**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Concat/)() :star: Observable
@@ -173,16 +174,6 @@ Operators that work with multiple source Observables to create a single Observab
 - WithLatestFrom :star:
 - ZipFromObservable
 
-### Multicasting Operators
-Operators that provide subscription multicasting from 1 to multiple subscribers.
-
-- (Observable) [**Publish**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Publish/)() Connectable
-- (Observable) [**PublishReplay**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/PublishReplay/)() Connectable
-- PublishLast
-- PublishBehavior
-- (Connectable) [**RefCount**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/RefCount/)() Observable
-- (Connectable) [**AutoConnect**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/AutoConnect/)() Observable
-
 ### Error Handling Operators
 Operators that help to recover from error notifications from an Observable.
 
@@ -190,16 +181,15 @@ Operators that help to recover from error notifications from an Observable.
 - OnErrorResumeNext
 - OnErrorReturn
 - OnErrorReturnItem
-
 - (Observable) [**Retry**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Retry/)() Observable
 
 ### Utility Operators
 A toolbox of useful Operators for working with Observables.
 
+- (Observable) [**Delay**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Delay/)() Observable
 - (Observable) [**Do**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Do/)() :star: Observable
 - (Observable) [**DoOnError**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Do/)() Observable
 - (Observable) [**DoOnComplete**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Do/)() Observable
-- (Observable) [**Delay**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Delay/)() Observable
 - (Observable) [**Finally**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Do/)() Observable
 - (Observable) [**Passthrough**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Passthrough/)() Observable
 - (Observable) [**Serialize**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Serialize/)() Observable
@@ -207,8 +197,6 @@ A toolbox of useful Operators for working with Observables.
 
 ### Conditional and Boolean Operators
 Operators that evaluate one or more Observables or items emitted by Observables.
-
-None yet. Who needs logic anyway?
 
 - (Observable) [**All**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/All/)() ObservableBool
 - Amb
@@ -226,39 +214,60 @@ Operators that operate on the entire sequence of items emitted by an Observable.
 - (Observable) [**Reduce**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Reduce/)() Observable
 - (Observable) [**Sum**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Sum/)() Observable
 
+### Type Casting and Type Filtering Operators
+Operators to type cast, type filter observables.
+
+- (Observable) [**AsObservable**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/AsObservable)() Observable
+- (Observable) [**Only**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Only/)() Observable
+
 ### Scheduling Operators
 Change the scheduler for subscribing and observing.
 
 - (Observable) [**ObserveOn**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/ObserveOn/)() Observable
 - (Observable) [**SubscribeOn**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/SubscribeOn/)() Observable
 
-### Type Casting, Converting and Filtering Operators
-Operators to type cast, type convert and type filter observables.
+### Multicasting Operators
+A *Connectable* is an *Observable* that can multicast to observers subscribed to it. The *Connectable* itself will subscribe to the *Observable* when the *Connect* method is called on it.
 
-- (Observable) [**AsObservable**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/AsObservable)() Observable
-- (Observable) [**Only**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Only/)() Observable
+- (Observable) [**Publish**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Publish/)() Connectable
+- (Observable) [**PublishReplay**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/PublishReplay/)() Connectable
+- PublishLast
+- PublishBehavior
+
+*Connectable* supports different strategies for subscribing to the *Observable* from which it was created.
+
+- (Connectable) [**RefCount**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/RefCount/)() Observable
+- (Connectable) [**AutoConnect**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/AutoConnect/)() Observable
+- (Connectable) [**Connect**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Connect)() Subscription
 
 ## Subjects
 A *Subject* is both a multicasting *Observable* as well as an *Observer*. The *Observable* side allows multiple simultaneous subscribers. The *Observer* side allows you to directly feed it data or subscribe it to another *Observable*.
 
-- [**NewSubject**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/)() Subject
-- [**NewReplaySubject**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/)() Subject
+- [**NewSubject**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Subject)() Subject
+- [**NewReplaySubject**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/ReplaySubject)() Subject
 
 ## Subscribing
-Subscribing breathes life into a chain of observables.
+Subscribing breathes life into a chain of observables. An observable may be subscribed to many times. 
 
-- (Observable) [**Subscribe**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/)() Subscriber
-	Following methods call Subscribe internally:
-	- (Connectable) [**Connect**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/)() Subscriber
-		Following operators call Connect internally:
-		- (Connectable) [**RefCount**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/RefCount)() Observable
-		- (Connectable) [**AutoConnect**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/AutoConnect)() Observable
-	- (Observable) [**SubscribeNext**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/) Subsciber
-	- (Observable) [**Println**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/)() error
-	- (Observable) [**ToChan**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/)() chan foo
-	- (Observable) [**ToSingle**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/)() (foo, error)
-	- (Observable) [**ToSlice**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/)() ([]foo, error)
-	- (Observable) [**Wait**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/)() error
+**Println** and **Subscribe** implement subscribing behavior directly.
+
+- (Observable) [**Println**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Println)() error
+- (Observable) [**Subscribe**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Subscribe)() Subscription
+
+**Subscribe** is called internally by **Connect**, **SubscribeNext**, **ToChan**, **ToSingle**, **ToSlice** and **Wait**.
+
+- (Connectable) [**Connect**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Connect)() Subscription
+- (Observable) [**SubscribeNext**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/SubscribeNext) Subscription
+- (Observable) [**ToChan**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/ToChan)() chan foo
+- (Observable) [**ToSingle**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/ToSingle)() (foo, error)
+- (Observable) [**ToSlice**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/ToSlice)() ([]foo, error)
+- (Observable) [**Wait**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Wait)() error
+
+
+**Connect** is called internally by **RefCount** and **AutoConnect**.
+
+- (Connectable) [**RefCount**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/RefCount)() Observable
+- (Connectable) [**AutoConnect**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/AutoConnect)() Observable
 
 ## Obligatory Dijkstra Quote
 
