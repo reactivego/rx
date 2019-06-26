@@ -1,5 +1,5 @@
 /*
-Operator Repeat documentation and tests.
+Function and operator Repeat documentation and tests.
 
 	Repeat	http://reactivex.io/documentation/operators/repeat.html
 */
