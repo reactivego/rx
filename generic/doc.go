@@ -5,14 +5,31 @@ using observable sequences. The library consists of more than a 100 generic
 templates to enable type-safe programming with observable streams.
 To use it, you will need Generics for Go (https://github.com/reactivego/jig).
 
-Using the library is very simple. Import the library with the blank
-identifier `_` as the package name:
-	import _ "github.com/reactivego/rx"
-The side effect of this import is that
-generics from the library can now be accessed by the jig tool. Then start
-using generics from the library and run jig to generate code. Take a look at
-the Quick Start guide to see how it all fits together
-https://github.com/ReactiveGo/rx/blob/master/doc/QUICKSTART.md.
+Using the library is simple. Start by creating a file "main.go":
+
+	package main
+
+	import _ "github.com/reactivego/rx/generic"
+
+	func main() {
+		FromInt(1,2,3).Println()
+	}
+	
+The import is purely done for jig. Jig searches for generic templates inside
+the imported package. FromInt matches generic function template From<Foo>.
+Running jig will generate the code:
+
+	go get github.com/reactivego/rx
+	go get github.com/reactivego/jig
+	go run github.com/reactivego/jig -rv
+
+The code has been generated into file "rx.go".
+You can now build and run the generated code:
+
+	go run *.go
+
+Take a look at the Quick Start guide to see a more elaborate version of the
+example above. https://github.com/ReactiveGo/jig/blob/master/QUICKSTART.md.
 
 For an overview of all implemented operators, see
 https://github.com/reactivego/rx
