@@ -315,20 +315,20 @@ func (o ObservableFoo) MergeDelayError(other ...ObservableFoo) ObservableFoo {
 }
 
 //jig:template ObservableObservable<Foo> SwitchAll
-//jig:needs <Foo>Link
+//jig:needs link<Foo>
 
 // SwitchAll converts an Observable that emits Observables into a single Observable
 // that emits the items emitted by the most-recently-emitted of those Observables.
 func (o ObservableObservableFoo) SwitchAll() ObservableFoo {
 	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(link *FooLink, next foo, err error, done bool) {
+		observer := func(link *linkFoo, next foo, err error, done bool) {
 			if !done || err != nil {
 				observe(next, err, done)
 			} else {
 				link.subscriber.Unsubscribe() // We filter complete. Therefore, we need to perform Unsubscribe.
 			}
 		}
-		currentLink := NewInitialFooLink()
+		currentLink := newInitialLinkFoo()
 		var switcherMutex sync.Mutex
 		switcherSubscriber := subscriber.AddChild()
 		switcher := func(next ObservableFoo, err error, done bool) {
@@ -338,7 +338,7 @@ func (o ObservableObservableFoo) SwitchAll() ObservableFoo {
 				func() {
 					switcherMutex.Lock()
 					defer switcherMutex.Unlock()
-					currentLink = NewFooLink(observer, subscriber)
+					currentLink = newLinkFoo(observer, subscriber)
 				}()
 				previousLink.Cancel(func() {
 					switcherMutex.Lock()

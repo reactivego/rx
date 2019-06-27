@@ -33,13 +33,13 @@ const (
 	linkCancelOrCompleted
 )
 
-//jig:template <Foo>Link
+//jig:template link<Foo>
 //jig:needs RxError, LinkEnums
 
-type FooLinkObserveFunc func(*FooLink, foo, error, bool)
+type linkFooObserveFunc func(*linkFoo, foo, error, bool)
 
-type FooLink struct {
-	observe       FooLinkObserveFunc
+type linkFoo struct {
+	observe       linkFooObserveFunc
 	state         int32
 	callbackState int32
 	callbackKind  int
@@ -47,18 +47,18 @@ type FooLink struct {
 	subscriber    Subscriber
 }
 
-func NewInitialFooLink() *FooLink {
-	return &FooLink{state: linkCompleting, subscriber: subscriber.New()}
+func newInitialLinkFoo() *linkFoo {
+	return &linkFoo{state: linkCompleting, subscriber: subscriber.New()}
 }
 
-func NewFooLink(observe FooLinkObserveFunc, subscriber Subscriber) *FooLink {
-	return &FooLink{
+func newLinkFoo(observe linkFooObserveFunc, subscriber Subscriber) *linkFoo {
+	return &linkFoo{
 		observe:    observe,
 		subscriber: subscriber.AddChild(),
 	}
 }
 
-func (o *FooLink) Observe(next foo, err error, done bool) error {
+func (o *linkFoo) Observe(next foo, err error, done bool) error {
 	if !atomic.CompareAndSwapInt32(&o.state, linkIdle, linkBusy) {
 		if atomic.LoadInt32(&o.state) > linkBusy {
 			return RxError("Already Done")
@@ -95,7 +95,7 @@ func (o *FooLink) Observe(next foo, err error, done bool) error {
 	return nil
 }
 
-func (o *FooLink) SubscribeTo(observable ObservableFoo, scheduler Scheduler) error {
+func (o *linkFoo) SubscribeTo(observable ObservableFoo, scheduler Scheduler) error {
 	if !atomic.CompareAndSwapInt32(&o.state, linkUnsubscribed, linkSubscribing) {
 		return RxError("Already Subscribed")
 	}
@@ -109,7 +109,7 @@ func (o *FooLink) SubscribeTo(observable ObservableFoo, scheduler Scheduler) err
 	return nil
 }
 
-func (o *FooLink) Cancel(callback func()) error {
+func (o *linkFoo) Cancel(callback func()) error {
 	if !atomic.CompareAndSwapInt32(&o.callbackState, callbackNil, settingCallback) {
 		return RxError("Already Waiting")
 	}
@@ -128,7 +128,7 @@ func (o *FooLink) Cancel(callback func()) error {
 	return nil
 }
 
-func (o *FooLink) OnComplete(callback func()) error {
+func (o *linkFoo) OnComplete(callback func()) error {
 	if !atomic.CompareAndSwapInt32(&o.callbackState, callbackNil, settingCallback) {
 		return RxError("Already Waiting")
 	}
