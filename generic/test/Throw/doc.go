@@ -1,5 +1,5 @@
 /*
-Function Throw documentation and tests.
+Throw function tests.
 
 	Throw	http://reactivex.io/documentation/operators/empty-never-throw.html
 */

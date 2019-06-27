@@ -1,5 +1,5 @@
 /*
-Operator MergeMap (FlatMap) documentation and tests.
+MergeMap (FlatMap) operator tests.
 
 The name FlatMap is deprecated as MergeMap more accurately describes what the
 operator does with the observables returned from the Map project function.

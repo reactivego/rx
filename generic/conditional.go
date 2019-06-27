@@ -3,6 +3,7 @@ package rx
 import "sync/atomic"
 
 //jig:template Observable All
+//jig:needs ObservableBool
 
 // All determines whether all items emitted by an Observable meet some
 // criteria.

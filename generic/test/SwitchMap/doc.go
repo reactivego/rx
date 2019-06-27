@@ -1,5 +1,5 @@
 /*
-Operator SwitchMap documentation and tests.
+SwitchMap operator tests.
 
 	SwitchMap
 		http://reactivex.io/documentation/operators/flatmap.html

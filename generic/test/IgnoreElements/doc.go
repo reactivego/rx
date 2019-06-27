@@ -1,5 +1,5 @@
 /*
-Operator IgnoreElements documentation and tests.
+IgnoreElements operator tests.
 
 	IgnoreElements	http://reactivex.io/documentation/operators/ignoreelements.html
 */

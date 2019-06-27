@@ -1,5 +1,5 @@
 /*
-Operator Serialize documentation and tests.
+Serialize operator tests.
 
 	Serialize
 

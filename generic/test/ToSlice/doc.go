@@ -1,7 +1,9 @@
 /*
-Operator ToSlice documentation and tests.
+ToSlice method tests.
 
 	ToSlice		http://reactivex.io/documentation/operators/to.html
+
+This method subscribes to an observable.
 */
 package ToSlice
 

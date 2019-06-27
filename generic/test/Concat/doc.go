@@ -1,5 +1,5 @@
 /*
-Function and operator Concat documentation and tests.
+Concat function and operator tests.
 
 	Concat	http://reactivex.io/documentation/operators/concat.html
 */

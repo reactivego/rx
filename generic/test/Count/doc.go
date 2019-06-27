@@ -1,5 +1,5 @@
 /*
-Operator Count documentation and tests.
+Count operator tests.
 
 	Count	http://reactivex.io/documentation/operators/count.html
 */

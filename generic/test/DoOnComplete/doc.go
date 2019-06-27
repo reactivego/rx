@@ -1,5 +1,5 @@
 /*
-Operator DoOnComplete documentation and tests.
+DoOnComplete operator tests.
 
 	DoOnComplete	http://reactivex.io/documentation/operators/do.html
 */

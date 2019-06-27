@@ -1,5 +1,5 @@
 /*
-Struct ReplaySubject documentation and tests.
+ReplaySubject type tests.
 
 	ReplaySubject	http://reactivex.io/documentation/subject.html
 */

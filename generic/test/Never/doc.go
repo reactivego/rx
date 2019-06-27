@@ -1,5 +1,5 @@
 /*
-Function Never documentation and tests.
+Never function tests.
 
 	Never	http://reactivex.io/documentation/operators/empty-never-throw.html
 */

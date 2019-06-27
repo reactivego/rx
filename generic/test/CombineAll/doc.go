@@ -1,5 +1,5 @@
 /*
-Operator CombineAll documentation and tests.
+CombineAll operator tests.
 
 	CombineAll
 

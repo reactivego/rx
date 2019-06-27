@@ -1,5 +1,5 @@
 /*
-Operator Last documentation and tests.
+Last operator tests.
 
 	Last	http://reactivex.io/documentation/operators/last.html
 */

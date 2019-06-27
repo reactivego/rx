@@ -1,5 +1,5 @@
 /*
-Operator ElementAt documentation and tests.
+ElementAt operator tests.
 
 	ElementAt		http://reactivex.io/documentation/operators/elementat.html
 */

@@ -1,5 +1,5 @@
 /*
-Function Start documentation and tests.
+Start function tests.
 
 	Start	http://reactivex.io/documentation/operators/start.html
 */

@@ -1,5 +1,5 @@
 /*
-Operator IgnoreCompletion documentation and tests.
+IgnoreCompletion operator tests.
 
 	IgnoreCompletion
 

@@ -1,5 +1,5 @@
 /*
-Operator AutoConnect documentation and tests.
+AutoConnect operator tests.
 
 	AutoConnect
 

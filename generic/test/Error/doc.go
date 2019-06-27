@@ -1,5 +1,5 @@
 /*
-Function Error documentation and tests.
+Error function tests.
 
 Error is just an alias for the function Throw.
 

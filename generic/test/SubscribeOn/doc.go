@@ -1,5 +1,5 @@
 /*
-Operator SubscribeOn documentation and tests.
+SubscribeOn operator tests.
 
 	SubscribeOn	http://reactivex.io/documentation/operators/subscribeon.html
 */

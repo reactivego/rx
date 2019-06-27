@@ -1,5 +1,5 @@
 /*
-Operator Filter documentation and tests.
+Filter operator tests.
 
 	Filter	http://reactivex.io/documentation/operators/filter.html
 */

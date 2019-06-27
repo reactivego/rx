@@ -1,5 +1,5 @@
 /*
-Operator Sum documentation and tests.
+Sum operator tests.
 
 	Sum	http://reactivex.io/documentation/operators/sum.html
 */

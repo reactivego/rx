@@ -1,5 +1,5 @@
 /*
-Operator SwitchAll documentation and tests.
+SwitchAll operator tests.
 
 	SwitchAll	http://reactivex.io/documentation/operators/switch.html
 */

@@ -1,5 +1,5 @@
 /*
-Operator PublishReplay documentation and tests.
+PublishReplay operator tests.
 
 	Replay	http://reactivex.io/documentation/operators/replay.html
 

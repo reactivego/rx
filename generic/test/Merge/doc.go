@@ -1,5 +1,5 @@
 /*
-Operator Merge documentation and tests.
+Merge operator tests.
 
 	Merge		http://reactivex.io/documentation/operators/merge.html
 */

@@ -1,5 +1,5 @@
 /*
-Operator Catch documentation and tests.
+Catch operator tests.
 
 	Catch	http://reactivex.io/documentation/operators/catch.html
 */

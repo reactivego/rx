@@ -1,5 +1,5 @@
 /*
-Operator Delay documentation and tests.
+Delay operator tests.
 
 	Delay
 		http://reactivex.io/documentation/operators/delay.html

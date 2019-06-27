@@ -1,5 +1,5 @@
 /*
-Operator DoOnError documentation and tests.
+DoOnError operator tests.
 
 	DoOnError	http://reactivex.io/documentation/operators/do.html
 */

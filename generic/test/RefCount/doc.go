@@ -1,5 +1,5 @@
 /*
-Operator RefCount documentation and tests.
+RefCount operator tests.
 
 	RefCount http://reactivex.io/documentation/operators/refcount.html
 

@@ -1,5 +1,5 @@
 /*
-Operator Passthrough documentation and tests.
+Passthrough operator tests.
 
 	Passthrough
 

@@ -1,5 +1,5 @@
 /*
-Operator As documentation and tests.
+AsObservable operator tests.
 
 	AsObservableBar
 

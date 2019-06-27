@@ -1,5 +1,5 @@
 /*
-Operator Only documentation and tests.
+Only operator tests.
 
 	Only
 

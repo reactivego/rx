@@ -1,5 +1,5 @@
 /*
-Operator Retry documentation and tests.
+Retry operator tests.
 
 	Retry	http://reactivex.io/documentation/operators/retry.html
 */

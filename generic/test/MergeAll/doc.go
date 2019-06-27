@@ -1,5 +1,5 @@
 /*
-Operator MergeAll documentation and tests.
+MergeAll operator tests.
 
 	MergeAll
 

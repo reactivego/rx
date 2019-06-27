@@ -1,7 +1,9 @@
 /*
-Method Wait documentation and tests.
+Wait method tests.
 
 	Wait
+
+This method subscribes to an observable.
 */
 package Wait
 

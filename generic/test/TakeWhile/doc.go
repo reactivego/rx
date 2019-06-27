@@ -1,5 +1,5 @@
 /*
-Operator TakeWhile documentation and tests.
+TakeWhile operator tests.
 
 	TakeWhile	http://reactivex.io/documentation/operators/takewhile.html
 */

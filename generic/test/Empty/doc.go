@@ -1,5 +1,5 @@
 /*
-Function Empty documentation and tests.
+Empty function tests.
 
 	Empty		http://reactivex.io/documentation/operators/empty-never-throw.html
 */

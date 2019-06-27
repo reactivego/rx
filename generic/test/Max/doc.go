@@ -1,5 +1,5 @@
 /*
-Operator Max documentation and tests.
+Max operator tests.
 
 	Max	http://reactivex.io/documentation/operators/max.html
 */

@@ -1,5 +1,5 @@
 /*
-Operator Publish documentation and tests.
+Publish operator tests.
 
 	Publish	http://reactivex.io/documentation/operators/publish.html
 */

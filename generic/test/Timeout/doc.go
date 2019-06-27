@@ -1,5 +1,5 @@
 /*
-Operator Timeout documentation and tests.
+Timeout operator tests.
 
 	Timeout	http://reactivex.io/documentation/operators/timeout.html
 
@@ -9,6 +9,8 @@ particular period of time elapses without any emitted items.
 The Timeout operator allows you to abort an Observable with an onError
 termination if that Observable fails to emit any items during a specified
 span of time.
+
+This operator uses a goroutine internally.
 */
 package Timeout
 

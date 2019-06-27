@@ -1,8 +1,9 @@
 /*
-Method Println documentation and tests.
+Println method tests.
 
 	Println
 
+This method subscribes to an observable.
 */
 package Println
 

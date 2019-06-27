@@ -1,5 +1,5 @@
 /*
-Operator Min documentation and tests.
+Min operator tests.
 
 	Min	http://reactivex.io/documentation/operators/min.html
 */

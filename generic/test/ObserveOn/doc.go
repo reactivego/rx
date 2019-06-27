@@ -1,5 +1,5 @@
 /*
-Operator ObserveOn documentation and tests.
+ObserveOn operator tests.
 
 	ObserveOn	http://reactivex.io/documentation/operators/observeon.html
 

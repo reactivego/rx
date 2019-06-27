@@ -1,5 +1,5 @@
 /*
-Operator TakeLast documentation and tests.
+TakeLast operator tests.
 
 	TakeLast	http://reactivex.io/documentation/operators/takelast.html
 */

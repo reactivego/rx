@@ -1,5 +1,5 @@
 /*
-Operator All documentation and tests.
+All operator tests.
 
 	All	http://reactivex.io/documentation/operators/all.html
 

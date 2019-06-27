@@ -1,5 +1,5 @@
 /*
-Operator Average documentation and tests.
+Average operator tests.
 
 	Average	http://reactivex.io/documentation/operators/average.html
 */

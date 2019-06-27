@@ -1,5 +1,5 @@
 /*
-Operator ConcatAll documentation and tests.
+ConcatAll operator tests.
 
 	ConcatAll
 

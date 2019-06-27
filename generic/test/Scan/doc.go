@@ -1,5 +1,5 @@
 /*
-Operator Scan documentation and tests.
+Scan operator tests.
 
 	Scan	http://reactivex.io/documentation/operators/scan.html
 */

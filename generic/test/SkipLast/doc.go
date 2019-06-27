@@ -1,5 +1,5 @@
 /*
-Operator SkipLast documentation and tests.
+SkipLast operator tests.
 
 	SkipLast	http://reactivex.io/documentation/operators/skiplast.html
 */

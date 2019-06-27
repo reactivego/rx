@@ -1,5 +1,5 @@
 /*
-Observable documentation and tests.
+Observable type tests.
 
 	Observable 	http://reactivex.io/documentation/observable.html
 

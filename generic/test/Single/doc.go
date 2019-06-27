@@ -1,5 +1,5 @@
 /*
-Operator Single documentation and tests.
+Single operator tests.
 
 	Single
 

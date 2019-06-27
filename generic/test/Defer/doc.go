@@ -1,5 +1,5 @@
 /*
-Function Defer documentation and tests.
+Defer function tests.
 
 	Defer	http://reactivex.io/documentation/operators/defer.html
 

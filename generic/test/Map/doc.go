@@ -1,5 +1,5 @@
 /*
-Operator Map documentation and tests.
+Map operator tests.
 
 	Map	http://reactivex.io/documentation/operators/map.html
 */

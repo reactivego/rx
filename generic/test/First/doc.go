@@ -1,5 +1,5 @@
 /*
-Operator First documentation and tests.
+First operator tests.
 
 	First	http://reactivex.io/documentation/operators/first.html
 */

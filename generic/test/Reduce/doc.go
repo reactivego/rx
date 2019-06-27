@@ -1,5 +1,5 @@
 /*
-Operator Reduce documentation and tests.
+Reduce operator tests.
 
 	Reduce	http://reactivex.io/documentation/operators/reduce.html
 */

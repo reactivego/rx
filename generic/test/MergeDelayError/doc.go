@@ -1,5 +1,5 @@
 /*
-Operator MergeDelayError documentation and tests.
+MergeDelayError operator tests.
 
 	MergeDelayError	http://reactivex.io/documentation/operators/merge.html
 */

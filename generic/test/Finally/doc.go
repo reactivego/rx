@@ -1,5 +1,5 @@
 /*
-Operator Finally documentation and tests.
+Finally operator tests.
 
 	Finally		http://reactivex.io/documentation/operators/do.html
 */
