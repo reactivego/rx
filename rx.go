@@ -39,6 +39,68 @@ type ObserveFunc func(next interface{}, err error, done bool)
 
 var zero interface{}
 
+//jig:name Observable
+
+// Observable is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type Observable func(ObserveFunc, Scheduler, Subscriber)
+
+//jig:name BoolObserveFunc
+
+// BoolObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type BoolObserveFunc func(next bool, err error, done bool)
+
+var zeroBool bool
+
+//jig:name ObservableBool
+
+// ObservableBool is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type ObservableBool func(BoolObserveFunc, Scheduler, Subscriber)
+
+//jig:name IntObserveFunc
+
+// IntObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type IntObserveFunc func(next int, err error, done bool)
+
+var zeroInt int
+
+//jig:name ObservableInt
+
+// ObservableInt is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
+
+//jig:name ObservableObserveFunc
+
+// ObservableObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type ObservableObserveFunc func(next Observable, err error, done bool)
+
+var zeroObservable Observable
+
+//jig:name ObservableObservable
+
+// ObservableObservable is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type ObservableObservable func(ObservableObserveFunc, Scheduler, Subscriber)
+
+//jig:name Observer
+
 // Next is called by an Observable to emit the next interface{} value to the
 // observer.
 func (f ObserveFunc) Next(next interface{}) {
@@ -55,14 +117,6 @@ func (f ObserveFunc) Error(err error) {
 func (f ObserveFunc) Complete() {
 	f(zero, nil, true)
 }
-
-//jig:name Observable
-
-// Observable is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type Observable func(ObserveFunc, Scheduler, Subscriber)
-
-//jig:name Observer
 
 // Observer is the interface used with Create when implementing a custom
 // observable.
@@ -102,19 +156,73 @@ func Create(f func(Observer)) Observable {
 	return observable
 }
 
+//jig:name Defer
+
+// Defer does not create the Observable until the observer subscribes,
+// and creates a fresh Observable for each observer.
+func Defer(factory func() Observable) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		factory()(observe, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name Empty
+
+// Empty creates an Observable that emits no items but terminates normally.
+func Empty() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		subscribeOn.Schedule(func() {
+			if !subscriber.Canceled() {
+				observe(zero, nil, true)
+			}
+		})
+	}
+	return observable
+}
+
+//jig:name Error
+
+// Error creates an Observable that emits no items and terminates with an
+// error.
+func Error(err error) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		subscribeOn.Schedule(func() {
+			if !subscriber.Canceled() {
+				observe(zero, err, true)
+			}
+		})
+	}
+	return observable
+}
+
+//jig:name RxError
+
+type RxError string
+
+func (e RxError) Error() string	{ return string(e) }
+
 //jig:name FromSlice
 
 // FromSlice creates an Observable from a slice of interface{} values passed in.
 func FromSlice(slice []interface{}) Observable {
-	return Create(func(observer Observer) {
-		for _, next := range slice {
-			if observer.Closed() {
-				return
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		i := 0
+		subscribeOn.ScheduleRecursive(func(self func()) {
+			if !subscriber.Canceled() {
+				if i < len(slice) {
+					observe(slice[i], nil, false)
+					if !subscriber.Canceled() {
+						i++
+						self()
+					}
+				} else {
+					observe(zero, nil, true)
+				}
 			}
-			observer.Next(next)
-		}
-		observer.Complete()
-	})
+		})
+	}
+	return observable
 }
 
 //jig:name From
@@ -122,125 +230,6 @@ func FromSlice(slice []interface{}) Observable {
 // From creates an Observable from multiple interface{} values passed in.
 func From(slice ...interface{}) Observable {
 	return FromSlice(slice)
-}
-
-//jig:name IntObserveFunc
-
-// IntObserveFunc is the observer, a function that gets called whenever the
-// observable has something to report. The next argument is the item value that
-// is only valid when the done argument is false. When done is true and the err
-// argument is not nil, then the observable has terminated with an error.
-// When done is true and the err argument is nil, then the observable has
-// completed normally.
-type IntObserveFunc func(next int, err error, done bool)
-
-var zeroInt int
-
-// Next is called by an ObservableInt to emit the next int value to the
-// observer.
-func (f IntObserveFunc) Next(next int) {
-	f(next, nil, false)
-}
-
-// Error is called by an ObservableInt to report an error to the observer.
-func (f IntObserveFunc) Error(err error) {
-	f(zeroInt, err, true)
-}
-
-// Complete is called by an ObservableInt to signal that no more data is
-// forthcoming to the observer.
-func (f IntObserveFunc) Complete() {
-	f(zeroInt, nil, true)
-}
-
-//jig:name ObservableInt
-
-// ObservableInt is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
-
-//jig:name IntObserver
-
-// IntObserver is the interface used with CreateInt when implementing a custom
-// observable.
-type IntObserver interface {
-	// Next emits the next int value.
-	Next(int)
-	// Error signals an error condition.
-	Error(error)
-	// Complete signals that no more data is to be expected.
-	Complete()
-	// Closed returns true when the subscription has been canceled.
-	Closed() bool
-}
-
-//jig:name CreateInt
-
-// CreateInt creates an Observable from scratch by calling observer methods
-// programmatically.
-func CreateInt(f func(IntObserver)) ObservableInt {
-	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		scheduler.Schedule(func() {
-			if subscriber.Closed() {
-				return
-			}
-			observer := func(next int, err error, done bool) {
-				if !subscriber.Closed() {
-					observe(next, err, done)
-				}
-			}
-			type ObserverSubscriber struct {
-				IntObserveFunc
-				Subscriber
-			}
-			f(&ObserverSubscriber{observer, subscriber})
-		})
-	}
-	return observable
-}
-
-//jig:name Interval
-
-// Interval creates an ObservableInt that emits a sequence of integers spaced
-// by a particular time interval.
-func Interval(interval time.Duration) ObservableInt {
-	return CreateInt(func(observer IntObserver) {
-		for i := 0; ; i++ {
-			time.Sleep(interval)
-			if observer.Closed() {
-				return
-			}
-			observer.Next(i)
-		}
-	})
-}
-
-//jig:name Range
-
-// Range creates an ObservableInt that emits a range of sequential integers.
-func Range(start, count int) ObservableInt {
-	end := start + count
-	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		i := start
-		scheduler.ScheduleRecursive(func(self func()) {
-			if subscriber.Closed() {
-				return
-			}
-			if i < end {
-				observe(i, nil, false)
-			}
-			if subscriber.Closed() {
-				return
-			}
-			i++
-			if i >= end {
-				observe(zeroInt, nil, true)
-				return
-			}
-			self()
-		})
-	}
-	return observable
 }
 
 //jig:name FromChan
@@ -252,22 +241,1526 @@ func Range(start, count int) ObservableInt {
 // an error into the channel, it should close the channel immediately to
 // indicate termination with error.
 func FromChan(ch <-chan interface{}) Observable {
-	return Create(func(observer Observer) {
-		for item := range ch {
-			if observer.Closed() {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		subscribeOn.ScheduleRecursive(func(self func()) {
+			if subscriber.Canceled() {
 				return
 			}
-			if err, ok := item.(error); ok {
-				observer.Error(err)
+			next, ok := <-ch
+			if subscriber.Canceled() {
 				return
 			}
-			observer.Next(item)
+			if ok {
+				err, ok := next.(error)
+				if !ok {
+					observe(next, nil, false)
+					if !subscriber.Canceled() {
+						self()
+					}
+				} else {
+					observe(zero, err, true)
+				}
+			} else {
+				observe(zero, nil, true)
+			}
+		})
+	}
+	return observable
+}
+
+//jig:name Froms
+
+// Froms creates an Observable from multiple interface{} values passed in.
+func Froms(slice ...interface{}) Observable {
+	return FromSlice(slice)
+}
+
+//jig:name Interval
+
+// Interval creates an ObservableInt that emits a sequence of integers spaced
+// by a particular time interval.
+func Interval(interval time.Duration) ObservableInt {
+	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		i := 0
+		scheduler.ScheduleRecursive(func(self func()) {
+			if subscriber.Canceled() {
+				return
+			}
+			time.Sleep(interval)
+			if subscriber.Canceled() {
+				return
+			}
+			observe(i, nil, false)
+			if subscriber.Canceled() {
+				return
+			}
+			i++
+			self()
+		})
+	}
+	return observable
+}
+
+//jig:name Just
+
+// Just creates an Observable that emits a particular item.
+func Just(element interface{}) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		done := false
+		subscribeOn.ScheduleRecursive(func(self func()) {
+			if !subscriber.Canceled() {
+				if !done {
+					observe(element, nil, false)
+					if !subscriber.Canceled() {
+						done = true
+						self()
+					}
+				} else {
+					observe(zero, nil, true)
+				}
+			}
+		})
+	}
+	return observable
+}
+
+//jig:name ObservableConcat
+
+// Concat emits the emissions from two or more Observables without interleaving them.
+func (o Observable) Concat(other ...Observable) Observable {
+	if len(other) == 0 {
+		return o
+	}
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		var (
+			observables	= append([]Observable{}, other...)
+			observer	ObserveFunc
+		)
+		observer = func(next interface{}, err error, done bool) {
+			if !done || err != nil {
+				observe(next, err, done)
+			} else {
+				if len(observables) == 0 {
+					observe(zero, nil, true)
+				} else {
+					o := observables[0]
+					observables = observables[1:]
+					o(observer, subscribeOn, subscriber)
+				}
+			}
 		}
-		if observer.Closed() {
-			return
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name Concat
+
+// Concat emits the emissions from two or more Observables without interleaving them.
+func Concat(observables ...Observable) Observable {
+	if len(observables) == 0 {
+		return Empty()
+	}
+	return observables[0].Concat(observables[1:]...)
+}
+
+//jig:name ObservableMerge
+
+// Merge combines multiple Observables into one by merging their emissions.
+// An error from any of the observables will terminate the merged observables.
+func (o Observable) Merge(other ...Observable) Observable {
+	if len(other) == 0 {
+		return o
+	}
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		var observers struct {
+			sync.Mutex
+			done	bool
+			len	int
 		}
-		observer.Complete()
-	})
+		observer := func(next interface{}, err error, done bool) {
+			observers.Lock()
+			defer observers.Unlock()
+			if !observers.done {
+				switch {
+				case !done:
+					observe(next, nil, false)
+				case err != nil:
+					observers.done = true
+					observe(zero, err, true)
+				default:
+					if observers.len--; observers.len == 0 {
+						observe(zero, nil, true)
+					}
+				}
+			}
+		}
+		subscribeOn.Schedule(func() {
+			if !subscriber.Canceled() {
+				observers.len = 1 + len(other)
+				o(observer, subscribeOn, subscriber)
+				for _, o := range other {
+					if subscriber.Canceled() {
+						return
+					}
+					o(observer, subscribeOn, subscriber)
+				}
+			}
+		})
+	}
+	return observable
+}
+
+//jig:name Merge
+
+// Merge combines multiple Observables into one by merging their emissions.
+// An error from any of the observables will terminate the merged observables.
+func Merge(observables ...Observable) Observable {
+	if len(observables) == 0 {
+		return Empty()
+	}
+	return observables[0].Merge(observables[1:]...)
+}
+
+//jig:name Never
+
+// Never creates an Observable that emits no items and does't terminate.
+func Never() Observable {
+	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+	}
+	return observable
+}
+
+//jig:name Range
+
+// Range creates an ObservableInt that emits a range of sequential integers.
+func Range(start, count int) ObservableInt {
+	end := start + count
+	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		i := start
+		scheduler.ScheduleRecursive(func(self func()) {
+			if !subscriber.Canceled() {
+				if i < end {
+					observe(i, nil, false)
+					if !subscriber.Canceled() {
+						i++
+						self()
+					}
+				} else {
+					observe(zeroInt, nil, true)
+				}
+			}
+		})
+	}
+	return observable
+}
+
+//jig:name Repeat
+
+// Repeat creates an Observable that emits a particular item or sequence
+// of items repeatedly.
+func Repeat(value interface{}, count int) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		i := 0
+		subscribeOn.ScheduleRecursive(func(self func()) {
+			if !subscriber.Canceled() {
+				if i < count {
+					observe(value, nil, false)
+					if !subscriber.Canceled() {
+						i++
+						self()
+					}
+				} else {
+					observe(zero, nil, true)
+				}
+			}
+		})
+	}
+	return observable
+}
+
+//jig:name Start
+
+// Start creates an Observable that emits the return value of a function.
+// It is designed to be used with a function that returns a (interface{}, error) tuple.
+// If the error is non-nil the returned Observable will be that error,
+// otherwise it will be a single-value stream of interface{}.
+func Start(f func() (interface{}, error)) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		done := false
+		subscribeOn.ScheduleRecursive(func(self func()) {
+			if !subscriber.Canceled() {
+				if !done {
+					if next, err := f(); err == nil {
+						observe(next, nil, false)
+						if !subscriber.Canceled() {
+							done = true
+							self()
+						}
+					} else {
+						observe(zero, err, true)
+					}
+				} else {
+					observe(zero, nil, true)
+				}
+			}
+		})
+	}
+	return observable
+}
+
+//jig:name Throw
+
+// Throw creates an Observable that emits no items and terminates with an
+// error.
+func Throw(err error) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		subscribeOn.Schedule(func() {
+			if !subscriber.Canceled() {
+				observe(zero, err, true)
+			}
+		})
+	}
+	return observable
+}
+
+//jig:name ObservableAll
+
+// All determines whether all items emitted by an Observable meet some
+// criteria.
+//
+// Pass a predicate function to the All operator that accepts an item emitted
+// by the source Observable and returns a boolean value based on an
+// evaluation of that item. All returns an ObservableBool that emits a single
+// boolean value: true if and only if the source Observable terminates
+// normally and every item emitted by the source Observable evaluated as
+// true according to this predicate; false if any item emitted by the source
+// Observable evaluates as false according to this predicate.
+func (o Observable) All(predicate func(next interface{}) bool) ObservableBool {
+	observable := func(observe BoolObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			switch {
+			case !done:
+				if !predicate(next) {
+					observe(false, nil, false)
+					observe(zeroBool, nil, true)
+				}
+			case err != nil:
+				observe(zeroBool, err, true)
+			default:
+				observe(true, nil, false)
+				observe(zeroBool, nil, true)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ErrTypecastToBool
+
+// ErrTypecastToBool is delivered to an observer if the generic value cannot be
+// typecast to bool.
+const ErrTypecastToBool = RxError("typecast to bool failed")
+
+//jig:name ObservableAsObservableBool
+
+// AsBool turns an Observable of interface{} into an ObservableBool. If during
+// observing a typecast fails, the error ErrTypecastToBool will be emitted.
+func (o Observable) AsObservableBool() ObservableBool {
+	observable := func(observe BoolObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				if nextBool, ok := next.(bool); ok {
+					observe(nextBool, err, done)
+				} else {
+					observe(zeroBool, ErrTypecastToBool, true)
+				}
+			} else {
+				observe(zeroBool, err, true)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ErrTypecastToInt
+
+// ErrTypecastToInt is delivered to an observer if the generic value cannot be
+// typecast to int.
+const ErrTypecastToInt = RxError("typecast to int failed")
+
+//jig:name ObservableAsObservableInt
+
+// AsInt turns an Observable of interface{} into an ObservableInt. If during
+// observing a typecast fails, the error ErrTypecastToInt will be emitted.
+func (o Observable) AsObservableInt() ObservableInt {
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				if nextInt, ok := next.(int); ok {
+					observe(nextInt, err, done)
+				} else {
+					observe(zeroInt, ErrTypecastToInt, true)
+				}
+			} else {
+				observe(zeroInt, err, true)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableBoolAsObservable
+
+// AsObservable turns a typed ObservableBool into an Observable of interface{}.
+func (o ObservableBool) AsObservable() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next bool, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableIntAsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableIntAverage
+
+// Average calculates the average of numbers emitted by an ObservableInt and
+// emits this average.
+func (o ObservableInt) Average() ObservableInt {
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		var sum, count int
+		observer := func(next int, err error, done bool) {
+			if !done {
+				sum += next
+				count++
+			} else {
+				if count > 0 {
+					observe(sum/count, nil, false)
+				}
+				observe(zeroInt, err, done)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableCatch
+
+// Catch recovers from an error notification by continuing the sequence without
+// emitting the error but by switching to the catch Observable to provide
+// items.
+func (o Observable) Catch(catch Observable) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if err != nil {
+				catch(observe, subscribeOn, subscriber)
+			} else {
+				observe(next, err, done)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableObservableCombineAll
+
+type Slice []interface{}
+
+func (o ObservableObservable) CombineAll() ObservableSlice {
+	observable := func(observe SliceObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observables := []Observable(nil)
+		var observers struct {
+			sync.Mutex
+			values		[]interface{}
+			initialized	int
+			active		int
+		}
+		makeObserver := func(index int) ObserveFunc {
+			observer := func(next interface{}, err error, done bool) {
+				observers.Lock()
+				defer observers.Unlock()
+				if observers.active > 0 {
+					switch {
+					case !done:
+						if observers.values[index] == zero {
+							observers.initialized++
+						}
+						observers.values[index] = next
+						if observers.initialized == len(observers.values) {
+							observe(observers.values, nil, false)
+						}
+					case err != nil:
+						observers.active = 0
+						observe(zeroSlice, err, true)
+					default:
+						if observers.active--; observers.active == 0 {
+							observe(zeroSlice, nil, true)
+						}
+					}
+				}
+			}
+			return observer
+		}
+
+		observer := func(next Observable, err error, done bool) {
+			switch {
+			case !done:
+				observables = append(observables, next)
+			case err != nil:
+				observe(zeroSlice, err, true)
+			default:
+				subscribeOn.Schedule(func() {
+					if !subscriber.Canceled() {
+						numObservables := len(observables)
+						observers.values = make([]interface{}, numObservables)
+						observers.active = numObservables
+						for i, v := range observables {
+							if subscriber.Canceled() {
+								return
+							}
+							v(makeObserver(i), subscribeOn, subscriber)
+						}
+					}
+				})
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableObservableConcatAll
+
+// ConcatAll flattens a higher order observable by concattenating the observables it emits.
+func (o ObservableObservable) ConcatAll() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		var (
+			mutex		sync.Mutex
+			observables	[]Observable
+			observer	ObserveFunc
+		)
+		observer = func(next interface{}, err error, done bool) {
+			mutex.Lock()
+			defer mutex.Unlock()
+			if !done || err != nil {
+				observe(next, err, done)
+			} else {
+				if len(observables) == 0 {
+					observe(zero, nil, true)
+				} else {
+					o := observables[0]
+					observables = observables[1:]
+					o(observer, subscribeOn, subscriber)
+				}
+			}
+		}
+		sourceSubscriber := subscriber.AddChild()
+		concatenator := func(next Observable, err error, done bool) {
+			if !done {
+				mutex.Lock()
+				defer mutex.Unlock()
+				observables = append(observables, next)
+			} else {
+				observer(zero, err, done)
+				sourceSubscriber.Unsubscribe()
+			}
+		}
+		o(concatenator, subscribeOn, sourceSubscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableCount
+
+// Count counts the number of items emitted by the source Observable and
+// emits only this value.
+func (o Observable) Count() ObservableInt {
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		var count int
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				count++
+			} else {
+				observe(count, nil, false)
+				observe(zeroInt, err, done)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableDebounce
+
+// Debounce only emits the last item of a burst from an Observable if a
+// particular timespan has passed without it emitting another item.
+func (o Observable) Debounce(duration time.Duration) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		valuech := make(chan interface{})
+		donech := make(chan error)
+		debouncer := func() {
+			var nextValue interface{}
+			var timeout <-chan time.Time
+			for {
+				select {
+				case nextValue = <-valuech:
+					timeout = time.After(duration)
+				case err, subscribed := <-donech:
+					if !subscribed {
+						return
+					}
+					if timeout != nil {
+						observe(nextValue, nil, false)
+					}
+					if err != nil {
+						observe(nil, err, true)
+					} else {
+						observe(nil, nil, true)
+					}
+				case <-timeout:
+					observe(nextValue, nil, false)
+					timeout = nil
+				}
+			}
+		}
+		go debouncer()
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				valuech <- next
+			} else {
+				donech <- err
+			}
+		}
+		o(observer, subscribeOn, subscriber.Add(func() { close(donech) }))
+	}
+	return observable
+}
+
+//jig:name ObservableDelay
+
+// Delay shifts the emission from an Observable forward in time by a particular amount of time.
+func (o Observable) Delay(duration time.Duration) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		firstTime := true
+		observer := func(next interface{}, err error, done bool) {
+			if firstTime {
+				firstTime = false
+				time.Sleep(duration)
+			}
+			observe(next, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableDistinct
+
+// Distinct suppress duplicate items emitted by an Observable
+func (o Observable) Distinct() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		seen := map[interface{}]struct{}{}
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				if _, present := seen[next]; present {
+					return
+				}
+				seen[next] = struct{}{}
+			}
+			observe(next, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableDo
+
+// Do calls a function for each next value passing through the observable.
+func (o Observable) Do(f func(next interface{})) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				f(next)
+			}
+			observe(next, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableDoOnComplete
+
+// DoOnComplete calls a function when the stream completes.
+func (o Observable) DoOnComplete(f func()) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if err == nil && done {
+				f()
+			}
+			observe(next, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableDoOnError
+
+// DoOnError calls a function for any error on the stream.
+func (o Observable) DoOnError(f func(err error)) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if err != nil {
+				f(err)
+			}
+			observe(next, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableElementAt
+
+// ElementAt emit only item n emitted by an Observable
+func (o Observable) ElementAt(n int) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		i := 0
+		observer := func(next interface{}, err error, done bool) {
+			if done || i == n {
+				observe(next, err, done)
+			}
+			i++
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableFilter
+
+// Filter emits only those items from an Observable that pass a predicate test.
+func (o Observable) Filter(predicate func(next interface{}) bool) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if done || predicate(next) {
+				observe(next, err, done)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableFinally
+
+// Finally applies a function for any error or completion on the stream.
+// This doesn't expose whether this was an error or a completion.
+func (o Observable) Finally(f func()) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if done {
+				f()
+			}
+			observe(next, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableFirst
+
+// First emits only the first item, or the first item that meets a condition, from an Observable.
+func (o Observable) First() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		start := true
+		observer := func(next interface{}, err error, done bool) {
+			if done || start {
+				observe(next, err, done)
+			}
+			start = false
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableIgnoreCompletion
+
+// IgnoreCompletion only emits items and never completes, neither with Error nor with Complete.
+func (o Observable) IgnoreCompletion() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				observe(next, err, done)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableIgnoreElements
+
+// IgnoreElements does not emit any items from an Observable but mirrors its termination notification.
+func (o Observable) IgnoreElements() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if done {
+				observe(next, err, done)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableLast
+
+// Last emits only the last item emitted by an Observable.
+func (o Observable) Last() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		have := false
+		var last interface{}
+		observer := func(next interface{}, err error, done bool) {
+			if done {
+				if have {
+					observe(last, nil, false)
+				}
+				observe(nil, err, true)
+			} else {
+				last = next
+				have = true
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableMap
+
+// Map transforms the items emitted by an Observable by applying a
+// function to each item.
+func (o Observable) Map(project func(interface{}) interface{}) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			var mapped interface{}
+			if !done {
+				mapped = project(next)
+			}
+			observe(mapped, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableIntMapObservable
+
+// MapObservable transforms the items emitted by an ObservableInt by applying a
+// function to each item.
+func (o ObservableInt) MapObservable(project func(int) Observable) ObservableObservable {
+	observable := func(observe ObservableObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			var mapped Observable
+			if !done {
+				mapped = project(next)
+			}
+			observe(mapped, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableIntMax
+
+// Max determines, and emits, the maximum-valued item emitted by an
+// ObservableInt.
+func (o ObservableInt) Max() ObservableInt {
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		var started bool
+		var max int
+		observer := func(next int, err error, done bool) {
+			if started {
+				if !done {
+					if max < next {
+						max = next
+					}
+				} else {
+					observe(max, nil, false)
+					observe(zeroInt, err, done)
+				}
+			} else {
+				if !done {
+					max = next
+					started = true
+				} else {
+					observe(zeroInt, err, done)
+				}
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableObservableMergeAll
+
+// MergeAll flattens a higher order observable by merging the observables it emits.
+func (o ObservableObservable) MergeAll() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		var observers struct {
+			sync.Mutex
+			done	bool
+			len	int32
+		}
+		observer := func(next interface{}, err error, done bool) {
+			observers.Lock()
+			defer observers.Unlock()
+			if !observers.done {
+				switch {
+				case !done:
+					observe(next, nil, false)
+				case err != nil:
+					observers.done = true
+					observe(zero, err, true)
+				default:
+					if atomic.AddInt32(&observers.len, -1) == 0 {
+						observe(zero, nil, true)
+					}
+				}
+			}
+		}
+		merger := func(next Observable, err error, done bool) {
+			if !done {
+				atomic.AddInt32(&observers.len, 1)
+				next(observer, subscribeOn, subscriber)
+			} else {
+				observer(zero, err, true)
+			}
+		}
+		subscribeOn.Schedule(func() {
+			if !subscriber.Canceled() {
+				observers.len = 1
+				o(merger, subscribeOn, subscriber)
+			}
+		})
+	}
+	return observable
+}
+
+//jig:name ObservableMergeDelayError
+
+// MergeDelayError combines multiple Observables into one by merging their emissions.
+// Any error will be deferred until all observables terminate.
+func (o Observable) MergeDelayError(other ...Observable) Observable {
+	if len(other) == 0 {
+		return o
+	}
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		var observers struct {
+			sync.Mutex
+			len	int
+			err	error
+		}
+		observer := func(next interface{}, err error, done bool) {
+			observers.Lock()
+			defer observers.Unlock()
+			if !done {
+				observe(next, nil, false)
+			} else {
+				if err != nil {
+					observers.err = err
+				}
+				if observers.len--; observers.len == 0 {
+					observe(zero, observers.err, true)
+				}
+			}
+		}
+		subscribeOn.Schedule(func() {
+			if !subscriber.Canceled() {
+				observers.len = 1 + len(other)
+				o(observer, subscribeOn, subscriber)
+				for _, o := range other {
+					if subscriber.Canceled() {
+						return
+					}
+					o(observer, subscribeOn, subscriber)
+				}
+			}
+		})
+	}
+	return observable
+}
+
+//jig:name ObservableMergeMap
+
+// MergeMap transforms the items emitted by an Observable by applying a
+// function to each item an returning an Observable. The stream of Observable
+// items is then merged into a single stream of  items using the MergeAll operator.
+func (o Observable) MergeMap(project func(interface{}) Observable) Observable {
+	return o.MapObservable(project).MergeAll()
+}
+
+//jig:name ObservableIntMin
+
+// Min determines, and emits, the minimum-valued item emitted by an
+// ObservableInt.
+func (o ObservableInt) Min() ObservableInt {
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		var started bool
+		var min int
+		observer := func(next int, err error, done bool) {
+			if started {
+				if !done {
+					if min > next {
+						min = next
+					}
+				} else {
+					observe(min, nil, false)
+					observe(zeroInt, err, done)
+				}
+			} else {
+				if !done {
+					min = next
+					started = true
+				} else {
+					observe(zeroInt, err, done)
+				}
+
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableObserveOn
+
+// ObserveOn specifies the scheduler on which an observer will observe this
+// Observable.
+func (o Observable) ObserveOn(observeOn Scheduler) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			observeOn.Schedule(func() {
+				observe(next, err, done)
+			})
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableOnlyBool
+
+// OnlyBool filters the value stream of an Observable of interface{} and outputs only the
+// bool typed values.
+func (o Observable) OnlyBool() ObservableBool {
+	observable := func(observe BoolObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				if nextBool, ok := next.(bool); ok {
+					observe(nextBool, err, done)
+				}
+			} else {
+				observe(zeroBool, err, true)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableOnlyInt
+
+// OnlyInt filters the value stream of an Observable of interface{} and outputs only the
+// int typed values.
+func (o Observable) OnlyInt() ObservableInt {
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				if nextInt, ok := next.(int); ok {
+					observe(nextInt, err, done)
+				}
+			} else {
+				observe(zeroInt, err, true)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableReduce
+
+// Reduce applies a reducer function to each item emitted by an Observable
+// and the previous reducer result. The operator accepts a seed argument that
+// is passed to the reducer for the first item emitted by the Observable.
+// Reduce emits only the final value.
+func (o Observable) Reduce(reducer func(interface{}, interface{}) interface{}, seed interface{}) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		state := seed
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				state = reducer(state, next)
+			} else {
+				if err == nil {
+					observe(state, nil, false)
+				}
+				observe(zero, err, done)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableRepeat
+
+// Repeat creates an Observable that emits a sequence of items repeatedly.
+func (o Observable) Repeat(count int) Observable {
+	if count == 0 {
+		return Empty()
+	}
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		var repeated int
+		var observer ObserveFunc
+		observer = func(next interface{}, err error, done bool) {
+			if !done || err != nil {
+				observe(next, err, done)
+			} else {
+				repeated++
+				if repeated < count {
+					o(observer, subscribeOn, subscriber)
+				} else {
+					observe(nil, nil, true)
+				}
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableRetry
+
+// Retry if a source Observable sends an error notification, resubscribe to
+// it in the hopes that it will complete without error.
+func (o Observable) Retry() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		var observer ObserveFunc
+		observer = func(next interface{}, err error, done bool) {
+			if err != nil {
+				o(observer, subscribeOn, subscriber)
+			} else {
+				observe(next, nil, done)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableSample
+
+// Sample emits the most recent item emitted by an Observable within periodic time intervals.
+func (o Observable) Sample(window time.Duration) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		var unsubscribe = make(chan struct{})
+		var last struct {
+			sync.Mutex
+			Fresh	bool
+			Value	interface{}
+		}
+		sampler := func() {
+			for {
+				select {
+				case <-time.After(window):
+					var (
+						fresh	bool
+						value	interface{}
+					)
+					last.Lock()
+					if last.Fresh {
+						last.Fresh = false
+						fresh = true
+						value = last.Value
+					}
+					last.Unlock()
+					if fresh {
+						observe(value, nil, false)
+					}
+				case <-unsubscribe:
+					return
+				}
+			}
+		}
+		go sampler()
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				last.Lock()
+				last.Fresh = true
+				last.Value = next
+				last.Unlock()
+			} else {
+				observe(nil, err, true)
+			}
+		}
+		o(observer, subscribeOn, subscriber.Add(func() { close(unsubscribe) }))
+	}
+	return observable
+}
+
+//jig:name ObservableScan
+
+// Scan applies a accumulator function to each item emitted by an
+// Observable and the previous accumulator result. The operator accepts a
+// seed argument that is passed to the accumulator for the first item emitted
+// by the Observable. Scan emits every value, both intermediate and final.
+func (o Observable) Scan(accumulator func(interface{}, interface{}) interface{}, seed interface{}) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		state := seed
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				state = accumulator(state, next)
+				observe(state, nil, false)
+			} else {
+				observe(zero, err, done)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableSingle
+
+// Single enforces that the observable sends exactly one data item and then
+// completes. If the observable sends no data before completing or sends more
+// than 1 item before completing  this reported as an error to the observer.
+func (o Observable) Single() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		var (
+			count	int
+			latest	interface{}
+		)
+		observer := func(next interface{}, err error, done bool) {
+			if count < 2 {
+				if done {
+					if err != nil {
+						observe(nil, err, true)
+					} else {
+						if count == 1 {
+							observe(latest, nil, false)
+							observe(nil, nil, true)
+						} else {
+							observe(nil, RxError("expected one value, got none"), true)
+						}
+					}
+				} else {
+					count++
+					if count == 1 {
+						latest = next
+					} else {
+						observe(nil, RxError("expected one value, got multiple"), true)
+					}
+				}
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableSkip
+
+// Skip suppresses the first n items emitted by an Observable.
+func (o Observable) Skip(n int) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		i := 0
+		observer := func(next interface{}, err error, done bool) {
+			if done || i >= n {
+				observe(next, err, done)
+			}
+			i++
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableSkipLast
+
+// SkipLast suppresses the last n items emitted by an Observable.
+func (o Observable) SkipLast(n int) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		read := 0
+		write := 0
+		n++
+		buffer := make([]interface{}, n)
+		observer := func(next interface{}, err error, done bool) {
+			if done {
+				observe(nil, err, true)
+			} else {
+				buffer[write] = next
+				write = (write + 1) % n
+				if write == read {
+					observe(buffer[read], nil, false)
+					read = (read + 1) % n
+				}
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableSubscribeOn
+
+// SubscribeOn specifies the scheduler an Observable should use when it is
+// subscribed to.
+func (o Observable) SubscribeOn(subscribeOn Scheduler) Observable {
+	observable := func(observe ObserveFunc, _ Scheduler, subscriber Subscriber) {
+		o(observe, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableIntSum
+
+// Sum calculates the sum of numbers emitted by an ObservableInt and emits this sum.
+func (o ObservableInt) Sum() ObservableInt {
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		var sum int
+		observer := func(next int, err error, done bool) {
+			if !done {
+				sum += next
+			} else {
+				observe(sum, nil, false)
+				observe(zeroInt, err, done)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name LinkEnums
+
+// state
+const (
+	linkUnsubscribed	= iota
+	linkSubscribing
+	linkIdle
+	linkBusy
+	linkError	// done:error
+	linkCanceled	// externally:canceled
+	linkCompleting
+	linkComplete	// done:complete
+)
+
+// callbackState
+const (
+	callbackNil	= iota
+	settingCallback
+	callbackSet
+)
+
+// callbackKind
+const (
+	linkCallbackOnComplete	= iota
+	linkCancelOrCompleted
+)
+
+//jig:name link
+
+type linkObserveFunc func(*link, interface{}, error, bool)
+
+type link struct {
+	observe		linkObserveFunc
+	state		int32
+	callbackState	int32
+	callbackKind	int
+	callback	func()
+	subscriber	Subscriber
+}
+
+func newInitialLink() *link {
+	return &link{state: linkCompleting, subscriber: subscriber.New()}
+}
+
+func newLink(observe linkObserveFunc, subscriber Subscriber) *link {
+	return &link{
+		observe:	observe,
+		subscriber:	subscriber.AddChild(),
+	}
+}
+
+func (o *link) Observe(next interface{}, err error, done bool) error {
+	if !atomic.CompareAndSwapInt32(&o.state, linkIdle, linkBusy) {
+		if atomic.LoadInt32(&o.state) > linkBusy {
+			return RxError("Already Done")
+		}
+		return RxError("Recursion Error")
+	}
+	o.observe(o, next, err, done)
+	if done {
+		if err != nil {
+			if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkError) {
+				return RxError("Internal Error: 'busy' -> 'error'")
+			}
+		} else {
+			if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkCompleting) {
+				return RxError("Internal Error: 'busy' -> 'completing'")
+			}
+		}
+	} else {
+		if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkIdle) {
+			return RxError("Internal Error: 'busy' -> 'idle'")
+		}
+	}
+	if atomic.LoadInt32(&o.callbackState) != callbackSet {
+		return nil
+	}
+	if atomic.CompareAndSwapInt32(&o.state, linkCompleting, linkComplete) {
+		o.callback()
+	}
+	if o.callbackKind == linkCancelOrCompleted {
+		if atomic.CompareAndSwapInt32(&o.state, linkIdle, linkCanceled) {
+			o.callback()
+		}
+	}
+	return nil
+}
+
+func (o *link) SubscribeTo(observable Observable, scheduler Scheduler) error {
+	if !atomic.CompareAndSwapInt32(&o.state, linkUnsubscribed, linkSubscribing) {
+		return RxError("Already Subscribed")
+	}
+	observer := func(next interface{}, err error, done bool) {
+		o.Observe(next, err, done)
+	}
+	observable(observer, scheduler, o.subscriber)
+	if !atomic.CompareAndSwapInt32(&o.state, linkSubscribing, linkIdle) {
+		return RxError("Internal Error")
+	}
+	return nil
+}
+
+func (o *link) Cancel(callback func()) error {
+	if !atomic.CompareAndSwapInt32(&o.callbackState, callbackNil, settingCallback) {
+		return RxError("Already Waiting")
+	}
+	o.callbackKind = linkCancelOrCompleted
+	o.callback = callback
+	if !atomic.CompareAndSwapInt32(&o.callbackState, settingCallback, callbackSet) {
+		return RxError("Internal Error")
+	}
+	o.subscriber.Unsubscribe()
+	if atomic.CompareAndSwapInt32(&o.state, linkCompleting, linkComplete) {
+		o.callback()
+	}
+	if atomic.CompareAndSwapInt32(&o.state, linkIdle, linkCanceled) {
+		o.callback()
+	}
+	return nil
+}
+
+func (o *link) OnComplete(callback func()) error {
+	if !atomic.CompareAndSwapInt32(&o.callbackState, callbackNil, settingCallback) {
+		return RxError("Already Waiting")
+	}
+	o.callbackKind = linkCallbackOnComplete
+	o.callback = callback
+	if !atomic.CompareAndSwapInt32(&o.callbackState, settingCallback, callbackSet) {
+		return RxError("Internal Error")
+	}
+	if atomic.CompareAndSwapInt32(&o.state, linkCompleting, linkComplete) {
+		o.callback()
+	}
+	return nil
+}
+
+//jig:name ObservableObservableSwitchAll
+
+// SwitchAll converts an Observable that emits Observables into a single Observable
+// that emits the items emitted by the most-recently-emitted of those Observables.
+func (o ObservableObservable) SwitchAll() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(link *link, next interface{}, err error, done bool) {
+			if !done || err != nil {
+				observe(next, err, done)
+			} else {
+				link.subscriber.Unsubscribe()
+			}
+		}
+		currentLink := newInitialLink()
+		var switcherMutex sync.Mutex
+		switcherSubscriber := subscriber.AddChild()
+		switcher := func(next Observable, err error, done bool) {
+			switch {
+			case !done:
+				previousLink := currentLink
+				func() {
+					switcherMutex.Lock()
+					defer switcherMutex.Unlock()
+					currentLink = newLink(observer, subscriber)
+				}()
+				previousLink.Cancel(func() {
+					switcherMutex.Lock()
+					defer switcherMutex.Unlock()
+					currentLink.SubscribeTo(next, subscribeOn)
+				})
+			case err != nil:
+				currentLink.Cancel(func() {
+					observe(zero, err, true)
+				})
+				switcherSubscriber.Unsubscribe()
+			default:
+				currentLink.OnComplete(func() {
+					observe(zero, nil, true)
+				})
+				switcherSubscriber.Unsubscribe()
+			}
+		}
+		o(switcher, subscribeOn, switcherSubscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableSwitchMap
+
+// SwitchMap transforms the items emitted by an Observable by applying a
+// function to each item an returning an Observable. In doing so, it behaves much like
+// MergeMap (previously FlatMap), except that whenever a new Observable is emitted
+// SwitchMap will unsubscribe from the previous Observable and begin emitting items
+// from the newly emitted one.
+func (o Observable) SwitchMap(project func(interface{}) Observable) Observable {
+	return o.MapObservable(project).SwitchAll()
 }
 
 //jig:name ObservableTake
@@ -299,44 +1792,149 @@ func (o ObservableInt) Take(n int) ObservableInt {
 	return o.AsObservable().Take(n).AsObservableInt()
 }
 
-//jig:name ObservableMergeMap
+//jig:name ObservableTakeLast
 
-// MergeMap transforms the items emitted by an Observable by applying a
-// function to each item an returning an Observable. The stream of Observable
-// items is then merged into a single stream of  items using the MergeAll operator.
-func (o Observable) MergeMap(project func(interface{}) Observable) Observable {
-	return o.MapObservable(project).MergeAll()
-}
-
-//jig:name ObservableIntAsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
+// TakeLast emits only the last n items emitted by an Observable.
+func (o Observable) TakeLast(n int) Observable {
 	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
+		read := 0
+		write := 0
+		n++
+		buffer := make([]interface{}, n)
+		observer := func(next interface{}, err error, done bool) {
+			if done {
+				for read != write {
+					observe(buffer[read], nil, false)
+					read = (read + 1) % n
+				}
+				observe(nil, err, true)
+			} else {
+				buffer[write] = next
+				write = (write + 1) % n
+				if write == read {
+					read = (read + 1) % n
+				}
+			}
 		}
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
 }
 
-//jig:name ObservableMap
+//jig:name ObservableTakeUntil
 
-// Map transforms the items emitted by an Observable by applying a
-// function to each item.
-func (o Observable) Map(project func(interface{}) interface{}) Observable {
+// TakeUntil emits items emitted by an Observable until another Observable emits an item.
+func (o Observable) TakeUntil(other Observable) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		var watcherNext int32
+		watcherSubscriber := subscriber.AddChild()
+		watcher := func(next interface{}, err error, done bool) {
+			if !done {
+				atomic.StoreInt32(&watcherNext, 1)
+			}
+			watcherSubscriber.Unsubscribe()
+		}
+		other(watcher, subscribeOn, watcherSubscriber)
+
+		observer := func(next interface{}, err error, done bool) {
+			if done || atomic.LoadInt32(&watcherNext) != 1 {
+				observe(next, err, done)
+			} else {
+				observe(zero, nil, true)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableTakeWhile
+
+// TakeWhile mirrors items emitted by an Observable until a specified condition becomes false.
+//
+// The TakeWhile mirrors the source Observable until such time as some condition you specify
+// becomes false, at which point TakeWhile stops mirroring the source Observable and terminates
+// its own Observable.
+func (o Observable) TakeWhile(condition func(next interface{}) bool) Observable {
 	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
-			var mapped interface{}
-			if !done {
-				mapped = project(next)
+			if done || condition(next) {
+				observe(next, err, done)
+			} else {
+				observe(zero, nil, true)
 			}
-			observe(mapped, err, done)
 		}
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
+}
+
+//jig:name ObservableSerialize
+
+// Serialize forces an Observable to make serialized calls and to be
+// well-behaved.
+func (o Observable) Serialize() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		var observer struct {
+			sync.Mutex
+			done	bool
+		}
+		serializer := func(next interface{}, err error, done bool) {
+			observer.Lock()
+			defer observer.Unlock()
+			if !observer.done {
+				observer.done = done
+				observe(next, err, done)
+			}
+		}
+		o(serializer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableTimeout
+
+// ErrTimeout is delivered to an observer if the stream times out.
+const ErrTimeout = RxError("timeout")
+
+// Timeout mirrors the source Observable, but issues an error notification if a
+// particular period of time elapses without any emitted items.
+//
+// This observer starts a goroutine for every subscription to monitor the
+// timeout deadline. It is guaranteed that calls to the observer for this
+// subscription will never be called concurrently. It is however almost certain
+// that any timeout error will be delivered on a goroutine other than the one
+// delivering the next values.
+func (o Observable) Timeout(timeout time.Duration) Observable {
+	observable := Observable(func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		deadline := time.NewTimer(timeout)
+		unsubscribe := make(chan struct{})
+		observer := func(next interface{}, err error, done bool) {
+			if deadline.Stop() {
+				if subscriber.Closed() {
+					return
+				}
+				observe(next, err, done)
+				if done {
+					return
+				}
+				deadline.Reset(timeout)
+			}
+		}
+		timeouter := func() {
+			select {
+			case <-deadline.C:
+				if subscriber.Closed() {
+					return
+				}
+				observe(nil, ErrTimeout, true)
+			case <-unsubscribe:
+			}
+		}
+		go timeouter()
+		o(observer, subscribeOn, subscriber.Add(func() { close(unsubscribe) }))
+	})
+	return observable.Serialize()
 }
 
 //jig:name Schedulers
@@ -346,6 +1944,69 @@ func ImmediateScheduler() Scheduler	{ return scheduler.Immediate }
 func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
 
 func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
+
+//jig:name ObservablePrintln
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+func (o Observable) Println() (err error) {
+	subscriber := subscriber.New()
+	scheduler := CurrentGoroutineScheduler()
+	observer := func(next interface{}, e error, done bool) {
+		if !done {
+			fmt.Println(next)
+		} else {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
+}
+
+//jig:name ObservableBoolPrintln
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+func (o ObservableBool) Println() (err error) {
+	subscriber := subscriber.New()
+	scheduler := CurrentGoroutineScheduler()
+	observer := func(next bool, e error, done bool) {
+		if !done {
+			fmt.Println(next)
+		} else {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
+}
+
+//jig:name ObservableIntPrintln
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+func (o ObservableInt) Println() (err error) {
+	subscriber := subscriber.New()
+	scheduler := CurrentGoroutineScheduler()
+	observer := func(next int, e error, done bool) {
+		if !done {
+			fmt.Println(next)
+		} else {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
+}
 
 //jig:name SubscribeOption
 
@@ -434,116 +2095,380 @@ func (o Observable) Subscribe(observe ObserveFunc, options ...SubscribeOption) S
 	return subscriber
 }
 
-//jig:name ObservablePrintln
+//jig:name ObservableBoolSubscribe
 
-// Println subscribes to the Observable and prints every item to os.Stdout while
-// it waits for completion or error. Returns either the error or nil when the
-// Observable completed normally.
-func (o Observable) Println(options ...SubscribeOption) (e error) {
+// Subscribe operates upon the emissions and notifications from an Observable.
+// This method returns a Subscription.
+func (o ObservableBool) Subscribe(observe BoolObserveFunc, options ...SubscribeOption) Subscription {
+	scheduler, subscriber := newSchedulerAndSubscriber(options)
+	observer := func(next bool, err error, done bool) {
+		if !done {
+			observe(next, err, done)
+		} else {
+			observe(zeroBool, err, true)
+			subscriber.Unsubscribe()
+		}
+	}
+	o(observer, scheduler, subscriber)
+	return subscriber
+}
+
+//jig:name ObservableIntSubscribe
+
+// Subscribe operates upon the emissions and notifications from an Observable.
+// This method returns a Subscription.
+func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOption) Subscription {
+	scheduler, subscriber := newSchedulerAndSubscriber(options)
+	observer := func(next int, err error, done bool) {
+		if !done {
+			observe(next, err, done)
+		} else {
+			observe(zeroInt, err, true)
+			subscriber.Unsubscribe()
+		}
+	}
+	o(observer, scheduler, subscriber)
+	return subscriber
+}
+
+//jig:name ObservableSubscribeNext
+
+// SubscribeNext operates upon the emissions from an Observable only.
+// This method returns a Subscription.
+func (o Observable) SubscribeNext(f func(next interface{}), options ...SubscribeOption) Subscription {
+	return o.Subscribe(func(next interface{}, err error, done bool) {
+		if !done {
+			f(next)
+		}
+	}, options...)
+}
+
+//jig:name ObservableBoolSubscribeNext
+
+// SubscribeNext operates upon the emissions from an Observable only.
+// This method returns a Subscription.
+func (o ObservableBool) SubscribeNext(f func(next bool), options ...SubscribeOption) Subscription {
+	return o.Subscribe(func(next bool, err error, done bool) {
+		if !done {
+			f(next)
+		}
+	}, options...)
+}
+
+//jig:name ObservableIntSubscribeNext
+
+// SubscribeNext operates upon the emissions from an Observable only.
+// This method returns a Subscription.
+func (o ObservableInt) SubscribeNext(f func(next int), options ...SubscribeOption) Subscription {
+	return o.Subscribe(func(next int, err error, done bool) {
+		if !done {
+			f(next)
+		}
+	}, options...)
+}
+
+//jig:name ObservableToChan
+
+// ToChan returns a channel that emits interface{} values. If the source
+// observable does not emit values but emits an error or complete, then the
+// returned channel will enit any error and then close without emitting any
+// values.
+//
+// Because the channel is fed by subscribing to the observable, ToChan would
+// block when subscribed on the standard Trampoline scheduler which is
+// initially synchronous. That's why the subscribing is done on the
+// NewGoroutine scheduler.
+//
+// To cancel the subscription created internally by ToChan you will need access
+// to the subscription used internally by ToChan. To get at this subscription,
+// pass the result of a call to option OnSubscribe(func(Subscription)) as a
+// parameter to ToChan. On suscription the callback will be called with the
+// subscription that was created.
+func (o Observable) ToChan(options ...SubscribeOption) <-chan interface{} {
+	scheduler := NewGoroutineScheduler()
+	nextch := make(chan interface{}, 1)
 	o.Subscribe(func(next interface{}, err error, done bool) {
 		if !done {
-			fmt.Println(next)
+			nextch <- next
 		} else {
-			e = err
+			if err != nil {
+				nextch <- err
+			}
+			close(nextch)
 		}
-	}, options...).Wait()
-	return e
+	}, SubscribeOn(scheduler, options...))
+	return nextch
 }
 
-//jig:name ObservableFilter
+//jig:name ObservableBoolToChan
 
-// Filter emits only those items from an Observable that pass a predicate test.
-func (o Observable) Filter(predicate func(next interface{}) bool) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if done || predicate(next) {
-				observe(next, err, done)
-			}
+// ToChan returns a channel that emits bool values. If the source observable does
+// not emit values but emits an error or complete, then the returned channel
+// will close without emitting any values.
+//
+// There is no way to determine whether the observable feeding into the
+// channel terminated with an error or completed normally.
+// Because the channel is fed by subscribing to the observable, ToChan would
+// block when subscribed on the standard Trampoline scheduler which is
+// initially synchronous. That's why the subscribing is done on the
+// NewGoroutine scheduler. It is not possible to cancel the subscription
+// created internally by ToChan.
+func (o ObservableBool) ToChan(options ...SubscribeOption) <-chan bool {
+	scheduler := NewGoroutineScheduler()
+	nextch := make(chan bool, 1)
+	o.Subscribe(func(next bool, err error, done bool) {
+		if !done {
+			nextch <- next
+		} else {
+			close(nextch)
 		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
+	}, SubscribeOn(scheduler, options...))
+	return nextch
 }
 
-//jig:name ObservableConcat
+//jig:name ObservableIntToChan
 
-// Concat emits the emissions from two or more Observables without interleaving them.
-func (o Observable) Concat(other ...Observable) Observable {
-	if len(other) == 0 {
-		return o
-	}
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		var (
-			observables	= append([]Observable{}, other...)
-			observer	ObserveFunc
-		)
-		observer = func(next interface{}, err error, done bool) {
-			if !done || err != nil {
-				observe(next, err, done)
-			} else {
-				if len(observables) == 0 {
-					observe(zero, nil, true)
-				} else {
-					o := observables[0]
-					observables = observables[1:]
-					o(observer, subscribeOn, subscriber)
-				}
-			}
+// ToChan returns a channel that emits int values. If the source observable does
+// not emit values but emits an error or complete, then the returned channel
+// will close without emitting any values.
+//
+// There is no way to determine whether the observable feeding into the
+// channel terminated with an error or completed normally.
+// Because the channel is fed by subscribing to the observable, ToChan would
+// block when subscribed on the standard Trampoline scheduler which is
+// initially synchronous. That's why the subscribing is done on the
+// NewGoroutine scheduler. It is not possible to cancel the subscription
+// created internally by ToChan.
+func (o ObservableInt) ToChan(options ...SubscribeOption) <-chan int {
+	scheduler := NewGoroutineScheduler()
+	nextch := make(chan int, 1)
+	o.Subscribe(func(next int, err error, done bool) {
+		if !done {
+			nextch <- next
+		} else {
+			close(nextch)
 		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
+	}, SubscribeOn(scheduler, options...))
+	return nextch
 }
 
-//jig:name ObservableScan
+//jig:name ObservableToSingle
 
-// Scan applies a accumulator function to each item emitted by an
-// Observable and the previous accumulator result. The operator accepts a
-// seed argument that is passed to the accumulator for the first item emitted
-// by the Observable. Scan emits every value, both intermediate and final.
-func (o Observable) Scan(accumulator func(interface{}, interface{}) interface{}, seed interface{}) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		state := seed
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				state = accumulator(state, next)
-				observe(state, nil, false)
-			} else {
-				observe(zero, err, done)
-			}
+// ToSingle blocks until the Observable emits exactly one value or an error.
+// The value and any error are returned.
+//
+// This function subscribes to the source observable on the NewGoroutine
+// scheduler. The NewGoroutine scheduler works in more situations for
+// complex chains of observables, like when merging the output of multiple
+// observables.
+func (o Observable) ToSingle(options ...SubscribeOption) (entry interface{}, err error) {
+	scheduler := NewGoroutineScheduler()
+	o.Single().Subscribe(func(next interface{}, e error, done bool) {
+		if !done {
+			entry = next
+		} else {
+			err = e
 		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
+	}, SubscribeOn(scheduler, options...)).Wait()
+	return
 }
 
-//jig:name ObservableDo
+//jig:name ObservableBoolToSingle
 
-// Do calls a function for each next value passing through the observable.
-func (o Observable) Do(f func(next interface{})) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				f(next)
-			}
-			observe(next, err, done)
+// ToSingle blocks until the ObservableBool emits exactly one value or an error.
+// The value and any error are returned.
+//
+// This function subscribes to the source observable on the NewGoroutine
+// scheduler. The NewGoroutine scheduler works in more situations for
+// complex chains of observables, like when merging the output of multiple
+// observables.
+func (o ObservableBool) ToSingle(options ...SubscribeOption) (entry bool, err error) {
+	scheduler := NewGoroutineScheduler()
+	o.Single().Subscribe(func(next bool, e error, done bool) {
+		if !done {
+			entry = next
+		} else {
+			err = e
 		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
+	}, SubscribeOn(scheduler, options...)).Wait()
+	return
+}
+
+//jig:name ObservableIntToSingle
+
+// ToSingle blocks until the ObservableInt emits exactly one value or an error.
+// The value and any error are returned.
+//
+// This function subscribes to the source observable on the NewGoroutine
+// scheduler. The NewGoroutine scheduler works in more situations for
+// complex chains of observables, like when merging the output of multiple
+// observables.
+func (o ObservableInt) ToSingle(options ...SubscribeOption) (entry int, err error) {
+	scheduler := NewGoroutineScheduler()
+	o.Single().Subscribe(func(next int, e error, done bool) {
+		if !done {
+			entry = next
+		} else {
+			err = e
+		}
+	}, SubscribeOn(scheduler, options...)).Wait()
+	return
+}
+
+//jig:name ObservableToSlice
+
+// ToSlice collects all values from the Observable into an slice. The
+// complete slice and any error are returned.
+//
+// This function subscribes to the source observable on the NewGoroutine
+// scheduler. The NewGoroutine scheduler works in more situations for
+// complex chains of observables, like when merging the output of multiple
+// observables.
+func (o Observable) ToSlice(options ...SubscribeOption) (slice []interface{}, err error) {
+	scheduler := NewGoroutineScheduler()
+	o.Subscribe(func(next interface{}, e error, done bool) {
+		if !done {
+			slice = append(slice, next)
+		} else {
+			err = e
+		}
+	}, SubscribeOn(scheduler, options...)).Wait()
+	return
+}
+
+//jig:name ObservableBoolToSlice
+
+// ToSlice collects all values from the ObservableBool into an slice. The
+// complete slice and any error are returned.
+//
+// This function subscribes to the source observable on the NewGoroutine
+// scheduler. The NewGoroutine scheduler works in more situations for
+// complex chains of observables, like when merging the output of multiple
+// observables.
+func (o ObservableBool) ToSlice(options ...SubscribeOption) (slice []bool, err error) {
+	scheduler := NewGoroutineScheduler()
+	o.Subscribe(func(next bool, e error, done bool) {
+		if !done {
+			slice = append(slice, next)
+		} else {
+			err = e
+		}
+	}, SubscribeOn(scheduler, options...)).Wait()
+	return
+}
+
+//jig:name ObservableIntToSlice
+
+// ToSlice collects all values from the ObservableInt into an slice. The
+// complete slice and any error are returned.
+//
+// This function subscribes to the source observable on the NewGoroutine
+// scheduler. The NewGoroutine scheduler works in more situations for
+// complex chains of observables, like when merging the output of multiple
+// observables.
+func (o ObservableInt) ToSlice(options ...SubscribeOption) (slice []int, err error) {
+	scheduler := NewGoroutineScheduler()
+	o.Subscribe(func(next int, e error, done bool) {
+		if !done {
+			slice = append(slice, next)
+		} else {
+			err = e
+		}
+	}, SubscribeOn(scheduler, options...)).Wait()
+	return
 }
 
 //jig:name ObservableWait
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
-func (o Observable) Wait(options ...SubscribeOption) (e error) {
-	o.Subscribe(func(next interface{}, err error, done bool) {
+// Subscription is performed on the normal CurrentGoroutine scheduler.
+func (o Observable) Wait() (err error) {
+	subscriber := subscriber.New()
+	scheduler := CurrentGoroutineScheduler()
+	observer := func(next interface{}, e error, done bool) {
 		if done {
-			e = err
+			err = e
+			subscriber.Unsubscribe()
 		}
-	}, options...).Wait()
-	return e
+	}
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
+}
+
+//jig:name ObservableBoolWait
+
+// Wait subscribes to the Observable and waits for completion or error.
+// Returns either the error or nil when the Observable completed normally.
+// Subscription is performed on the normal CurrentGoroutine scheduler.
+func (o ObservableBool) Wait() (err error) {
+	subscriber := subscriber.New()
+	scheduler := CurrentGoroutineScheduler()
+	observer := func(next bool, e error, done bool) {
+		if done {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
+}
+
+//jig:name ObservableIntWait
+
+// Wait subscribes to the Observable and waits for completion or error.
+// Returns either the error or nil when the Observable completed normally.
+// Subscription is performed on the normal CurrentGoroutine scheduler.
+func (o ObservableInt) Wait() (err error) {
+	subscriber := subscriber.New()
+	scheduler := CurrentGoroutineScheduler()
+	observer := func(next int, e error, done bool) {
+		if done {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
+}
+
+//jig:name SliceObserveFunc
+
+// SliceObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type SliceObserveFunc func(next Slice, err error, done bool)
+
+var zeroSlice Slice
+
+//jig:name ObservableSlice
+
+// ObservableSlice is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type ObservableSlice func(SliceObserveFunc, Scheduler, Subscriber)
+
+//jig:name ObservableIntSingle
+
+// Single enforces that the observableInt sends exactly one data item and then
+// completes. If the observable sends no data before completing or sends more
+// than 1 item before completing  this reported as an error to the observer.
+func (o ObservableInt) Single() ObservableInt {
+	return o.AsObservable().Single().AsObservableInt()
+}
+
+//jig:name ObservableBoolSingle
+
+// Single enforces that the observableBool sends exactly one data item and then
+// completes. If the observable sends no data before completing or sends more
+// than 1 item before completing  this reported as an error to the observer.
+func (o ObservableBool) Single() ObservableBool {
+	return o.AsObservable().Single().AsObservableBool()
 }
 
 //jig:name ObservableMapObservable
@@ -560,321 +2485,6 @@ func (o Observable) MapObservable(project func(interface{}) Observable) Observab
 			observe(mapped, err, done)
 		}
 		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name RxError
-
-type RxError string
-
-func (e RxError) Error() string	{ return string(e) }
-
-//jig:name ErrTypecastToInt
-
-// ErrTypecastToInt is delivered to an observer if the generic value cannot be
-// typecast to int.
-const ErrTypecastToInt = RxError("typecast to int failed")
-
-//jig:name ObservableAsObservableInt
-
-// AsInt turns an Observable of interface{} into an ObservableInt. If during
-// observing a typecast fails, the error ErrTypecastToInt will be emitted.
-func (o Observable) AsObservableInt() ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				if nextInt, ok := next.(int); ok {
-					observe(nextInt, err, done)
-				} else {
-					observe(zeroInt, ErrTypecastToInt, true)
-				}
-			} else {
-				observe(zeroInt, err, true)
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableSubscribeNext
-
-// SubscribeNext operates upon the emissions from an Observable only.
-// This method returns a Subscription.
-func (o Observable) SubscribeNext(f func(next interface{}), options ...SubscribeOption) Subscription {
-	return o.Subscribe(func(next interface{}, err error, done bool) {
-		if !done {
-			f(next)
-		}
-	}, options...)
-}
-
-//jig:name ObservableIntMapObservable
-
-// MapObservable transforms the items emitted by an ObservableInt by applying a
-// function to each item.
-func (o ObservableInt) MapObservable(project func(int) Observable) ObservableObservable {
-	observable := func(observe ObservableObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			var mapped Observable
-			if !done {
-				mapped = project(next)
-			}
-			observe(mapped, err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableObserveFunc
-
-// ObservableObserveFunc is the observer, a function that gets called whenever the
-// observable has something to report. The next argument is the item value that
-// is only valid when the done argument is false. When done is true and the err
-// argument is not nil, then the observable has terminated with an error.
-// When done is true and the err argument is nil, then the observable has
-// completed normally.
-type ObservableObserveFunc func(next Observable, err error, done bool)
-
-var zeroObservable Observable
-
-// Next is called by an ObservableObservable to emit the next Observable value to the
-// observer.
-func (f ObservableObserveFunc) Next(next Observable) {
-	f(next, nil, false)
-}
-
-// Error is called by an ObservableObservable to report an error to the observer.
-func (f ObservableObserveFunc) Error(err error) {
-	f(zeroObservable, err, true)
-}
-
-// Complete is called by an ObservableObservable to signal that no more data is
-// forthcoming to the observer.
-func (f ObservableObserveFunc) Complete() {
-	f(zeroObservable, nil, true)
-}
-
-//jig:name ObservableObservable
-
-// ObservableObservable is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableObservable func(ObservableObserveFunc, Scheduler, Subscriber)
-
-//jig:name LinkEnums
-
-// state
-const (
-	linkUnsubscribed	= iota
-	linkSubscribing
-	linkIdle
-	linkBusy
-	linkError	// done:error
-	linkCanceled	// externally:canceled
-	linkCompleting
-	linkComplete	// done:complete
-)
-
-// callbackState
-const (
-	callbackNil	= iota
-	settingCallback
-	callbackSet
-)
-
-// callbackKind
-const (
-	linkCallbackOnComplete	= iota
-	linkCancelOrCompleted
-)
-
-//jig:name Link
-
-type LinkObserveFunc func(*Link, interface{}, error, bool)
-
-type Link struct {
-	observe		LinkObserveFunc
-	state		int32
-	callbackState	int32
-	callbackKind	int
-	callback	func()
-	subscriber	Subscriber
-}
-
-func NewInitialLink() *Link {
-	return &Link{state: linkCompleting, subscriber: subscriber.New()}
-}
-
-func NewLink(observe LinkObserveFunc, subscriber Subscriber) *Link {
-	return &Link{
-		observe:	observe,
-		subscriber:	subscriber.AddChild(),
-	}
-}
-
-func (o *Link) Observe(next interface{}, err error, done bool) error {
-	if !atomic.CompareAndSwapInt32(&o.state, linkIdle, linkBusy) {
-		if atomic.LoadInt32(&o.state) > linkBusy {
-			return RxError("Already Done")
-		}
-		return RxError("Recursion Error")
-	}
-	o.observe(o, next, err, done)
-	if done {
-		if err != nil {
-			if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkError) {
-				return RxError("Internal Error: 'busy' -> 'error'")
-			}
-		} else {
-			if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkCompleting) {
-				return RxError("Internal Error: 'busy' -> 'completing'")
-			}
-		}
-	} else {
-		if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkIdle) {
-			return RxError("Internal Error: 'busy' -> 'idle'")
-		}
-	}
-	if atomic.LoadInt32(&o.callbackState) != callbackSet {
-		return nil
-	}
-	if atomic.CompareAndSwapInt32(&o.state, linkCompleting, linkComplete) {
-		o.callback()
-	}
-	if o.callbackKind == linkCancelOrCompleted {
-		if atomic.CompareAndSwapInt32(&o.state, linkIdle, linkCanceled) {
-			o.callback()
-		}
-	}
-	return nil
-}
-
-func (o *Link) SubscribeTo(observable Observable, scheduler Scheduler) error {
-	if !atomic.CompareAndSwapInt32(&o.state, linkUnsubscribed, linkSubscribing) {
-		return RxError("Already Subscribed")
-	}
-	observer := func(next interface{}, err error, done bool) {
-		o.Observe(next, err, done)
-	}
-	observable(observer, scheduler, o.subscriber)
-	if !atomic.CompareAndSwapInt32(&o.state, linkSubscribing, linkIdle) {
-		return RxError("Internal Error")
-	}
-	return nil
-}
-
-func (o *Link) Cancel(callback func()) error {
-	if !atomic.CompareAndSwapInt32(&o.callbackState, callbackNil, settingCallback) {
-		return RxError("Already Waiting")
-	}
-	o.callbackKind = linkCancelOrCompleted
-	o.callback = callback
-	if !atomic.CompareAndSwapInt32(&o.callbackState, settingCallback, callbackSet) {
-		return RxError("Internal Error")
-	}
-	o.subscriber.Unsubscribe()
-	if atomic.CompareAndSwapInt32(&o.state, linkCompleting, linkComplete) {
-		o.callback()
-	}
-	if atomic.CompareAndSwapInt32(&o.state, linkIdle, linkCanceled) {
-		o.callback()
-	}
-	return nil
-}
-
-func (o *Link) OnComplete(callback func()) error {
-	if !atomic.CompareAndSwapInt32(&o.callbackState, callbackNil, settingCallback) {
-		return RxError("Already Waiting")
-	}
-	o.callbackKind = linkCallbackOnComplete
-	o.callback = callback
-	if !atomic.CompareAndSwapInt32(&o.callbackState, settingCallback, callbackSet) {
-		return RxError("Internal Error")
-	}
-	if atomic.CompareAndSwapInt32(&o.state, linkCompleting, linkComplete) {
-		o.callback()
-	}
-	return nil
-}
-
-//jig:name ObservableObservableSwitchAll
-
-// SwitchAll converts an Observable that emits Observables into a single Observable
-// that emits the items emitted by the most-recently-emitted of those Observables.
-func (o ObservableObservable) SwitchAll() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(link *Link, next interface{}, err error, done bool) {
-			if !done || err != nil {
-				observe(next, err, done)
-			} else {
-				link.subscriber.Unsubscribe()
-			}
-		}
-		currentLink := NewInitialLink()
-		var switcherMutex sync.Mutex
-		switcherSubscriber := subscriber.AddChild()
-		switcher := func(next Observable, err error, done bool) {
-			switch {
-			case !done:
-				previousLink := currentLink
-				func() {
-					switcherMutex.Lock()
-					defer switcherMutex.Unlock()
-					currentLink = NewLink(observer, subscriber)
-				}()
-				previousLink.Cancel(func() {
-					switcherMutex.Lock()
-					defer switcherMutex.Unlock()
-					currentLink.SubscribeTo(next, subscribeOn)
-				})
-			case err != nil:
-				currentLink.Cancel(func() {
-					observe(zero, err, true)
-				})
-				switcherSubscriber.Unsubscribe()
-			default:
-				currentLink.OnComplete(func() {
-					observe(zero, nil, true)
-				})
-				switcherSubscriber.Unsubscribe()
-			}
-		}
-		o(switcher, subscribeOn, switcherSubscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableObservableMergeAll
-
-// MergeAll flattens a higher order observable by merging the observables it emits.
-func (o ObservableObservable) MergeAll() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		var (
-			mutex	sync.Mutex
-			count	int32	= 1
-		)
-		observer := func(next interface{}, err error, done bool) {
-			mutex.Lock()
-			defer mutex.Unlock()
-			if !done || err != nil {
-				observe(next, err, done)
-			} else {
-				if atomic.AddInt32(&count, -1) == 0 {
-					observe(zero, nil, true)
-				}
-			}
-		}
-		merger := func(next Observable, err error, done bool) {
-			if !done {
-				atomic.AddInt32(&count, 1)
-				next(observer, subscribeOn, subscriber)
-			} else {
-				observer(zero, err, true)
-			}
-		}
-		o(merger, subscribeOn, subscriber)
 	}
 	return observable
 }
