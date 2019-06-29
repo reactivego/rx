@@ -25,12 +25,6 @@ import (
 // side will be handled according to the specific behavior of the subject.
 // There are different types of subjects, see the different NewXxxSubjectFoo
 // functions for more info.
-//
-// Important! a subject is a hot observable. This means that subscribing to
-// it will block the calling goroutine while it is waiting for items and
-// notifications to receive. Unless you have code on a different goroutine
-// already feeding into the subject, your subscribe will deadlock.
-// Alternatively, you could subscribe on a goroutine as shown in the example.
 type SubjectFoo struct {
 	ObservableFoo
 	FooObserveFunc
@@ -97,13 +91,6 @@ var MaxReplayCapacity = 16383
 // subscribe after. When bufferCapacity argument is 0, then MaxReplayCapacity is
 // used (currently 16383). When windowDuration argument is 0, then entries added
 // to the buffer will remain fresh forever.
-//
-// Note that this implementation is non-blocking. When no subscribers are
-// present the buffer fills up to bufferCapacity after which new items will
-// start overwriting the oldest ones according to the FIFO principle.
-// If a subscriber cannot keep up with the data rate of the source observable,
-// eventually the buffer for the subscriber will overflow. At that moment the
-// subscriber will receive an ErrMissingBackpressure error.
 func NewReplaySubjectFoo(bufferCapacity int, windowDuration time.Duration) SubjectFoo {
 	if bufferCapacity == 0 {
 		bufferCapacity = MaxReplayCapacity
