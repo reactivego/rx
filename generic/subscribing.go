@@ -36,6 +36,26 @@ func (o ObservableFoo) Println() (err error) {
 	return
 }
 
+//jig:template Observable<Foo> Wait
+//jig:needs Schedulers, Subscriber
+
+// Wait subscribes to the Observable and waits for completion or error.
+// Returns either the error or nil when the Observable completed normally.
+// Subscription is performed on the normal CurrentGoroutine scheduler.
+func (o ObservableFoo) Wait() (err error) {
+	subscriber := subscriber.New()
+	scheduler := CurrentGoroutineScheduler()
+	observer := func(next foo, e error, done bool) {
+		if done {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
+}
+
 //jig:template SubscribeOption
 //jig:needs Schedulers, Subscriber
 
@@ -241,20 +261,5 @@ func (o ObservableFoo) ToSlice(options ...SubscribeOption) (slice []foo, err err
 			err = e
 		}
 	}, SubscribeOn(scheduler, options...)).Wait()
-	return
-}
-
-//jig:template Observable<Foo> Wait
-//jig:needs Observable<Foo> Subscribe
-
-// Wait subscribes to the Observable and waits for completion or error.
-// Returns either the error or nil when the Observable completed normally.
-// Subscription is performed on the normal CurrentGoroutine scheduler.
-func (o ObservableFoo) Wait(options ...SubscribeOption) (err error) {
-	o.Subscribe(func(next foo, e error, done bool) {
-		if done {
-			err = e
-		}
-	}, options...).Wait()
 	return
 }
