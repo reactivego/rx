@@ -1,17 +1,18 @@
-package rx
+package rx_test
 
 import (
 	"fmt"
 	"time"
 
+	"github.com/reactivego/rx"
 )
 
 func ExampleObservable_Concat() {
-	oa := From(0, 1, 2, 3)
-	ob := From(4, 5)
-	oc := From(6)
-	od := From(7, 8, 9)
-	oa.Concat(ob, oc).Concat(od).SubscribeNext(func(next any) {
+	oa := rx.From(0, 1, 2, 3)
+	ob := rx.From(4, 5)
+	oc := rx.From(6)
+	od := rx.From(7, 8, 9)
+	oa.Concat(ob, oc).Concat(od).SubscribeNext(func(next interface{}) {
 		fmt.Printf("%d,", next.(int))
 	})
 
@@ -20,7 +21,7 @@ func ExampleObservable_Concat() {
 }
 
 func ExampleObservable_Do() {
-	From(1, 2, 3).Do(func(v any) {
+	rx.From(1, 2, 3).Do(func(v interface{}) {
 		fmt.Println(v.(int))
 	}).Wait()
 
@@ -31,11 +32,11 @@ func ExampleObservable_Do() {
 }
 
 func ExampleObservable_Filter() {
-	even := func(i any) bool {
+	even := func(i interface{}) bool {
 		return i.(int)%2 == 0
 	}
 
-	From(1, 2, 3, 4, 5, 6, 7, 8).Filter(even).Println()
+	rx.From(1, 2, 3, 4, 5, 6, 7, 8).Filter(even).Println()
 
 	// Output:
 	// 2
@@ -45,13 +46,13 @@ func ExampleObservable_Filter() {
 }
 
 func ExampleFromChan() {
-	ch := make(chan any, 6)
+	ch := make(chan interface{}, 6)
 	for i := 0; i < 5; i++ {
 		ch <- i + 1
 	}
 	close(ch)
 
-	FromChan(ch).Println()
+	rx.FromChan(ch).Println()
 
 	// Output:
 	// 1
@@ -62,7 +63,7 @@ func ExampleFromChan() {
 }
 
 func ExampleFrom() {
-	From(1, 2, 3, 4, 5).Println()
+	rx.From(1, 2, 3, 4, 5).Println()
 
 	// Output:
 	// 1
@@ -73,7 +74,7 @@ func ExampleFrom() {
 }
 
 func ExampleFromSlice() {
-	FromSlice([]any{1, 2, 3, 4, 5}).Println()
+	rx.FromSlice([]interface{}{1, 2, 3, 4, 5}).Println()
 
 	// Output:
 	// 1
@@ -84,7 +85,7 @@ func ExampleFromSlice() {
 }
 
 func ExampleObservable_Map() {
-	From(1, 2, 3, 4).Map(func(i any) any {
+	rx.From(1, 2, 3, 4).Map(func(i interface{}) interface{} {
 		return fmt.Sprintf("%d!", i.(int))
 	}).Println()
 
@@ -96,11 +97,11 @@ func ExampleObservable_Map() {
 }
 
 func ExampleObservable_MergeMap() {
-	scheduler := NewGoroutineScheduler()
+	scheduler := rx.NewGoroutineScheduler()
 
-	source := From(1, 2).
-		MergeMap(func(n any) Observable {
-			return Range(n.(int), 2).AsObservable()
+	source := rx.From(1, 2).
+		MergeMap(func(n interface{}) rx.Observable {
+			return rx.Range(n.(int), 2).AsObservable()
 		}).
 		SubscribeOn(scheduler)
 	if err := source.Println(); err != nil {
@@ -115,11 +116,11 @@ func ExampleObservable_MergeMap() {
 }
 
 func ExampleObservable_Scan() {
-	add := func(acc any, value any) any {
+	add := func(acc interface{}, value interface{}) interface{} {
 		return acc.(int) + value.(int)
 	}
 
-	From(1, 2, 3, 4, 5).Scan(add, 0).Println()
+	rx.From(1, 2, 3, 4, 5).Scan(add, 0).Println()
 
 	// Output:
 	// 1
@@ -132,18 +133,18 @@ func ExampleObservable_Scan() {
 func ExampleObservableObservable_SwitchAll() {
 
 	// SwitchAll does not work well with the default trampoline scheduler, so we use a goroutine scheduler instead.
-	scheduler := NewGoroutineScheduler()
+	scheduler := rx.NewGoroutineScheduler()
 
 	// intToObs creates a new observable that emits an integer starting after and then repeated every 20 milliseconds
 	// in the range starting at 0 and incrementing by 1. It takes only the first 10 emitted values and then uses
 	// AsObservable to convert the IntObservable back to an untyped Observable.
-	intToObs := func(i int) Observable {
-		return Interval(20 * time.Millisecond).
+	intToObs := func(i int) rx.Observable {
+		return rx.Interval(20 * time.Millisecond).
 			Take(10).
 			AsObservable()
 	}
 
-	Interval(100 * time.Millisecond).
+	rx.Interval(100 * time.Millisecond).
 		Take(3).
 		MapObservable(intToObs).
 		SwitchAll().
