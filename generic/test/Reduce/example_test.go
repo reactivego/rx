@@ -1,12 +1,10 @@
 package Reduce
 
-import "fmt"
-
 func Example_reduce() {
 	add := func(acc float32, value int) float32 {
 		return acc + float32(value)
 	}
-	FromInts(1, 2, 3, 4, 5).ReduceFloat32(add, 0.0).SubscribeNext(func(next float32) { fmt.Println(next) })
+	FromInts(1, 2, 3, 4, 5).ReduceFloat32(add, 0.0).Println()
 
 	// Output:
 	// 15
@@ -20,7 +18,7 @@ func Example_reduceWeak() {
 		}
 		return accint + value
 	}
-	FromInt(1, 2, 3, 4, 5).Reduce(add, 0).SubscribeNext(func(next interface{}) { fmt.Println(next) })
+	FromInt(1, 2, 3, 4, 5).Reduce(add, 0).Println()
 
 	// Output:
 	// 15
