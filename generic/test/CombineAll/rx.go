@@ -35,6 +35,8 @@ type Subscription subscriber.Subscription
 // completed normally.
 type IntObserveFunc func(next int, err error, done bool)
 
+//jig:name zeroInt
+
 var zeroInt int
 
 //jig:name ObservableInt
@@ -83,6 +85,8 @@ func FromInt(slice ...int) ObservableInt {
 // completed normally.
 type ObservableIntObserveFunc func(next ObservableInt, err error, done bool)
 
+//jig:name zeroObservableInt
+
 var zeroObservableInt ObservableInt
 
 //jig:name ObservableObservableInt
@@ -121,9 +125,11 @@ func FromObservableInt(slice ...ObservableInt) ObservableObservableInt {
 	return FromSliceObservableInt(slice)
 }
 
-//jig:name ObservableObservableIntCombineAll
+//jig:name IntSlice
 
 type IntSlice []int
+
+//jig:name ObservableObservableIntCombineAll
 
 func (o ObservableObservableInt) CombineAll() ObservableIntSlice {
 	observable := func(observe IntSliceObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
@@ -198,6 +204,8 @@ func (o ObservableObservableInt) CombineAll() ObservableIntSlice {
 // completed normally.
 type IntSliceObserveFunc func(next IntSlice, err error, done bool)
 
+//jig:name zeroIntSlice
+
 var zeroIntSlice IntSlice
 
 //jig:name ObservableIntSlice
@@ -233,6 +241,8 @@ func (o ObservableIntSlice) MapVector(project func(IntSlice) Vector) ObservableV
 // When done is true and the err argument is nil, then the observable has
 // completed normally.
 type VectorObserveFunc func(next Vector, err error, done bool)
+
+//jig:name zeroVector
 
 var zeroVector Vector
 
