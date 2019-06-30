@@ -5,9 +5,12 @@ import (
 	"sync/atomic"
 )
 
-//jig:template ObservableObservable<Foo> CombineAll
+//jig:template <Foo>Slice
 
 type FooSlice []foo
+
+//jig:template ObservableObservable<Foo> CombineAll
+//jig:needs <Foo>Slice, zero<Foo>
 
 func (o ObservableObservableFoo) CombineAll() ObservableFooSlice {
 	observable := func(observe FooSliceObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {

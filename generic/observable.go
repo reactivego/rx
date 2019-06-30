@@ -10,10 +10,12 @@ package rx
 // completed normally.
 type FooObserveFunc func(next foo, err error, done bool)
 
+//jig:template zero<Foo>
+
 var zeroFoo foo
 
 //jig:template Observable<Foo>
-//jig:needs Scheduler, Subscriber, <Foo>ObserveFunc
+//jig:needs Scheduler, Subscriber, <Foo>ObserveFunc, zero<Foo>
 
 // ObservableFoo is essentially a subscribe function taking an observe
 // function, scheduler and an subscriber.
