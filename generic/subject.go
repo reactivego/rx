@@ -7,7 +7,7 @@ import (
 )
 
 //jig:template Subject<Foo>
-//jig:embeds Observable<Foo>
+//jig:embeds <Foo>ObserveFuncMethods, Observable<Foo>
 
 // SubjectFoo is a combination of an observer and observable. Subjects are
 // special because they are the only reactive constructs that support
