@@ -34,6 +34,8 @@ type Subscription subscriber.Subscription
 // completed normally.
 type IntObserveFunc func(next int, err error, done bool)
 
+//jig:name zeroInt
+
 var zeroInt int
 
 //jig:name ObservableInt
@@ -184,17 +186,18 @@ func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOpt
 // ToSlice collects all values from the ObservableInt into an slice. The
 // complete slice and any error are returned.
 //
-// This function subscribes to the source observable on the Goroutine scheduler.
-// The Goroutine scheduler works in more situations for complex chains of
-// observables, like when merging the output of multiple observables.
-func (o ObservableInt) ToSlice(options ...SubscribeOption) (a []int, e error) {
+// This function subscribes to the source observable on the NewGoroutine
+// scheduler. The NewGoroutine scheduler works in more situations for
+// complex chains of observables, like when merging the output of multiple
+// observables.
+func (o ObservableInt) ToSlice(options ...SubscribeOption) (slice []int, err error) {
 	scheduler := NewGoroutineScheduler()
-	o.Subscribe(func(next int, err error, done bool) {
+	o.Subscribe(func(next int, e error, done bool) {
 		if !done {
-			a = append(a, next)
+			slice = append(slice, next)
 		} else {
-			e = err
+			err = e
 		}
 	}, SubscribeOn(scheduler, options...)).Wait()
-	return a, e
+	return
 }

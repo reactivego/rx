@@ -12,9 +12,7 @@ import (
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
-}
+type Scheduler scheduler.Scheduler
 
 //jig:name Subscriber
 
@@ -34,7 +32,17 @@ type Subscription subscriber.Subscription
 // completed normally.
 type ObserveFunc func(next interface{}, err error, done bool)
 
+//jig:name zero
+
 var zero interface{}
+
+//jig:name Observable
+
+// Observable is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type Observable func(ObserveFunc, Scheduler, Subscriber)
+
+//jig:name ObserveFuncMethods
 
 // Next is called by an Observable to emit the next interface{} value to the
 // observer.
@@ -52,12 +60,6 @@ func (f ObserveFunc) Error(err error) {
 func (f ObserveFunc) Complete() {
 	f(zero, nil, true)
 }
-
-//jig:name Observable
-
-// Observable is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type Observable func(ObserveFunc, Scheduler, Subscriber)
 
 //jig:name Observer
 
@@ -109,24 +111,9 @@ func Create(f func(Observer)) Observable {
 // completed normally.
 type StringObserveFunc func(next string, err error, done bool)
 
+//jig:name zeroString
+
 var zeroString string
-
-// Next is called by an ObservableString to emit the next string value to the
-// observer.
-func (f StringObserveFunc) Next(next string) {
-	f(next, nil, false)
-}
-
-// Error is called by an ObservableString to report an error to the observer.
-func (f StringObserveFunc) Error(err error) {
-	f(zeroString, err, true)
-}
-
-// Complete is called by an ObservableString to signal that no more data is
-// forthcoming to the observer.
-func (f StringObserveFunc) Complete() {
-	f(zeroString, nil, true)
-}
 
 //jig:name ObservableString
 
@@ -164,24 +151,9 @@ func (o Observable) OnlyString() ObservableString {
 // completed normally.
 type SizeObserveFunc func(next Size, err error, done bool)
 
+//jig:name zeroSize
+
 var zeroSize Size
-
-// Next is called by an ObservableSize to emit the next Size value to the
-// observer.
-func (f SizeObserveFunc) Next(next Size) {
-	f(next, nil, false)
-}
-
-// Error is called by an ObservableSize to report an error to the observer.
-func (f SizeObserveFunc) Error(err error) {
-	f(zeroSize, err, true)
-}
-
-// Complete is called by an ObservableSize to signal that no more data is
-// forthcoming to the observer.
-func (f SizeObserveFunc) Complete() {
-	f(zeroSize, nil, true)
-}
 
 //jig:name ObservableSize
 
@@ -219,24 +191,9 @@ func (o Observable) OnlySize() ObservableSize {
 // completed normally.
 type PointObserveFunc func(next []point, err error, done bool)
 
+//jig:name zeroPoint
+
 var zeroPoint []point
-
-// Next is called by an ObservablePoint to emit the next []point value to the
-// observer.
-func (f PointObserveFunc) Next(next []point) {
-	f(next, nil, false)
-}
-
-// Error is called by an ObservablePoint to report an error to the observer.
-func (f PointObserveFunc) Error(err error) {
-	f(zeroPoint, err, true)
-}
-
-// Complete is called by an ObservablePoint to signal that no more data is
-// forthcoming to the observer.
-func (f PointObserveFunc) Complete() {
-	f(zeroPoint, nil, true)
-}
 
 //jig:name ObservablePoint
 
@@ -264,11 +221,13 @@ func (o Observable) OnlyPoint() ObservablePoint {
 	return observable
 }
 
-//jig:name NewScheduler
+//jig:name Schedulers
 
-func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
+func ImmediateScheduler() Scheduler	{ return scheduler.Immediate }
 
 func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
+
+func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
 
 //jig:name SubscribeOption
 

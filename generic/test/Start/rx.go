@@ -32,6 +32,8 @@ type Subscription subscriber.Subscription
 // completed normally.
 type IntObserveFunc func(next int, err error, done bool)
 
+//jig:name zeroInt
+
 var zeroInt int
 
 //jig:name ObservableInt
@@ -48,7 +50,7 @@ type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 // otherwise it will be a single-value stream of int.
 func StartInt(f func() (int, error)) ObservableInt {
 	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		var done bool
+		done := false
 		subscribeOn.ScheduleRecursive(func(self func()) {
 			if !subscriber.Canceled() {
 				if !done {
@@ -176,19 +178,20 @@ func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOpt
 // ToSlice collects all values from the ObservableInt into an slice. The
 // complete slice and any error are returned.
 //
-// This function subscribes to the source observable on the Goroutine scheduler.
-// The Goroutine scheduler works in more situations for complex chains of
-// observables, like when merging the output of multiple observables.
-func (o ObservableInt) ToSlice(options ...SubscribeOption) (a []int, e error) {
+// This function subscribes to the source observable on the NewGoroutine
+// scheduler. The NewGoroutine scheduler works in more situations for
+// complex chains of observables, like when merging the output of multiple
+// observables.
+func (o ObservableInt) ToSlice(options ...SubscribeOption) (slice []int, err error) {
 	scheduler := NewGoroutineScheduler()
-	o.Subscribe(func(next int, err error, done bool) {
+	o.Subscribe(func(next int, e error, done bool) {
 		if !done {
-			a = append(a, next)
+			slice = append(slice, next)
 		} else {
-			e = err
+			err = e
 		}
 	}, SubscribeOn(scheduler, options...)).Wait()
-	return a, e
+	return
 }
 
 //jig:name ObservableIntToSingle
@@ -196,19 +199,20 @@ func (o ObservableInt) ToSlice(options ...SubscribeOption) (a []int, e error) {
 // ToSingle blocks until the ObservableInt emits exactly one value or an error.
 // The value and any error are returned.
 //
-// This function subscribes to the source observable on the Goroutine scheduler.
-// The Goroutine scheduler works in more situations for complex chains of
-// observables, like when merging the output of multiple observables.
-func (o ObservableInt) ToSingle(options ...SubscribeOption) (v int, e error) {
+// This function subscribes to the source observable on the NewGoroutine
+// scheduler. The NewGoroutine scheduler works in more situations for
+// complex chains of observables, like when merging the output of multiple
+// observables.
+func (o ObservableInt) ToSingle(options ...SubscribeOption) (entry int, err error) {
 	scheduler := NewGoroutineScheduler()
-	o.Single().Subscribe(func(next int, err error, done bool) {
+	o.Single().Subscribe(func(next int, e error, done bool) {
 		if !done {
-			v = next
+			entry = next
 		} else {
-			e = err
+			err = e
 		}
 	}, SubscribeOn(scheduler, options...)).Wait()
-	return v, e
+	return
 }
 
 //jig:name ObservableIntSingle
@@ -229,6 +233,8 @@ func (o ObservableInt) Single() ObservableInt {
 // When done is true and the err argument is nil, then the observable has
 // completed normally.
 type ObserveFunc func(next interface{}, err error, done bool)
+
+//jig:name zero
 
 var zero interface{}
 

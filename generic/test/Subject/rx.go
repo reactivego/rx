@@ -10,21 +10,6 @@ import (
 	"github.com/reactivego/subscriber"
 )
 
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
-}
-
-//jig:name Subscriber
-
-// Subscriber is an alias for the subscriber.Subscriber interface type.
-type Subscriber subscriber.Subscriber
-
-// Subscription is an alias for the subscriber.Subscription interface type.
-type Subscription subscriber.Subscription
-
 //jig:name IntObserveFunc
 
 // IntObserveFunc is the observer, a function that gets called whenever the
@@ -35,7 +20,11 @@ type Subscription subscriber.Subscription
 // completed normally.
 type IntObserveFunc func(next int, err error, done bool)
 
+//jig:name zeroInt
+
 var zeroInt int
+
+//jig:name IntObserveFuncMethods
 
 // Next is called by an ObservableInt to emit the next int value to the
 // observer.
@@ -53,6 +42,19 @@ func (f IntObserveFunc) Error(err error) {
 func (f IntObserveFunc) Complete() {
 	f(zeroInt, nil, true)
 }
+
+//jig:name Scheduler
+
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler scheduler.Scheduler
+
+//jig:name Subscriber
+
+// Subscriber is an alias for the subscriber.Subscriber interface type.
+type Subscriber subscriber.Subscriber
+
+// Subscription is an alias for the subscriber.Subscription interface type.
+type Subscription subscriber.Subscription
 
 //jig:name ObservableInt
 
@@ -78,12 +80,6 @@ type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 // side will be handled according to the specific behavior of the subject.
 // There are different types of subjects, see the different NewXxxSubjectInt
 // functions for more info.
-//
-// Important! a subject is a hot observable. This means that subscribing to
-// it will block the calling goroutine while it is waiting for items and
-// notifications to receive. Unless you have code on a different goroutine
-// already feeding into the subject, your subscribe will deadlock.
-// Alternatively, you could subscribe on a goroutine as shown in the example.
 type SubjectInt struct {
 	ObservableInt
 	IntObserveFunc
@@ -136,11 +132,98 @@ func NewSubjectInt() SubjectInt {
 	return SubjectInt{observable.AsObservableInt(), observer}
 }
 
-//jig:name NewScheduler
+//jig:name RxError
 
-func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
+type RxError string
+
+func (e RxError) Error() string	{ return string(e) }
+
+//jig:name ObserveFunc
+
+// ObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type ObserveFunc func(next interface{}, err error, done bool)
+
+//jig:name zero
+
+var zero interface{}
+
+//jig:name Observable
+
+// Observable is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type Observable func(ObserveFunc, Scheduler, Subscriber)
+
+//jig:name ObserveFuncMethods
+
+// Next is called by an Observable to emit the next interface{} value to the
+// observer.
+func (f ObserveFunc) Next(next interface{}) {
+	f(next, nil, false)
+}
+
+// Error is called by an Observable to report an error to the observer.
+func (f ObserveFunc) Error(err error) {
+	f(zero, err, true)
+}
+
+// Complete is called by an Observable to signal that no more data is
+// forthcoming to the observer.
+func (f ObserveFunc) Complete() {
+	f(zero, nil, true)
+}
+
+//jig:name Observer
+
+// Observer is the interface used with Create when implementing a custom
+// observable.
+type Observer interface {
+	// Next emits the next interface{} value.
+	Next(interface{})
+	// Error signals an error condition.
+	Error(error)
+	// Complete signals that no more data is to be expected.
+	Complete()
+	// Closed returns true when the subscription has been canceled.
+	Closed() bool
+}
+
+//jig:name Create
+
+// Create creates an Observable from scratch by calling observer methods
+// programmatically.
+func Create(f func(Observer)) Observable {
+	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		scheduler.Schedule(func() {
+			if subscriber.Closed() {
+				return
+			}
+			observer := func(next interface{}, err error, done bool) {
+				if !subscriber.Closed() {
+					observe(next, err, done)
+				}
+			}
+			type ObserverSubscriber struct {
+				ObserveFunc
+				Subscriber
+			}
+			f(&ObserverSubscriber{observer, subscriber})
+		})
+	}
+	return observable
+}
+
+//jig:name Schedulers
+
+func ImmediateScheduler() Scheduler	{ return scheduler.Immediate }
 
 func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
+
+func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
 
 //jig:name SubscribeOption
 
@@ -245,95 +328,20 @@ func (o ObservableInt) SubscribeNext(f func(next int), options ...SubscribeOptio
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
-func (o ObservableInt) Wait(options ...SubscribeOption) (e error) {
-	o.Subscribe(func(next int, err error, done bool) {
+// Subscription is performed on the normal CurrentGoroutine scheduler.
+func (o ObservableInt) Wait() (err error) {
+	subscriber := subscriber.New()
+	scheduler := CurrentGoroutineScheduler()
+	observer := func(next int, e error, done bool) {
 		if done {
-			e = err
+			err = e
+			subscriber.Unsubscribe()
 		}
-	}, options...).Wait()
-	return e
-}
-
-//jig:name ObserveFunc
-
-// ObserveFunc is the observer, a function that gets called whenever the
-// observable has something to report. The next argument is the item value that
-// is only valid when the done argument is false. When done is true and the err
-// argument is not nil, then the observable has terminated with an error.
-// When done is true and the err argument is nil, then the observable has
-// completed normally.
-type ObserveFunc func(next interface{}, err error, done bool)
-
-var zero interface{}
-
-// Next is called by an Observable to emit the next interface{} value to the
-// observer.
-func (f ObserveFunc) Next(next interface{}) {
-	f(next, nil, false)
-}
-
-// Error is called by an Observable to report an error to the observer.
-func (f ObserveFunc) Error(err error) {
-	f(zero, err, true)
-}
-
-// Complete is called by an Observable to signal that no more data is
-// forthcoming to the observer.
-func (f ObserveFunc) Complete() {
-	f(zero, nil, true)
-}
-
-//jig:name Observable
-
-// Observable is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type Observable func(ObserveFunc, Scheduler, Subscriber)
-
-//jig:name Observer
-
-// Observer is the interface used with Create when implementing a custom
-// observable.
-type Observer interface {
-	// Next emits the next interface{} value.
-	Next(interface{})
-	// Error signals an error condition.
-	Error(error)
-	// Complete signals that no more data is to be expected.
-	Complete()
-	// Closed returns true when the subscription has been canceled.
-	Closed() bool
-}
-
-//jig:name Create
-
-// Create creates an Observable from scratch by calling observer methods
-// programmatically.
-func Create(f func(Observer)) Observable {
-	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		scheduler.Schedule(func() {
-			if subscriber.Closed() {
-				return
-			}
-			observer := func(next interface{}, err error, done bool) {
-				if !subscriber.Closed() {
-					observe(next, err, done)
-				}
-			}
-			type ObserverSubscriber struct {
-				ObserveFunc
-				Subscriber
-			}
-			f(&ObserverSubscriber{observer, subscriber})
-		})
 	}
-	return observable
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
 }
-
-//jig:name RxError
-
-type RxError string
-
-func (e RxError) Error() string	{ return string(e) }
 
 //jig:name ErrTypecastToInt
 

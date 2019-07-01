@@ -34,6 +34,8 @@ type Subscription subscriber.Subscription
 // completed normally.
 type IntObserveFunc func(next int, err error, done bool)
 
+//jig:name zeroInt
+
 var zeroInt int
 
 //jig:name ObservableInt
@@ -213,6 +215,8 @@ func (o ObservableInt) Take(n int) ObservableInt {
 // When done is true and the err argument is nil, then the observable has
 // completed normally.
 type ObserveFunc func(next interface{}, err error, done bool)
+
+//jig:name zero
 
 var zero interface{}
 

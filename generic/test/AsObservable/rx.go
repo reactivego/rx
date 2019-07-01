@@ -12,9 +12,7 @@ import (
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
-}
+type Scheduler scheduler.Scheduler
 
 //jig:name Subscriber
 
@@ -34,24 +32,9 @@ type Subscription subscriber.Subscription
 // completed normally.
 type StringObserveFunc func(next string, err error, done bool)
 
+//jig:name zeroString
+
 var zeroString string
-
-// Next is called by an ObservableString to emit the next string value to the
-// observer.
-func (f StringObserveFunc) Next(next string) {
-	f(next, nil, false)
-}
-
-// Error is called by an ObservableString to report an error to the observer.
-func (f StringObserveFunc) Error(err error) {
-	f(zeroString, err, true)
-}
-
-// Complete is called by an ObservableString to signal that no more data is
-// forthcoming to the observer.
-func (f StringObserveFunc) Complete() {
-	f(zeroString, nil, true)
-}
 
 //jig:name ObservableString
 
@@ -59,59 +42,27 @@ func (f StringObserveFunc) Complete() {
 // function, scheduler and an subscriber.
 type ObservableString func(StringObserveFunc, Scheduler, Subscriber)
 
-//jig:name StringObserver
-
-// StringObserver is the interface used with CreateString when implementing a custom
-// observable.
-type StringObserver interface {
-	// Next emits the next string value.
-	Next(string)
-	// Error signals an error condition.
-	Error(error)
-	// Complete signals that no more data is to be expected.
-	Complete()
-	// Closed returns true when the subscription has been canceled.
-	Closed() bool
-}
-
-//jig:name CreateString
-
-// CreateString creates an Observable from scratch by calling observer methods
-// programmatically.
-func CreateString(f func(StringObserver)) ObservableString {
-	observable := func(observe StringObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		scheduler.Schedule(func() {
-			if subscriber.Closed() {
-				return
-			}
-			observer := func(next string, err error, done bool) {
-				if !subscriber.Closed() {
-					observe(next, err, done)
-				}
-			}
-			type ObserverSubscriber struct {
-				StringObserveFunc
-				Subscriber
-			}
-			f(&ObserverSubscriber{observer, subscriber})
-		})
-	}
-	return observable
-}
-
 //jig:name FromSliceString
 
 // FromSliceString creates an ObservableString from a slice of string values passed in.
 func FromSliceString(slice []string) ObservableString {
-	return CreateString(func(observer StringObserver) {
-		for _, next := range slice {
-			if observer.Closed() {
-				return
+	observable := func(observe StringObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		i := 0
+		subscribeOn.ScheduleRecursive(func(self func()) {
+			if !subscriber.Canceled() {
+				if i < len(slice) {
+					observe(slice[i], nil, false)
+					if !subscriber.Canceled() {
+						i++
+						self()
+					}
+				} else {
+					observe(zeroString, nil, true)
+				}
 			}
-			observer.Next(next)
-		}
-		observer.Complete()
-	})
+		})
+	}
+	return observable
 }
 
 //jig:name FromString
@@ -131,24 +82,9 @@ func FromString(slice ...string) ObservableString {
 // completed normally.
 type ObserveFunc func(next interface{}, err error, done bool)
 
+//jig:name zero
+
 var zero interface{}
-
-// Next is called by an Observable to emit the next interface{} value to the
-// observer.
-func (f ObserveFunc) Next(next interface{}) {
-	f(next, nil, false)
-}
-
-// Error is called by an Observable to report an error to the observer.
-func (f ObserveFunc) Error(err error) {
-	f(zero, err, true)
-}
-
-// Complete is called by an Observable to signal that no more data is
-// forthcoming to the observer.
-func (f ObserveFunc) Complete() {
-	f(zero, nil, true)
-}
 
 //jig:name Observable
 
@@ -156,59 +92,27 @@ func (f ObserveFunc) Complete() {
 // function, scheduler and an subscriber.
 type Observable func(ObserveFunc, Scheduler, Subscriber)
 
-//jig:name Observer
-
-// Observer is the interface used with Create when implementing a custom
-// observable.
-type Observer interface {
-	// Next emits the next interface{} value.
-	Next(interface{})
-	// Error signals an error condition.
-	Error(error)
-	// Complete signals that no more data is to be expected.
-	Complete()
-	// Closed returns true when the subscription has been canceled.
-	Closed() bool
-}
-
-//jig:name Create
-
-// Create creates an Observable from scratch by calling observer methods
-// programmatically.
-func Create(f func(Observer)) Observable {
-	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		scheduler.Schedule(func() {
-			if subscriber.Closed() {
-				return
-			}
-			observer := func(next interface{}, err error, done bool) {
-				if !subscriber.Closed() {
-					observe(next, err, done)
-				}
-			}
-			type ObserverSubscriber struct {
-				ObserveFunc
-				Subscriber
-			}
-			f(&ObserverSubscriber{observer, subscriber})
-		})
-	}
-	return observable
-}
-
 //jig:name FromSlice
 
 // FromSlice creates an Observable from a slice of interface{} values passed in.
 func FromSlice(slice []interface{}) Observable {
-	return Create(func(observer Observer) {
-		for _, next := range slice {
-			if observer.Closed() {
-				return
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		i := 0
+		subscribeOn.ScheduleRecursive(func(self func()) {
+			if !subscriber.Canceled() {
+				if i < len(slice) {
+					observe(slice[i], nil, false)
+					if !subscriber.Canceled() {
+						i++
+						self()
+					}
+				} else {
+					observe(zero, nil, true)
+				}
 			}
-			observer.Next(next)
-		}
-		observer.Complete()
-	})
+		})
+	}
+	return observable
 }
 
 //jig:name From
@@ -241,24 +145,9 @@ func (o ObservableString) AsObservable() Observable {
 // completed normally.
 type Float64ObserveFunc func(next float64, err error, done bool)
 
+//jig:name zeroFloat64
+
 var zeroFloat64 float64
-
-// Next is called by an ObservableFloat64 to emit the next float64 value to the
-// observer.
-func (f Float64ObserveFunc) Next(next float64) {
-	f(next, nil, false)
-}
-
-// Error is called by an ObservableFloat64 to report an error to the observer.
-func (f Float64ObserveFunc) Error(err error) {
-	f(zeroFloat64, err, true)
-}
-
-// Complete is called by an ObservableFloat64 to signal that no more data is
-// forthcoming to the observer.
-func (f Float64ObserveFunc) Complete() {
-	f(zeroFloat64, nil, true)
-}
 
 //jig:name ObservableFloat64
 
@@ -300,11 +189,13 @@ func (o Observable) AsObservableFloat64() ObservableFloat64 {
 	return observable
 }
 
-//jig:name NewScheduler
+//jig:name Schedulers
 
-func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
+func ImmediateScheduler() Scheduler	{ return scheduler.Immediate }
 
 func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
+
+func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
 
 //jig:name SubscribeOption
 
@@ -439,11 +330,17 @@ func (o ObservableFloat64) SubscribeNext(f func(next float64), options ...Subscr
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
-func (o ObservableFloat64) Wait(options ...SubscribeOption) (e error) {
-	o.Subscribe(func(next float64, err error, done bool) {
+// Subscription is performed on the normal CurrentGoroutine scheduler.
+func (o ObservableFloat64) Wait() (err error) {
+	subscriber := subscriber.New()
+	scheduler := CurrentGoroutineScheduler()
+	observer := func(next float64, e error, done bool) {
 		if done {
-			e = err
+			err = e
+			subscriber.Unsubscribe()
 		}
-	}, options...).Wait()
-	return e
+	}
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
 }

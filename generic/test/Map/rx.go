@@ -24,54 +24,6 @@ type Subscriber subscriber.Subscriber
 // Subscription is an alias for the subscriber.Subscription interface type.
 type Subscription subscriber.Subscription
 
-//jig:name VectorObserveFunc
-
-// VectorObserveFunc is the observer, a function that gets called whenever the
-// observable has something to report. The next argument is the item value that
-// is only valid when the done argument is false. When done is true and the err
-// argument is not nil, then the observable has terminated with an error.
-// When done is true and the err argument is nil, then the observable has
-// completed normally.
-type VectorObserveFunc func(next Vector, err error, done bool)
-
-var zeroVector Vector
-
-//jig:name ObservableVector
-
-// ObservableVector is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableVector func(VectorObserveFunc, Scheduler, Subscriber)
-
-//jig:name FromSliceVector
-
-// FromSliceVector creates an ObservableVector from a slice of Vector values passed in.
-func FromSliceVector(slice []Vector) ObservableVector {
-	observable := func(observe VectorObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		i := 0
-		subscribeOn.ScheduleRecursive(func(self func()) {
-			if !subscriber.Canceled() {
-				if i < len(slice) {
-					observe(slice[i], nil, false)
-					if !subscriber.Canceled() {
-						i++
-						self()
-					}
-				} else {
-					observe(zeroVector, nil, true)
-				}
-			}
-		})
-	}
-	return observable
-}
-
-//jig:name FromVector
-
-// FromVector creates an ObservableVector from multiple Vector values passed in.
-func FromVector(slice ...Vector) ObservableVector {
-	return FromSliceVector(slice)
-}
-
 //jig:name IntObserveFunc
 
 // IntObserveFunc is the observer, a function that gets called whenever the
@@ -81,6 +33,8 @@ func FromVector(slice ...Vector) ObservableVector {
 // When done is true and the err argument is nil, then the observable has
 // completed normally.
 type IntObserveFunc func(next int, err error, done bool)
+
+//jig:name zeroInt
 
 var zeroInt int
 
@@ -118,6 +72,56 @@ func FromSliceInt(slice []int) ObservableInt {
 // FromInts creates an ObservableInt from multiple int values passed in.
 func FromInts(slice ...int) ObservableInt {
 	return FromSliceInt(slice)
+}
+
+//jig:name VectorObserveFunc
+
+// VectorObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type VectorObserveFunc func(next Vector, err error, done bool)
+
+//jig:name zeroVector
+
+var zeroVector Vector
+
+//jig:name ObservableVector
+
+// ObservableVector is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type ObservableVector func(VectorObserveFunc, Scheduler, Subscriber)
+
+//jig:name FromSliceVector
+
+// FromSliceVector creates an ObservableVector from a slice of Vector values passed in.
+func FromSliceVector(slice []Vector) ObservableVector {
+	observable := func(observe VectorObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		i := 0
+		subscribeOn.ScheduleRecursive(func(self func()) {
+			if !subscriber.Canceled() {
+				if i < len(slice) {
+					observe(slice[i], nil, false)
+					if !subscriber.Canceled() {
+						i++
+						self()
+					}
+				} else {
+					observe(zeroVector, nil, true)
+				}
+			}
+		})
+	}
+	return observable
+}
+
+//jig:name FromVector
+
+// FromVector creates an ObservableVector from multiple Vector values passed in.
+func FromVector(slice ...Vector) ObservableVector {
+	return FromSliceVector(slice)
 }
 
 //jig:name ObservableIntMapString
@@ -165,6 +169,8 @@ func (o ObservableVector) MapInt(project func(Vector) int) ObservableInt {
 // When done is true and the err argument is nil, then the observable has
 // completed normally.
 type StringObserveFunc func(next string, err error, done bool)
+
+//jig:name zeroString
 
 var zeroString string
 
@@ -307,17 +313,18 @@ func (o ObservableString) SubscribeNext(f func(next string), options ...Subscrib
 // ToSlice collects all values from the ObservableString into an slice. The
 // complete slice and any error are returned.
 //
-// This function subscribes to the source observable on the Goroutine scheduler.
-// The Goroutine scheduler works in more situations for complex chains of
-// observables, like when merging the output of multiple observables.
-func (o ObservableString) ToSlice(options ...SubscribeOption) (a []string, e error) {
+// This function subscribes to the source observable on the NewGoroutine
+// scheduler. The NewGoroutine scheduler works in more situations for
+// complex chains of observables, like when merging the output of multiple
+// observables.
+func (o ObservableString) ToSlice(options ...SubscribeOption) (slice []string, err error) {
 	scheduler := NewGoroutineScheduler()
-	o.Subscribe(func(next string, err error, done bool) {
+	o.Subscribe(func(next string, e error, done bool) {
 		if !done {
-			a = append(a, next)
+			slice = append(slice, next)
 		} else {
-			e = err
+			err = e
 		}
 	}, SubscribeOn(scheduler, options...)).Wait()
-	return a, e
+	return
 }

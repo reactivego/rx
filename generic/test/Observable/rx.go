@@ -4,7 +4,23 @@
 
 package Observable
 
-import "github.com/reactivego/subscriber"
+import (
+	"github.com/reactivego/scheduler"
+	"github.com/reactivego/subscriber"
+)
+
+//jig:name Scheduler
+
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler scheduler.Scheduler
+
+//jig:name Subscriber
+
+// Subscriber is an alias for the subscriber.Subscriber interface type.
+type Subscriber subscriber.Subscriber
+
+// Subscription is an alias for the subscriber.Subscription interface type.
+type Subscription subscriber.Subscription
 
 //jig:name ObserveFunc
 
@@ -16,39 +32,15 @@ import "github.com/reactivego/subscriber"
 // completed normally.
 type ObserveFunc func(next interface{}, err error, done bool)
 
+//jig:name zero
+
 var zero interface{}
 
-// Next is called by an Observable to emit the next interface{} value to the
-// observer.
-func (f ObserveFunc) Next(next interface{}) {
-	f(next, nil, false)
-}
+//jig:name Observable
 
-// Error is called by an Observable to report an error to the observer.
-func (f ObserveFunc) Error(err error) {
-	f(zero, err, true)
-}
-
-// Complete is called by an Observable to signal that no more data is
-// forthcoming to the observer.
-func (f ObserveFunc) Complete() {
-	f(zero, nil, true)
-}
-
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
-}
-
-//jig:name Subscriber
-
-// Subscriber is an alias for the subscriber.Subscriber interface type.
-type Subscriber subscriber.Subscriber
-
-// Subscription is an alias for the subscriber.Subscription interface type.
-type Subscription subscriber.Subscription
+// Observable is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type Observable func(ObserveFunc, Scheduler, Subscriber)
 
 //jig:name RxError
 

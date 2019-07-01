@@ -35,6 +35,8 @@ type Subscription subscriber.Subscription
 // completed normally.
 type IntObserveFunc func(next int, err error, done bool)
 
+//jig:name zeroInt
+
 var zeroInt int
 
 //jig:name ObservableInt
@@ -239,6 +241,25 @@ func (o ObservableInt) Multicast(factory func() SubjectInt) ConnectableInt {
 	return ConnectableInt{ObservableInt: observable, connect: connect}
 }
 
+//jig:name IntObserveFuncMethods
+
+// Next is called by an ObservableInt to emit the next int value to the
+// observer.
+func (f IntObserveFunc) Next(next int) {
+	f(next, nil, false)
+}
+
+// Error is called by an ObservableInt to report an error to the observer.
+func (f IntObserveFunc) Error(err error) {
+	f(zeroInt, err, true)
+}
+
+// Complete is called by an ObservableInt to signal that no more data is
+// forthcoming to the observer.
+func (f IntObserveFunc) Complete() {
+	f(zeroInt, nil, true)
+}
+
 //jig:name SubjectInt
 
 // SubjectInt is a combination of an observer and observable. Subjects are
@@ -257,12 +278,6 @@ func (o ObservableInt) Multicast(factory func() SubjectInt) ConnectableInt {
 // side will be handled according to the specific behavior of the subject.
 // There are different types of subjects, see the different NewXxxSubjectInt
 // functions for more info.
-//
-// Important! a subject is a hot observable. This means that subscribing to
-// it will block the calling goroutine while it is waiting for items and
-// notifications to receive. Unless you have code on a different goroutine
-// already feeding into the subject, your subscribe will deadlock.
-// Alternatively, you could subscribe on a goroutine as shown in the example.
 type SubjectInt struct {
 	ObservableInt
 	IntObserveFunc
@@ -341,6 +356,8 @@ func (o ObservableInt) Publish() ConnectableInt {
 // completed normally.
 type ObserveFunc func(next interface{}, err error, done bool)
 
+//jig:name zero
+
 var zero interface{}
 
 //jig:name Observable
@@ -349,7 +366,7 @@ var zero interface{}
 // function, scheduler and an subscriber.
 type Observable func(ObserveFunc, Scheduler, Subscriber)
 
-//jig:name Observer
+//jig:name ObserveFuncMethods
 
 // Next is called by an Observable to emit the next interface{} value to the
 // observer.
@@ -367,6 +384,8 @@ func (f ObserveFunc) Error(err error) {
 func (f ObserveFunc) Complete() {
 	f(zero, nil, true)
 }
+
+//jig:name Observer
 
 // Observer is the interface used with Create when implementing a custom
 // observable.
@@ -506,6 +525,8 @@ func (o ObservableInt) MapBool(project func(int) bool) ObservableBool {
 // completed normally.
 type StringObserveFunc func(next string, err error, done bool)
 
+//jig:name zeroString
+
 var zeroString string
 
 //jig:name ObservableString
@@ -523,6 +544,8 @@ type ObservableString func(StringObserveFunc, Scheduler, Subscriber)
 // When done is true and the err argument is nil, then the observable has
 // completed normally.
 type BoolObserveFunc func(next bool, err error, done bool)
+
+//jig:name zeroBool
 
 var zeroBool bool
 

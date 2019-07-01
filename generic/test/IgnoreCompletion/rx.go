@@ -12,9 +12,7 @@ import (
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
-}
+type Scheduler scheduler.Scheduler
 
 //jig:name Subscriber
 
@@ -34,7 +32,17 @@ type Subscription subscriber.Subscription
 // completed normally.
 type IntObserveFunc func(next int, err error, done bool)
 
+//jig:name zeroInt
+
 var zeroInt int
+
+//jig:name ObservableInt
+
+// ObservableInt is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
+
+//jig:name IntObserveFuncMethods
 
 // Next is called by an ObservableInt to emit the next int value to the
 // observer.
@@ -52,12 +60,6 @@ func (f IntObserveFunc) Error(err error) {
 func (f IntObserveFunc) Complete() {
 	f(zeroInt, nil, true)
 }
-
-//jig:name ObservableInt
-
-// ObservableInt is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 
 //jig:name IntObserver
 
@@ -99,20 +101,34 @@ func CreateInt(f func(IntObserver)) ObservableInt {
 	return observable
 }
 
+//jig:name RxError
+
+type RxError string
+
+func (e RxError) Error() string	{ return string(e) }
+
 //jig:name Range
 
 // Range creates an ObservableInt that emits a range of sequential integers.
 func Range(start, count int) ObservableInt {
 	end := start + count
-	return CreateInt(func(observer IntObserver) {
-		for i := start; i < end; i++ {
-			if observer.Closed() {
-				return
+	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		i := start
+		scheduler.ScheduleRecursive(func(self func()) {
+			if !subscriber.Canceled() {
+				if i < end {
+					observe(i, nil, false)
+					if !subscriber.Canceled() {
+						i++
+						self()
+					}
+				} else {
+					observe(zeroInt, nil, true)
+				}
 			}
-			observer.Next(i)
-		}
-		observer.Complete()
-	})
+		})
+	}
+	return observable
 }
 
 //jig:name ObservableIgnoreCompletion
@@ -147,24 +163,9 @@ func (o ObservableInt) IgnoreCompletion() ObservableInt {
 // completed normally.
 type ObserveFunc func(next interface{}, err error, done bool)
 
+//jig:name zero
+
 var zero interface{}
-
-// Next is called by an Observable to emit the next interface{} value to the
-// observer.
-func (f ObserveFunc) Next(next interface{}) {
-	f(next, nil, false)
-}
-
-// Error is called by an Observable to report an error to the observer.
-func (f ObserveFunc) Error(err error) {
-	f(zero, err, true)
-}
-
-// Complete is called by an Observable to signal that no more data is
-// forthcoming to the observer.
-func (f ObserveFunc) Complete() {
-	f(zero, nil, true)
-}
 
 //jig:name Observable
 
@@ -172,11 +173,26 @@ func (f ObserveFunc) Complete() {
 // function, scheduler and an subscriber.
 type Observable func(ObserveFunc, Scheduler, Subscriber)
 
-//jig:name NewScheduler
+//jig:name ObservableIntAsObservable
 
-func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name Schedulers
+
+func ImmediateScheduler() Scheduler	{ return scheduler.Immediate }
 
 func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
+
+func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
 
 //jig:name SubscribeOption
 
@@ -276,25 +292,6 @@ func (o ObservableInt) SubscribeNext(f func(next int), options ...SubscribeOptio
 		}
 	}, options...)
 }
-
-//jig:name ObservableIntAsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name RxError
-
-type RxError string
-
-func (e RxError) Error() string	{ return string(e) }
 
 //jig:name ErrTypecastToInt
 

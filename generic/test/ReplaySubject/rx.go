@@ -12,21 +12,6 @@ import (
 	"github.com/reactivego/subscriber"
 )
 
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
-}
-
-//jig:name Subscriber
-
-// Subscriber is an alias for the subscriber.Subscriber interface type.
-type Subscriber subscriber.Subscriber
-
-// Subscription is an alias for the subscriber.Subscription interface type.
-type Subscription subscriber.Subscription
-
 //jig:name StringObserveFunc
 
 // StringObserveFunc is the observer, a function that gets called whenever the
@@ -37,7 +22,11 @@ type Subscription subscriber.Subscription
 // completed normally.
 type StringObserveFunc func(next string, err error, done bool)
 
+//jig:name zeroString
+
 var zeroString string
+
+//jig:name StringObserveFuncMethods
 
 // Next is called by an ObservableString to emit the next string value to the
 // observer.
@@ -55,6 +44,19 @@ func (f StringObserveFunc) Error(err error) {
 func (f StringObserveFunc) Complete() {
 	f(zeroString, nil, true)
 }
+
+//jig:name Scheduler
+
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler scheduler.Scheduler
+
+//jig:name Subscriber
+
+// Subscriber is an alias for the subscriber.Subscriber interface type.
+type Subscriber subscriber.Subscriber
+
+// Subscription is an alias for the subscriber.Subscription interface type.
+type Subscription subscriber.Subscription
 
 //jig:name ObservableString
 
@@ -80,12 +82,6 @@ type ObservableString func(StringObserveFunc, Scheduler, Subscriber)
 // side will be handled according to the specific behavior of the subject.
 // There are different types of subjects, see the different NewXxxSubjectString
 // functions for more info.
-//
-// Important! a subject is a hot observable. This means that subscribing to
-// it will block the calling goroutine while it is waiting for items and
-// notifications to receive. Unless you have code on a different goroutine
-// already feeding into the subject, your subscribe will deadlock.
-// Alternatively, you could subscribe on a goroutine as shown in the example.
 type SubjectString struct {
 	ObservableString
 	StringObserveFunc
@@ -103,13 +99,6 @@ var MaxReplayCapacity = 16383
 // subscribe after. When bufferCapacity argument is 0, then MaxReplayCapacity is
 // used (currently 16383). When windowDuration argument is 0, then entries added
 // to the buffer will remain fresh forever.
-//
-// Note that this implementation is non-blocking. When no subscribers are
-// present the buffer fills up to bufferCapacity after which new items will
-// start overwriting the oldest ones according to the FIFO principle.
-// If a subscriber cannot keep up with the data rate of the source observable,
-// eventually the buffer for the subscriber will overflow. At that moment the
-// subscriber will receive an ErrMissingBackpressure error.
 func NewReplaySubjectString(bufferCapacity int, windowDuration time.Duration) SubjectString {
 	if bufferCapacity == 0 {
 		bufferCapacity = MaxReplayCapacity
@@ -159,7 +148,11 @@ func NewReplaySubjectString(bufferCapacity int, windowDuration time.Duration) Su
 // completed normally.
 type IntObserveFunc func(next int, err error, done bool)
 
+//jig:name zeroInt
+
 var zeroInt int
+
+//jig:name IntObserveFuncMethods
 
 // Next is called by an ObservableInt to emit the next int value to the
 // observer.
@@ -202,12 +195,6 @@ type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 // side will be handled according to the specific behavior of the subject.
 // There are different types of subjects, see the different NewXxxSubjectInt
 // functions for more info.
-//
-// Important! a subject is a hot observable. This means that subscribing to
-// it will block the calling goroutine while it is waiting for items and
-// notifications to receive. Unless you have code on a different goroutine
-// already feeding into the subject, your subscribe will deadlock.
-// Alternatively, you could subscribe on a goroutine as shown in the example.
 type SubjectInt struct {
 	ObservableInt
 	IntObserveFunc
@@ -220,13 +207,6 @@ type SubjectInt struct {
 // subscribe after. When bufferCapacity argument is 0, then MaxReplayCapacity is
 // used (currently 16383). When windowDuration argument is 0, then entries added
 // to the buffer will remain fresh forever.
-//
-// Note that this implementation is non-blocking. When no subscribers are
-// present the buffer fills up to bufferCapacity after which new items will
-// start overwriting the oldest ones according to the FIFO principle.
-// If a subscriber cannot keep up with the data rate of the source observable,
-// eventually the buffer for the subscriber will overflow. At that moment the
-// subscriber will receive an ErrMissingBackpressure error.
 func NewReplaySubjectInt(bufferCapacity int, windowDuration time.Duration) SubjectInt {
 	if bufferCapacity == 0 {
 		bufferCapacity = MaxReplayCapacity
@@ -276,7 +256,17 @@ func NewReplaySubjectInt(bufferCapacity int, windowDuration time.Duration) Subje
 // completed normally.
 type ObserveFunc func(next interface{}, err error, done bool)
 
+//jig:name zero
+
 var zero interface{}
+
+//jig:name Observable
+
+// Observable is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type Observable func(ObserveFunc, Scheduler, Subscriber)
+
+//jig:name ObserveFuncMethods
 
 // Next is called by an Observable to emit the next interface{} value to the
 // observer.
@@ -294,12 +284,6 @@ func (f ObserveFunc) Error(err error) {
 func (f ObserveFunc) Complete() {
 	f(zero, nil, true)
 }
-
-//jig:name Observable
-
-// Observable is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type Observable func(ObserveFunc, Scheduler, Subscriber)
 
 //jig:name Observer
 
@@ -352,11 +336,13 @@ func (o ObservableString) SubscribeOn(subscribeOn Scheduler) ObservableString {
 	return observable
 }
 
-//jig:name NewScheduler
+//jig:name Schedulers
 
-func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
+func ImmediateScheduler() Scheduler	{ return scheduler.Immediate }
 
 func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
+
+func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
 
 //jig:name SubscribeOption
 

@@ -37,6 +37,8 @@ type Subscription subscriber.Subscription
 // completed normally.
 type ObserveFunc func(next interface{}, err error, done bool)
 
+//jig:name zero
+
 var zero interface{}
 
 //jig:name Observable
@@ -54,6 +56,8 @@ type Observable func(ObserveFunc, Scheduler, Subscriber)
 // When done is true and the err argument is nil, then the observable has
 // completed normally.
 type BoolObserveFunc func(next bool, err error, done bool)
+
+//jig:name zeroBool
 
 var zeroBool bool
 
@@ -73,6 +77,8 @@ type ObservableBool func(BoolObserveFunc, Scheduler, Subscriber)
 // completed normally.
 type IntObserveFunc func(next int, err error, done bool)
 
+//jig:name zeroInt
+
 var zeroInt int
 
 //jig:name ObservableInt
@@ -90,6 +96,8 @@ type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 // When done is true and the err argument is nil, then the observable has
 // completed normally.
 type ObservableObserveFunc func(next Observable, err error, done bool)
+
+//jig:name zeroObservable
 
 var zeroObservable Observable
 
@@ -681,9 +689,11 @@ func (o Observable) Catch(catch Observable) Observable {
 	return observable
 }
 
-//jig:name ObservableObservableCombineAll
+//jig:name Slice
 
 type Slice []interface{}
+
+//jig:name ObservableObservableCombineAll
 
 func (o ObservableObservable) CombineAll() ObservableSlice {
 	observable := func(observe SliceObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
@@ -2445,6 +2455,8 @@ func (o ObservableInt) Wait() (err error) {
 // completed normally.
 type SliceObserveFunc func(next Slice, err error, done bool)
 
+//jig:name zeroSlice
+
 var zeroSlice Slice
 
 //jig:name ObservableSlice
@@ -2452,24 +2464,6 @@ var zeroSlice Slice
 // ObservableSlice is essentially a subscribe function taking an observe
 // function, scheduler and an subscriber.
 type ObservableSlice func(SliceObserveFunc, Scheduler, Subscriber)
-
-//jig:name ObservableIntSingle
-
-// Single enforces that the observableInt sends exactly one data item and then
-// completes. If the observable sends no data before completing or sends more
-// than 1 item before completing  this reported as an error to the observer.
-func (o ObservableInt) Single() ObservableInt {
-	return o.AsObservable().Single().AsObservableInt()
-}
-
-//jig:name ObservableBoolSingle
-
-// Single enforces that the observableBool sends exactly one data item and then
-// completes. If the observable sends no data before completing or sends more
-// than 1 item before completing  this reported as an error to the observer.
-func (o ObservableBool) Single() ObservableBool {
-	return o.AsObservable().Single().AsObservableBool()
-}
 
 //jig:name ObservableMapObservable
 
@@ -2487,4 +2481,22 @@ func (o Observable) MapObservable(project func(interface{}) Observable) Observab
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
+}
+
+//jig:name ObservableIntSingle
+
+// Single enforces that the observableInt sends exactly one data item and then
+// completes. If the observable sends no data before completing or sends more
+// than 1 item before completing  this reported as an error to the observer.
+func (o ObservableInt) Single() ObservableInt {
+	return o.AsObservable().Single().AsObservableInt()
+}
+
+//jig:name ObservableBoolSingle
+
+// Single enforces that the observableBool sends exactly one data item and then
+// completes. If the observable sends no data before completing or sends more
+// than 1 item before completing  this reported as an error to the observer.
+func (o ObservableBool) Single() ObservableBool {
+	return o.AsObservable().Single().AsObservableBool()
 }

@@ -14,9 +14,7 @@ import (
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
-}
+type Scheduler scheduler.Scheduler
 
 //jig:name Subscriber
 
@@ -36,7 +34,17 @@ type Subscription subscriber.Subscription
 // completed normally.
 type IntObserveFunc func(next int, err error, done bool)
 
+//jig:name zeroInt
+
 var zeroInt int
+
+//jig:name ObservableInt
+
+// ObservableInt is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
+
+//jig:name IntObserveFuncMethods
 
 // Next is called by an ObservableInt to emit the next int value to the
 // observer.
@@ -54,12 +62,6 @@ func (f IntObserveFunc) Error(err error) {
 func (f IntObserveFunc) Complete() {
 	f(zeroInt, nil, true)
 }
-
-//jig:name ObservableInt
-
-// ObservableInt is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 
 //jig:name IntObserver
 
@@ -101,11 +103,139 @@ func CreateInt(f func(IntObserver)) ObservableInt {
 	return observable
 }
 
-//jig:name NewScheduler
+//jig:name Schedulers
+
+func ImmediateScheduler() Scheduler	{ return scheduler.Immediate }
+
+func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
 
 func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
 
-func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
+//jig:name ObservableIntPrintln
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+func (o ObservableInt) Println() (err error) {
+	subscriber := subscriber.New()
+	scheduler := CurrentGoroutineScheduler()
+	observer := func(next int, e error, done bool) {
+		if !done {
+			fmt.Println(next)
+		} else {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
+}
+
+//jig:name ObservableIntAll
+
+// All determines whether all items emitted by an ObservableInt meet some
+// criteria.
+//
+// Pass a predicate function to the All operator that accepts an item emitted
+// by the source ObservableInt and returns a boolean value based on an
+// evaluation of that item. All returns an ObservableBool that emits a single
+// boolean value: true if and only if the source ObservableInt terminates
+// normally and every item emitted by the source ObservableInt evaluated as
+// true according to this predicate; false if any item emitted by the source
+// ObservableInt evaluates as false according to this predicate.
+func (o ObservableInt) All(predicate func(next int) bool) ObservableBool {
+	condition := func(next interface{}) bool {
+		return predicate(next.(int))
+	}
+	return o.AsObservable().All(condition)
+}
+
+//jig:name BoolObserveFunc
+
+// BoolObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type BoolObserveFunc func(next bool, err error, done bool)
+
+//jig:name zeroBool
+
+var zeroBool bool
+
+//jig:name ObservableBool
+
+// ObservableBool is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type ObservableBool func(BoolObserveFunc, Scheduler, Subscriber)
+
+//jig:name ObserveFunc
+
+// ObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type ObserveFunc func(next interface{}, err error, done bool)
+
+//jig:name zero
+
+var zero interface{}
+
+//jig:name Observable
+
+// Observable is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type Observable func(ObserveFunc, Scheduler, Subscriber)
+
+//jig:name ObservableIntAsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableAll
+
+// All determines whether all items emitted by an Observable meet some
+// criteria.
+//
+// Pass a predicate function to the All operator that accepts an item emitted
+// by the source Observable and returns a boolean value based on an
+// evaluation of that item. All returns an ObservableBool that emits a single
+// boolean value: true if and only if the source Observable terminates
+// normally and every item emitted by the source Observable evaluated as
+// true according to this predicate; false if any item emitted by the source
+// Observable evaluates as false according to this predicate.
+func (o Observable) All(predicate func(next interface{}) bool) ObservableBool {
+	observable := func(observe BoolObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			switch {
+			case !done:
+				if !predicate(next) {
+					observe(false, nil, false)
+					observe(zeroBool, nil, true)
+				}
+			case err != nil:
+				observe(zeroBool, err, true)
+			default:
+				observe(true, nil, false)
+				observe(zeroBool, nil, true)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
 
 //jig:name SubscribeOption
 
@@ -174,175 +304,6 @@ func newSchedulerAndSubscriber(setters []SubscribeOption) (Scheduler, Subscriber
 		options.onSubscribe(options.subscriber)
 	}
 	return options.scheduler, options.subscriber
-}
-
-//jig:name ObservableIntSubscribe
-
-// Subscribe operates upon the emissions and notifications from an Observable.
-// This method returns a Subscription.
-func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOption) Subscription {
-	scheduler, subscriber := newSchedulerAndSubscriber(options)
-	observer := func(next int, err error, done bool) {
-		if !done {
-			observe(next, err, done)
-		} else {
-			observe(zeroInt, err, true)
-			subscriber.Unsubscribe()
-		}
-	}
-	o(observer, scheduler, subscriber)
-	return subscriber
-}
-
-//jig:name ObservableIntPrintln
-
-// Println subscribes to the Observable and prints every item to os.Stdout while
-// it waits for completion or error. Returns either the error or nil when the
-// Observable completed normally.
-func (o ObservableInt) Println(options ...SubscribeOption) (e error) {
-	o.Subscribe(func(next int, err error, done bool) {
-		if !done {
-			fmt.Println(next)
-		} else {
-			e = err
-		}
-	}, options...).Wait()
-	return e
-}
-
-//jig:name ObservableIntAll
-
-// All determines whether all items emitted by an ObservableInt meet some
-// criteria.
-//
-// Pass a predicate function to the All operator that accepts an item emitted
-// by the source ObservableInt and returns a boolean value based on an
-// evaluation of that item. All returns an ObservableBool that emits a single
-// boolean value: true if and only if the source ObservableInt terminates
-// normally and every item emitted by the source ObservableInt evaluated as
-// true according to this predicate; false if any item emitted by the source
-// ObservableInt evaluates as false according to this predicate.
-func (o ObservableInt) All(predicate func(next int) bool) ObservableBool {
-	condition := func(next interface{}) bool {
-		return predicate(next.(int))
-	}
-	return o.AsObservable().All(condition)
-}
-
-//jig:name BoolObserveFunc
-
-// BoolObserveFunc is the observer, a function that gets called whenever the
-// observable has something to report. The next argument is the item value that
-// is only valid when the done argument is false. When done is true and the err
-// argument is not nil, then the observable has terminated with an error.
-// When done is true and the err argument is nil, then the observable has
-// completed normally.
-type BoolObserveFunc func(next bool, err error, done bool)
-
-var zeroBool bool
-
-// Next is called by an ObservableBool to emit the next bool value to the
-// observer.
-func (f BoolObserveFunc) Next(next bool) {
-	f(next, nil, false)
-}
-
-// Error is called by an ObservableBool to report an error to the observer.
-func (f BoolObserveFunc) Error(err error) {
-	f(zeroBool, err, true)
-}
-
-// Complete is called by an ObservableBool to signal that no more data is
-// forthcoming to the observer.
-func (f BoolObserveFunc) Complete() {
-	f(zeroBool, nil, true)
-}
-
-//jig:name ObservableBool
-
-// ObservableBool is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableBool func(BoolObserveFunc, Scheduler, Subscriber)
-
-//jig:name ObserveFunc
-
-// ObserveFunc is the observer, a function that gets called whenever the
-// observable has something to report. The next argument is the item value that
-// is only valid when the done argument is false. When done is true and the err
-// argument is not nil, then the observable has terminated with an error.
-// When done is true and the err argument is nil, then the observable has
-// completed normally.
-type ObserveFunc func(next interface{}, err error, done bool)
-
-var zero interface{}
-
-// Next is called by an Observable to emit the next interface{} value to the
-// observer.
-func (f ObserveFunc) Next(next interface{}) {
-	f(next, nil, false)
-}
-
-// Error is called by an Observable to report an error to the observer.
-func (f ObserveFunc) Error(err error) {
-	f(zero, err, true)
-}
-
-// Complete is called by an Observable to signal that no more data is
-// forthcoming to the observer.
-func (f ObserveFunc) Complete() {
-	f(zero, nil, true)
-}
-
-//jig:name Observable
-
-// Observable is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type Observable func(ObserveFunc, Scheduler, Subscriber)
-
-//jig:name ObservableIntAsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableAll
-
-// All determines whether all items emitted by an Observable meet some
-// criteria.
-//
-// Pass a predicate function to the All operator that accepts an item emitted
-// by the source Observable and returns a boolean value based on an
-// evaluation of that item. All returns an ObservableBool that emits a single
-// boolean value: true if and only if the source Observable terminates
-// normally and every item emitted by the source Observable evaluated as
-// true according to this predicate; false if any item emitted by the source
-// Observable evaluates as false according to this predicate.
-func (o Observable) All(predicate func(next interface{}) bool) ObservableBool {
-	observable := func(observe BoolObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			switch {
-			case !done:
-				if !predicate(next) {
-					observe(false, nil, false)
-					observe(zeroBool, nil, true)
-				}
-			case err != nil:
-				observe(zeroBool, err, true)
-			default:
-				observe(true, nil, false)
-				observe(zeroBool, nil, true)
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
 }
 
 //jig:name ObservableBoolSubscribe

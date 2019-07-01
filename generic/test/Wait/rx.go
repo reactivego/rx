@@ -12,9 +12,7 @@ import (
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
-}
+type Scheduler scheduler.Scheduler
 
 //jig:name Subscriber
 
@@ -34,7 +32,17 @@ type Subscription subscriber.Subscription
 // completed normally.
 type IntObserveFunc func(next int, err error, done bool)
 
+//jig:name zeroInt
+
 var zeroInt int
+
+//jig:name ObservableInt
+
+// ObservableInt is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
+
+//jig:name IntObserveFuncMethods
 
 // Next is called by an ObservableInt to emit the next int value to the
 // observer.
@@ -52,12 +60,6 @@ func (f IntObserveFunc) Error(err error) {
 func (f IntObserveFunc) Complete() {
 	f(zeroInt, nil, true)
 }
-
-//jig:name ObservableInt
-
-// ObservableInt is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 
 //jig:name IntObserver
 
@@ -99,114 +101,35 @@ func CreateInt(f func(IntObserver)) ObservableInt {
 	return observable
 }
 
-//jig:name NewScheduler
-
-func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
-
-func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
-
-//jig:name SubscribeOption
-
-// SubscribeOption is an option that can be passed to the Subscribe method.
-type SubscribeOption func(options *subscribeOptions)
-
-type subscribeOptions struct {
-	scheduler	Scheduler
-	subscriber	Subscriber
-	onSubscribe	func(subscription Subscription)
-	onUnsubscribe	func()
-}
-
-// SubscribeOn returns an option that can be passed to the Subscribe method.
-// It takes the scheduler to subscribe the observable on. The tasks that
-// actually perform the observable functionality are scheduled on this
-// scheduler. The other options that can be passed here are applied after the
-// scheduler was set so any schedulers passed in via other will override
-// the scheduler passed here.
-func SubscribeOn(scheduler Scheduler, other ...SubscribeOption) SubscribeOption {
-	return func(options *subscribeOptions) {
-		options.scheduler = scheduler
-		for _, setter := range other {
-			setter(options)
-		}
-	}
-}
-
-// WithSubscriber returns an option that can be passed to the Subscribe method.
-// The Subscribe method will use the subscriber passed here instead of creating
-// a new one.
-func WithSubscriber(subscriber Subscriber) SubscribeOption {
-	return func(options *subscribeOptions) {
-		options.subscriber = subscriber
-	}
-}
-
-// OnSubscribe returns an option that can be passed to the Subscribe method.
-// It takes a callback that is called from the Subscribe method just before
-// subscribing continues further.
-func OnSubscribe(callback func(Subscription)) SubscribeOption {
-	return func(options *subscribeOptions) { options.onSubscribe = callback }
-}
-
-// OnUnsubscribe returns an option that can be passed to the Subscribe method.
-// It takes a callback that is called by the Subscribe method to notify the
-// client that the subscription has been canceled.
-func OnUnsubscribe(callback func()) SubscribeOption {
-	return func(options *subscribeOptions) { options.onUnsubscribe = callback }
-}
-
-// newSchedulerAndSubscriber will return either return the scheduler and subscriber
-// passed in through the SubscribeOn() and WithSubscriber() options or it will
-// return newly created scheduler and subscriber. Before returning the callback
-// passed in through OnSubscribe() will already have been called.
-func newSchedulerAndSubscriber(setters []SubscribeOption) (Scheduler, Subscriber) {
-	options := &subscribeOptions{scheduler: CurrentGoroutineScheduler()}
-	for _, setter := range setters {
-		setter(options)
-	}
-	if options.subscriber == nil {
-		options.subscriber = subscriber.New()
-	}
-	options.subscriber.OnUnsubscribe(options.onUnsubscribe)
-	if options.onSubscribe != nil {
-		options.onSubscribe(options.subscriber)
-	}
-	return options.scheduler, options.subscriber
-}
-
-//jig:name ObservableIntSubscribe
-
-// Subscribe operates upon the emissions and notifications from an Observable.
-// This method returns a Subscription.
-func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOption) Subscription {
-	scheduler, subscriber := newSchedulerAndSubscriber(options)
-	observer := func(next int, err error, done bool) {
-		if !done {
-			observe(next, err, done)
-		} else {
-			observe(zeroInt, err, true)
-			subscriber.Unsubscribe()
-		}
-	}
-	o(observer, scheduler, subscriber)
-	return subscriber
-}
-
-//jig:name ObservableIntWait
-
-// Wait subscribes to the Observable and waits for completion or error.
-// Returns either the error or nil when the Observable completed normally.
-func (o ObservableInt) Wait(options ...SubscribeOption) (e error) {
-	o.Subscribe(func(next int, err error, done bool) {
-		if done {
-			e = err
-		}
-	}, options...).Wait()
-	return e
-}
-
 //jig:name RxError
 
 type RxError string
 
 func (e RxError) Error() string	{ return string(e) }
+
+//jig:name Schedulers
+
+func ImmediateScheduler() Scheduler	{ return scheduler.Immediate }
+
+func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
+
+func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
+
+//jig:name ObservableIntWait
+
+// Wait subscribes to the Observable and waits for completion or error.
+// Returns either the error or nil when the Observable completed normally.
+// Subscription is performed on the normal CurrentGoroutine scheduler.
+func (o ObservableInt) Wait() (err error) {
+	subscriber := subscriber.New()
+	scheduler := CurrentGoroutineScheduler()
+	observer := func(next int, e error, done bool) {
+		if done {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
+}

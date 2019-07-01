@@ -34,6 +34,8 @@ type Subscription subscriber.Subscription
 // completed normally.
 type IntObserveFunc func(next int, err error, done bool)
 
+//jig:name zeroInt
+
 var zeroInt int
 
 //jig:name ObservableInt
@@ -137,6 +139,8 @@ func (o ObservableInt) ReduceFloat32(reducer func(float32, int) float32, seed fl
 // completed normally.
 type ObserveFunc func(next interface{}, err error, done bool)
 
+//jig:name zero
+
 var zero interface{}
 
 //jig:name Observable
@@ -154,6 +158,8 @@ type Observable func(ObserveFunc, Scheduler, Subscriber)
 // When done is true and the err argument is nil, then the observable has
 // completed normally.
 type Float32ObserveFunc func(next float32, err error, done bool)
+
+//jig:name zeroFloat32
 
 var zeroFloat32 float32
 

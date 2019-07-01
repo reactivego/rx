@@ -34,6 +34,8 @@ type Subscription subscriber.Subscription
 // completed normally.
 type IntObserveFunc func(next int, err error, done bool)
 
+//jig:name zeroInt
+
 var zeroInt int
 
 //jig:name ObservableInt
@@ -62,6 +64,37 @@ func Range(start, count int) ObservableInt {
 				}
 			}
 		})
+	}
+	return observable
+}
+
+//jig:name ObservableIntDoOnComplete
+
+// DoOnComplete calls a function when the stream completes.
+func (o ObservableInt) DoOnComplete(f func()) ObservableInt {
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			if err == nil && done {
+				f()
+			}
+			observe(next, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableIntFilter
+
+// Filter emits only those items from an ObservableInt that pass a predicate test.
+func (o ObservableInt) Filter(predicate func(next int) bool) ObservableInt {
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			if done || predicate(next) {
+				observe(next, err, done)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
 	}
 	return observable
 }
@@ -180,37 +213,6 @@ func (o ObservableInt) ToSlice(options ...SubscribeOption) (slice []int, err err
 		}
 	}, SubscribeOn(scheduler, options...)).Wait()
 	return
-}
-
-//jig:name ObservableIntDoOnComplete
-
-// DoOnComplete calls a function when the stream completes.
-func (o ObservableInt) DoOnComplete(f func()) ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			if err == nil && done {
-				f()
-			}
-			observe(next, err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableIntFilter
-
-// Filter emits only those items from an ObservableInt that pass a predicate test.
-func (o ObservableInt) Filter(predicate func(next int) bool) ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			if done || predicate(next) {
-				observe(next, err, done)
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
 }
 
 //jig:name ObservableIntPrintln

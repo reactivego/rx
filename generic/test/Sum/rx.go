@@ -12,9 +12,7 @@ import (
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
-}
+type Scheduler scheduler.Scheduler
 
 //jig:name Subscriber
 
@@ -34,24 +32,9 @@ type Subscription subscriber.Subscription
 // completed normally.
 type Float32ObserveFunc func(next float32, err error, done bool)
 
+//jig:name zeroFloat32
+
 var zeroFloat32 float32
-
-// Next is called by an ObservableFloat32 to emit the next float32 value to the
-// observer.
-func (f Float32ObserveFunc) Next(next float32) {
-	f(next, nil, false)
-}
-
-// Error is called by an ObservableFloat32 to report an error to the observer.
-func (f Float32ObserveFunc) Error(err error) {
-	f(zeroFloat32, err, true)
-}
-
-// Complete is called by an ObservableFloat32 to signal that no more data is
-// forthcoming to the observer.
-func (f Float32ObserveFunc) Complete() {
-	f(zeroFloat32, nil, true)
-}
 
 //jig:name ObservableFloat32
 
@@ -59,59 +42,27 @@ func (f Float32ObserveFunc) Complete() {
 // function, scheduler and an subscriber.
 type ObservableFloat32 func(Float32ObserveFunc, Scheduler, Subscriber)
 
-//jig:name Float32Observer
-
-// Float32Observer is the interface used with CreateFloat32 when implementing a custom
-// observable.
-type Float32Observer interface {
-	// Next emits the next float32 value.
-	Next(float32)
-	// Error signals an error condition.
-	Error(error)
-	// Complete signals that no more data is to be expected.
-	Complete()
-	// Closed returns true when the subscription has been canceled.
-	Closed() bool
-}
-
-//jig:name CreateFloat32
-
-// CreateFloat32 creates an Observable from scratch by calling observer methods
-// programmatically.
-func CreateFloat32(f func(Float32Observer)) ObservableFloat32 {
-	observable := func(observe Float32ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		scheduler.Schedule(func() {
-			if subscriber.Closed() {
-				return
-			}
-			observer := func(next float32, err error, done bool) {
-				if !subscriber.Closed() {
-					observe(next, err, done)
-				}
-			}
-			type ObserverSubscriber struct {
-				Float32ObserveFunc
-				Subscriber
-			}
-			f(&ObserverSubscriber{observer, subscriber})
-		})
-	}
-	return observable
-}
-
 //jig:name FromSliceFloat32
 
 // FromSliceFloat32 creates an ObservableFloat32 from a slice of float32 values passed in.
 func FromSliceFloat32(slice []float32) ObservableFloat32 {
-	return CreateFloat32(func(observer Float32Observer) {
-		for _, next := range slice {
-			if observer.Closed() {
-				return
+	observable := func(observe Float32ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		i := 0
+		subscribeOn.ScheduleRecursive(func(self func()) {
+			if !subscriber.Canceled() {
+				if i < len(slice) {
+					observe(slice[i], nil, false)
+					if !subscriber.Canceled() {
+						i++
+						self()
+					}
+				} else {
+					observe(zeroFloat32, nil, true)
+				}
 			}
-			observer.Next(next)
-		}
-		observer.Complete()
-	})
+		})
+	}
+	return observable
 }
 
 //jig:name FromFloat32
@@ -131,24 +82,9 @@ func FromFloat32(slice ...float32) ObservableFloat32 {
 // completed normally.
 type IntObserveFunc func(next int, err error, done bool)
 
+//jig:name zeroInt
+
 var zeroInt int
-
-// Next is called by an ObservableInt to emit the next int value to the
-// observer.
-func (f IntObserveFunc) Next(next int) {
-	f(next, nil, false)
-}
-
-// Error is called by an ObservableInt to report an error to the observer.
-func (f IntObserveFunc) Error(err error) {
-	f(zeroInt, err, true)
-}
-
-// Complete is called by an ObservableInt to signal that no more data is
-// forthcoming to the observer.
-func (f IntObserveFunc) Complete() {
-	f(zeroInt, nil, true)
-}
 
 //jig:name ObservableInt
 
@@ -156,59 +92,27 @@ func (f IntObserveFunc) Complete() {
 // function, scheduler and an subscriber.
 type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 
-//jig:name IntObserver
-
-// IntObserver is the interface used with CreateInt when implementing a custom
-// observable.
-type IntObserver interface {
-	// Next emits the next int value.
-	Next(int)
-	// Error signals an error condition.
-	Error(error)
-	// Complete signals that no more data is to be expected.
-	Complete()
-	// Closed returns true when the subscription has been canceled.
-	Closed() bool
-}
-
-//jig:name CreateInt
-
-// CreateInt creates an Observable from scratch by calling observer methods
-// programmatically.
-func CreateInt(f func(IntObserver)) ObservableInt {
-	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		scheduler.Schedule(func() {
-			if subscriber.Closed() {
-				return
-			}
-			observer := func(next int, err error, done bool) {
-				if !subscriber.Closed() {
-					observe(next, err, done)
-				}
-			}
-			type ObserverSubscriber struct {
-				IntObserveFunc
-				Subscriber
-			}
-			f(&ObserverSubscriber{observer, subscriber})
-		})
-	}
-	return observable
-}
-
 //jig:name FromSliceInt
 
 // FromSliceInt creates an ObservableInt from a slice of int values passed in.
 func FromSliceInt(slice []int) ObservableInt {
-	return CreateInt(func(observer IntObserver) {
-		for _, next := range slice {
-			if observer.Closed() {
-				return
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		i := 0
+		subscribeOn.ScheduleRecursive(func(self func()) {
+			if !subscriber.Canceled() {
+				if i < len(slice) {
+					observe(slice[i], nil, false)
+					if !subscriber.Canceled() {
+						i++
+						self()
+					}
+				} else {
+					observe(zeroInt, nil, true)
+				}
 			}
-			observer.Next(next)
-		}
-		observer.Complete()
-	})
+		})
+	}
+	return observable
 }
 
 //jig:name FromInts
@@ -256,11 +160,13 @@ func (o ObservableInt) Sum() ObservableInt {
 	return observable
 }
 
-//jig:name NewScheduler
+//jig:name Schedulers
 
-func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
+func ImmediateScheduler() Scheduler	{ return scheduler.Immediate }
 
 func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
+
+func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
 
 //jig:name SubscribeOption
 
@@ -354,19 +260,20 @@ func (o ObservableFloat32) Subscribe(observe Float32ObserveFunc, options ...Subs
 // ToSingle blocks until the ObservableFloat32 emits exactly one value or an error.
 // The value and any error are returned.
 //
-// This function subscribes to the source observable on the Goroutine scheduler.
-// The Goroutine scheduler works in more situations for complex chains of
-// observables, like when merging the output of multiple observables.
-func (o ObservableFloat32) ToSingle(options ...SubscribeOption) (v float32, e error) {
+// This function subscribes to the source observable on the NewGoroutine
+// scheduler. The NewGoroutine scheduler works in more situations for
+// complex chains of observables, like when merging the output of multiple
+// observables.
+func (o ObservableFloat32) ToSingle(options ...SubscribeOption) (entry float32, err error) {
 	scheduler := NewGoroutineScheduler()
-	o.Single().Subscribe(func(next float32, err error, done bool) {
+	o.Single().Subscribe(func(next float32, e error, done bool) {
 		if !done {
-			v = next
+			entry = next
 		} else {
-			e = err
+			err = e
 		}
 	}, SubscribeOn(scheduler, options...)).Wait()
-	return v, e
+	return
 }
 
 //jig:name ObservableIntSubscribe
@@ -392,19 +299,20 @@ func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOpt
 // ToSingle blocks until the ObservableInt emits exactly one value or an error.
 // The value and any error are returned.
 //
-// This function subscribes to the source observable on the Goroutine scheduler.
-// The Goroutine scheduler works in more situations for complex chains of
-// observables, like when merging the output of multiple observables.
-func (o ObservableInt) ToSingle(options ...SubscribeOption) (v int, e error) {
+// This function subscribes to the source observable on the NewGoroutine
+// scheduler. The NewGoroutine scheduler works in more situations for
+// complex chains of observables, like when merging the output of multiple
+// observables.
+func (o ObservableInt) ToSingle(options ...SubscribeOption) (entry int, err error) {
 	scheduler := NewGoroutineScheduler()
-	o.Single().Subscribe(func(next int, err error, done bool) {
+	o.Single().Subscribe(func(next int, e error, done bool) {
 		if !done {
-			v = next
+			entry = next
 		} else {
-			e = err
+			err = e
 		}
 	}, SubscribeOn(scheduler, options...)).Wait()
-	return v, e
+	return
 }
 
 //jig:name ObservableIntSingle
@@ -435,24 +343,9 @@ func (o ObservableFloat32) Single() ObservableFloat32 {
 // completed normally.
 type ObserveFunc func(next interface{}, err error, done bool)
 
+//jig:name zero
+
 var zero interface{}
-
-// Next is called by an Observable to emit the next interface{} value to the
-// observer.
-func (f ObserveFunc) Next(next interface{}) {
-	f(next, nil, false)
-}
-
-// Error is called by an Observable to report an error to the observer.
-func (f ObserveFunc) Error(err error) {
-	f(zero, err, true)
-}
-
-// Complete is called by an Observable to signal that no more data is
-// forthcoming to the observer.
-func (f ObserveFunc) Complete() {
-	f(zero, nil, true)
-}
 
 //jig:name Observable
 
@@ -460,12 +353,12 @@ func (f ObserveFunc) Complete() {
 // function, scheduler and an subscriber.
 type Observable func(ObserveFunc, Scheduler, Subscriber)
 
-//jig:name ObservableFloat32AsObservable
+//jig:name ObservableIntAsObservable
 
-// AsObservable turns a typed ObservableFloat32 into an Observable of interface{}.
-func (o ObservableFloat32) AsObservable() Observable {
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
 	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next float32, err error, done bool) {
+		observer := func(next int, err error, done bool) {
 			observe(interface{}(next), err, done)
 		}
 		o(observer, subscribeOn, subscriber)
@@ -473,12 +366,12 @@ func (o ObservableFloat32) AsObservable() Observable {
 	return observable
 }
 
-//jig:name ObservableIntAsObservable
+//jig:name ObservableFloat32AsObservable
 
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
+// AsObservable turns a typed ObservableFloat32 into an Observable of interface{}.
+func (o ObservableFloat32) AsObservable() Observable {
 	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
+		observer := func(next float32, err error, done bool) {
 			observe(interface{}(next), err, done)
 		}
 		o(observer, subscribeOn, subscriber)
@@ -531,34 +424,6 @@ func (o Observable) Single() Observable {
 	return observable
 }
 
-//jig:name ErrTypecastToFloat32
-
-// ErrTypecastToFloat32 is delivered to an observer if the generic value cannot be
-// typecast to float32.
-const ErrTypecastToFloat32 = RxError("typecast to float32 failed")
-
-//jig:name ObservableAsObservableFloat32
-
-// AsFloat32 turns an Observable of interface{} into an ObservableFloat32. If during
-// observing a typecast fails, the error ErrTypecastToFloat32 will be emitted.
-func (o Observable) AsObservableFloat32() ObservableFloat32 {
-	observable := func(observe Float32ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				if nextFloat32, ok := next.(float32); ok {
-					observe(nextFloat32, err, done)
-				} else {
-					observe(zeroFloat32, ErrTypecastToFloat32, true)
-				}
-			} else {
-				observe(zeroFloat32, err, true)
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name ErrTypecastToInt
 
 // ErrTypecastToInt is delivered to an observer if the generic value cannot be
@@ -580,6 +445,34 @@ func (o Observable) AsObservableInt() ObservableInt {
 				}
 			} else {
 				observe(zeroInt, err, true)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ErrTypecastToFloat32
+
+// ErrTypecastToFloat32 is delivered to an observer if the generic value cannot be
+// typecast to float32.
+const ErrTypecastToFloat32 = RxError("typecast to float32 failed")
+
+//jig:name ObservableAsObservableFloat32
+
+// AsFloat32 turns an Observable of interface{} into an ObservableFloat32. If during
+// observing a typecast fails, the error ErrTypecastToFloat32 will be emitted.
+func (o Observable) AsObservableFloat32() ObservableFloat32 {
+	observable := func(observe Float32ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				if nextFloat32, ok := next.(float32); ok {
+					observe(nextFloat32, err, done)
+				} else {
+					observe(zeroFloat32, ErrTypecastToFloat32, true)
+				}
+			} else {
+				observe(zeroFloat32, err, true)
 			}
 		}
 		o(observer, subscribeOn, subscriber)

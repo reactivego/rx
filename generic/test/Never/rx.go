@@ -32,6 +32,8 @@ type Subscription subscriber.Subscription
 // completed normally.
 type IntObserveFunc func(next int, err error, done bool)
 
+//jig:name zeroInt
+
 var zeroInt int
 
 //jig:name ObservableInt
@@ -44,7 +46,8 @@ type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 
 // NeverInt creates an ObservableInt that emits no items and does't terminate.
 func NeverInt() ObservableInt {
-	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {}
+	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+	}
 	return observable
 }
 

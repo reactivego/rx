@@ -16,9 +16,7 @@ import (
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
-}
+type Scheduler scheduler.Scheduler
 
 //jig:name Subscriber
 
@@ -38,24 +36,9 @@ type Subscription subscriber.Subscription
 // completed normally.
 type ObserveFunc func(next interface{}, err error, done bool)
 
+//jig:name zero
+
 var zero interface{}
-
-// Next is called by an Observable to emit the next interface{} value to the
-// observer.
-func (f ObserveFunc) Next(next interface{}) {
-	f(next, nil, false)
-}
-
-// Error is called by an Observable to report an error to the observer.
-func (f ObserveFunc) Error(err error) {
-	f(zero, err, true)
-}
-
-// Complete is called by an Observable to signal that no more data is
-// forthcoming to the observer.
-func (f ObserveFunc) Complete() {
-	f(zero, nil, true)
-}
 
 //jig:name Observable
 
@@ -63,52 +46,13 @@ func (f ObserveFunc) Complete() {
 // function, scheduler and an subscriber.
 type Observable func(ObserveFunc, Scheduler, Subscriber)
 
-//jig:name Observer
-
-// Observer is the interface used with Create when implementing a custom
-// observable.
-type Observer interface {
-	// Next emits the next interface{} value.
-	Next(interface{})
-	// Error signals an error condition.
-	Error(error)
-	// Complete signals that no more data is to be expected.
-	Complete()
-	// Closed returns true when the subscription has been canceled.
-	Closed() bool
-}
-
-//jig:name Create
-
-// Create creates an Observable from scratch by calling observer methods
-// programmatically.
-func Create(f func(Observer)) Observable {
-	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		scheduler.Schedule(func() {
-			if subscriber.Closed() {
-				return
-			}
-			observer := func(next interface{}, err error, done bool) {
-				if !subscriber.Closed() {
-					observe(next, err, done)
-				}
-			}
-			type ObserverSubscriber struct {
-				ObserveFunc
-				Subscriber
-			}
-			f(&ObserverSubscriber{observer, subscriber})
-		})
-	}
-	return observable
-}
-
 //jig:name Never
 
 // Never creates an Observable that emits no items and does't terminate.
 func Never() Observable {
-	return Create(func(observer Observer) {
-	})
+	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+	}
+	return observable
 }
 
 //jig:name StringObserveFunc
@@ -121,24 +65,9 @@ func Never() Observable {
 // completed normally.
 type StringObserveFunc func(next string, err error, done bool)
 
+//jig:name zeroString
+
 var zeroString string
-
-// Next is called by an ObservableString to emit the next string value to the
-// observer.
-func (f StringObserveFunc) Next(next string) {
-	f(next, nil, false)
-}
-
-// Error is called by an ObservableString to report an error to the observer.
-func (f StringObserveFunc) Error(err error) {
-	f(zeroString, err, true)
-}
-
-// Complete is called by an ObservableString to signal that no more data is
-// forthcoming to the observer.
-func (f StringObserveFunc) Complete() {
-	f(zeroString, nil, true)
-}
 
 //jig:name ObservableString
 
@@ -150,15 +79,23 @@ type ObservableString func(StringObserveFunc, Scheduler, Subscriber)
 
 // FromSlice creates an Observable from a slice of interface{} values passed in.
 func FromSlice(slice []interface{}) Observable {
-	return Create(func(observer Observer) {
-		for _, next := range slice {
-			if observer.Closed() {
-				return
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		i := 0
+		subscribeOn.ScheduleRecursive(func(self func()) {
+			if !subscriber.Canceled() {
+				if i < len(slice) {
+					observe(slice[i], nil, false)
+					if !subscriber.Canceled() {
+						i++
+						self()
+					}
+				} else {
+					observe(zero, nil, true)
+				}
 			}
-			observer.Next(next)
-		}
-		observer.Complete()
-	})
+		})
+	}
+	return observable
 }
 
 //jig:name From
@@ -178,24 +115,9 @@ func From(slice ...interface{}) Observable {
 // completed normally.
 type IntObserveFunc func(next int, err error, done bool)
 
+//jig:name zeroInt
+
 var zeroInt int
-
-// Next is called by an ObservableInt to emit the next int value to the
-// observer.
-func (f IntObserveFunc) Next(next int) {
-	f(next, nil, false)
-}
-
-// Error is called by an ObservableInt to report an error to the observer.
-func (f IntObserveFunc) Error(err error) {
-	f(zeroInt, err, true)
-}
-
-// Complete is called by an ObservableInt to signal that no more data is
-// forthcoming to the observer.
-func (f IntObserveFunc) Complete() {
-	f(zeroInt, nil, true)
-}
 
 //jig:name ObservableInt
 
@@ -203,97 +125,27 @@ func (f IntObserveFunc) Complete() {
 // function, scheduler and an subscriber.
 type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 
-//jig:name IntObserver
-
-// IntObserver is the interface used with CreateInt when implementing a custom
-// observable.
-type IntObserver interface {
-	// Next emits the next int value.
-	Next(int)
-	// Error signals an error condition.
-	Error(error)
-	// Complete signals that no more data is to be expected.
-	Complete()
-	// Closed returns true when the subscription has been canceled.
-	Closed() bool
-}
-
-//jig:name CreateInt
-
-// CreateInt creates an Observable from scratch by calling observer methods
-// programmatically.
-func CreateInt(f func(IntObserver)) ObservableInt {
-	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		scheduler.Schedule(func() {
-			if subscriber.Closed() {
-				return
-			}
-			observer := func(next int, err error, done bool) {
-				if !subscriber.Closed() {
-					observe(next, err, done)
-				}
-			}
-			type ObserverSubscriber struct {
-				IntObserveFunc
-				Subscriber
-			}
-			f(&ObserverSubscriber{observer, subscriber})
-		})
-	}
-	return observable
-}
-
 //jig:name Interval
 
 // Interval creates an ObservableInt that emits a sequence of integers spaced
 // by a particular time interval.
 func Interval(interval time.Duration) ObservableInt {
-	return CreateInt(func(observer IntObserver) {
-		for i := 0; ; i++ {
+	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		i := 0
+		scheduler.ScheduleRecursive(func(self func()) {
+			if subscriber.Canceled() {
+				return
+			}
 			time.Sleep(interval)
-			if observer.Closed() {
+			if subscriber.Canceled() {
 				return
 			}
-			observer.Next(i)
-		}
-	})
-}
-
-//jig:name StringObserver
-
-// StringObserver is the interface used with CreateString when implementing a custom
-// observable.
-type StringObserver interface {
-	// Next emits the next string value.
-	Next(string)
-	// Error signals an error condition.
-	Error(error)
-	// Complete signals that no more data is to be expected.
-	Complete()
-	// Closed returns true when the subscription has been canceled.
-	Closed() bool
-}
-
-//jig:name CreateString
-
-// CreateString creates an Observable from scratch by calling observer methods
-// programmatically.
-func CreateString(f func(StringObserver)) ObservableString {
-	observable := func(observe StringObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		scheduler.Schedule(func() {
-			if subscriber.Closed() {
+			observe(i, nil, false)
+			if subscriber.Canceled() {
 				return
 			}
-			observer := func(next string, err error, done bool) {
-				if !subscriber.Closed() {
-					observe(next, err, done)
-				}
-			}
-			type ObserverSubscriber struct {
-				StringObserveFunc
-				Subscriber
-			}
-			f(&ObserverSubscriber{observer, subscriber})
+			i++
+			self()
 		})
 	}
 	return observable
@@ -303,9 +155,14 @@ func CreateString(f func(StringObserver)) ObservableString {
 
 // EmptyString creates an Observable that emits no items but terminates normally.
 func EmptyString() ObservableString {
-	return CreateString(func(observer StringObserver) {
-		observer.Complete()
-	})
+	observable := func(observe StringObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		subscribeOn.Schedule(func() {
+			if !subscriber.Canceled() {
+				observe(zeroString, nil, true)
+			}
+		})
+	}
+	return observable
 }
 
 //jig:name RxError
@@ -320,19 +177,19 @@ func (e RxError) Error() string	{ return string(e) }
 // well-behaved.
 func (o Observable) Serialize() Observable {
 	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		var (
-			mutex		sync.Mutex
-			alreadyDone	bool
-		)
-		observer := func(next interface{}, err error, done bool) {
-			mutex.Lock()
-			defer mutex.Unlock()
-			if !alreadyDone {
-				alreadyDone = done
+		var observer struct {
+			sync.Mutex
+			done	bool
+		}
+		serializer := func(next interface{}, err error, done bool) {
+			observer.Lock()
+			defer observer.Unlock()
+			if !observer.done {
+				observer.done = done
 				observe(next, err, done)
 			}
 		}
-		o(observer, subscribeOn, subscriber)
+		o(serializer, subscribeOn, subscriber)
 	}
 	return observable
 }
@@ -366,7 +223,7 @@ func (o Observable) Timeout(timeout time.Duration) Observable {
 				deadline.Reset(timeout)
 			}
 		}
-		watchdog := func() {
+		timeouter := func() {
 			select {
 			case <-deadline.C:
 				if subscriber.Closed() {
@@ -376,7 +233,7 @@ func (o Observable) Timeout(timeout time.Duration) Observable {
 			case <-unsubscribe:
 			}
 		}
-		go watchdog()
+		go timeouter()
 		o(observer, subscribeOn, subscriber.Add(func() { close(unsubscribe) }))
 	})
 	return observable.Serialize()
@@ -482,11 +339,13 @@ func (o ObservableInt) AsObservable() Observable {
 	return observable
 }
 
-//jig:name NewScheduler
+//jig:name Schedulers
 
-func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
+func ImmediateScheduler() Scheduler	{ return scheduler.Immediate }
 
 func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
+
+func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
 
 //jig:name SubscribeOption
 
@@ -580,19 +439,20 @@ func (o ObservableString) Subscribe(observe StringObserveFunc, options ...Subscr
 // ToSlice collects all values from the ObservableString into an slice. The
 // complete slice and any error are returned.
 //
-// This function subscribes to the source observable on the Goroutine scheduler.
-// The Goroutine scheduler works in more situations for complex chains of
-// observables, like when merging the output of multiple observables.
-func (o ObservableString) ToSlice(options ...SubscribeOption) (a []string, e error) {
+// This function subscribes to the source observable on the NewGoroutine
+// scheduler. The NewGoroutine scheduler works in more situations for
+// complex chains of observables, like when merging the output of multiple
+// observables.
+func (o ObservableString) ToSlice(options ...SubscribeOption) (slice []string, err error) {
 	scheduler := NewGoroutineScheduler()
-	o.Subscribe(func(next string, err error, done bool) {
+	o.Subscribe(func(next string, e error, done bool) {
 		if !done {
-			a = append(a, next)
+			slice = append(slice, next)
 		} else {
-			e = err
+			err = e
 		}
 	}, SubscribeOn(scheduler, options...)).Wait()
-	return a, e
+	return
 }
 
 //jig:name ObservableIntMapObservableString
@@ -651,24 +511,9 @@ func (o Observable) AsObservableInt() ObservableInt {
 // completed normally.
 type ObservableStringObserveFunc func(next ObservableString, err error, done bool)
 
+//jig:name zeroObservableString
+
 var zeroObservableString ObservableString
-
-// Next is called by an ObservableObservableString to emit the next ObservableString value to the
-// observer.
-func (f ObservableStringObserveFunc) Next(next ObservableString) {
-	f(next, nil, false)
-}
-
-// Error is called by an ObservableObservableString to report an error to the observer.
-func (f ObservableStringObserveFunc) Error(err error) {
-	f(zeroObservableString, err, true)
-}
-
-// Complete is called by an ObservableObservableString to signal that no more data is
-// forthcoming to the observer.
-func (f ObservableStringObserveFunc) Complete() {
-	f(zeroObservableString, nil, true)
-}
 
 //jig:name ObservableObservableString
 
@@ -703,12 +548,12 @@ const (
 	linkCancelOrCompleted
 )
 
-//jig:name StringLink
+//jig:name linkString
 
-type StringLinkObserveFunc func(*StringLink, string, error, bool)
+type linkStringObserveFunc func(*linkString, string, error, bool)
 
-type StringLink struct {
-	observe		StringLinkObserveFunc
+type linkString struct {
+	observe		linkStringObserveFunc
 	state		int32
 	callbackState	int32
 	callbackKind	int
@@ -716,18 +561,18 @@ type StringLink struct {
 	subscriber	Subscriber
 }
 
-func NewInitialStringLink() *StringLink {
-	return &StringLink{state: linkCompleting, subscriber: subscriber.New()}
+func newInitialLinkString() *linkString {
+	return &linkString{state: linkCompleting, subscriber: subscriber.New()}
 }
 
-func NewStringLink(observe StringLinkObserveFunc, subscriber Subscriber) *StringLink {
-	return &StringLink{
+func newLinkString(observe linkStringObserveFunc, subscriber Subscriber) *linkString {
+	return &linkString{
 		observe:	observe,
 		subscriber:	subscriber.AddChild(),
 	}
 }
 
-func (o *StringLink) Observe(next string, err error, done bool) error {
+func (o *linkString) Observe(next string, err error, done bool) error {
 	if !atomic.CompareAndSwapInt32(&o.state, linkIdle, linkBusy) {
 		if atomic.LoadInt32(&o.state) > linkBusy {
 			return RxError("Already Done")
@@ -764,7 +609,7 @@ func (o *StringLink) Observe(next string, err error, done bool) error {
 	return nil
 }
 
-func (o *StringLink) SubscribeTo(observable ObservableString, scheduler Scheduler) error {
+func (o *linkString) SubscribeTo(observable ObservableString, scheduler Scheduler) error {
 	if !atomic.CompareAndSwapInt32(&o.state, linkUnsubscribed, linkSubscribing) {
 		return RxError("Already Subscribed")
 	}
@@ -778,7 +623,7 @@ func (o *StringLink) SubscribeTo(observable ObservableString, scheduler Schedule
 	return nil
 }
 
-func (o *StringLink) Cancel(callback func()) error {
+func (o *linkString) Cancel(callback func()) error {
 	if !atomic.CompareAndSwapInt32(&o.callbackState, callbackNil, settingCallback) {
 		return RxError("Already Waiting")
 	}
@@ -797,7 +642,7 @@ func (o *StringLink) Cancel(callback func()) error {
 	return nil
 }
 
-func (o *StringLink) OnComplete(callback func()) error {
+func (o *linkString) OnComplete(callback func()) error {
 	if !atomic.CompareAndSwapInt32(&o.callbackState, callbackNil, settingCallback) {
 		return RxError("Already Waiting")
 	}
@@ -818,14 +663,14 @@ func (o *StringLink) OnComplete(callback func()) error {
 // that emits the items emitted by the most-recently-emitted of those Observables.
 func (o ObservableObservableString) SwitchAll() ObservableString {
 	observable := func(observe StringObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(link *StringLink, next string, err error, done bool) {
+		observer := func(link *linkString, next string, err error, done bool) {
 			if !done || err != nil {
 				observe(next, err, done)
 			} else {
 				link.subscriber.Unsubscribe()
 			}
 		}
-		currentLink := NewInitialStringLink()
+		currentLink := newInitialLinkString()
 		var switcherMutex sync.Mutex
 		switcherSubscriber := subscriber.AddChild()
 		switcher := func(next ObservableString, err error, done bool) {
@@ -835,7 +680,7 @@ func (o ObservableObservableString) SwitchAll() ObservableString {
 				func() {
 					switcherMutex.Lock()
 					defer switcherMutex.Unlock()
-					currentLink = NewStringLink(observer, subscriber)
+					currentLink = newLinkString(observer, subscriber)
 				}()
 				previousLink.Cancel(func() {
 					switcherMutex.Lock()

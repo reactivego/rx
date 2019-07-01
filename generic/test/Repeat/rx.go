@@ -32,6 +32,8 @@ type Subscription subscriber.Subscription
 // completed normally.
 type IntObserveFunc func(next int, err error, done bool)
 
+//jig:name zeroInt
+
 var zeroInt int
 
 //jig:name ObservableInt
@@ -40,7 +42,7 @@ var zeroInt int
 // function, scheduler and an subscriber.
 type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 
-//jig:name IntObserver
+//jig:name IntObserveFuncMethods
 
 // Next is called by an ObservableInt to emit the next int value to the
 // observer.
@@ -58,6 +60,8 @@ func (f IntObserveFunc) Error(err error) {
 func (f IntObserveFunc) Complete() {
 	f(zeroInt, nil, true)
 }
+
+//jig:name IntObserver
 
 // IntObserver is the interface used with CreateInt when implementing a custom
 // observable.
@@ -281,6 +285,8 @@ func (o ObservableInt) ToSlice(options ...SubscribeOption) (slice []int, err err
 // completed normally.
 type ObserveFunc func(next interface{}, err error, done bool)
 
+//jig:name zero
+
 var zero interface{}
 
 //jig:name Observable
@@ -288,6 +294,33 @@ var zero interface{}
 // Observable is essentially a subscribe function taking an observe
 // function, scheduler and an subscriber.
 type Observable func(ObserveFunc, Scheduler, Subscriber)
+
+//jig:name Empty
+
+// Empty creates an Observable that emits no items but terminates normally.
+func Empty() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		subscribeOn.Schedule(func() {
+			if !subscriber.Canceled() {
+				observe(zero, nil, true)
+			}
+		})
+	}
+	return observable
+}
+
+//jig:name ObservableIntAsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
 
 //jig:name ObservableTakeLast
 
@@ -323,33 +356,6 @@ func (o Observable) TakeLast(n int) Observable {
 // TakeLast emits only the last n items emitted by an ObservableInt.
 func (o ObservableInt) TakeLast(n int) ObservableInt {
 	return o.AsObservable().TakeLast(n).AsObservableInt()
-}
-
-//jig:name ObservableIntAsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name Empty
-
-// Empty creates an Observable that emits no items but terminates normally.
-func Empty() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		subscribeOn.Schedule(func() {
-			if !subscriber.Canceled() {
-				observe(zero, nil, true)
-			}
-		})
-	}
-	return observable
 }
 
 //jig:name RxError

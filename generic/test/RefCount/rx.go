@@ -16,9 +16,7 @@ import (
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
-}
+type Scheduler scheduler.Scheduler
 
 //jig:name Subscriber
 
@@ -38,70 +36,15 @@ type Subscription subscriber.Subscription
 // completed normally.
 type IntObserveFunc func(next int, err error, done bool)
 
+//jig:name zeroInt
+
 var zeroInt int
-
-// Next is called by an ObservableInt to emit the next int value to the
-// observer.
-func (f IntObserveFunc) Next(next int) {
-	f(next, nil, false)
-}
-
-// Error is called by an ObservableInt to report an error to the observer.
-func (f IntObserveFunc) Error(err error) {
-	f(zeroInt, err, true)
-}
-
-// Complete is called by an ObservableInt to signal that no more data is
-// forthcoming to the observer.
-func (f IntObserveFunc) Complete() {
-	f(zeroInt, nil, true)
-}
 
 //jig:name ObservableInt
 
 // ObservableInt is essentially a subscribe function taking an observe
 // function, scheduler and an subscriber.
 type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
-
-//jig:name IntObserver
-
-// IntObserver is the interface used with CreateInt when implementing a custom
-// observable.
-type IntObserver interface {
-	// Next emits the next int value.
-	Next(int)
-	// Error signals an error condition.
-	Error(error)
-	// Complete signals that no more data is to be expected.
-	Complete()
-	// Closed returns true when the subscription has been canceled.
-	Closed() bool
-}
-
-//jig:name CreateInt
-
-// CreateInt creates an Observable from scratch by calling observer methods
-// programmatically.
-func CreateInt(f func(IntObserver)) ObservableInt {
-	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		scheduler.Schedule(func() {
-			if subscriber.Closed() {
-				return
-			}
-			observer := func(next int, err error, done bool) {
-				if !subscriber.Closed() {
-					observe(next, err, done)
-				}
-			}
-			type ObserverSubscriber struct {
-				IntObserveFunc
-				Subscriber
-			}
-			f(&ObserverSubscriber{observer, subscriber})
-		})
-	}
-	return observable
-}
 
 //jig:name FromChanInt
 
@@ -110,15 +53,26 @@ func CreateInt(f func(IntObserver)) ObservableInt {
 // The feeding code can send zero or more int items and then closing the
 // channel will be seen as completion.
 func FromChanInt(ch <-chan int) ObservableInt {
-	return CreateInt(func(observer IntObserver) {
-		for next := range ch {
-			if observer.Closed() {
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		subscribeOn.ScheduleRecursive(func(self func()) {
+			if subscriber.Canceled() {
 				return
 			}
-			observer.Next(next)
-		}
-		observer.Complete()
-	})
+			next, ok := <-ch
+			if subscriber.Canceled() {
+				return
+			}
+			if ok {
+				observe(next, nil, false)
+				if !subscriber.Canceled() {
+					self()
+				}
+			} else {
+				observe(zeroInt, nil, true)
+			}
+		})
+	}
+	return observable
 }
 
 //jig:name Interval
@@ -126,22 +80,34 @@ func FromChanInt(ch <-chan int) ObservableInt {
 // Interval creates an ObservableInt that emits a sequence of integers spaced
 // by a particular time interval.
 func Interval(interval time.Duration) ObservableInt {
-	return CreateInt(func(observer IntObserver) {
-		for i := 0; ; i++ {
-			time.Sleep(interval)
-			if observer.Closed() {
+	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		i := 0
+		scheduler.ScheduleRecursive(func(self func()) {
+			if subscriber.Canceled() {
 				return
 			}
-			observer.Next(i)
-		}
-	})
+			time.Sleep(interval)
+			if subscriber.Canceled() {
+				return
+			}
+			observe(i, nil, false)
+			if subscriber.Canceled() {
+				return
+			}
+			i++
+			self()
+		})
+	}
+	return observable
 }
 
-//jig:name NewScheduler
+//jig:name Schedulers
 
-func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
+func ImmediateScheduler() Scheduler	{ return scheduler.Immediate }
 
 func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
+
+func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
 
 //jig:name SubscribeOption
 
@@ -301,6 +267,25 @@ func (o ObservableInt) Multicast(factory func() SubjectInt) ConnectableInt {
 	return ConnectableInt{ObservableInt: observable, connect: connect}
 }
 
+//jig:name IntObserveFuncMethods
+
+// Next is called by an ObservableInt to emit the next int value to the
+// observer.
+func (f IntObserveFunc) Next(next int) {
+	f(next, nil, false)
+}
+
+// Error is called by an ObservableInt to report an error to the observer.
+func (f IntObserveFunc) Error(err error) {
+	f(zeroInt, err, true)
+}
+
+// Complete is called by an ObservableInt to signal that no more data is
+// forthcoming to the observer.
+func (f IntObserveFunc) Complete() {
+	f(zeroInt, nil, true)
+}
+
 //jig:name SubjectInt
 
 // SubjectInt is a combination of an observer and observable. Subjects are
@@ -319,12 +304,6 @@ func (o ObservableInt) Multicast(factory func() SubjectInt) ConnectableInt {
 // side will be handled according to the specific behavior of the subject.
 // There are different types of subjects, see the different NewXxxSubjectInt
 // functions for more info.
-//
-// Important! a subject is a hot observable. This means that subscribing to
-// it will block the calling goroutine while it is waiting for items and
-// notifications to receive. Unless you have code on a different goroutine
-// already feeding into the subject, your subscribe will deadlock.
-// Alternatively, you could subscribe on a goroutine as shown in the example.
 type SubjectInt struct {
 	ObservableInt
 	IntObserveFunc
@@ -442,7 +421,17 @@ func (o ObservableInt) SubscribeNext(f func(next int), options ...SubscribeOptio
 // completed normally.
 type ObserveFunc func(next interface{}, err error, done bool)
 
+//jig:name zero
+
 var zero interface{}
+
+//jig:name Observable
+
+// Observable is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type Observable func(ObserveFunc, Scheduler, Subscriber)
+
+//jig:name ObserveFuncMethods
 
 // Next is called by an Observable to emit the next interface{} value to the
 // observer.
@@ -460,12 +449,6 @@ func (f ObserveFunc) Error(err error) {
 func (f ObserveFunc) Complete() {
 	f(zero, nil, true)
 }
-
-//jig:name Observable
-
-// Observable is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type Observable func(ObserveFunc, Scheduler, Subscriber)
 
 //jig:name Observer
 

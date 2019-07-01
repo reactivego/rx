@@ -34,6 +34,8 @@ type Subscription subscriber.Subscription
 // completed normally.
 type IntObserveFunc func(next int, err error, done bool)
 
+//jig:name zeroInt
+
 var zeroInt int
 
 //jig:name ObservableInt
@@ -110,6 +112,8 @@ func (o ObservableInt) MapString(project func(int) string) ObservableString {
 // When done is true and the err argument is nil, then the observable has
 // completed normally.
 type StringObserveFunc func(next string, err error, done bool)
+
+//jig:name zeroString
 
 var zeroString string
 

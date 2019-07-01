@@ -35,6 +35,8 @@ type Subscription subscriber.Subscription
 // completed normally.
 type ObservableStringObserveFunc func(next ObservableString, err error, done bool)
 
+//jig:name zeroObservableString
+
 var zeroObservableString ObservableString
 
 //jig:name ObservableObservableString
@@ -43,7 +45,7 @@ var zeroObservableString ObservableString
 // function, scheduler and an subscriber.
 type ObservableObservableString func(ObservableStringObserveFunc, Scheduler, Subscriber)
 
-//jig:name ObservableStringObserver
+//jig:name ObservableStringObserveFuncMethods
 
 // Next is called by an ObservableObservableString to emit the next ObservableString value to the
 // observer.
@@ -61,6 +63,8 @@ func (f ObservableStringObserveFunc) Error(err error) {
 func (f ObservableStringObserveFunc) Complete() {
 	f(zeroObservableString, nil, true)
 }
+
+//jig:name ObservableStringObserver
 
 // ObservableStringObserver is the interface used with CreateObservableString when implementing a custom
 // observable.
@@ -110,6 +114,8 @@ func CreateObservableString(f func(ObservableStringObserver)) ObservableObservab
 // completed normally.
 type StringObserveFunc func(next string, err error, done bool)
 
+//jig:name zeroString
+
 var zeroString string
 
 //jig:name ObservableString
@@ -118,71 +124,27 @@ var zeroString string
 // function, scheduler and an subscriber.
 type ObservableString func(StringObserveFunc, Scheduler, Subscriber)
 
-//jig:name StringObserver
-
-// Next is called by an ObservableString to emit the next string value to the
-// observer.
-func (f StringObserveFunc) Next(next string) {
-	f(next, nil, false)
-}
-
-// Error is called by an ObservableString to report an error to the observer.
-func (f StringObserveFunc) Error(err error) {
-	f(zeroString, err, true)
-}
-
-// Complete is called by an ObservableString to signal that no more data is
-// forthcoming to the observer.
-func (f StringObserveFunc) Complete() {
-	f(zeroString, nil, true)
-}
-
-// StringObserver is the interface used with CreateString when implementing a custom
-// observable.
-type StringObserver interface {
-	// Next emits the next string value.
-	Next(string)
-	// Error signals an error condition.
-	Error(error)
-	// Complete signals that no more data is to be expected.
-	Complete()
-	// Closed returns true when the subscription has been canceled.
-	Closed() bool
-}
-
-//jig:name CreateString
-
-// CreateString creates an Observable from scratch by calling observer methods
-// programmatically.
-func CreateString(f func(StringObserver)) ObservableString {
-	observable := func(observe StringObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		scheduler.Schedule(func() {
-			if subscriber.Closed() {
-				return
-			}
-			observer := func(next string, err error, done bool) {
-				if !subscriber.Closed() {
-					observe(next, err, done)
-				}
-			}
-			type ObserverSubscriber struct {
-				StringObserveFunc
-				Subscriber
-			}
-			f(&ObserverSubscriber{observer, subscriber})
-		})
-	}
-	return observable
-}
-
 //jig:name JustString
 
 // JustString creates an ObservableString that emits a particular item.
 func JustString(element string) ObservableString {
-	return CreateString(func(observer StringObserver) {
-		observer.Next(element)
-		observer.Complete()
-	})
+	observable := func(observe StringObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		done := false
+		subscribeOn.ScheduleRecursive(func(self func()) {
+			if !subscriber.Canceled() {
+				if !done {
+					observe(element, nil, false)
+					if !subscriber.Canceled() {
+						done = true
+						self()
+					}
+				} else {
+					observe(zeroString, nil, true)
+				}
+			}
+		})
+	}
+	return observable
 }
 
 //jig:name ObservableObservableStringMergeAll

@@ -14,9 +14,7 @@ import (
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler interface {
-	Schedule(task func())
-}
+type Scheduler scheduler.Scheduler
 
 //jig:name Subscriber
 
@@ -36,7 +34,17 @@ type Subscription subscriber.Subscription
 // completed normally.
 type IntObserveFunc func(next int, err error, done bool)
 
+//jig:name zeroInt
+
 var zeroInt int
+
+//jig:name ObservableInt
+
+// ObservableInt is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
+
+//jig:name IntObserveFuncMethods
 
 // Next is called by an ObservableInt to emit the next int value to the
 // observer.
@@ -54,12 +62,6 @@ func (f IntObserveFunc) Error(err error) {
 func (f IntObserveFunc) Complete() {
 	f(zeroInt, nil, true)
 }
-
-//jig:name ObservableInt
-
-// ObservableInt is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 
 //jig:name IntObserver
 
@@ -101,11 +103,13 @@ func CreateInt(f func(IntObserver)) ObservableInt {
 	return observable
 }
 
-//jig:name NewScheduler
+//jig:name Schedulers
 
-func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
+func ImmediateScheduler() Scheduler	{ return scheduler.Immediate }
 
 func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
+
+func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
 
 //jig:name SubscribeOption
 
@@ -212,19 +216,19 @@ func (o ObservableInt) SubscribeNext(f func(next int), options ...SubscribeOptio
 // well-behaved.
 func (o ObservableInt) Serialize() ObservableInt {
 	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		var (
-			mutex		sync.Mutex
-			alreadyDone	bool
-		)
-		observer := func(next int, err error, done bool) {
-			mutex.Lock()
-			defer mutex.Unlock()
-			if !alreadyDone {
-				alreadyDone = done
+		var observer struct {
+			sync.Mutex
+			done	bool
+		}
+		serializer := func(next int, err error, done bool) {
+			observer.Lock()
+			defer observer.Unlock()
+			if !observer.done {
+				observer.done = done
 				observe(next, err, done)
 			}
 		}
-		o(observer, subscribeOn, subscriber)
+		o(serializer, subscribeOn, subscriber)
 	}
 	return observable
 }
