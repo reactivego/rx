@@ -5,22 +5,32 @@ import (
 	"time"
 )
 
-// This example showcases the Interval operator.
+// This example showcases the Interval operator. After 100ms the example
+// cancels the observable subscription by calling the Unsubscribe method on the
+// returned subscription.
 func Example_newGoroutineScheduler() {
-	// Interval 30ms, internally uses time.Sleep() may take 2ms longer.
-	period := time.Millisecond * 28
+	const _10ms = 10 * time.Millisecond
+	const _28ms = 28 * time.Millisecond
 
+	// NewGoroutine asynchronously runs each subscribe on a separate goroutine.
+	scheduler := NewGoroutineScheduler()
+
+	// Print time since start of the subcribe.
 	start := time.Now()
 	printSinceStart := func(int) {
-		fmt.Println(time.Since(start).Round(10 * time.Millisecond))
+		elapsed := time.Since(start)
+		fmt.Println(elapsed.Round(_10ms))
 	}
 
-	// Subscribe asynchronously and print ms since start
-	sub := Interval(period).SubscribeOn(NewGoroutineScheduler()).SubscribeNext(printSinceStart)
+	// Interval 30ms usually takes up to 4ms longer, so we'er using 28ms.
+	// Subscribe (asynchronous through NewGoroutine) and print ms since start.
+	subscription := Interval(_28ms).SubscribeOn(scheduler).SubscribeNext(printSinceStart)
 
+	// Sleep for 100ms
 	time.Sleep(100 * time.Millisecond)
 
-	sub.Unsubscribe()
+	// Cancel the subscription, Interval doesn't stop by itself.
+	subscription.Unsubscribe()
 
 	// Output:
 	// 30ms
@@ -28,26 +38,31 @@ func Example_newGoroutineScheduler() {
 	// 90ms
 }
 
+// Interval operator used together with the default CurrentGoroutine scheduler.
+// 
 func Example_currentGoroutineScheduler() {
-	period := time.Millisecond * 10
-	start := time.Now()
-	elapsed := func(n int) string {
-		// True if elapsed time was >= 10ms
-		now := time.Now()
-		duration := now.Sub(start)
-		withinBounds := duration >= period && duration <= period+time.Millisecond*5
-		s := fmt.Sprint(n, " 10ms >= duration <= 15ms ? ", withinBounds)
-		start = now
-		return s
-	}
-	Interval(period).Take(5).MapString(elapsed).Println()
+	const _10ms = 10 * time.Millisecond
+	const _15ms = 15 * time.Millisecond
 
-	time.Sleep(100 * time.Millisecond)
+	start := time.Now()
+	calculateElapsed := func(n int) string {
+		// calculate elapsed time
+		now := time.Now()
+		elapsed := now.Sub(start)
+		start = now
+
+		// withinBounds true when elapsed time is between 10ms and 15ms
+		withinBounds := (elapsed >= _10ms && elapsed <= _15ms)
+
+		return fmt.Sprint(n, ": 10ms >= duration <= 15ms ? ", withinBounds)
+	}
+
+	Interval(_10ms).Take(5).MapString(calculateElapsed).Println()
 
 	// Output:
-	// 0 10ms >= duration <= 15ms ? true
-	// 1 10ms >= duration <= 15ms ? true
-	// 2 10ms >= duration <= 15ms ? true
-	// 3 10ms >= duration <= 15ms ? true
-	// 4 10ms >= duration <= 15ms ? true
+	// 0: 10ms >= duration <= 15ms ? true
+	// 1: 10ms >= duration <= 15ms ? true
+	// 2: 10ms >= duration <= 15ms ? true
+	// 3: 10ms >= duration <= 15ms ? true
+	// 4: 10ms >= duration <= 15ms ? true
 }

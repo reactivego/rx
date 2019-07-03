@@ -202,11 +202,7 @@ func FromSliceFoo(slice []foo) ObservableFoo {
 func Interval(interval time.Duration) ObservableInt {
 	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
-		scheduler.ScheduleRecursive(func(self func()) {
-			if subscriber.Canceled() {
-				return
-			}
-			time.Sleep(interval)
+		scheduler.ScheduleFutureRecursive(interval, func(self func(time.Duration)) {
 			if subscriber.Canceled() {
 				return
 			}
@@ -215,7 +211,7 @@ func Interval(interval time.Duration) ObservableInt {
 				return
 			}
 			i++
-			self()
+			self(interval)
 		})
 	}
 	return observable

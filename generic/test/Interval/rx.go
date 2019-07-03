@@ -52,11 +52,7 @@ type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 func Interval(interval time.Duration) ObservableInt {
 	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
-		scheduler.ScheduleRecursive(func(self func()) {
-			if subscriber.Canceled() {
-				return
-			}
-			time.Sleep(interval)
+		scheduler.ScheduleFutureRecursive(interval, func(self func(time.Duration)) {
 			if subscriber.Canceled() {
 				return
 			}
@@ -65,8 +61,99 @@ func Interval(interval time.Duration) ObservableInt {
 				return
 			}
 			i++
-			self()
+			self(interval)
 		})
+	}
+	return observable
+}
+
+//jig:name ObservableTake
+
+// Take emits only the first n items emitted by an Observable.
+func (o Observable) Take(n int) Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		taken := 0
+		observer := func(next interface{}, err error, done bool) {
+			if taken < n {
+				observe(next, err, done)
+				if !done {
+					taken++
+					if taken >= n {
+						observe(nil, nil, true)
+					}
+				}
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableIntTake
+
+// Take emits only the first n items emitted by an ObservableInt.
+func (o ObservableInt) Take(n int) ObservableInt {
+	return o.AsObservable().Take(n).AsObservableInt()
+}
+
+//jig:name ObservableIntSubscribeOn
+
+// SubscribeOn specifies the scheduler an ObservableInt should use when it is
+// subscribed to.
+func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
+	observable := func(observe IntObserveFunc, _ Scheduler, subscriber Subscriber) {
+		o(observe, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObserveFunc
+
+// ObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type ObserveFunc func(next interface{}, err error, done bool)
+
+//jig:name zero
+
+var zero interface{}
+
+//jig:name Observable
+
+// Observable is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type Observable func(ObserveFunc, Scheduler, Subscriber)
+
+//jig:name ObservableIntAsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableIntMapString
+
+// MapString transforms the items emitted by an ObservableInt by applying a
+// function to each item.
+func (o ObservableInt) MapString(project func(int) string) ObservableString {
+	observable := func(observe StringObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			var mapped string
+			if !done {
+				mapped = project(next)
+			}
+			observe(mapped, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
 	}
 	return observable
 }
@@ -178,67 +265,25 @@ func (o ObservableInt) SubscribeNext(f func(next int), options ...SubscribeOptio
 	}, options...)
 }
 
-//jig:name ObservableTake
+//jig:name StringObserveFunc
 
-// Take emits only the first n items emitted by an Observable.
-func (o Observable) Take(n int) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		taken := 0
-		observer := func(next interface{}, err error, done bool) {
-			if taken < n {
-				observe(next, err, done)
-				if !done {
-					taken++
-					if taken >= n {
-						observe(nil, nil, true)
-					}
-				}
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableIntTake
-
-// Take emits only the first n items emitted by an ObservableInt.
-func (o ObservableInt) Take(n int) ObservableInt {
-	return o.AsObservable().Take(n).AsObservableInt()
-}
-
-//jig:name ObserveFunc
-
-// ObserveFunc is the observer, a function that gets called whenever the
+// StringObserveFunc is the observer, a function that gets called whenever the
 // observable has something to report. The next argument is the item value that
 // is only valid when the done argument is false. When done is true and the err
 // argument is not nil, then the observable has terminated with an error.
 // When done is true and the err argument is nil, then the observable has
 // completed normally.
-type ObserveFunc func(next interface{}, err error, done bool)
+type StringObserveFunc func(next string, err error, done bool)
 
-//jig:name zero
+//jig:name zeroString
 
-var zero interface{}
+var zeroString string
 
-//jig:name Observable
+//jig:name ObservableString
 
-// Observable is essentially a subscribe function taking an observe
+// ObservableString is essentially a subscribe function taking an observe
 // function, scheduler and an subscriber.
-type Observable func(ObserveFunc, Scheduler, Subscriber)
-
-//jig:name ObservableIntAsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
+type ObservableString func(StringObserveFunc, Scheduler, Subscriber)
 
 //jig:name RxError
 
@@ -273,55 +318,6 @@ func (o Observable) AsObservableInt() ObservableInt {
 	}
 	return observable
 }
-
-//jig:name ObservableIntMapString
-
-// MapString transforms the items emitted by an ObservableInt by applying a
-// function to each item.
-func (o ObservableInt) MapString(project func(int) string) ObservableString {
-	observable := func(observe StringObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			var mapped string
-			if !done {
-				mapped = project(next)
-			}
-			observe(mapped, err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableIntSubscribeOn
-
-// SubscribeOn specifies the scheduler an ObservableInt should use when it is
-// subscribed to.
-func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
-	observable := func(observe IntObserveFunc, _ Scheduler, subscriber Subscriber) {
-		o(observe, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name StringObserveFunc
-
-// StringObserveFunc is the observer, a function that gets called whenever the
-// observable has something to report. The next argument is the item value that
-// is only valid when the done argument is false. When done is true and the err
-// argument is not nil, then the observable has terminated with an error.
-// When done is true and the err argument is nil, then the observable has
-// completed normally.
-type StringObserveFunc func(next string, err error, done bool)
-
-//jig:name zeroString
-
-var zeroString string
-
-//jig:name ObservableString
-
-// ObservableString is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableString func(StringObserveFunc, Scheduler, Subscriber)
 
 //jig:name ObservableStringPrintln
 
