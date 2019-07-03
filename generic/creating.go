@@ -100,7 +100,7 @@ func FromChanFoo(ch <-chan foo) ObservableFoo {
 			if subscriber.Canceled() {
 				return
 			}
-			next, ok := <-ch;
+			next, ok := <-ch
 			if subscriber.Canceled() {
 				return
 			}
@@ -109,7 +109,7 @@ func FromChanFoo(ch <-chan foo) ObservableFoo {
 				if !subscriber.Canceled() {
 					self()
 				}
-			} else {			
+			} else {
 				observe(zeroFoo, nil, true)
 			}
 		})
