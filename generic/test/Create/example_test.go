@@ -4,6 +4,8 @@ import (
 	"fmt"
 )
 
+//jig:no-doc
+
 // Shows how to use CreateString to create an observable of strings
 func Example_createString() {
 	source := CreateString(func(observer StringObserver) {
@@ -12,8 +14,14 @@ func Example_createString() {
 		observer.Complete()
 	})
 
-	source.SubscribeNext(func(value string) { fmt.Print(value) })
+	err := source.Println()
+
+	if err == nil {
+		fmt.Println("success")
+	}
 
 	// Output:
-	// HelloWorld!
+	// Hello
+	// World!
+	// success
 }
