@@ -167,7 +167,7 @@ func (o ObservableFoo) SubscribeNext(f func(next foo), options ...SubscribeOptio
 // values.
 //
 // Because the channel is fed by subscribing to the observable, ToChan would
-// block when subscribed on the standard Trampoline scheduler which is
+// block when subscribed on the standard CurrentGoroutine scheduler which is
 // initially synchronous. That's why the subscribing is done on the
 // NewGoroutine scheduler.
 //
@@ -203,7 +203,7 @@ func (o Observable) ToChan(options ...SubscribeOption) <-chan interface{} {
 // There is no way to determine whether the observable feeding into the
 // channel terminated with an error or completed normally.
 // Because the channel is fed by subscribing to the observable, ToChan would
-// block when subscribed on the standard Trampoline scheduler which is
+// block when subscribed on the standard CurrentGoroutine scheduler which is
 // initially synchronous. That's why the subscribing is done on the
 // NewGoroutine scheduler. It is not possible to cancel the subscription
 // created internally by ToChan.
