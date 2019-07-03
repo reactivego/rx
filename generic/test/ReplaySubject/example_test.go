@@ -19,14 +19,14 @@ func Example_replaySubject() {
 		subject.Next(888)
 	}()
 
-	// Subscribe to the subject on the default Trampoline scheduler.
+	// Subscribe to subject on the default CurrentGoroutine scheduler.
 	subject.SubscribeNext(func(next int) {
 		fmt.Println("first", next)
 	})
 
 	fmt.Println("--")
 
-	// Subscribe to the subject again on the default Trampoline scheduler.
+	// Subscribe to subject again on the default CurrentGoroutine scheduler.
 	subject.SubscribeNext(func(next int) {
 		fmt.Println("second", next)
 	})
@@ -40,7 +40,7 @@ func Example_replaySubject() {
 }
 
 // ReplaySubject example with multiple subscribers. Subscribe normally uses a
-// synchronous Trampoline scheduler. To be able to subscribe multiple times
+// synchronous CurrentGoroutine scheduler. To be able to subscribe multiple times
 // without blocking, we have to change the scheduler to an asynchronous one
 // using the SubscribeOn operator.
 func Example_replaySubjectMultiple() {

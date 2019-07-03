@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRetryTrampoline(t *testing.T) {
+func TestRetryCurrentGoroutine(t *testing.T) {
 	errored := false
 	a := CreateInt(func(observer IntObserver) {
 		observer.Next(1)
@@ -26,7 +26,7 @@ func TestRetryTrampoline(t *testing.T) {
 	assert.True(t, errored)
 }
 
-func TestRetryGoroutine(t *testing.T) {
+func TestRetryNewGoroutine(t *testing.T) {
 	errored := false
 	a := CreateInt(func(observer IntObserver) {
 		observer.Next(1)
