@@ -144,32 +144,54 @@ const ErrTimeout = RxError("timeout")
 // delivering the next values.
 func (o Observable) Timeout(timeout time.Duration) Observable {
 	observable := Observable(func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		deadline := time.NewTimer(timeout)
-		unsubscribe := make(chan struct{})
-		observer := func(next interface{}, err error, done bool) {
-			if deadline.Stop() {
-				if subscriber.Closed() {
+		operator := func() {
+			if subscriber.Canceled() {
+				return
+			}
+			var last struct {
+				sync.Mutex
+				at time.Time
+				done bool
+			}
+			last.at = subscribeOn.Now()
+			timer := func(self func(time.Duration)){
+				last.Lock()
+				defer last.Unlock()
+				if last.done || subscriber.Canceled() {
 					return
 				}
+				deadline := last.at.Add(timeout)
+				now := subscribeOn.Now()
+				if now.Before(deadline) {
+					self(deadline.Sub(now))
+					return
+				}
+				last.done = true
+				observe(zero, ErrTimeout, true)
+			}
+			subscribeOn.ScheduleFutureRecursive(timeout, timer)
+			observer := func(next interface{}, err error, done bool) {
+				last.Lock()
+				defer last.Unlock()
+				if last.done || subscriber.Canceled() {
+					return
+				}
+				now := subscribeOn.Now()
+				deadline := last.at.Add(timeout) 
+				if !now.Before(deadline) {
+					return
+				}
+				last.done = done
+				last.at = now
 				observe(next, err, done)
-				if done {
-					return
-				}
-				deadline.Reset(timeout)
 			}
+			o(observer, subscribeOn, subscriber)
 		}
-		timeouter := func() {
-			select {
-			case <-deadline.C:
-				if subscriber.Closed() {
-					return
-				}
-				observe(nil, ErrTimeout, true)
-			case <-unsubscribe:
-			}
+		if subscribeOn.IsAsynchronous() {
+			operator()
+		} else {
+			subscribeOn.Schedule(operator)
 		}
-		go timeouter()
-		o(observer, subscribeOn, subscriber.Add(func() { close(unsubscribe) }))
 	})
 	return observable.Serialize()
 }
