@@ -1,29 +1,34 @@
 package Debounce
 
 import (
-	"fmt"
 	"time"
 )
 
 func Example_debounce() {
 
-	source := CreateInt(func(observer IntObserver) {
-		observer.Next(1)
-		time.Sleep(300 * time.Millisecond)
-
-		observer.Next(2)
-		time.Sleep(80 * time.Millisecond) // 80ms < 100ms => '2' is ignored
-
-		observer.Next(3)
-		time.Sleep(110 * time.Millisecond)
-
-		observer.Next(4)
-		observer.Complete()
-	})
+	i := 1
+	due := []time.Duration{
+		0,
+		300 * time.Millisecond,
+		80 * time.Millisecond, // 80ms < 100ms => '2' is ignored
+		110 * time.Millisecond,
+		0,
+	}
+	source := MakeTimedInt(due[0],
+		func(Next func(int), Error func(error), Complete func()) time.Duration {
+			if i < len(due) {
+				Next(i)
+				i++
+				return due[i-1]
+			} else {
+				Complete()
+				return 0
+			}
+		})
 
 	debounced := source.Debounce(100 * time.Millisecond)
 
-	debounced.SubscribeNext(func(next int) { fmt.Println(next) })
+	debounced.Println()
 
 	// Output:
 	// 1
