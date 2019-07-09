@@ -1,6 +1,7 @@
 package Debounce
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -28,7 +29,9 @@ func Example_debounce() {
 
 	debounced := source.Debounce(100 * time.Millisecond)
 
-	debounced.Println()
+	if err := debounced.Println(); err != nil {
+		fmt.Println(err)
+	}
 
 	// Output:
 	// 1
