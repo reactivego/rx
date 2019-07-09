@@ -2,6 +2,102 @@ package rx
 
 import "time"
 
+//jig:template Make<Foo>Func
+
+// MakeFooFunc is the signature of a function that can be passed to MakeFoo
+// to implement an ObservableFoo.
+type MakeFooFunc func(Next func(foo), Error func(error), Complete func())
+
+//jig:template Make<Foo>
+//jig:needs Observable<Foo>, Make<Foo>Func
+
+// MakeFoo provides a way of creating an ObservableFoo from scratch by
+// calling observer methods programmatically. A make function conforming to the
+// MakeFooFunc signature will be called by MakeFoo provining a Next, Error and
+// Complete function that can be called by the code that implements the
+// Observable.
+func MakeFoo(make MakeFooFunc) ObservableFoo {
+	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		done := false
+		scheduler.ScheduleRecursive(func(self func()) {
+			if subscriber.Canceled() {
+				return
+			}
+			next := func(n foo) {
+				if !subscriber.Canceled() {
+					observe(n, nil, false)
+				}
+			}
+			err := func(e error) {
+				done = true
+				if !subscriber.Canceled() {
+					observe(zeroFoo, e, true)
+				}
+			}
+			complete := func() {
+				done = true
+				if !subscriber.Canceled() {
+					observe(zeroFoo, nil, true)
+				}
+			}
+			make(next, err, complete)
+			if !done && !subscriber.Canceled() {
+				self()
+			}
+		})
+	}
+	return observable
+}
+
+//jig:template MakeTimed<Foo>Func
+
+// MakeTimedFooFunc is the signature of a function that can be passed to
+// MakeTimedFoo to implement an ObservableFoo.
+type MakeTimedFooFunc func(Next func(foo), Error func(error), Complete func()) time.Duration
+
+//jig:template MakeTimed<Foo>
+//jig:needs Observable<Foo>, MakeTimed<Foo>Func
+
+// MakeTimedFoo provides a way of creating an ObservableFoo from scratch by
+// calling observer methods programmatically. A make function conforming to the
+// MakeFooFunc signature will be called by MakeFoo provining a Next, Error and
+// Complete function that can be called by the code that implements the
+// Observable. The timeout passed in determines the time between calling the
+// make function. The time.Duration returned by MakeTimedFooFunc determines when
+// to reschedule the next iteration.
+func MakeTimedFoo(timeout time.Duration, make MakeTimedFooFunc) ObservableFoo {
+	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		done := false
+		scheduler.ScheduleFutureRecursive(timeout, func(self func(time.Duration)) {
+			if subscriber.Canceled() {
+				return
+			}
+			next := func(n foo) {
+				if !subscriber.Canceled() {
+					observe(n, nil, false)
+				}
+			}
+			error := func(e error) {
+				done = true
+				if !subscriber.Canceled() {
+					observe(zeroFoo, e, true)
+				}
+			}
+			complete := func() {
+				done = true
+				if !subscriber.Canceled() {
+					observe(zeroFoo, nil, true)
+				}
+			}
+			timeout = make(next, error, complete)
+			if !done && !subscriber.Canceled() {
+				self(timeout)
+			}
+		})
+	}
+	return observable
+}
+
 //jig:template <Foo>Observer
 //jig:needs <Foo>ObserveFuncMethods
 
