@@ -46,7 +46,10 @@ func (o Observable) Debounce(duration time.Duration) Observable {
 				donech <- err
 			}
 		}
-		o(observer, subscribeOn, subscriber.Add(func() { close(donech) }))
+		subscriber.OnUnsubscribe(func() {
+			close(donech)
+		})
+		o(observer, subscribeOn, subscriber)
 	}
 	return observable
 }
@@ -277,7 +280,10 @@ func (o Observable) Sample(window time.Duration) Observable {
 				observe(nil, err, true)
 			}
 		}
-		o(observer, subscribeOn, subscriber.Add(func() { close(unsubscribe) }))
+		subscriber.OnUnsubscribe(func() {
+			close(unsubscribe)
+		})
+		o(observer, subscribeOn, subscriber)
 	}
 	return observable
 }
