@@ -49,9 +49,9 @@ type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 
 // FromSliceInt creates an ObservableInt from a slice of int values passed in.
 func FromSliceInt(slice []int) ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
-		subscribeOn.ScheduleRecursive(func(self func()) {
+		scheduler.ScheduleRecursive(func(self func()) {
 			if !subscriber.Canceled() {
 				if i < len(slice) {
 					observe(slice[i], nil, false)
@@ -99,9 +99,9 @@ type ObservableObservableInt func(ObservableIntObserveFunc, Scheduler, Subscribe
 
 // FromSliceObservableInt creates an ObservableObservableInt from a slice of ObservableInt values passed in.
 func FromSliceObservableInt(slice []ObservableInt) ObservableObservableInt {
-	observable := func(observe ObservableIntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe ObservableIntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
-		subscribeOn.ScheduleRecursive(func(self func()) {
+		scheduler.ScheduleRecursive(func(self func()) {
 			if !subscriber.Canceled() {
 				if i < len(slice) {
 					observe(slice[i], nil, false)
@@ -131,6 +131,11 @@ type IntSlice []int
 
 //jig:name ObservableObservableIntCombineAll
 
+// CombineAll will collect ObservableInt items and then wait for all of them
+// to emit an item. This combination of items will then be emitted as a single
+// slice. Subsequent emits by one of the subscribed ObservableInt items will
+// again emit a slice with the newly emitted value combined with the other
+// previously emitted values.
 func (o ObservableObservableInt) CombineAll() ObservableIntSlice {
 	observable := func(observe IntSliceObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		observables := []ObservableInt(nil)

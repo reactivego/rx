@@ -12,6 +12,11 @@ type FooSlice []foo
 //jig:template ObservableObservable<Foo> CombineAll
 //jig:needs <Foo>Slice, zero<Foo>
 
+// CombineAll will collect ObservableFoo items and then wait for all of them
+// to emit an item. This combination of items will then be emitted as a single
+// slice. Subsequent emits by one of the subscribed ObservableFoo items will
+// again emit a slice with the newly emitted value combined with the other
+// previously emitted values.
 func (o ObservableObservableFoo) CombineAll() ObservableFooSlice {
 	observable := func(observe FooSliceObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		observables := []ObservableFoo(nil)
