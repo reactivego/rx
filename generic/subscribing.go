@@ -63,9 +63,9 @@ func (o ObservableFoo) Wait() (err error) {
 type SubscribeOption func(options *subscribeOptions)
 
 type subscribeOptions struct {
-	scheduler Scheduler
-	subscriber Subscriber
-	onSubscribe func(subscription Subscription)
+	scheduler     Scheduler
+	subscriber    Subscriber
+	onSubscribe   func(subscription Subscription)
 	onUnsubscribe func()
 }
 

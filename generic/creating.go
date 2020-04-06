@@ -146,8 +146,8 @@ func CreateFoo(f func(FooObserver)) ObservableFoo {
 // DeferFoo does not create the ObservableFoo until the observer subscribes,
 // and creates a fresh ObservableFoo for each observer.
 func DeferFoo(factory func() ObservableFoo) ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		factory()(observe, subscribeOn, subscriber)
+	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		factory()(observe, scheduler, subscriber)
 	}
 	return observable
 }
@@ -157,8 +157,8 @@ func DeferFoo(factory func() ObservableFoo) ObservableFoo {
 
 // EmptyFoo creates an Observable that emits no items but terminates normally.
 func EmptyFoo() ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		subscribeOn.Schedule(func() {
+	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		scheduler.Schedule(func() {
 			if !subscriber.Canceled() {
 				observe(zeroFoo, nil, true)
 			}
@@ -173,8 +173,8 @@ func EmptyFoo() ObservableFoo {
 // ErrorFoo creates an Observable that emits no items and terminates with an
 // error.
 func ErrorFoo(err error) ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		subscribeOn.Schedule(func() {
+	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		scheduler.Schedule(func() {
 			if !subscriber.Canceled() {
 				observe(zeroFoo, err, true)
 			}
@@ -191,8 +191,8 @@ func ErrorFoo(err error) ObservableFoo {
 // The feeding code can send zero or more foo items and then closing the
 // channel will be seen as completion.
 func FromChanFoo(ch <-chan foo) ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		subscribeOn.ScheduleRecursive(func(self func()) {
+	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Canceled() {
 				return
 			}
@@ -223,8 +223,8 @@ func FromChanFoo(ch <-chan foo) ObservableFoo {
 // an error into the channel, it should close the channel immediately to
 // indicate termination with error.
 func FromChan(ch <-chan interface{}) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		subscribeOn.ScheduleRecursive(func(self func()) {
+	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Canceled() {
 				return
 			}
@@ -271,9 +271,9 @@ func FromFoos(slice ...foo) ObservableFoo {
 
 // FromSliceFoo creates an ObservableFoo from a slice of foo values passed in.
 func FromSliceFoo(slice []foo) ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
-		subscribeOn.ScheduleRecursive(func(self func()) {
+		scheduler.ScheduleRecursive(func(self func()) {
 			if !subscriber.Canceled() {
 				if i < len(slice) {
 					observe(slice[i], nil, false)
@@ -318,9 +318,9 @@ func Interval(interval time.Duration) ObservableInt {
 
 // JustFoo creates an ObservableFoo that emits a particular item.
 func JustFoo(element foo) ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		done := false
-		subscribeOn.ScheduleRecursive(func(self func()) {
+		scheduler.ScheduleRecursive(func(self func()) {
 			if !subscriber.Canceled() {
 				if !done {
 					observe(element, nil, false)
@@ -379,7 +379,7 @@ func (o Observable) Repeat(count int) Observable {
 	if count == 0 {
 		return Empty()
 	}
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		var repeated int
 		var observer ObserveFunc
 		observer = func(next interface{}, err error, done bool) {
@@ -388,13 +388,13 @@ func (o Observable) Repeat(count int) Observable {
 			} else {
 				repeated++
 				if repeated < count {
-					o(observer, subscribeOn, subscriber)
+					o(observer, scheduler, subscriber)
 				} else {
 					observe(nil, nil, true)
 				}
 			}
 		}
-		o(observer, subscribeOn, subscriber)
+		o(observer, scheduler, subscriber)
 	}
 	return observable
 }
@@ -413,9 +413,9 @@ func (o ObservableFoo) Repeat(count int) ObservableFoo {
 // RepeatFoo creates an ObservableFoo that emits a particular item or sequence
 // of items repeatedly.
 func RepeatFoo(value foo, count int) ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
-		subscribeOn.ScheduleRecursive(func(self func()) {
+		scheduler.ScheduleRecursive(func(self func()) {
 			if !subscriber.Canceled() {
 				if i < count {
 					observe(value, nil, false)
@@ -440,9 +440,9 @@ func RepeatFoo(value foo, count int) ObservableFoo {
 // If the error is non-nil the returned ObservableFoo will be that error,
 // otherwise it will be a single-value stream of foo.
 func StartFoo(f func() (foo, error)) ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		done := false
-		subscribeOn.ScheduleRecursive(func(self func()) {
+		scheduler.ScheduleRecursive(func(self func()) {
 			if !subscriber.Canceled() {
 				if !done {
 					if next, err := f(); err == nil {
@@ -469,8 +469,8 @@ func StartFoo(f func() (foo, error)) ObservableFoo {
 // ThrowFoo creates an Observable that emits no items and terminates with an
 // error.
 func ThrowFoo(err error) ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		subscribeOn.Schedule(func() {
+	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		scheduler.Schedule(func() {
 			if !subscriber.Canceled() {
 				observe(zeroFoo, err, true)
 			}
