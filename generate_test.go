@@ -1,11 +1,15 @@
 package rx
 
 import (
+	"testing"
 	"time"
 )
 
-// This example guides code generation by explicitly using the generics we want expanded into this package.
-func Example_generate() {
+func TestGenerate(t *testing.T) {
+	// This test sole purpose is to guide code generation by explicitly using
+	// the generics we want expanded into this package.
+	return 
+
 	/*
 		Observable Types
 	*/
