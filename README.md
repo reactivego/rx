@@ -26,5 +26,7 @@ From(1,"hi",2.3).Println()
 The call above creates an observable from numbers and strings and then prints
 them.
 
+For an overview of all implemented operators, see [Operators](generic/README.md#operators)
+
 ## License
 This library is licensed under the terms of the MIT License. See [LICENSE](LICENSE) file in this repository for copyright notice and exact wording.
