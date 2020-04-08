@@ -32,7 +32,7 @@ Take a look at the Quick Start guide to see a more elaborate version of the
 example above. https://github.com/ReactiveGo/jig/blob/master/QUICKSTART.md.
 
 For an overview of all implemented operators, see
-https://github.com/reactivego/rx
+https://github.com/reactivego/rx/tree/master/generic#operators
 */
 package rx
 

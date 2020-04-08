@@ -49,7 +49,7 @@ Methods on observables to trigger side effects.
 	Finally
 
 For an overview of all implemented operators, see
-https://github.com/reactivego/rx
+https://github.com/reactivego/rx/tree/master/generic#operators
 
 Regenerating this Package
 
