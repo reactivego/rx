@@ -9,7 +9,7 @@ import (
 )
 
 func TestPublishRefCount(t *testing.T) {
-	scheduler := NewGoroutineScheduler()
+	scheduler := GoroutineScheduler()
 	ch := make(chan int, 30)
 	s := FromChanInt(ch).Publish().RefCount().SubscribeOn(scheduler)
 	a := []int{}

@@ -131,11 +131,8 @@ type IntSlice []int
 
 //jig:name ObservableObservableIntCombineAll
 
-// CombineAll will collect ObservableInt items and then wait for all of them
-// to emit an item. This combination of items will then be emitted as a single
-// slice. Subsequent emits by one of the subscribed ObservableInt items will
-// again emit a slice with the newly emitted value combined with the other
-// previously emitted values.
+// CombineAll flattens an ObservableObservableInt by applying combineLatest
+// when the ObservableObservableInt completes.
 func (o ObservableObservableInt) CombineAll() ObservableIntSlice {
 	observable := func(observe IntSliceObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		observables := []ObservableInt(nil)
@@ -259,11 +256,9 @@ type ObservableVector func(VectorObserveFunc, Scheduler, Subscriber)
 
 //jig:name Schedulers
 
-func ImmediateScheduler() Scheduler	{ return scheduler.Immediate }
+func TrampolineScheduler() Scheduler	{ return scheduler.Trampoline }
 
-func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
-
-func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
+func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
 
 //jig:name ObservableVectorPrintln
 
@@ -272,7 +267,7 @@ func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
 // when the Observable completed normally.
 func (o ObservableVector) Println() (err error) {
 	subscriber := subscriber.New()
-	scheduler := CurrentGoroutineScheduler()
+	scheduler := TrampolineScheduler()
 	observer := func(next Vector, e error, done bool) {
 		if !done {
 			fmt.Println(next)

@@ -199,11 +199,9 @@ func Range(start, count int) ObservableInt {
 
 //jig:name Schedulers
 
-func ImmediateScheduler() Scheduler	{ return scheduler.Immediate }
+func TrampolineScheduler() Scheduler	{ return scheduler.Trampoline }
 
-func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
-
-func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
+func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
 
 //jig:name SubscribeOption
 
@@ -260,7 +258,7 @@ func OnUnsubscribe(callback func()) SubscribeOption {
 // return newly created scheduler and subscriber. Before returning the callback
 // passed in through OnSubscribe() will already have been called.
 func newSchedulerAndSubscriber(setters []SubscribeOption) (Scheduler, Subscriber) {
-	options := &subscribeOptions{scheduler: CurrentGoroutineScheduler()}
+	options := &subscribeOptions{scheduler: TrampolineScheduler()}
 	for _, setter := range setters {
 		setter(options)
 	}
@@ -302,7 +300,7 @@ func (o Observable) Subscribe(observe ObserveFunc, options ...SubscribeOption) S
 // Because the channel is fed by subscribing to the observable, ToChan would
 // block when subscribed on the standard Trampoline scheduler which is
 // initially synchronous. That's why the subscribing is done on the
-// NewGoroutine scheduler.
+// Goroutine scheduler.
 //
 // To cancel the subscription created internally by ToChan you will need access
 // to the subscription used internally by ToChan. To get at this subscription,
@@ -310,7 +308,7 @@ func (o Observable) Subscribe(observe ObserveFunc, options ...SubscribeOption) S
 // parameter to ToChan. On suscription the callback will be called with the
 // subscription that was created.
 func (o Observable) ToChan(options ...SubscribeOption) <-chan interface{} {
-	scheduler := NewGoroutineScheduler()
+	scheduler := GoroutineScheduler()
 	nextch := make(chan interface{}, 1)
 	o.Subscribe(func(next interface{}, err error, done bool) {
 		if !done {
@@ -354,10 +352,10 @@ func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOpt
 // Because the channel is fed by subscribing to the observable, ToChan would
 // block when subscribed on the standard Trampoline scheduler which is
 // initially synchronous. That's why the subscribing is done on the
-// NewGoroutine scheduler. It is not possible to cancel the subscription
+// Goroutine scheduler. It is not possible to cancel the subscription
 // created internally by ToChan.
 func (o ObservableInt) ToChan(options ...SubscribeOption) <-chan int {
-	scheduler := NewGoroutineScheduler()
+	scheduler := GoroutineScheduler()
 	nextch := make(chan int, 1)
 	o.Subscribe(func(next int, err error, done bool) {
 		if !done {

@@ -273,11 +273,9 @@ func (o ObservableObservableInt) ConcatAll() ObservableInt {
 
 //jig:name Schedulers
 
-func ImmediateScheduler() Scheduler	{ return scheduler.Immediate }
+func TrampolineScheduler() Scheduler	{ return scheduler.Trampoline }
 
-func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
-
-func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
+func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
 
 //jig:name ObservableIntPrintln
 
@@ -286,7 +284,7 @@ func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
 // when the Observable completed normally.
 func (o ObservableInt) Println() (err error) {
 	subscriber := subscriber.New()
-	scheduler := CurrentGoroutineScheduler()
+	scheduler := TrampolineScheduler()
 	observer := func(next int, e error, done bool) {
 		if !done {
 			fmt.Println(next)

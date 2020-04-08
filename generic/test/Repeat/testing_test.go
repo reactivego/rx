@@ -20,40 +20,40 @@ func TestRepeat(t *testing.T) {
 const _1M = 1000000
 
 // Repeating the Observable 1 million times works fine using the
-// CurrentGoroutine scheduler. When the repeated observable signals completion
-// this will cause the Repeat operator to re-subscribe. The CurrentGoroutine
+// Trampoline scheduler. When the repeated observable signals completion
+// this will cause the Repeat operator to re-subscribe. The Trampoline
 // scheduler will schedule every subscribe asynchronously to run after the
 // first subscribe returns. So subscribe calls are actually not nested but
 // executed in sequence.
-func TestRepeatCurrentGoroutine(t *testing.T) {
+func TestRepeatTrampoline(t *testing.T) {
 	source := CreateInt(func(observer IntObserver) {
 		observer.Next(1)
 		observer.Next(2)
 		observer.Next(3)
 		observer.Complete()
 	})
-	result, err := source.Repeat(_1M).TakeLast(9).ToSlice(SubscribeOn(CurrentGoroutineScheduler()))
+	result, err := source.Repeat(_1M).TakeLast(9).ToSlice(SubscribeOn(TrampolineScheduler()))
 	expect := []int{1, 2, 3, 1, 2, 3, 1, 2, 3}
 	assert.NoError(t, err)
 	assert.Equal(t, expect, result)
 }
 
-// Repeating the Observable 1 million times works fine using the NewGoroutine
+// Repeating the Observable 1 million times works fine using the Goroutine
 // scheduler. When the repeated observable signals completion, this will
-// cause the Repeat operator to re-subscribe. The NewGoroutine scheduler
+// cause the Repeat operator to re-subscribe. The Goroutine scheduler
 // will schedule every subscribe asynchronously and concurrently on a
 // different goroutine. Therefore no nesting of subscriptions occurs.
-// The CurrentGoroutine scheduler is much faster than the NewGoroutine
+// The Trampoline scheduler is much faster than the Goroutine
 // scheduler because it does not create goroutines. It needs less than 70% 
-// of the time the NewGoroutine scheduler needs.
-func TestRepeatNewGoroutineScheduler(t *testing.T) {
+// of the time the Goroutine scheduler needs.
+func TestRepeatGoroutineScheduler(t *testing.T) {
 	source := CreateInt(func(observer IntObserver) {
 		observer.Next(1)
 		observer.Next(2)
 		observer.Next(3)
 		observer.Complete()
 	})
-	result, err := source.Repeat(_1M).TakeLast(9).ToSlice(SubscribeOn(NewGoroutineScheduler()))
+	result, err := source.Repeat(_1M).TakeLast(9).ToSlice(SubscribeOn(GoroutineScheduler()))
 	expect := []int{1, 2, 3, 1, 2, 3, 1, 2, 3}
 	assert.NoError(t, err)
 	assert.Equal(t, expect, result)

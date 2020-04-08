@@ -11,7 +11,7 @@ func TestNever(t *testing.T) {
 	never := true
 	subscription := NeverInt().SubscribeNext(func(next int) {
 		never = false
-	}, SubscribeOn(NewGoroutineScheduler()))
+	}, SubscribeOn(GoroutineScheduler()))
 
 	go func() {
 		time.Sleep(100 * time.Millisecond)

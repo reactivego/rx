@@ -101,11 +101,9 @@ func (o ObservableInt) Filter(predicate func(next int) bool) ObservableInt {
 
 //jig:name Schedulers
 
-func ImmediateScheduler() Scheduler	{ return scheduler.Immediate }
+func TrampolineScheduler() Scheduler	{ return scheduler.Trampoline }
 
-func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
-
-func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
+func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
 
 //jig:name SubscribeOption
 
@@ -162,7 +160,7 @@ func OnUnsubscribe(callback func()) SubscribeOption {
 // return newly created scheduler and subscriber. Before returning the callback
 // passed in through OnSubscribe() will already have been called.
 func newSchedulerAndSubscriber(setters []SubscribeOption) (Scheduler, Subscriber) {
-	options := &subscribeOptions{scheduler: CurrentGoroutineScheduler()}
+	options := &subscribeOptions{scheduler: TrampolineScheduler()}
 	for _, setter := range setters {
 		setter(options)
 	}
@@ -199,12 +197,12 @@ func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOpt
 // ToSlice collects all values from the ObservableInt into an slice. The
 // complete slice and any error are returned.
 //
-// This function subscribes to the source observable on the NewGoroutine
-// scheduler. The NewGoroutine scheduler works in more situations for
+// This function subscribes to the source observable on the Goroutine
+// scheduler. The Goroutine scheduler works in more situations for
 // complex chains of observables, like when merging the output of multiple
 // observables.
 func (o ObservableInt) ToSlice(options ...SubscribeOption) (slice []int, err error) {
-	scheduler := NewGoroutineScheduler()
+	scheduler := GoroutineScheduler()
 	o.Subscribe(func(next int, e error, done bool) {
 		if !done {
 			slice = append(slice, next)
@@ -222,7 +220,7 @@ func (o ObservableInt) ToSlice(options ...SubscribeOption) (slice []int, err err
 // when the Observable completed normally.
 func (o ObservableInt) Println() (err error) {
 	subscriber := subscriber.New()
-	scheduler := CurrentGoroutineScheduler()
+	scheduler := TrampolineScheduler()
 	observer := func(next int, e error, done bool) {
 		if !done {
 			fmt.Println(next)

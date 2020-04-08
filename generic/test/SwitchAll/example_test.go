@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-func Example_newGoroutine() {
-	scheduler := NewGoroutineScheduler()
+func Example_Goroutine() {
+	scheduler := GoroutineScheduler()
 	err := Interval(42 * time.Millisecond).
 		Take(4).
 		MapObservableInt(func(i int) ObservableInt {
@@ -34,7 +34,7 @@ func Example_newGoroutine() {
 	// success
 }
 
-func Example_currentGoroutine() {
+func Example_Trampoline() {
 	err := Interval(42 * time.Millisecond).
 		Take(4).
 		MapObservableInt(func(i int) ObservableInt {

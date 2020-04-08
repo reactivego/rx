@@ -48,7 +48,7 @@ func Example_autoConnect() {
 func Example_autoConnectMulti() {
 	// We will be subscribing on an asynchronous scheduler, otherwise first
 	// call to Subscribe will lockup.
-	scheduler := NewGoroutineScheduler()
+	scheduler := GoroutineScheduler()
 
 	range1to99 := CreateInt(func(observer IntObserver) {
 		fmt.Println("subscribed")

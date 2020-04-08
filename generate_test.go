@@ -55,7 +55,7 @@ func TestGenerate(t *testing.T) {
 	o.MergeDelayError()
 	o.MergeMap(func(interface{}) Observable { return o })
 	i.Min()
-	o.ObserveOn(CurrentGoroutineScheduler())
+	o.ObserveOn(TrampolineScheduler())
 	o.OnlyBool()
 	o.OnlyInt()
 	// Passthrough
@@ -68,7 +68,7 @@ func TestGenerate(t *testing.T) {
 	o.Single()
 	o.Skip(1)
 	o.SkipLast(1)
-	o.SubscribeOn(CurrentGoroutineScheduler())
+	o.SubscribeOn(TrampolineScheduler())
 	i.Sum()
 	oo.SwitchAll()
 	o.SwitchMap(func(interface{}) Observable { return o })

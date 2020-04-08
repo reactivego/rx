@@ -22,7 +22,7 @@ type Subscription subscriber.Subscription
 // when the Observable completed normally.
 func (o ObservableFoo) Println() (err error) {
 	subscriber := subscriber.New()
-	scheduler := CurrentGoroutineScheduler()
+	scheduler := TrampolineScheduler()
 	observer := func(next foo, e error, done bool) {
 		if !done {
 			fmt.Println(next)
@@ -41,10 +41,10 @@ func (o ObservableFoo) Println() (err error) {
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
-// Subscription is performed on the normal CurrentGoroutine scheduler.
+// Subscription is performed on the normal Trampoline scheduler.
 func (o ObservableFoo) Wait() (err error) {
 	subscriber := subscriber.New()
-	scheduler := CurrentGoroutineScheduler()
+	scheduler := TrampolineScheduler()
 	observer := func(next foo, e error, done bool) {
 		if done {
 			err = e
@@ -112,7 +112,7 @@ func OnUnsubscribe(callback func()) SubscribeOption {
 // return newly created scheduler and subscriber. Before returning the callback
 // passed in through OnSubscribe() will already have been called.
 func newSchedulerAndSubscriber(setters []SubscribeOption) (Scheduler, Subscriber) {
-	options := &subscribeOptions{scheduler: CurrentGoroutineScheduler()}
+	options := &subscribeOptions{scheduler: TrampolineScheduler()}
 	for _, setter := range setters {
 		setter(options)
 	}
@@ -167,9 +167,9 @@ func (o ObservableFoo) SubscribeNext(f func(next foo), options ...SubscribeOptio
 // values.
 //
 // Because the channel is fed by subscribing to the observable, ToChan would
-// block when subscribed on the standard CurrentGoroutine scheduler which is
+// block when subscribed on the standard Trampoline scheduler which is
 // initially synchronous. That's why the subscribing is done on the
-// NewGoroutine scheduler.
+// Goroutine scheduler.
 //
 // To cancel the subscription created internally by ToChan you will need access
 // to the subscription used internally by ToChan. To get at this subscription,
@@ -177,7 +177,7 @@ func (o ObservableFoo) SubscribeNext(f func(next foo), options ...SubscribeOptio
 // parameter to ToChan. On suscription the callback will be called with the
 // subscription that was created.
 func (o Observable) ToChan(options ...SubscribeOption) <-chan interface{} {
-	scheduler := NewGoroutineScheduler()
+	scheduler := GoroutineScheduler()
 	nextch := make(chan interface{}, 1)
 	o.Subscribe(func(next interface{}, err error, done bool) {
 		if !done {
@@ -203,12 +203,12 @@ func (o Observable) ToChan(options ...SubscribeOption) <-chan interface{} {
 // There is no way to determine whether the observable feeding into the
 // channel terminated with an error or completed normally.
 // Because the channel is fed by subscribing to the observable, ToChan would
-// block when subscribed on the standard CurrentGoroutine scheduler which is
+// block when subscribed on the standard Trampoline scheduler which is
 // initially synchronous. That's why the subscribing is done on the
-// NewGoroutine scheduler. It is not possible to cancel the subscription
+// Goroutine scheduler. It is not possible to cancel the subscription
 // created internally by ToChan.
 func (o ObservableFoo) ToChan(options ...SubscribeOption) <-chan foo {
-	scheduler := NewGoroutineScheduler()
+	scheduler := GoroutineScheduler()
 	nextch := make(chan foo, 1)
 	o.Subscribe(func(next foo, err error, done bool) {
 		if !done {
@@ -226,12 +226,12 @@ func (o ObservableFoo) ToChan(options ...SubscribeOption) <-chan foo {
 // ToSingle blocks until the ObservableFoo emits exactly one value or an error.
 // The value and any error are returned.
 //
-// This function subscribes to the source observable on the NewGoroutine
-// scheduler. The NewGoroutine scheduler works in more situations for
+// This function subscribes to the source observable on the Goroutine
+// scheduler. The Goroutine scheduler works in more situations for
 // complex chains of observables, like when merging the output of multiple
 // observables.
 func (o ObservableFoo) ToSingle(options ...SubscribeOption) (entry foo, err error) {
-	scheduler := NewGoroutineScheduler()
+	scheduler := GoroutineScheduler()
 	o.Single().Subscribe(func(next foo, e error, done bool) {
 		if !done {
 			entry = next
@@ -248,12 +248,12 @@ func (o ObservableFoo) ToSingle(options ...SubscribeOption) (entry foo, err erro
 // ToSlice collects all values from the ObservableFoo into an slice. The
 // complete slice and any error are returned.
 //
-// This function subscribes to the source observable on the NewGoroutine
-// scheduler. The NewGoroutine scheduler works in more situations for
+// This function subscribes to the source observable on the Goroutine
+// scheduler. The Goroutine scheduler works in more situations for
 // complex chains of observables, like when merging the output of multiple
 // observables.
 func (o ObservableFoo) ToSlice(options ...SubscribeOption) (slice []foo, err error) {
-	scheduler := NewGoroutineScheduler()
+	scheduler := GoroutineScheduler()
 	o.Subscribe(func(next foo, e error, done bool) {
 		if !done {
 			slice = append(slice, next)

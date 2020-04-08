@@ -160,11 +160,9 @@ func (o ObservableInt) MapString(project func(int) string) ObservableString {
 
 //jig:name Schedulers
 
-func ImmediateScheduler() Scheduler	{ return scheduler.Immediate }
+func TrampolineScheduler() Scheduler	{ return scheduler.Trampoline }
 
-func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
-
-func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
+func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
 
 //jig:name SubscribeOption
 
@@ -221,7 +219,7 @@ func OnUnsubscribe(callback func()) SubscribeOption {
 // return newly created scheduler and subscriber. Before returning the callback
 // passed in through OnSubscribe() will already have been called.
 func newSchedulerAndSubscriber(setters []SubscribeOption) (Scheduler, Subscriber) {
-	options := &subscribeOptions{scheduler: CurrentGoroutineScheduler()}
+	options := &subscribeOptions{scheduler: TrampolineScheduler()}
 	for _, setter := range setters {
 		setter(options)
 	}
@@ -326,7 +324,7 @@ func (o Observable) AsObservableInt() ObservableInt {
 // when the Observable completed normally.
 func (o ObservableString) Println() (err error) {
 	subscriber := subscriber.New()
-	scheduler := CurrentGoroutineScheduler()
+	scheduler := TrampolineScheduler()
 	observer := func(next string, e error, done bool) {
 		if !done {
 			fmt.Println(next)

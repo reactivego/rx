@@ -11,7 +11,7 @@ func Example_ignoreCompletion() {
 	// Subscribe asynchronously
 	subscription := source.SubscribeNext(func(next int) {
 		fmt.Println(next)
-	}, SubscribeOn( /*must be async*/ NewGoroutineScheduler()))
+	}, SubscribeOn( /*must be async*/ GoroutineScheduler()))
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -40,7 +40,7 @@ func Example_ignoreCompletionError() {
 	// Subscribe asynchronously
 	subscription := source.SubscribeNext(func(next int) {
 		fmt.Println(next)
-	}, SubscribeOn( /*must be async*/ NewGoroutineScheduler()))
+	}, SubscribeOn( /*must be async*/ GoroutineScheduler()))
 
 	time.Sleep(100 * time.Millisecond)
 

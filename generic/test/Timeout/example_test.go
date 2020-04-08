@@ -12,8 +12,8 @@ func Example_timeout() {
 	const _250ms = 250 * time.Millisecond
 	const _500ms = 500 * time.Millisecond
 
-	scheduler := CurrentGoroutineScheduler()
-	// scheduler := NewGoroutineScheduler()
+	scheduler := TrampolineScheduler()
+	// scheduler := GoroutineScheduler()
 	start := scheduler.Now()
 
 	active := true

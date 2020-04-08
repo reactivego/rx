@@ -109,20 +109,18 @@ func (e RxError) Error() string	{ return string(e) }
 
 //jig:name Schedulers
 
-func ImmediateScheduler() Scheduler	{ return scheduler.Immediate }
+func TrampolineScheduler() Scheduler	{ return scheduler.Trampoline }
 
-func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
-
-func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
+func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
 
 //jig:name ObservableIntWait
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
-// Subscription is performed on the normal CurrentGoroutine scheduler.
+// Subscription is performed on the normal Trampoline scheduler.
 func (o ObservableInt) Wait() (err error) {
 	subscriber := subscriber.New()
-	scheduler := CurrentGoroutineScheduler()
+	scheduler := TrampolineScheduler()
 	observer := func(next int, e error, done bool) {
 		if done {
 			err = e

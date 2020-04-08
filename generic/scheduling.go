@@ -12,9 +12,9 @@ type Scheduler scheduler.Scheduler
 //jig:template Schedulers
 //jig:needs Scheduler
 
-func ImmediateScheduler() Scheduler  { return scheduler.Immediate }
-func CurrentGoroutineScheduler() Scheduler { return scheduler.CurrentGoroutine }
-func NewGoroutineScheduler() Scheduler  { return scheduler.NewGoroutine }
+
+func TrampolineScheduler() Scheduler { return scheduler.Trampoline }
+func GoroutineScheduler() Scheduler  { return scheduler.Goroutine }
 
 //jig:template Observable<Foo> ObserveOn
 

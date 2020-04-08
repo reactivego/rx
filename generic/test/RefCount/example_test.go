@@ -11,7 +11,7 @@ import (
 // about using RefCount.
 func Example_introToRx() {
 	// Subscribe on concurrent scheduler
-	scheduler := NewGoroutineScheduler()
+	scheduler := GoroutineScheduler()
 
 	observable := Interval(50 * time.Millisecond)
 
@@ -50,7 +50,7 @@ func Example_introToRx() {
 // Connectable who's Connect is controlled by a RefCount operator.
 func Example_refCountMultipleSubscriptions() {
 	// Subscribe on concurrent scheduler
-	scheduler := NewGoroutineScheduler()
+	scheduler := GoroutineScheduler()
 
 	var wg sync.WaitGroup
 	channel := make(chan int, 30)

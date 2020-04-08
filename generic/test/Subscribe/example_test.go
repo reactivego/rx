@@ -32,7 +32,7 @@ func Example_subscribeDirect() {
 
 	// Non standard way of subscribing to an observable. But it does illustrate
 	// that an observable is just a function that can be called directly.
-	observable(observe, CurrentGoroutineScheduler(), subscriber.New())
+	observable(observe, TrampolineScheduler(), subscriber.New())
 
 	// Note that this incorrectly delivers the error after complete. So don't
 	// subscribe like this, use the Subscribe method.

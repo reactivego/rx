@@ -34,45 +34,6 @@ var zeroInt int
 
 type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 
-//jig:name MakeTimedIntFunc
-
-type MakeTimedIntFunc func(Next func(int), Error func(error), Complete func()) time.Duration
-
-//jig:name MakeTimedInt
-
-func MakeTimedInt(timeout time.Duration, make MakeTimedIntFunc) ObservableInt {
-	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		done := false
-		scheduler.ScheduleFutureRecursive(timeout, func(self func(time.Duration)) {
-			if subscriber.Canceled() {
-				return
-			}
-			next := func(n int) {
-				if !subscriber.Canceled() {
-					observe(n, nil, false)
-				}
-			}
-			error := func(e error) {
-				done = true
-				if !subscriber.Canceled() {
-					observe(zeroInt, e, true)
-				}
-			}
-			complete := func() {
-				done = true
-				if !subscriber.Canceled() {
-					observe(zeroInt, nil, true)
-				}
-			}
-			timeout = make(next, error, complete)
-			if !done && !subscriber.Canceled() {
-				self(timeout)
-			}
-		})
-	}
-	return observable
-}
-
 //jig:name MakeIntFunc
 
 type MakeIntFunc func(Next func(int), Error func(error), Complete func())
@@ -112,6 +73,69 @@ func MakeInt(make MakeIntFunc) ObservableInt {
 	return observable
 }
 
+//jig:name MakeTimedIntFunc
+
+type MakeTimedIntFunc func(Next func(int), Error func(error), Complete func()) time.Duration
+
+//jig:name MakeTimedInt
+
+func MakeTimedInt(timeout time.Duration, make MakeTimedIntFunc) ObservableInt {
+	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		done := false
+		scheduler.ScheduleFutureRecursive(timeout, func(self func(time.Duration)) {
+			if subscriber.Canceled() {
+				return
+			}
+			next := func(n int) {
+				if !subscriber.Canceled() {
+					observe(n, nil, false)
+				}
+			}
+			error := func(e error) {
+				done = true
+				if !subscriber.Canceled() {
+					observe(zeroInt, e, true)
+				}
+			}
+			complete := func() {
+				done = true
+				if !subscriber.Canceled() {
+					observe(zeroInt, nil, true)
+				}
+			}
+			timeout = make(next, error, complete)
+			if !done && !subscriber.Canceled() {
+				self(timeout)
+			}
+		})
+	}
+	return observable
+}
+
+//jig:name Schedulers
+
+func TrampolineScheduler() Scheduler	{ return scheduler.Trampoline }
+
+func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
+
+//jig:name ObservableIntPrintln
+
+func (o ObservableInt) Println() (err error) {
+	subscriber := subscriber.New()
+	scheduler := TrampolineScheduler()
+	observer := func(next int, e error, done bool) {
+		if !done {
+			fmt.Println(next)
+		} else {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
+}
+
 //jig:name ObservableTake
 
 func (o Observable) Take(n int) Observable {
@@ -137,33 +161,6 @@ func (o Observable) Take(n int) Observable {
 
 func (o ObservableInt) Take(n int) ObservableInt {
 	return o.AsObservable().Take(n).AsObservableInt()
-}
-
-//jig:name Schedulers
-
-func ImmediateScheduler() Scheduler	{ return scheduler.Immediate }
-
-func CurrentGoroutineScheduler() Scheduler	{ return scheduler.CurrentGoroutine }
-
-func NewGoroutineScheduler() Scheduler	{ return scheduler.NewGoroutine }
-
-//jig:name ObservableIntPrintln
-
-func (o ObservableInt) Println() (err error) {
-	subscriber := subscriber.New()
-	scheduler := CurrentGoroutineScheduler()
-	observer := func(next int, e error, done bool) {
-		if !done {
-			fmt.Println(next)
-		} else {
-			err = e
-			subscriber.Unsubscribe()
-			scheduler.Cancel()
-		}
-	}
-	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
 }
 
 //jig:name ObserveFunc

@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRetryCurrentGoroutine(t *testing.T) {
+func TestRetryTrampoline(t *testing.T) {
 	errored := false
 	a := CreateInt(func(observer IntObserver) {
 		observer.Next(1)
@@ -19,14 +19,14 @@ func TestRetryCurrentGoroutine(t *testing.T) {
 			observer.Error(RxError("error"))
 			errored = true
 		}
-	}).SubscribeOn(CurrentGoroutineScheduler())
+	}).SubscribeOn(TrampolineScheduler())
 	b, e := a.Retry().ToSlice()
 	assert.NoError(t, e)
 	assert.Equal(t, []int{1, 2, 3, 1, 2, 3}, b)
 	assert.True(t, errored)
 }
 
-func TestRetryNewGoroutine(t *testing.T) {
+func TestRetryGoroutine(t *testing.T) {
 	errored := false
 	a := CreateInt(func(observer IntObserver) {
 		observer.Next(1)
@@ -38,7 +38,7 @@ func TestRetryNewGoroutine(t *testing.T) {
 			observer.Error(RxError("error"))
 			errored = true
 		}
-	}).SubscribeOn(NewGoroutineScheduler())
+	}).SubscribeOn(GoroutineScheduler())
 	b, e := a.Retry().ToSlice()
 	assert.NoError(t, e)
 	assert.Equal(t, []int{1, 2, 3, 1, 2, 3}, b)

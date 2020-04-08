@@ -97,7 +97,7 @@ func ExampleObservable_Map() {
 }
 
 func ExampleObservable_MergeMap() {
-	scheduler := rx.NewGoroutineScheduler()
+	scheduler := rx.GoroutineScheduler()
 
 	source := rx.From(1, 2).
 		MergeMap(func(n interface{}) rx.Observable {
@@ -133,7 +133,7 @@ func ExampleObservable_Scan() {
 func ExampleObservableObservable_SwitchAll() {
 
 	// SwitchAll does not work well with the default trampoline scheduler, so we use a goroutine scheduler instead.
-	scheduler := rx.NewGoroutineScheduler()
+	scheduler := rx.GoroutineScheduler()
 
 	// intToObs creates a new observable that emits an integer starting after and then repeated every 20 milliseconds
 	// in the range starting at 0 and incrementing by 1. It takes only the first 10 emitted values and then uses
