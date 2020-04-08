@@ -5,7 +5,7 @@ import "time"
 
 //jig:no-doc
 
-func Example() {
+func Example_makeInt() {
 	example := func() ObservableInt {
 		done := false
 		return MakeInt(func(Next func(int), Error func(error), Complete func()) {
@@ -24,7 +24,7 @@ func Example() {
 	// 1
 }
 
-func Example_interval() {
+func Example_makeTimedInt() {
 	const _10ms = 10 * time.Millisecond
 
 	interval := func(period time.Duration) ObservableInt {
