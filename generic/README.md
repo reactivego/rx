@@ -34,7 +34,6 @@ func main() {
 <!-- MarkdownTOC -->
 
 - [Why?](#why)
-- [Generic Programming](#generic-programming)
 - [Operators](#operators)
 	- [Creating Operators](#creating-operators)
 	- [Transforming Operators](#transforming-operators)
@@ -49,6 +48,7 @@ func main() {
 	- [Multicasting Operators](#multicasting-operators)
 - [Subjects](#subjects)
 - [Subscribing](#subscribing)
+- [Generic Programming](#generic-programming)
 - [Obligatory Dijkstra Quote](#obligatory-dijkstra-quote)
 - [Acknowledgements](#acknowledgements)
 - [License](#license)
@@ -58,36 +58,9 @@ func main() {
 ## Why?
 ReactiveX observables are somewhat similar to Go channels but have much richer semantics. Observables can be hot or cold, can complete normally or with an error, use subscriptions that can be cancelled from the subscriber side. Where a normal variable is just a place where you read and write values from, an observable captures how the value of this variable changes over time. Concurrency follows naturally from the fact that an observable is an ever changing stream of values.
 
-`rx` is a library of operators that work on one or more observables. The way in which observables can be combined using operators to form new observables is the real strength of ReactiveX. Operators specify how observables representing streams of values are e.g. merged, transformed, concatenated, split, multicasted, replayed, delayed and debounced. My observation is that [RxJS 5](https://github.com/ReactiveX/rxjs) and [RxJava 2](https://github.com/ReactiveX/RxJava) have been pushing the envelope in evolving ReactiveX operator semantics. The whole field is still in flux, but the more Rx is applied, the more patterns are emerging. I would like Go to be a participant in this field as well, but for that to happen we need....
+`rx` is a library of operators that work on one or more observables. The way in which observables can be combined using operators to form new observables is the real strength of ReactiveX. Operators specify how observables representing streams of values are e.g. merged, transformed, concatenated, split, multicasted, replayed, delayed and debounced.
 
-## Generic Programming
-
-`rx` is a generics library. Generics like `Map<T>` use a place-holder type name `T` between angle brackets. Go does not natively support this syntax. Instead I use the syntax `MapT` that Go does support. A special comment prefix then specifies what part of the name is generic. See the example below for what a template written in this syntax will look like:
-
-```go
-//jig:template Observable<Foo> Map<Bar>
-
-func (o ObservableFoo) MapBar(project func(foo) bar) ObservableBar {
-	...
-	// generic implementation using `foo` and `bar` for the real type and `Foo` and `Bar` in identifiers
-	...
-}
-```
-I have choosen to use metasyntactic type names like *Foo* and *Bar* for my template libraries. So e.g. `MapBar` instead of `Map<T>`. I settled on using the words *Foo*, *Bar* and *Baz*, but you can choose other words you like better.
-
-Using generics is easy. Just reference the generic in your code and specify a concrete type instead of the place-holder type.
-So, to specialize on `int` write e.g. `MapInt`. See the following code for how that works: 
-
-```go
-FromInts(1, 2).MapInt(func(x int) int {
-	return x + 10
-}).Println()
-
-// Output:
-// 11
-// 12
-```
-This code will not compile by itself, because MapInt is not known. Running the [jig](https://github.com/reactivego/jig) command will specialize all generic templates into compilable code.
+This implemenation takes cues from boh [RxJS 6](https://github.com/ReactiveX/rxjs) and [RxJava 2](https://github.com/ReactiveX/RxJava) that have been pushing the envelope in evolving ReactiveX operator semantics.
 
 ## Operators 
 
@@ -268,6 +241,35 @@ Subscribing breathes life into a chain of observables. An observable may be subs
 
 - (Connectable) [**RefCount**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/RefCount)() Observable
 - (Connectable) [**AutoConnect**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/AutoConnect)() Observable
+
+## Generic Programming
+
+`rx` is a generics library. Generics like `Map<T>` use a place-holder type name `T` between angle brackets. Go does not natively support this syntax. Instead I use the syntax `MapT` that Go does support. A special comment prefix then specifies what part of the name is generic. See the example below for what a template written in this syntax will look like:
+
+```go
+//jig:template Observable<Foo> Map<Bar>
+
+func (o ObservableFoo) MapBar(project func(foo) bar) ObservableBar {
+	...
+	// generic implementation using `foo` and `bar` for the real type and `Foo` and `Bar` in identifiers
+	...
+}
+```
+I have choosen to use metasyntactic type names like *Foo* and *Bar* for my template libraries. So e.g. `MapBar` instead of `Map<T>`. I settled on using the words *Foo*, *Bar* and *Baz*, but you can choose other words you like better.
+
+Using generics is easy. Just reference the generic in your code and specify a concrete type instead of the place-holder type.
+So, to specialize on `int` write e.g. `MapInt`. See the following code for how that works: 
+
+```go
+FromInts(1, 2).MapInt(func(x int) int {
+	return x + 10
+}).Println()
+
+// Output:
+// 11
+// 12
+```
+This code will not compile by itself, because MapInt is not known. Running the [jig](https://github.com/reactivego/jig) command will specialize all generic templates into compilable code.
 
 ## Obligatory Dijkstra Quote
 
