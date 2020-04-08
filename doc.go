@@ -2,22 +2,22 @@
 Package rx provides Reactive Extensions (ReactiveX) for Go, an API for
 asynchronous programming with observable streams (Observables).
 
-What is rx?
+What rx is
 
 Observables are the main focus of rx and they are (sort of) sets of events.
-They represent values that changes over time and you get notified when they do.
-- They assume zero to many values over time.
-- They push values.
-- They can take any amount of time to complete (or may never).
-- They are cancellable.
-- They are lazy; they don't do anything until you subscribe.
+They assume zero to many values over time.
+They push values.
+They can take any amount of time to complete (or may never).
+They are cancellable.
+They are lazy; they don't do anything until you subscribe.
 
-This implementation of rx not strongly typed. It uses `interface{}` for value
-types, so you can mix different types of values in function and method calls:
+This implementation of rx uses interface{} for value types, so you can
+mix different types of values in function and method calls. To create an
+observable you might write the following:
 
 	From(1,"hi",2.3).Println()
 
-The call above creates an observable from ints and strings and then prints
+The call above creates an observable from numbers and strings and then prints
 them.
 
 Creating Observables
@@ -51,15 +51,14 @@ Methods on observables to trigger side effects.
 For an overview of all implemented operators, see
 https://github.com/reactivego/rx
 
-Generics for Go
+Regenerating this Package
 
-You don't need Generics for Go in order to use this package. If you are however
-interested in regenerating this package, then read on.
-
-The implementation in this package is generated from a generic implementation
-found in the subdirectory "generic" inside this package. It works by replacing
-the place-holder types in the templates with interface{}. To regenerate this
-implementation, run jig inside this package directory as follows:
+This package is generated from a generic implementation in the
+subdirectory "generic" by a generator called "jig". You don't need "jig"
+in order to use this package though. If you are however interested in
+regenerating this package, then read on. Jig works by replacing the
+place-holder types of templated types with interface{}. To regenerate
+this rx implementation, run jig inside this package directory as follows:
 
 	go get -d github.com/reactivego/jig
 	go run github.com/reactivego/jig -rv
