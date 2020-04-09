@@ -70,9 +70,9 @@ func Range(start, count int) ObservableInt {
 
 // FromSliceInt creates an ObservableInt from a slice of int values passed in.
 func FromSliceInt(slice []int) ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
-		subscribeOn.ScheduleRecursive(func(self func()) {
+		scheduler.ScheduleRecursive(func(self func()) {
 			if !subscriber.Canceled() {
 				if i < len(slice) {
 					observe(slice[i], nil, false)
@@ -168,6 +168,7 @@ func newSchedulerAndSubscriber(setters []SubscribeOption) (Scheduler, Subscriber
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
+// Subscribe by default is performed on the Trampoline scheduler.
 func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOption) Subscription {
 	scheduler, subscriber := newSchedulerAndSubscriber(options)
 	observer := func(next int, err error, done bool) {
@@ -192,13 +193,12 @@ func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOpt
 // complex chains of observables, like when merging the output of multiple
 // observables.
 func (o ObservableInt) ToSlice(options ...SubscribeOption) (slice []int, err error) {
-	scheduler := GoroutineScheduler()
 	o.Subscribe(func(next int, e error, done bool) {
 		if !done {
 			slice = append(slice, next)
 		} else {
 			err = e
 		}
-	}, SubscribeOn(scheduler, options...)).Wait()
+	}, options...).Wait()
 	return
 }

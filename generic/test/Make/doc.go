@@ -1,5 +1,5 @@
 /*
-Make function tests.
+Make tests.
 
 	Make	http://reactivex.io/documentation/operators/create.html
 */

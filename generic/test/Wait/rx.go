@@ -117,7 +117,7 @@ func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
-// Subscription is performed on the normal Trampoline scheduler.
+// Subscription is performed on the Trampoline scheduler.
 func (o ObservableInt) Wait() (err error) {
 	subscriber := subscriber.New()
 	scheduler := TrampolineScheduler()

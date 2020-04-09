@@ -1,7 +1,7 @@
 /*
-Error function tests.
+Error tests.
 
-Error is just an alias for the function Throw.
+Error is just an alias for the Throw function.
 
 	Throw	http://reactivex.io/documentation/operators/empty-never-throw.html
 */

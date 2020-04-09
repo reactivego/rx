@@ -1,5 +1,5 @@
 /*
-Range function tests.
+Range tests.
 
 	Range	http://reactivex.io/documentation/operators/range.html
 */

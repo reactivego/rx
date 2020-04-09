@@ -46,9 +46,9 @@ type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 
 // FromSliceInt creates an ObservableInt from a slice of int values passed in.
 func FromSliceInt(slice []int) ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
-		subscribeOn.ScheduleRecursive(func(self func()) {
+		scheduler.ScheduleRecursive(func(self func()) {
 			if !subscriber.Canceled() {
 				if i < len(slice) {
 					observe(slice[i], nil, false)
@@ -76,21 +76,14 @@ func FromInts(slice ...int) ObservableInt {
 
 // EmptyInt creates an Observable that emits no items but terminates normally.
 func EmptyInt() ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		subscribeOn.Schedule(func() {
+	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		scheduler.Schedule(func() {
 			if !subscriber.Canceled() {
 				observe(zeroInt, nil, true)
 			}
 		})
 	}
 	return observable
-}
-
-//jig:name FromInt
-
-// FromInt creates an ObservableInt from multiple int values passed in.
-func FromInt(slice ...int) ObservableInt {
-	return FromSliceInt(slice)
 }
 
 //jig:name Schedulers
@@ -172,6 +165,7 @@ func newSchedulerAndSubscriber(setters []SubscribeOption) (Scheduler, Subscriber
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
+// Subscribe by default is performed on the Trampoline scheduler.
 func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOption) Subscription {
 	scheduler, subscriber := newSchedulerAndSubscriber(options)
 	observer := func(next int, err error, done bool) {
@@ -196,14 +190,13 @@ func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOpt
 // complex chains of observables, like when merging the output of multiple
 // observables.
 func (o ObservableInt) ToSingle(options ...SubscribeOption) (entry int, err error) {
-	scheduler := GoroutineScheduler()
 	o.Single().Subscribe(func(next int, e error, done bool) {
 		if !done {
 			entry = next
 		} else {
 			err = e
 		}
-	}, SubscribeOn(scheduler, options...)).Wait()
+	}, options...).Wait()
 	return
 }
 

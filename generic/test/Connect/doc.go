@@ -1,5 +1,5 @@
 /*
-Connect method tests.
+Connect tests.
 
 	Connects	http://reactivex.io/documentation/operators/connect.html
 

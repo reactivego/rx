@@ -693,11 +693,8 @@ type Slice []interface{}
 
 //jig:name ObservableObservableCombineAll
 
-// CombineAll will collect Observable items and then wait for all of them
-// to emit an item. This combination of items will then be emitted as a single
-// slice. Subsequent emits by one of the subscribed Observable items will
-// again emit a slice with the newly emitted value combined with the other
-// previously emitted values.
+// CombineAll flattens an ObservableObservable by applying combineLatest
+// when the ObservableObservable completes.
 func (o ObservableObservable) CombineAll() ObservableSlice {
 	observable := func(observe SliceObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		observables := []Observable(nil)

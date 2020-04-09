@@ -1,5 +1,5 @@
 /*
-ToChan method tests.
+ToChan tests.
 
 	ToChan		http://reactivex.io/documentation/operators/to.html
 

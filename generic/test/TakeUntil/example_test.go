@@ -5,8 +5,7 @@ import (
 )
 
 func Example_takeUntil() {
-	scheduler := GoroutineScheduler()
-	interrupt := Never().Timeout(150 * time.Millisecond).Catch(Just("stop")).SubscribeOn(scheduler)
+	interrupt := Never().Timeout(150 * time.Millisecond).Catch(Just("stop")).SubscribeOn(GoroutineScheduler())
 
 	Interval(100 * time.Millisecond).TakeUntil(interrupt).Println()
 

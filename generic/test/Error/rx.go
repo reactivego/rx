@@ -49,8 +49,8 @@ type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 // ErrorInt creates an Observable that emits no items and terminates with an
 // error.
 func ErrorInt(err error) ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		subscribeOn.Schedule(func() {
+	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		scheduler.Schedule(func() {
 			if !subscriber.Canceled() {
 				observe(zeroInt, err, true)
 			}
@@ -70,27 +70,6 @@ func (e RxError) Error() string	{ return string(e) }
 func TrampolineScheduler() Scheduler	{ return scheduler.Trampoline }
 
 func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
-
-//jig:name ObservableIntPrintln
-
-// Println subscribes to the Observable and prints every item to os.Stdout
-// while it waits for completion or error. Returns either the error or nil
-// when the Observable completed normally.
-func (o ObservableInt) Println() (err error) {
-	subscriber := subscriber.New()
-	scheduler := TrampolineScheduler()
-	observer := func(next int, e error, done bool) {
-		if !done {
-			fmt.Println(next)
-		} else {
-			err = e
-			subscriber.Unsubscribe()
-		}
-	}
-	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
-}
 
 //jig:name SubscribeOption
 
@@ -165,6 +144,7 @@ func newSchedulerAndSubscriber(setters []SubscribeOption) (Scheduler, Subscriber
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
+// Subscribe by default is performed on the Trampoline scheduler.
 func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOption) Subscription {
 	scheduler, subscriber := newSchedulerAndSubscriber(options)
 	observer := func(next int, err error, done bool) {
@@ -189,13 +169,34 @@ func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOpt
 // complex chains of observables, like when merging the output of multiple
 // observables.
 func (o ObservableInt) ToSlice(options ...SubscribeOption) (slice []int, err error) {
-	scheduler := GoroutineScheduler()
 	o.Subscribe(func(next int, e error, done bool) {
 		if !done {
 			slice = append(slice, next)
 		} else {
 			err = e
 		}
-	}, SubscribeOn(scheduler, options...)).Wait()
+	}, options...).Wait()
+	return
+}
+
+//jig:name ObservableIntPrintln
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println is performed on the Trampoline scheduler.
+func (o ObservableInt) Println() (err error) {
+	subscriber := subscriber.New()
+	scheduler := TrampolineScheduler()
+	observer := func(next int, e error, done bool) {
+		if !done {
+			fmt.Println(next)
+		} else {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
 	return
 }

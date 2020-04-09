@@ -1,5 +1,5 @@
 /*
-Subscribe method tests.
+Subscribe tests.
 
 	Subscribe	http://reactivex.io/documentation/operators/subscribe.html
 

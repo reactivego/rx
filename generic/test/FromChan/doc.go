@@ -1,5 +1,5 @@
 /*
-FromChan function tests.
+FromChan tests.
 
 	FromChanFoo	http://reactivex.io/documentation/operators/from.html
 */

@@ -1,20 +1,17 @@
 package Repeat
 
-import (
-	"testing"
+import "fmt"
 
-	"github.com/stretchr/testify/assert"
-)
-
-func TestRepeat(t *testing.T) {
+func Example_basic() {
 	source := RepeatInt(5, 3)
-	expect := []int{5, 5, 5}
-	result, err := source.ToSlice()
-	assert.NoError(t, err)
-	assert.Equal(t, expect, result)
-	result, err = source.ToSlice()
-	assert.NoError(t, err)
-	assert.Equal(t, expect, result)
+
+	slice, err := source.ToSlice()
+
+	fmt.Println(slice)
+	fmt.Println(err)
+	// Output:
+	// [5 5 5]
+	// <nil>
 }
 
 const _1M = 1000000
@@ -25,17 +22,20 @@ const _1M = 1000000
 // scheduler will schedule every subscribe asynchronously to run after the
 // first subscribe returns. So subscribe calls are actually not nested but
 // executed in sequence.
-func TestRepeatTrampoline(t *testing.T) {
+func Example_trampoline() {
 	source := CreateInt(func(observer IntObserver) {
 		observer.Next(1)
 		observer.Next(2)
 		observer.Next(3)
 		observer.Complete()
 	})
-	result, err := source.Repeat(_1M).TakeLast(9).ToSlice(SubscribeOn(TrampolineScheduler()))
-	expect := []int{1, 2, 3, 1, 2, 3, 1, 2, 3}
-	assert.NoError(t, err)
-	assert.Equal(t, expect, result)
+	slice, err := source.Repeat(_1M).TakeLast(9).SubscribeOn(TrampolineScheduler()).ToSlice()
+
+	fmt.Println(slice)
+	fmt.Println(err)
+	// Output:
+	// [1 2 3 1 2 3 1 2 3]
+	// <nil>
 }
 
 // Repeating the Observable 1 million times works fine using the Goroutine
@@ -44,17 +44,20 @@ func TestRepeatTrampoline(t *testing.T) {
 // will schedule every subscribe asynchronously and concurrently on a
 // different goroutine. Therefore no nesting of subscriptions occurs.
 // The Trampoline scheduler is much faster than the Goroutine
-// scheduler because it does not create goroutines. It needs less than 70% 
+// scheduler because it does not create goroutines. It needs less than 70%
 // of the time the Goroutine scheduler needs.
-func TestRepeatGoroutineScheduler(t *testing.T) {
+func Example_goroutine() {
 	source := CreateInt(func(observer IntObserver) {
 		observer.Next(1)
 		observer.Next(2)
 		observer.Next(3)
 		observer.Complete()
 	})
-	result, err := source.Repeat(_1M).TakeLast(9).ToSlice(SubscribeOn(GoroutineScheduler()))
-	expect := []int{1, 2, 3, 1, 2, 3, 1, 2, 3}
-	assert.NoError(t, err)
-	assert.Equal(t, expect, result)
+	slice, err := source.Repeat(_1M).TakeLast(9).SubscribeOn(GoroutineScheduler()).ToSlice()
+
+	fmt.Println(slice)
+	fmt.Println(err)
+	// Output:
+	// [1 2 3 1 2 3 1 2 3]
+	// <nil>
 }

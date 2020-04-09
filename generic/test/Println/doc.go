@@ -1,5 +1,5 @@
 /*
-Println method tests.
+Println tests.
 
 	Println
 

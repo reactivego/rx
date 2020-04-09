@@ -1,5 +1,5 @@
 /*
-From function tests.
+From tests.
 
 	FromFoo		http://reactivex.io/documentation/operators/from.html
 */

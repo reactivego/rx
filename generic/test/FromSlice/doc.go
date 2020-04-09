@@ -1,5 +1,5 @@
 /*
-FromSlice function tests.
+FromSlice tests.
 
 	FromSliceFoo	http://reactivex.io/documentation/operators/from.html
 */

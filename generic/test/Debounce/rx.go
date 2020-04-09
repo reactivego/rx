@@ -170,19 +170,6 @@ var zero interface{}
 // function, scheduler and an subscriber.
 type Observable func(ObserveFunc, Scheduler, Subscriber)
 
-//jig:name ObservableIntAsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name Schedulers
 
 func TrampolineScheduler() Scheduler	{ return scheduler.Trampoline }
@@ -194,6 +181,7 @@ func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
+// Println is performed on the Trampoline scheduler.
 func (o ObservableInt) Println() (err error) {
 	subscriber := subscriber.New()
 	scheduler := TrampolineScheduler()
@@ -203,12 +191,24 @@ func (o ObservableInt) Println() (err error) {
 		} else {
 			err = e
 			subscriber.Unsubscribe()
-			scheduler.Cancel()
 		}
 	}
 	o(observer, scheduler, subscriber)
 	subscriber.Wait()
 	return
+}
+
+//jig:name ObservableIntAsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
 }
 
 //jig:name RxError

@@ -44,13 +44,13 @@ var zeroInt int
 // function, scheduler and an subscriber.
 type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 
-//jig:name ErrorInt
+//jig:name ThrowInt
 
-// ErrorInt creates an Observable that emits no items and terminates with an
+// ThrowInt creates an Observable that emits no items and terminates with an
 // error.
-func ErrorInt(err error) ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		subscribeOn.Schedule(func() {
+func ThrowInt(err error) ObservableInt {
+	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		scheduler.Schedule(func() {
 			if !subscriber.Canceled() {
 				observe(zeroInt, err, true)
 			}
@@ -76,6 +76,7 @@ func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
+// Println is performed on the Trampoline scheduler.
 func (o ObservableInt) Println() (err error) {
 	subscriber := subscriber.New()
 	scheduler := TrampolineScheduler()

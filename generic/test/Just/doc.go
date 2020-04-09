@@ -1,5 +1,5 @@
 /*
-Just function tests.
+Just tests.
 
 	Just	http://reactivex.io/documentation/operators/just.html
 */

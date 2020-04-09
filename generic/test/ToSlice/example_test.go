@@ -4,16 +4,30 @@ import (
 	"fmt"
 )
 
-// ToSlice will run the observable to completion and then return the resulting
-// slice and any error that was emitted by the observable. ToSlice will
-// internally run the observable on an asynchronous scheduler.
-func Example_toSlice() {
-	if slice, err := Range(1, 9).ToSlice(); err == nil {
-		for _, value := range slice {
-			fmt.Print(value)
-		}
-	}
+func Example_once() {
+	slice, err := Range(1, 9).ToSlice()
 
+	fmt.Println(slice)
+	fmt.Println(err)
 	// Output:
-	// 123456789
+	// [1 2 3 4 5 6 7 8 9]
+	// <nil>
+}
+
+func Example_twice() {
+	source := FromSliceInt([]int{1, 2, 3, 4})
+
+	result, err := source.ToSlice()
+	fmt.Println(result)
+	fmt.Println(err)
+
+	slice, err = source.ToSlice()
+
+	fmt.Println(slice)
+	fmt.Println(err)
+	// Output:
+	// [1 2 3 4]
+	// <nil>
+	// [1 2 3 4]
+	// <nil>
 }

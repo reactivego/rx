@@ -60,9 +60,9 @@ func Never() Observable {
 
 // Just creates an Observable that emits a particular item.
 func Just(element interface{}) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		done := false
-		subscribeOn.ScheduleRecursive(func(self func()) {
+		scheduler.ScheduleRecursive(func(self func()) {
 			if !subscriber.Canceled() {
 				if !done {
 					observe(element, nil, false)
@@ -106,11 +106,7 @@ type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 func Interval(interval time.Duration) ObservableInt {
 	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
-		scheduler.ScheduleRecursive(func(self func()) {
-			if subscriber.Canceled() {
-				return
-			}
-			time.Sleep(interval)
+		scheduler.ScheduleFutureRecursive(interval, func(self func(time.Duration)) {
 			if subscriber.Canceled() {
 				return
 			}
@@ -119,7 +115,7 @@ func Interval(interval time.Duration) ObservableInt {
 				return
 			}
 			i++
-			self()
+			self(interval)
 		})
 	}
 	return observable
@@ -169,32 +165,54 @@ const ErrTimeout = RxError("timeout")
 // delivering the next values.
 func (o Observable) Timeout(timeout time.Duration) Observable {
 	observable := Observable(func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		deadline := time.NewTimer(timeout)
-		unsubscribe := make(chan struct{})
-		observer := func(next interface{}, err error, done bool) {
-			if deadline.Stop() {
-				if subscriber.Closed() {
+		operator := func() {
+			if subscriber.Canceled() {
+				return
+			}
+			var last struct {
+				sync.Mutex
+				at	time.Time
+				done	bool
+			}
+			last.at = subscribeOn.Now()
+			timer := func(self func(time.Duration)) {
+				last.Lock()
+				defer last.Unlock()
+				if last.done || subscriber.Canceled() {
 					return
 				}
+				deadline := last.at.Add(timeout)
+				now := subscribeOn.Now()
+				if now.Before(deadline) {
+					self(deadline.Sub(now))
+					return
+				}
+				last.done = true
+				observe(zero, ErrTimeout, true)
+			}
+			subscribeOn.ScheduleFutureRecursive(timeout, timer)
+			observer := func(next interface{}, err error, done bool) {
+				last.Lock()
+				defer last.Unlock()
+				if last.done || subscriber.Canceled() {
+					return
+				}
+				now := subscribeOn.Now()
+				deadline := last.at.Add(timeout)
+				if !now.Before(deadline) {
+					return
+				}
+				last.done = done
+				last.at = now
 				observe(next, err, done)
-				if done {
-					return
-				}
-				deadline.Reset(timeout)
 			}
+			o(observer, subscribeOn, subscriber)
 		}
-		timeouter := func() {
-			select {
-			case <-deadline.C:
-				if subscriber.Closed() {
-					return
-				}
-				observe(nil, ErrTimeout, true)
-			case <-unsubscribe:
-			}
+		if subscribeOn.IsAsynchronous() {
+			operator()
+		} else {
+			subscribeOn.Schedule(operator)
 		}
-		go timeouter()
-		o(observer, subscribeOn, subscriber.Add(func() { close(unsubscribe) }))
 	})
 	return observable.Serialize()
 }
@@ -257,6 +275,41 @@ func (o Observable) Catch(catch Observable) Observable {
 func TrampolineScheduler() Scheduler	{ return scheduler.Trampoline }
 
 func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
+
+//jig:name ObservableIntPrintln
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println is performed on the Trampoline scheduler.
+func (o ObservableInt) Println() (err error) {
+	subscriber := subscriber.New()
+	scheduler := TrampolineScheduler()
+	observer := func(next int, e error, done bool) {
+		if !done {
+			fmt.Println(next)
+		} else {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
+}
+
+//jig:name ObservableIntAsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
 
 //jig:name SubscribeOption
 
@@ -331,6 +384,7 @@ func newSchedulerAndSubscriber(setters []SubscribeOption) (Scheduler, Subscriber
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
+// Subscribe by default is performed on the Trampoline scheduler.
 func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOption) Subscription {
 	scheduler, subscriber := newSchedulerAndSubscriber(options)
 	observer := func(next int, err error, done bool) {
@@ -355,49 +409,25 @@ func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOpt
 // complex chains of observables, like when merging the output of multiple
 // observables.
 func (o ObservableInt) ToSlice(options ...SubscribeOption) (slice []int, err error) {
-	scheduler := GoroutineScheduler()
 	o.Subscribe(func(next int, e error, done bool) {
 		if !done {
 			slice = append(slice, next)
 		} else {
 			err = e
 		}
-	}, SubscribeOn(scheduler, options...)).Wait()
+	}, options...).Wait()
 	return
 }
 
-//jig:name ObservableIntAsObservable
+//jig:name ObservableSubscribeOn
 
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
+// SubscribeOn specifies the scheduler an Observable should use when it is
+// subscribed to.
+func (o Observable) SubscribeOn(subscribeOn Scheduler) Observable {
+	observable := func(observe ObserveFunc, _ Scheduler, subscriber Subscriber) {
+		o(observe, subscribeOn, subscriber)
 	}
 	return observable
-}
-
-//jig:name ObservableIntPrintln
-
-// Println subscribes to the Observable and prints every item to os.Stdout
-// while it waits for completion or error. Returns either the error or nil
-// when the Observable completed normally.
-func (o ObservableInt) Println() (err error) {
-	subscriber := subscriber.New()
-	scheduler := TrampolineScheduler()
-	observer := func(next int, e error, done bool) {
-		if !done {
-			fmt.Println(next)
-		} else {
-			err = e
-			subscriber.Unsubscribe()
-		}
-	}
-	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
 }
 
 //jig:name ErrTypecastToInt
@@ -424,17 +454,6 @@ func (o Observable) AsObservableInt() ObservableInt {
 			}
 		}
 		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableSubscribeOn
-
-// SubscribeOn specifies the scheduler an Observable should use when it is
-// subscribed to.
-func (o Observable) SubscribeOn(subscribeOn Scheduler) Observable {
-	observable := func(observe ObserveFunc, _ Scheduler, subscriber Subscriber) {
-		o(observe, subscribeOn, subscriber)
 	}
 	return observable
 }

@@ -1,23 +1,40 @@
 package ToSingle
 
-import (
-	"fmt"
-)
+import	"fmt"
 
-// ToSingle is used to make sure only a single value was produced by the
-// observable. ToSingle will internally run the observable on an asynchronous
-// scheduler. However it will only return when the observable was complete or
-// an error was emitted.
-func Example_toSingle() {
-	if value, err := FromInt(19).ToSingle(); err == nil {
-		fmt.Println(value)
-	}
 
-	if _, err := FromInts(19, 20).ToSingle(); err != nil {
-		fmt.Println(err)
-	}
+func Example_correct() {
+	value, err := FromInts(3).ToSingle()
 
+	fmt.Println(value)
+	fmt.Println(err)
 	// Output:
-	// 19
+	// 3
+	// <nil>
+}
+
+// ToSingle will return an error when the observable completes without emitting
+// a single value.
+func Example_empty() {
+	value, err := EmptyInt().ToSingle()
+
+	fmt.Println(value)
+	fmt.Println(err)
+	// Output:
+	// 0
+	// expected one value, got none
+}
+
+// ToSingle will return an error when the observable emits multiple values.
+func Example_multiple() {
+	value, err := FromInts(19, 20).ToSingle()
+
+	fmt.Println(value)
+	fmt.Println(err)
+	// Output:
+	// 0
 	// expected one value, got multiple
 }
+
+
+

@@ -8,7 +8,7 @@ import (
 )
 
 func TestTakeUntil(t *testing.T) {
-	interrupt := Never().Timeout(150 * time.Millisecond).Catch(Just("stop"))
+	interrupt := Never().Timeout(150 * time.Millisecond).Catch(Just("stop")).SubscribeOn(GoroutineScheduler())
 	result, err := Interval(100 * time.Millisecond).TakeUntil(interrupt).ToSlice()
 
 	expect := []int{0}

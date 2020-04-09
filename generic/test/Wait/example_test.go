@@ -4,9 +4,7 @@ import (
 	"fmt"
 )
 
-// Shows how to correctly wait for an observable to finish without doing
-// anything with the data.
-func Example_wait() {
+func Example_basic() {
 	// Create an observable of int values
 	observable := CreateInt(func(observer IntObserver) {
 		observer.Next(456)
@@ -20,7 +18,6 @@ func Example_wait() {
 	err := observable.Wait()
 
 	fmt.Println(err)
-
 	// Output:
 	// <nil>
 }

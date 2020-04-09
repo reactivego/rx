@@ -42,6 +42,30 @@ var zeroInt int
 // function, scheduler and an subscriber.
 type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 
+//jig:name RepeatInt
+
+// RepeatInt creates an ObservableInt that emits a particular item or sequence
+// of items repeatedly.
+func RepeatInt(value int, count int) ObservableInt {
+	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		i := 0
+		scheduler.ScheduleRecursive(func(self func()) {
+			if !subscriber.Canceled() {
+				if i < count {
+					observe(value, nil, false)
+					if !subscriber.Canceled() {
+						i++
+						self()
+					}
+				} else {
+					observe(zeroInt, nil, true)
+				}
+			}
+		})
+	}
+	return observable
+}
+
 //jig:name IntObserveFuncMethods
 
 // Next is called by an ObservableInt to emit the next int value to the
@@ -99,64 +123,6 @@ func CreateInt(f func(IntObserver)) ObservableInt {
 		})
 	}
 	return observable
-}
-
-//jig:name RepeatInt
-
-// RepeatInt creates an ObservableInt that emits a particular item or sequence
-// of items repeatedly.
-func RepeatInt(value int, count int) ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		i := 0
-		subscribeOn.ScheduleRecursive(func(self func()) {
-			if !subscriber.Canceled() {
-				if i < count {
-					observe(value, nil, false)
-					if !subscriber.Canceled() {
-						i++
-						self()
-					}
-				} else {
-					observe(zeroInt, nil, true)
-				}
-			}
-		})
-	}
-	return observable
-}
-
-//jig:name ObservableRepeat
-
-// Repeat creates an Observable that emits a sequence of items repeatedly.
-func (o Observable) Repeat(count int) Observable {
-	if count == 0 {
-		return Empty()
-	}
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		var repeated int
-		var observer ObserveFunc
-		observer = func(next interface{}, err error, done bool) {
-			if !done || err != nil {
-				observe(next, err, done)
-			} else {
-				repeated++
-				if repeated < count {
-					o(observer, subscribeOn, subscriber)
-				} else {
-					observe(nil, nil, true)
-				}
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableIntRepeat
-
-// Repeat creates an ObservableInt that emits a sequence of items repeatedly.
-func (o ObservableInt) Repeat(count int) ObservableInt {
-	return o.AsObservable().Repeat(count).AsObservableInt()
 }
 
 //jig:name Schedulers
@@ -238,6 +204,7 @@ func newSchedulerAndSubscriber(setters []SubscribeOption) (Scheduler, Subscriber
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
+// Subscribe by default is performed on the Trampoline scheduler.
 func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOption) Subscription {
 	scheduler, subscriber := newSchedulerAndSubscriber(options)
 	observer := func(next int, err error, done bool) {
@@ -262,15 +229,48 @@ func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOpt
 // complex chains of observables, like when merging the output of multiple
 // observables.
 func (o ObservableInt) ToSlice(options ...SubscribeOption) (slice []int, err error) {
-	scheduler := GoroutineScheduler()
 	o.Subscribe(func(next int, e error, done bool) {
 		if !done {
 			slice = append(slice, next)
 		} else {
 			err = e
 		}
-	}, SubscribeOn(scheduler, options...)).Wait()
+	}, options...).Wait()
 	return
+}
+
+//jig:name ObservableRepeat
+
+// Repeat creates an Observable that emits a sequence of items repeatedly.
+func (o Observable) Repeat(count int) Observable {
+	if count == 0 {
+		return Empty()
+	}
+	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		var repeated int
+		var observer ObserveFunc
+		observer = func(next interface{}, err error, done bool) {
+			if !done || err != nil {
+				observe(next, err, done)
+			} else {
+				repeated++
+				if repeated < count {
+					o(observer, scheduler, subscriber)
+				} else {
+					observe(nil, nil, true)
+				}
+			}
+		}
+		o(observer, scheduler, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableIntRepeat
+
+// Repeat creates an ObservableInt that emits a sequence of items repeatedly.
+func (o ObservableInt) Repeat(count int) ObservableInt {
+	return o.AsObservable().Repeat(count).AsObservableInt()
 }
 
 //jig:name ObserveFunc
@@ -297,8 +297,8 @@ type Observable func(ObserveFunc, Scheduler, Subscriber)
 
 // Empty creates an Observable that emits no items but terminates normally.
 func Empty() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		subscribeOn.Schedule(func() {
+	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		scheduler.Schedule(func() {
 			if !subscriber.Canceled() {
 				observe(zero, nil, true)
 			}
@@ -354,6 +354,17 @@ func (o Observable) TakeLast(n int) Observable {
 // TakeLast emits only the last n items emitted by an ObservableInt.
 func (o ObservableInt) TakeLast(n int) ObservableInt {
 	return o.AsObservable().TakeLast(n).AsObservableInt()
+}
+
+//jig:name ObservableIntSubscribeOn
+
+// SubscribeOn specifies the scheduler an ObservableInt should use when it is
+// subscribed to.
+func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
+	observable := func(observe IntObserveFunc, _ Scheduler, subscriber Subscriber) {
+		o(observe, subscribeOn, subscriber)
+	}
+	return observable
 }
 
 //jig:name RxError
