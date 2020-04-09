@@ -20,6 +20,7 @@ type Subscription subscriber.Subscription
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
+// Println is performed on the Trampoline scheduler.
 func (o ObservableFoo) Println() (err error) {
 	subscriber := subscriber.New()
 	scheduler := TrampolineScheduler()
@@ -41,7 +42,7 @@ func (o ObservableFoo) Println() (err error) {
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
-// Subscription is performed on the normal Trampoline scheduler.
+// Subscription is performed on the Trampoline scheduler.
 func (o ObservableFoo) Wait() (err error) {
 	subscriber := subscriber.New()
 	scheduler := TrampolineScheduler()
@@ -131,6 +132,7 @@ func newSchedulerAndSubscriber(setters []SubscribeOption) (Scheduler, Subscriber
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
+// Subscribe by default is performed on the Trampoline scheduler.
 func (o ObservableFoo) Subscribe(observe FooObserveFunc, options ...SubscribeOption) Subscription {
 	scheduler, subscriber := newSchedulerAndSubscriber(options)
 	observer := func(next foo, err error, done bool) {
@@ -150,6 +152,7 @@ func (o ObservableFoo) Subscribe(observe FooObserveFunc, options ...SubscribeOpt
 
 // SubscribeNext operates upon the emissions from an Observable only.
 // This method returns a Subscription.
+// SubscribeNext by default is performed on the Trampoline scheduler.
 func (o ObservableFoo) SubscribeNext(f func(next foo), options ...SubscribeOption) Subscription {
 	return o.Subscribe(func(next foo, err error, done bool) {
 		if !done {
@@ -167,9 +170,10 @@ func (o ObservableFoo) SubscribeNext(f func(next foo), options ...SubscribeOptio
 // values.
 //
 // Because the channel is fed by subscribing to the observable, ToChan would
-// block when subscribed on the standard Trampoline scheduler which is
-// initially synchronous. That's why the subscribing is done on the
-// Goroutine scheduler.
+// block when subscribed on the Trampoline scheduler which is initially
+// synchronous. That's why the subscribing is done on the Goroutine scheduler.
+// This also means that the code reading the channel can do so while running
+// on the main goroutine.
 //
 // To cancel the subscription created internally by ToChan you will need access
 // to the subscription used internally by ToChan. To get at this subscription,
@@ -231,14 +235,13 @@ func (o ObservableFoo) ToChan(options ...SubscribeOption) <-chan foo {
 // complex chains of observables, like when merging the output of multiple
 // observables.
 func (o ObservableFoo) ToSingle(options ...SubscribeOption) (entry foo, err error) {
-	scheduler := GoroutineScheduler()
 	o.Single().Subscribe(func(next foo, e error, done bool) {
 		if !done {
 			entry = next
 		} else {
 			err = e
 		}
-	}, SubscribeOn(scheduler, options...)).Wait()
+	}, options...).Wait()
 	return
 }
 
@@ -253,13 +256,12 @@ func (o ObservableFoo) ToSingle(options ...SubscribeOption) (entry foo, err erro
 // complex chains of observables, like when merging the output of multiple
 // observables.
 func (o ObservableFoo) ToSlice(options ...SubscribeOption) (slice []foo, err error) {
-	scheduler := GoroutineScheduler()
 	o.Subscribe(func(next foo, e error, done bool) {
 		if !done {
 			slice = append(slice, next)
 		} else {
 			err = e
 		}
-	}, SubscribeOn(scheduler, options...)).Wait()
+	}, options...).Wait()
 	return
 }
