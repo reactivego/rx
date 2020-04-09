@@ -1,6 +1,4 @@
 /*
-AsObservable operator tests.
-
 	AsObservableBar
 
 AsObservableBar when called on an Observable source will type assert the

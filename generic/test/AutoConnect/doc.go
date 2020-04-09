@@ -1,6 +1,4 @@
 /*
-AutoConnect operator tests.
-
 	AutoConnect
 
 AutoConnect is a declarative way of calling Connect on a Connectable. It is an

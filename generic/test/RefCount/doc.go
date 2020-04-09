@@ -1,6 +1,4 @@
 /*
-RefCount operator tests.
-
 	RefCount http://reactivex.io/documentation/operators/refcount.html
 
 RefCount is a declarative way of calling Connect on a Connectable. It is an

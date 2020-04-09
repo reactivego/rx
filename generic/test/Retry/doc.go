@@ -1,7 +1,7 @@
 /*
-Retry operator tests.
-
 	Retry	http://reactivex.io/documentation/operators/retry.html
+
+Retry operator tests.
 */
 package Retry
 

@@ -1,6 +1,4 @@
 /*
-CombineAll operator tests.
-
 	CombineAll
 
 CombineAll flattens a higher order observable (e.g. an ObservableObservableInt)

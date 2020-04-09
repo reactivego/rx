@@ -1,7 +1,7 @@
 /*
-TakeLast operator tests.
-
 	TakeLast	http://reactivex.io/documentation/operators/takelast.html
+
+TakeLast operator tests.
 */
 package TakeLast
 

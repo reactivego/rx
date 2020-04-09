@@ -1,10 +1,8 @@
 /*
-Wait tests.
-
 	Wait
 
-This method subscribes to an observable and waits for it to finish without
-doing anything with the emitted items.
+Wait subscribes to an observable and waits for it to finish without doing
+anything with the emitted items.
 */
 package Wait
 

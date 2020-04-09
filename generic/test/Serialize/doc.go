@@ -1,6 +1,4 @@
 /*
-Serialize operator tests.
-
 	Serialize
 
 Serialize forces an observable to make serialized calls and to be well-behaved.

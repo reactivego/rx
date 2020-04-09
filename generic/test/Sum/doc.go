@@ -1,7 +1,7 @@
 /*
-Sum operator tests.
-
 	Sum	http://reactivex.io/documentation/operators/sum.html
+
+Sum operator tests.
 */
 package Sum
 

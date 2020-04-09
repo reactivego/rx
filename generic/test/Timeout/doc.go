@@ -1,6 +1,4 @@
 /*
-Timeout operator tests.
-
 	Timeout	http://reactivex.io/documentation/operators/timeout.html
 
 Timeout mirrors the source Observable, but issue an error notification if a

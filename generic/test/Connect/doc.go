@@ -1,7 +1,7 @@
 /*
 Connect tests.
 
-	Connects	http://reactivex.io/documentation/operators/connect.html
+	Connect	http://reactivex.io/documentation/operators/connect.html
 
 This method subscribes to an observable.
 */

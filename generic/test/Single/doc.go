@@ -1,6 +1,4 @@
 /*
-Single operator tests.
-
 	Single
 
 Single enforces that the observable sends exactly one data item and then

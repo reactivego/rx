@@ -1,11 +1,8 @@
 /*
-ToSlice tests.
-
 	ToSlice		http://reactivex.io/documentation/operators/to.html
 
-This method subscribes to an observable and will run the observable to completion
-and then return the resulting slice and any error that was emitted by the
-observable.
+ToSlice collects all values from the Observable into an slice. The complete
+slice and any error are returned.
 */
 package ToSlice
 
