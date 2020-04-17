@@ -25,6 +25,11 @@ type Subscriber subscriber.Subscriber
 // Subscription is an alias for the subscriber.Subscription interface type.
 type Subscription subscriber.Subscription
 
+// NewSubscriber creates a new subscriber.
+func NewSubscriber() Subscriber {
+	return subscriber.New()
+}
+
 //jig:name IntObserveFunc
 
 // IntObserveFunc is the observer, a function that gets called whenever the
@@ -49,9 +54,9 @@ type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 
 // FromSliceInt creates an ObservableInt from a slice of int values passed in.
 func FromSliceInt(slice []int) ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
-		subscribeOn.ScheduleRecursive(func(self func()) {
+		scheduler.ScheduleRecursive(func(self func()) {
 			if !subscriber.Canceled() {
 				if i < len(slice) {
 					observe(slice[i], nil, false)
@@ -141,7 +146,7 @@ func newSchedulerAndSubscriber(setters []SubscribeOption) (Scheduler, Subscriber
 		setter(options)
 	}
 	if options.subscriber == nil {
-		options.subscriber = subscriber.New()
+		options.subscriber = NewSubscriber()
 	}
 	options.subscriber.OnUnsubscribe(options.onUnsubscribe)
 	if options.onSubscribe != nil {
@@ -154,6 +159,7 @@ func newSchedulerAndSubscriber(setters []SubscribeOption) (Scheduler, Subscriber
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
+// Subscribe by default is performed on the Trampoline scheduler.
 func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOption) Subscription {
 	scheduler, subscriber := newSchedulerAndSubscriber(options)
 	observer := func(next int, err error, done bool) {
@@ -225,7 +231,7 @@ func (o ObservableInt) Multicast(factory func() SubjectInt) ConnectableInt {
 			subjectValue.Store(factory())
 		}
 		if atomic.CompareAndSwapInt32(&subscriberValue.state, unsubscribed, subscribed) {
-			scheduler := GoroutineScheduler()
+			scheduler := TrampolineScheduler()
 			subscriber := subscriber.New()
 			o.Subscribe(observer, SubscribeOn(scheduler, options...), WithSubscriber(subscriber))
 			subscriberValue.Store(subscriber)
@@ -344,6 +350,26 @@ func (o ObservableInt) Publish() ConnectableInt {
 	return o.Multicast(NewSubjectInt)
 }
 
+//jig:name ObservableIntSubscribeOn
+
+// SubscribeOn specifies the scheduler an ObservableInt should use when it is
+// subscribed to.
+func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
+	observable := func(observe IntObserveFunc, _ Scheduler, subscriber Subscriber) {
+		o(observe, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ConnectableIntConnect
+
+// Connect instructs a connectable Observable to begin emitting items to its
+// subscribers. All values will then be passed on to the observers that
+// subscribed to this connectable observable
+func (c ConnectableInt) Connect(options ...SubscribeOption) Subscription {
+	return c.connect(options)
+}
+
 //jig:name ObserveFunc
 
 // ObserveFunc is the observer, a function that gets called whenever the
@@ -423,60 +449,6 @@ func Create(f func(Observer)) Observable {
 	return observable
 }
 
-//jig:name ObservableIntSubscribeOn
-
-// SubscribeOn specifies the scheduler an ObservableInt should use when it is
-// subscribed to.
-func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
-	observable := func(observe IntObserveFunc, _ Scheduler, subscriber Subscriber) {
-		o(observe, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ConnectableIntConnect
-
-// Connect instructs a connectable Observable to begin emitting items to its
-// subscribers. All values will then be passed on to the observers that
-// subscribed to this connectable observable
-func (c ConnectableInt) Connect(options ...SubscribeOption) Subscription {
-	return c.connect(options)
-}
-
-//jig:name RxError
-
-type RxError string
-
-func (e RxError) Error() string	{ return string(e) }
-
-//jig:name ErrTypecastToInt
-
-// ErrTypecastToInt is delivered to an observer if the generic value cannot be
-// typecast to int.
-const ErrTypecastToInt = RxError("typecast to int failed")
-
-//jig:name ObservableAsObservableInt
-
-// AsInt turns an Observable of interface{} into an ObservableInt. If during
-// observing a typecast fails, the error ErrTypecastToInt will be emitted.
-func (o Observable) AsObservableInt() ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				if nextInt, ok := next.(int); ok {
-					observe(nextInt, err, done)
-				} else {
-					observe(zeroInt, ErrTypecastToInt, true)
-				}
-			} else {
-				observe(zeroInt, err, true)
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name ObservableIntMapString
 
 // MapString transforms the items emitted by an ObservableInt by applying a
@@ -507,6 +479,40 @@ func (o ObservableInt) MapBool(project func(int) bool) ObservableBool {
 				mapped = project(next)
 			}
 			observe(mapped, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name RxError
+
+type RxError string
+
+func (e RxError) Error() string	{ return string(e) }
+
+//jig:name ErrTypecastToInt
+
+// ErrTypecastToInt is delivered to an observer if the generic value cannot be
+// typecast to int.
+const ErrTypecastToInt = RxError("typecast to int failed")
+
+//jig:name ObservableAsObservableInt
+
+// AsInt turns an Observable of interface{} into an ObservableInt. If during
+// observing a typecast fails, the error ErrTypecastToInt will be emitted.
+func (o Observable) AsObservableInt() ObservableInt {
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				if nextInt, ok := next.(int); ok {
+					observe(nextInt, err, done)
+				} else {
+					observe(zeroInt, ErrTypecastToInt, true)
+				}
+			} else {
+				observe(zeroInt, err, true)
+			}
 		}
 		o(observer, subscribeOn, subscriber)
 	}
@@ -557,6 +563,7 @@ type ObservableBool func(BoolObserveFunc, Scheduler, Subscriber)
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
+// Subscribe by default is performed on the Trampoline scheduler.
 func (o ObservableString) Subscribe(observe StringObserveFunc, options ...SubscribeOption) Subscription {
 	scheduler, subscriber := newSchedulerAndSubscriber(options)
 	observer := func(next string, err error, done bool) {
@@ -575,6 +582,7 @@ func (o ObservableString) Subscribe(observe StringObserveFunc, options ...Subscr
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
+// Subscribe by default is performed on the Trampoline scheduler.
 func (o ObservableBool) Subscribe(observe BoolObserveFunc, options ...SubscribeOption) Subscription {
 	scheduler, subscriber := newSchedulerAndSubscriber(options)
 	observer := func(next bool, err error, done bool) {
