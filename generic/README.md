@@ -69,25 +69,25 @@ Folowing is a list of [ReactiveX operators](http://reactivex.io/documentation/op
 ### Creating Operators
 Operators that originate new Observables.
 
-- [**Create**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Create/)() :star: Observable
-- [**Defer**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Defer/)() Observable
-- [**Empty**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Empty/)() Observable
-- [**Error**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Error/)() Observable
-- [**FromChan**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/From/)() Observable
+- [**Create**](https://godoc.org/github.com/reactivego/rx/generic/test/Create/)() :star: Observable
+- [**Defer**](https://godoc.org/github.com/reactivego/rx/generic/test/Defer/)() Observable
+- [**Empty**](https://godoc.org/github.com/reactivego/rx/generic/test/Empty/)() Observable
+- [**Error**](https://godoc.org/github.com/reactivego/rx/generic/test/Error/)() Observable
+- [**FromChan**](https://godoc.org/github.com/reactivego/rx/generic/test/From/)() Observable
 - FromEventSource
 - FromIterable
 - FromIterator
-- [**FromSlice**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/From/)() Observable
-- [**Froms**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/From/)() Observable
-- [**From**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/From/)() :star: Observable
-- [**Interval**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Interval/)() ObservableInt
-- [**Just**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Just/)() :star: Observable
-- [**Never**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Never/)() Observable
-- [**Range**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Range/)() ObservableInt
-- [**Repeat**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Repeat/)() Observable
-- (Observable) [**Repeat**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Repeat/)() Observable
-- [**Start**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Start/)() Observable
-- [**Throw**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Throw/)() Observable
+- [**FromSlice**](https://godoc.org/github.com/reactivego/rx/generic/test/From/)() Observable
+- [**Froms**](https://godoc.org/github.com/reactivego/rx/generic/test/From/)() Observable
+- [**From**](https://godoc.org/github.com/reactivego/rx/generic/test/From/)() :star: Observable
+- [**Interval**](https://godoc.org/github.com/reactivego/rx/generic/test/Interval/)() ObservableInt
+- [**Just**](https://godoc.org/github.com/reactivego/rx/generic/test/Just/)() :star: Observable
+- [**Never**](https://godoc.org/github.com/reactivego/rx/generic/test/Never/)() Observable
+- [**Range**](https://godoc.org/github.com/reactivego/rx/generic/test/Range/)() ObservableInt
+- [**Repeat**](https://godoc.org/github.com/reactivego/rx/generic/test/Repeat/)() Observable
+- (Observable) [**Repeat**](https://godoc.org/github.com/reactivego/rx/generic/test/Repeat/)() Observable
+- [**Start**](https://godoc.org/github.com/reactivego/rx/generic/test/Start/)() Observable
+- [**Throw**](https://godoc.org/github.com/reactivego/rx/generic/test/Throw/)() Observable
 
 ### Transforming Operators
 Operators that transform items that are emitted by an Observable.
@@ -96,82 +96,82 @@ Operators that transform items that are emitted by an Observable.
 - BufferWithTime :star:
 - BufferWithTimeOrCount
 - ConcatMap :star:
-- (Observable) [**Map**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Map/)() :star: Observable
-- (Observable) [**MergeMap**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/MergeMap/)() :star: Observable
-- (Observable) [**Scan**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Scan/)() :star: Observable
-- (Observable) [**SwitchMap**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/SwitchMap/)() :star: Observable
+- (Observable) [**Map**](https://godoc.org/github.com/reactivego/rx/generic/test/Map/)() :star: Observable
+- (Observable) [**MergeMap**](https://godoc.org/github.com/reactivego/rx/generic/test/MergeMap/)() :star: Observable
+- (Observable) [**Scan**](https://godoc.org/github.com/reactivego/rx/generic/test/Scan/)() :star: Observable
+- (Observable) [**SwitchMap**](https://godoc.org/github.com/reactivego/rx/generic/test/SwitchMap/)() :star: Observable
 
 ### Filtering Operators
 Operators that selectively emit items from a source Observable.
 
-- (Observable) [**Debounce**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Debounce/)() Observable
+- (Observable) [**Debounce**](https://godoc.org/github.com/reactivego/rx/generic/test/Debounce/)() Observable
 - DebounceTime :star:
-- (Observable) [**Distinct**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Distinct/)() Observable
+- (Observable) [**Distinct**](https://godoc.org/github.com/reactivego/rx/generic/test/Distinct/)() Observable
 - DistinctUntilChanged :star:
-- (Observable) [**ElementAt**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/ElementAt/)() Observable
-- (Observable) [**Filter**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Filter/)() :star: Observable
-- (Observable) [**First**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/First/)() Observable
+- (Observable) [**ElementAt**](https://godoc.org/github.com/reactivego/rx/generic/test/ElementAt/)() Observable
+- (Observable) [**Filter**](https://godoc.org/github.com/reactivego/rx/generic/test/Filter/)() :star: Observable
+- (Observable) [**First**](https://godoc.org/github.com/reactivego/rx/generic/test/First/)() Observable
 - FirstOrDefault
-- (Observable) [**IgnoreElements**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/IgnoreElements/)() Observable
-- (Observable) [**IgnoreCompletion**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/IgnoreCompletion/)() Observable
-- (Observable) [**Last**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Last/)() Observable
+- (Observable) [**IgnoreElements**](https://godoc.org/github.com/reactivego/rx/generic/test/IgnoreElements/)() Observable
+- (Observable) [**IgnoreCompletion**](https://godoc.org/github.com/reactivego/rx/generic/test/IgnoreCompletion/)() Observable
+- (Observable) [**Last**](https://godoc.org/github.com/reactivego/rx/generic/test/Last/)() Observable
 - LastOrDefault
-- (Observable) [**Sample**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Sample/)() Observable
-- (Observable) [**Single**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Single/)() Observable
-- (Observable) [**Skip**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Skip/)() Observable
-- (Observable) [**SkipLast**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/SkipLast/)() Observable
+- (Observable) [**Sample**](https://godoc.org/github.com/reactivego/rx/generic/test/Sample/)() Observable
+- (Observable) [**Single**](https://godoc.org/github.com/reactivego/rx/generic/test/Single/)() Observable
+- (Observable) [**Skip**](https://godoc.org/github.com/reactivego/rx/generic/test/Skip/)() Observable
+- (Observable) [**SkipLast**](https://godoc.org/github.com/reactivego/rx/generic/test/SkipLast/)() Observable
 - SkipWhile
-- (Observable) [**Take**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Take/)() :star: Observable
-- (Observable) [**TakeLast**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/TakeLast/)() Observable
-- (Observable) [**TakeUntil**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/TakeUntil/)() :star: Observable
-- (Observable) [**TakeWhile**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/TakeWhile/)() :star: Observable
+- (Observable) [**Take**](https://godoc.org/github.com/reactivego/rx/generic/test/Take/)() :star: Observable
+- (Observable) [**TakeLast**](https://godoc.org/github.com/reactivego/rx/generic/test/TakeLast/)() Observable
+- (Observable) [**TakeUntil**](https://godoc.org/github.com/reactivego/rx/generic/test/TakeUntil/)() :star: Observable
+- (Observable) [**TakeWhile**](https://godoc.org/github.com/reactivego/rx/generic/test/TakeWhile/)() :star: Observable
 
 ### Combining Operators
 Operators that work with multiple source Observables to create a single Observable.
 
-- (Observable<sup>2</sup>) [**ConbineAll**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/CombineAll/)() Observable
+- (Observable<sup>2</sup>) [**ConbineAll**](https://godoc.org/github.com/reactivego/rx/generic/test/CombineAll/)() Observable
 - CombineLatest :star:
-- [**Concat**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Concat/)() :star: Observable
-- (Observable) [**Concat**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Concat/)() :star: Observable
-- (Observable<sup>2</sup>) [**ConcatAll**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/ConcatAll/)() Observable
-- [**Merge**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Merge/)() Observable
-- (Observable) [**Merge**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Merge/)() :star: Observable
-- (Observable<sup>2</sup>) [**MergeAll**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/MergeAll/)() Observable
-- [**MergeDelayError**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/MergeDelayError/)() Observable
-- (Observable) [**MergeDelayError**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/MergeDelayError/)() Observable
+- [**Concat**](https://godoc.org/github.com/reactivego/rx/generic/test/Concat/)() :star: Observable
+- (Observable) [**Concat**](https://godoc.org/github.com/reactivego/rx/generic/test/Concat/)() :star: Observable
+- (Observable<sup>2</sup>) [**ConcatAll**](https://godoc.org/github.com/reactivego/rx/generic/test/ConcatAll/)() Observable
+- [**Merge**](https://godoc.org/github.com/reactivego/rx/generic/test/Merge/)() Observable
+- (Observable) [**Merge**](https://godoc.org/github.com/reactivego/rx/generic/test/Merge/)() :star: Observable
+- (Observable<sup>2</sup>) [**MergeAll**](https://godoc.org/github.com/reactivego/rx/generic/test/MergeAll/)() Observable
+- [**MergeDelayError**](https://godoc.org/github.com/reactivego/rx/generic/test/MergeDelayError/)() Observable
+- (Observable) [**MergeDelayError**](https://godoc.org/github.com/reactivego/rx/generic/test/MergeDelayError/)() Observable
 - StartWith :star:
 - StartWithItems
 - StartWithIterable
 - StartWithObservable
-- (Observable<sup>2</sup>) [**SwitchAll**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/SwitchAll/)() Observable
+- (Observable<sup>2</sup>) [**SwitchAll**](https://godoc.org/github.com/reactivego/rx/generic/test/SwitchAll/)() Observable
 - WithLatestFrom :star:
 - ZipFromObservable
 
 ### Error Handling Operators
 Operators that help to recover from error notifications from an Observable.
 
-- (Observable) [**Catch**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Catch/)() :star: Observable
+- (Observable) [**Catch**](https://godoc.org/github.com/reactivego/rx/generic/test/Catch/)() :star: Observable
 - OnErrorResumeNext
 - OnErrorReturn
 - OnErrorReturnItem
-- (Observable) [**Retry**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Retry/)() Observable
+- (Observable) [**Retry**](https://godoc.org/github.com/reactivego/rx/generic/test/Retry/)() Observable
 
 ### Utility Operators
 A toolbox of useful Operators for working with Observables.
 
-- (Observable) [**Delay**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Delay/)() Observable
-- (Observable) [**Do**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Do/)() :star: Observable
-- (Observable) [**DoOnError**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Do/)() Observable
-- (Observable) [**DoOnComplete**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Do/)() Observable
-- (Observable) [**Finally**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Do/)() Observable
-- (Observable) [**Passthrough**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Passthrough/)() Observable
-- (Observable) [**Serialize**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Serialize/)() Observable
-- (Observable) [**Timeout**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Timeout/)() Observable
+- (Observable) [**Delay**](https://godoc.org/github.com/reactivego/rx/generic/test/Delay/)() Observable
+- (Observable) [**Do**](https://godoc.org/github.com/reactivego/rx/generic/test/Do/)() :star: Observable
+- (Observable) [**DoOnError**](https://godoc.org/github.com/reactivego/rx/generic/test/Do/)() Observable
+- (Observable) [**DoOnComplete**](https://godoc.org/github.com/reactivego/rx/generic/test/Do/)() Observable
+- (Observable) [**Finally**](https://godoc.org/github.com/reactivego/rx/generic/test/Do/)() Observable
+- (Observable) [**Passthrough**](https://godoc.org/github.com/reactivego/rx/generic/test/Passthrough/)() Observable
+- (Observable) [**Serialize**](https://godoc.org/github.com/reactivego/rx/generic/test/Serialize/)() Observable
+- (Observable) [**Timeout**](https://godoc.org/github.com/reactivego/rx/generic/test/Timeout/)() Observable
 
 ### Conditional and Boolean Operators
 Operators that evaluate one or more Observables or items emitted by Observables.
 
-- (Observable) [**All**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/All/)() ObservableBool
+- (Observable) [**All**](https://godoc.org/github.com/reactivego/rx/generic/test/All/)() ObservableBool
 - Amb
 - Contains
 - DefaultIfEmpty
@@ -180,67 +180,67 @@ Operators that evaluate one or more Observables or items emitted by Observables.
 ### Mathematical and Aggregate Operators
 Operators that operate on the entire sequence of items emitted by an Observable.
 
-- (Observable) [**Average**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Average/)() Observable
-- (Observable) [**Count**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Count/)() ObservableInt
-- (Observable) [**Max**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Max/)() Observable
-- (Observable) [**Min**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Min/)() Observable
-- (Observable) [**Reduce**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Reduce/)() Observable
-- (Observable) [**Sum**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Sum/)() Observable
+- (Observable) [**Average**](https://godoc.org/github.com/reactivego/rx/generic/test/Average/)() Observable
+- (Observable) [**Count**](https://godoc.org/github.com/reactivego/rx/generic/test/Count/)() ObservableInt
+- (Observable) [**Max**](https://godoc.org/github.com/reactivego/rx/generic/test/Max/)() Observable
+- (Observable) [**Min**](https://godoc.org/github.com/reactivego/rx/generic/test/Min/)() Observable
+- (Observable) [**Reduce**](https://godoc.org/github.com/reactivego/rx/generic/test/Reduce/)() Observable
+- (Observable) [**Sum**](https://godoc.org/github.com/reactivego/rx/generic/test/Sum/)() Observable
 
 ### Type Casting and Type Filtering Operators
 Operators to type cast, type filter observables.
 
-- (Observable) [**AsObservable**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/AsObservable)() Observable
-- (Observable) [**Only**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Only/)() Observable
+- (Observable) [**AsObservable**](https://godoc.org/github.com/reactivego/rx/generic/test/AsObservable)() Observable
+- (Observable) [**Only**](https://godoc.org/github.com/reactivego/rx/generic/test/Only/)() Observable
 
 ### Scheduling Operators
 Change the scheduler for subscribing and observing.
 
-- (Observable) [**ObserveOn**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/ObserveOn/)() Observable
-- (Observable) [**SubscribeOn**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/SubscribeOn/)() Observable
+- (Observable) [**ObserveOn**](https://godoc.org/github.com/reactivego/rx/generic/test/ObserveOn/)() Observable
+- (Observable) [**SubscribeOn**](https://godoc.org/github.com/reactivego/rx/generic/test/SubscribeOn/)() Observable
 
 ### Multicasting Operators
 A *Connectable* is an *Observable* that can multicast to observers subscribed to it. The *Connectable* itself will subscribe to the *Observable* when the *Connect* method is called on it.
 
-- (Observable) [**Publish**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Publish/)() Connectable
-- (Observable) [**PublishReplay**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/PublishReplay/)() Connectable
+- (Observable) [**Publish**](https://godoc.org/github.com/reactivego/rx/generic/test/Publish/)() Connectable
+- (Observable) [**PublishReplay**](https://godoc.org/github.com/reactivego/rx/generic/test/PublishReplay/)() Connectable
 - PublishLast
 - PublishBehavior
 
 *Connectable* supports different strategies for subscribing to the *Observable* from which it was created.
 
-- (Connectable) [**RefCount**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/RefCount/)() Observable
-- (Connectable) [**AutoConnect**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/AutoConnect/)() Observable
-- (Connectable) [**Connect**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Connect)() Subscription
+- (Connectable) [**RefCount**](https://godoc.org/github.com/reactivego/rx/generic/test/RefCount/)() Observable
+- (Connectable) [**AutoConnect**](https://godoc.org/github.com/reactivego/rx/generic/test/AutoConnect/)() Observable
+- (Connectable) [**Connect**](https://godoc.org/github.com/reactivego/rx/generic/test/Connect)() Subscription
 
 ## Subjects
 A *Subject* is both a multicasting *Observable* as well as an *Observer*. The *Observable* side allows multiple simultaneous subscribers. The *Observer* side allows you to directly feed it data or subscribe it to another *Observable*.
 
-- [**NewSubject**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Subject)() Subject
-- [**NewReplaySubject**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/ReplaySubject)() Subject
+- [**NewSubject**](https://godoc.org/github.com/reactivego/rx/generic/test/Subject)() Subject
+- [**NewReplaySubject**](https://godoc.org/github.com/reactivego/rx/generic/test/ReplaySubject)() Subject
 
 ## Subscribing
 Subscribing breathes life into a chain of observables. An observable may be subscribed to many times. 
 
 **Println** and **Subscribe** implement subscribing behavior directly.
 
-- (Observable) [**Println**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Println)() error
-- (Observable) [**Subscribe**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Subscribe)() Subscription
+- (Observable) [**Println**](https://godoc.org/github.com/reactivego/rx/generic/test/Println)() error
+- (Observable) [**Subscribe**](https://godoc.org/github.com/reactivego/rx/generic/test/Subscribe)() Subscription
 
 **Subscribe** is called internally by **Connect**, **SubscribeNext**, **ToChan**, **ToSingle**, **ToSlice** and **Wait**.
 
-- (Connectable) [**Connect**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Connect)() Subscription
-- (Observable) [**SubscribeNext**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/SubscribeNext) Subscription
-- (Observable) [**ToChan**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/ToChan)() chan foo
-- (Observable) [**ToSingle**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/ToSingle)() (foo, error)
-- (Observable) [**ToSlice**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/ToSlice)() ([]foo, error)
-- (Observable) [**Wait**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/Wait)() error
+- (Connectable) [**Connect**](https://godoc.org/github.com/reactivego/rx/generic/test/Connect)() Subscription
+- (Observable) [**SubscribeNext**](https://godoc.org/github.com/reactivego/rx/generic/test/SubscribeNext) Subscription
+- (Observable) [**ToChan**](https://godoc.org/github.com/reactivego/rx/generic/test/ToChan)() chan foo
+- (Observable) [**ToSingle**](https://godoc.org/github.com/reactivego/rx/generic/test/ToSingle)() (foo, error)
+- (Observable) [**ToSlice**](https://godoc.org/github.com/reactivego/rx/generic/test/ToSlice)() ([]foo, error)
+- (Observable) [**Wait**](https://godoc.org/github.com/reactivego/rx/generic/test/Wait)() error
 
 
 **Connect** is called internally by **RefCount** and **AutoConnect**.
 
-- (Connectable) [**RefCount**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/RefCount)() Observable
-- (Connectable) [**AutoConnect**](https://godoc.org/github.com/ReactiveGo/rx/generic/test/AutoConnect)() Observable
+- (Connectable) [**RefCount**](https://godoc.org/github.com/reactivego/rx/generic/test/RefCount)() Observable
+- (Connectable) [**AutoConnect**](https://godoc.org/github.com/reactivego/rx/generic/test/AutoConnect)() Observable
 
 ## Generic Programming
 
