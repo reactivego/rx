@@ -27,6 +27,11 @@ type Subscriber subscriber.Subscriber
 // Subscription is an alias for the subscriber.Subscription interface type.
 type Subscription subscriber.Subscription
 
+// NewSubscriber creates a new subscriber.
+func NewSubscriber() Subscriber {
+	return subscriber.New()
+}
+
 //jig:name ObserveFunc
 
 // ObserveFunc is the observer, a function that gets called whenever the
@@ -1986,8 +1991,9 @@ func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
+// Println is performed on the Trampoline scheduler.
 func (o Observable) Println() (err error) {
-	subscriber := subscriber.New()
+	subscriber := NewSubscriber()
 	scheduler := TrampolineScheduler()
 	observer := func(next interface{}, e error, done bool) {
 		if !done {
@@ -2007,8 +2013,9 @@ func (o Observable) Println() (err error) {
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
+// Println is performed on the Trampoline scheduler.
 func (o ObservableBool) Println() (err error) {
-	subscriber := subscriber.New()
+	subscriber := NewSubscriber()
 	scheduler := TrampolineScheduler()
 	observer := func(next bool, e error, done bool) {
 		if !done {
@@ -2028,8 +2035,9 @@ func (o ObservableBool) Println() (err error) {
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
+// Println is performed on the Trampoline scheduler.
 func (o ObservableInt) Println() (err error) {
-	subscriber := subscriber.New()
+	subscriber := NewSubscriber()
 	scheduler := TrampolineScheduler()
 	observer := func(next int, e error, done bool) {
 		if !done {
@@ -2104,7 +2112,7 @@ func newSchedulerAndSubscriber(setters []SubscribeOption) (Scheduler, Subscriber
 		setter(options)
 	}
 	if options.subscriber == nil {
-		options.subscriber = subscriber.New()
+		options.subscriber = NewSubscriber()
 	}
 	options.subscriber.OnUnsubscribe(options.onUnsubscribe)
 	if options.onSubscribe != nil {
@@ -2117,6 +2125,7 @@ func newSchedulerAndSubscriber(setters []SubscribeOption) (Scheduler, Subscriber
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
+// Subscribe by default is performed on the Trampoline scheduler.
 func (o Observable) Subscribe(observe ObserveFunc, options ...SubscribeOption) Subscription {
 	scheduler, subscriber := newSchedulerAndSubscriber(options)
 	observer := func(next interface{}, err error, done bool) {
@@ -2135,6 +2144,7 @@ func (o Observable) Subscribe(observe ObserveFunc, options ...SubscribeOption) S
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
+// Subscribe by default is performed on the Trampoline scheduler.
 func (o ObservableBool) Subscribe(observe BoolObserveFunc, options ...SubscribeOption) Subscription {
 	scheduler, subscriber := newSchedulerAndSubscriber(options)
 	observer := func(next bool, err error, done bool) {
@@ -2153,6 +2163,7 @@ func (o ObservableBool) Subscribe(observe BoolObserveFunc, options ...SubscribeO
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
+// Subscribe by default is performed on the Trampoline scheduler.
 func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOption) Subscription {
 	scheduler, subscriber := newSchedulerAndSubscriber(options)
 	observer := func(next int, err error, done bool) {
@@ -2171,6 +2182,7 @@ func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOpt
 
 // SubscribeNext operates upon the emissions from an Observable only.
 // This method returns a Subscription.
+// SubscribeNext by default is performed on the Trampoline scheduler.
 func (o Observable) SubscribeNext(f func(next interface{}), options ...SubscribeOption) Subscription {
 	return o.Subscribe(func(next interface{}, err error, done bool) {
 		if !done {
@@ -2183,6 +2195,7 @@ func (o Observable) SubscribeNext(f func(next interface{}), options ...Subscribe
 
 // SubscribeNext operates upon the emissions from an Observable only.
 // This method returns a Subscription.
+// SubscribeNext by default is performed on the Trampoline scheduler.
 func (o ObservableBool) SubscribeNext(f func(next bool), options ...SubscribeOption) Subscription {
 	return o.Subscribe(func(next bool, err error, done bool) {
 		if !done {
@@ -2195,6 +2208,7 @@ func (o ObservableBool) SubscribeNext(f func(next bool), options ...SubscribeOpt
 
 // SubscribeNext operates upon the emissions from an Observable only.
 // This method returns a Subscription.
+// SubscribeNext by default is performed on the Trampoline scheduler.
 func (o ObservableInt) SubscribeNext(f func(next int), options ...SubscribeOption) Subscription {
 	return o.Subscribe(func(next int, err error, done bool) {
 		if !done {
@@ -2210,29 +2224,58 @@ func (o ObservableInt) SubscribeNext(f func(next int), options ...SubscribeOptio
 // returned channel will enit any error and then close without emitting any
 // values.
 //
-// Because the channel is fed by subscribing to the observable, ToChan would
-// block when subscribed on the standard Trampoline scheduler which is
-// initially synchronous. That's why the subscribing is done on the
-// Goroutine scheduler.
-//
-// To cancel the subscription created internally by ToChan you will need access
-// to the subscription used internally by ToChan. To get at this subscription,
-// pass the result of a call to option OnSubscribe(func(Subscription)) as a
-// parameter to ToChan. On suscription the callback will be called with the
-// subscription that was created.
-func (o Observable) ToChan(options ...SubscribeOption) <-chan interface{} {
+// This method subscribes to the observable on the Goroutine scheduler because
+// it needs the concurrency so the returned channel can be used by used
+// by the calling code directly. To cancel ToChan you will need to supply a
+// subscriber that you hold on to.
+func (o Observable) ToChan(subscribers ...Subscriber) <-chan interface{} {
 	scheduler := GoroutineScheduler()
-	nextch := make(chan interface{}, 1)
-	o.Subscribe(func(next interface{}, err error, done bool) {
-		if !done {
-			nextch <- next
-		} else {
+	subscribers = append(subscribers, NewSubscriber())
+	donech := make(chan struct{})
+	nextch := make(chan interface{})
+	const (
+		idle	= iota
+		busy
+		closed
+	)
+	state := int32(idle)
+	observer := func(next interface{}, err error, done bool) {
+		if atomic.CompareAndSwapInt32(&state, idle, busy) {
 			if err != nil {
-				nextch <- err
+				next = err
 			}
-			close(nextch)
+			if !done || err != nil {
+				select {
+				case <-donech:
+					atomic.StoreInt32(&state, closed)
+				default:
+					select {
+					case <-donech:
+						atomic.StoreInt32(&state, closed)
+					case nextch <- next:
+					}
+				}
+			}
+			if done {
+				atomic.StoreInt32(&state, closed)
+				subscribers[0].Unsubscribe()
+			}
+			if !atomic.CompareAndSwapInt32(&state, busy, idle) {
+				close(nextch)
+			}
 		}
-	}, SubscribeOn(scheduler, options...))
+	}
+	subscribers[0].OnUnsubscribe(func() {
+		close(donech)
+		if atomic.CompareAndSwapInt32(&state, busy, closed) {
+			return
+		}
+		if atomic.CompareAndSwapInt32(&state, idle, closed) {
+			close(nextch)
+			return
+		}
+	})
+	o(observer, scheduler, subscribers[0])
 	return nextch
 }
 
@@ -2242,23 +2285,54 @@ func (o Observable) ToChan(options ...SubscribeOption) <-chan interface{} {
 // not emit values but emits an error or complete, then the returned channel
 // will close without emitting any values.
 //
-// There is no way to determine whether the observable feeding into the
-// channel terminated with an error or completed normally.
-// Because the channel is fed by subscribing to the observable, ToChan would
-// block when subscribed on the standard Trampoline scheduler which is
-// initially synchronous. That's why the subscribing is done on the
-// Goroutine scheduler. It is not possible to cancel the subscription
-// created internally by ToChan.
-func (o ObservableBool) ToChan(options ...SubscribeOption) <-chan bool {
+// This method subscribes to the observable on the Goroutine scheduler because
+// it needs the concurrency so the returned channel can be used by used
+// by the calling code directly. To cancel ToChan you will need to supply a
+// subscriber that you hold on to.
+func (o ObservableBool) ToChan(subscribers ...Subscriber) <-chan bool {
 	scheduler := GoroutineScheduler()
-	nextch := make(chan bool, 1)
-	o.Subscribe(func(next bool, err error, done bool) {
-		if !done {
-			nextch <- next
-		} else {
-			close(nextch)
+	subscribers = append(subscribers, NewSubscriber())
+	donech := make(chan struct{})
+	nextch := make(chan bool)
+	const (
+		idle	= iota
+		busy
+		closed
+	)
+	state := int32(idle)
+	observer := func(next bool, err error, done bool) {
+		if atomic.CompareAndSwapInt32(&state, idle, busy) {
+			if !done {
+				select {
+				case <-donech:
+					atomic.StoreInt32(&state, closed)
+				default:
+					select {
+					case <-donech:
+						atomic.StoreInt32(&state, closed)
+					case nextch <- next:
+					}
+				}
+			} else {
+				atomic.StoreInt32(&state, closed)
+				subscribers[0].Unsubscribe()
+			}
+			if !atomic.CompareAndSwapInt32(&state, busy, idle) {
+				close(nextch)
+			}
 		}
-	}, SubscribeOn(scheduler, options...))
+	}
+	subscribers[0].OnUnsubscribe(func() {
+		close(donech)
+		if atomic.CompareAndSwapInt32(&state, busy, closed) {
+			return
+		}
+		if atomic.CompareAndSwapInt32(&state, idle, closed) {
+			close(nextch)
+			return
+		}
+	})
+	o(observer, scheduler, subscribers[0])
 	return nextch
 }
 
@@ -2268,23 +2342,54 @@ func (o ObservableBool) ToChan(options ...SubscribeOption) <-chan bool {
 // not emit values but emits an error or complete, then the returned channel
 // will close without emitting any values.
 //
-// There is no way to determine whether the observable feeding into the
-// channel terminated with an error or completed normally.
-// Because the channel is fed by subscribing to the observable, ToChan would
-// block when subscribed on the standard Trampoline scheduler which is
-// initially synchronous. That's why the subscribing is done on the
-// Goroutine scheduler. It is not possible to cancel the subscription
-// created internally by ToChan.
-func (o ObservableInt) ToChan(options ...SubscribeOption) <-chan int {
+// This method subscribes to the observable on the Goroutine scheduler because
+// it needs the concurrency so the returned channel can be used by used
+// by the calling code directly. To cancel ToChan you will need to supply a
+// subscriber that you hold on to.
+func (o ObservableInt) ToChan(subscribers ...Subscriber) <-chan int {
 	scheduler := GoroutineScheduler()
-	nextch := make(chan int, 1)
-	o.Subscribe(func(next int, err error, done bool) {
-		if !done {
-			nextch <- next
-		} else {
-			close(nextch)
+	subscribers = append(subscribers, NewSubscriber())
+	donech := make(chan struct{})
+	nextch := make(chan int)
+	const (
+		idle	= iota
+		busy
+		closed
+	)
+	state := int32(idle)
+	observer := func(next int, err error, done bool) {
+		if atomic.CompareAndSwapInt32(&state, idle, busy) {
+			if !done {
+				select {
+				case <-donech:
+					atomic.StoreInt32(&state, closed)
+				default:
+					select {
+					case <-donech:
+						atomic.StoreInt32(&state, closed)
+					case nextch <- next:
+					}
+				}
+			} else {
+				atomic.StoreInt32(&state, closed)
+				subscribers[0].Unsubscribe()
+			}
+			if !atomic.CompareAndSwapInt32(&state, busy, idle) {
+				close(nextch)
+			}
 		}
-	}, SubscribeOn(scheduler, options...))
+	}
+	subscribers[0].OnUnsubscribe(func() {
+		close(donech)
+		if atomic.CompareAndSwapInt32(&state, busy, closed) {
+			return
+		}
+		if atomic.CompareAndSwapInt32(&state, idle, closed) {
+			close(nextch)
+			return
+		}
+	})
+	o(observer, scheduler, subscribers[0])
 	return nextch
 }
 
@@ -2292,20 +2397,20 @@ func (o ObservableInt) ToChan(options ...SubscribeOption) <-chan int {
 
 // ToSingle blocks until the Observable emits exactly one value or an error.
 // The value and any error are returned.
-//
-// This function subscribes to the source observable on the Goroutine
-// scheduler. The Goroutine scheduler works in more situations for
-// complex chains of observables, like when merging the output of multiple
-// observables.
-func (o Observable) ToSingle(options ...SubscribeOption) (entry interface{}, err error) {
-	scheduler := GoroutineScheduler()
-	o.Single().Subscribe(func(next interface{}, e error, done bool) {
+func (o Observable) ToSingle() (entry interface{}, err error) {
+	o = o.Single()
+	subscriber := NewSubscriber()
+	scheduler := TrampolineScheduler()
+	observer := func(next interface{}, e error, done bool) {
 		if !done {
 			entry = next
 		} else {
 			err = e
+			subscriber.Unsubscribe()
 		}
-	}, SubscribeOn(scheduler, options...)).Wait()
+	}
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
 	return
 }
 
@@ -2313,20 +2418,20 @@ func (o Observable) ToSingle(options ...SubscribeOption) (entry interface{}, err
 
 // ToSingle blocks until the ObservableBool emits exactly one value or an error.
 // The value and any error are returned.
-//
-// This function subscribes to the source observable on the Goroutine
-// scheduler. The Goroutine scheduler works in more situations for
-// complex chains of observables, like when merging the output of multiple
-// observables.
-func (o ObservableBool) ToSingle(options ...SubscribeOption) (entry bool, err error) {
-	scheduler := GoroutineScheduler()
-	o.Single().Subscribe(func(next bool, e error, done bool) {
+func (o ObservableBool) ToSingle() (entry bool, err error) {
+	o = o.Single()
+	subscriber := NewSubscriber()
+	scheduler := TrampolineScheduler()
+	observer := func(next bool, e error, done bool) {
 		if !done {
 			entry = next
 		} else {
 			err = e
+			subscriber.Unsubscribe()
 		}
-	}, SubscribeOn(scheduler, options...)).Wait()
+	}
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
 	return
 }
 
@@ -2334,20 +2439,20 @@ func (o ObservableBool) ToSingle(options ...SubscribeOption) (entry bool, err er
 
 // ToSingle blocks until the ObservableInt emits exactly one value or an error.
 // The value and any error are returned.
-//
-// This function subscribes to the source observable on the Goroutine
-// scheduler. The Goroutine scheduler works in more situations for
-// complex chains of observables, like when merging the output of multiple
-// observables.
-func (o ObservableInt) ToSingle(options ...SubscribeOption) (entry int, err error) {
-	scheduler := GoroutineScheduler()
-	o.Single().Subscribe(func(next int, e error, done bool) {
+func (o ObservableInt) ToSingle() (entry int, err error) {
+	o = o.Single()
+	subscriber := NewSubscriber()
+	scheduler := TrampolineScheduler()
+	observer := func(next int, e error, done bool) {
 		if !done {
 			entry = next
 		} else {
 			err = e
+			subscriber.Unsubscribe()
 		}
-	}, SubscribeOn(scheduler, options...)).Wait()
+	}
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
 	return
 }
 
@@ -2355,20 +2460,19 @@ func (o ObservableInt) ToSingle(options ...SubscribeOption) (entry int, err erro
 
 // ToSlice collects all values from the Observable into an slice. The
 // complete slice and any error are returned.
-//
-// This function subscribes to the source observable on the Goroutine
-// scheduler. The Goroutine scheduler works in more situations for
-// complex chains of observables, like when merging the output of multiple
-// observables.
-func (o Observable) ToSlice(options ...SubscribeOption) (slice []interface{}, err error) {
-	scheduler := GoroutineScheduler()
-	o.Subscribe(func(next interface{}, e error, done bool) {
+func (o Observable) ToSlice() (slice []interface{}, err error) {
+	subscriber := NewSubscriber()
+	scheduler := TrampolineScheduler()
+	observer := func(next interface{}, e error, done bool) {
 		if !done {
 			slice = append(slice, next)
 		} else {
 			err = e
+			subscriber.Unsubscribe()
 		}
-	}, SubscribeOn(scheduler, options...)).Wait()
+	}
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
 	return
 }
 
@@ -2376,20 +2480,19 @@ func (o Observable) ToSlice(options ...SubscribeOption) (slice []interface{}, er
 
 // ToSlice collects all values from the ObservableBool into an slice. The
 // complete slice and any error are returned.
-//
-// This function subscribes to the source observable on the Goroutine
-// scheduler. The Goroutine scheduler works in more situations for
-// complex chains of observables, like when merging the output of multiple
-// observables.
-func (o ObservableBool) ToSlice(options ...SubscribeOption) (slice []bool, err error) {
-	scheduler := GoroutineScheduler()
-	o.Subscribe(func(next bool, e error, done bool) {
+func (o ObservableBool) ToSlice() (slice []bool, err error) {
+	subscriber := NewSubscriber()
+	scheduler := TrampolineScheduler()
+	observer := func(next bool, e error, done bool) {
 		if !done {
 			slice = append(slice, next)
 		} else {
 			err = e
+			subscriber.Unsubscribe()
 		}
-	}, SubscribeOn(scheduler, options...)).Wait()
+	}
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
 	return
 }
 
@@ -2397,20 +2500,19 @@ func (o ObservableBool) ToSlice(options ...SubscribeOption) (slice []bool, err e
 
 // ToSlice collects all values from the ObservableInt into an slice. The
 // complete slice and any error are returned.
-//
-// This function subscribes to the source observable on the Goroutine
-// scheduler. The Goroutine scheduler works in more situations for
-// complex chains of observables, like when merging the output of multiple
-// observables.
-func (o ObservableInt) ToSlice(options ...SubscribeOption) (slice []int, err error) {
-	scheduler := GoroutineScheduler()
-	o.Subscribe(func(next int, e error, done bool) {
+func (o ObservableInt) ToSlice() (slice []int, err error) {
+	subscriber := NewSubscriber()
+	scheduler := TrampolineScheduler()
+	observer := func(next int, e error, done bool) {
 		if !done {
 			slice = append(slice, next)
 		} else {
 			err = e
+			subscriber.Unsubscribe()
 		}
-	}, SubscribeOn(scheduler, options...)).Wait()
+	}
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
 	return
 }
 
@@ -2418,9 +2520,9 @@ func (o ObservableInt) ToSlice(options ...SubscribeOption) (slice []int, err err
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
-// Subscription is performed on the normal Trampoline scheduler.
+// Subscription is performed on the Trampoline scheduler.
 func (o Observable) Wait() (err error) {
-	subscriber := subscriber.New()
+	subscriber := NewSubscriber()
 	scheduler := TrampolineScheduler()
 	observer := func(next interface{}, e error, done bool) {
 		if done {
@@ -2437,9 +2539,9 @@ func (o Observable) Wait() (err error) {
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
-// Subscription is performed on the normal Trampoline scheduler.
+// Subscription is performed on the Trampoline scheduler.
 func (o ObservableBool) Wait() (err error) {
-	subscriber := subscriber.New()
+	subscriber := NewSubscriber()
 	scheduler := TrampolineScheduler()
 	observer := func(next bool, e error, done bool) {
 		if done {
@@ -2456,9 +2558,9 @@ func (o ObservableBool) Wait() (err error) {
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
-// Subscription is performed on the normal Trampoline scheduler.
+// Subscription is performed on the Trampoline scheduler.
 func (o ObservableInt) Wait() (err error) {
-	subscriber := subscriber.New()
+	subscriber := NewSubscriber()
 	scheduler := TrampolineScheduler()
 	observer := func(next int, e error, done bool) {
 		if done {
