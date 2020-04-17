@@ -17,7 +17,8 @@ func Example_all() {
 	fmt.Println("Source observable completed")
 
 	// Setup All operator to produce true only when all source values are less than 5
-	all := source.All(func(i int) bool { return i < 5 })
+	predicate := func(i int) bool { return i < 5 }
+	all := source.All(predicate)
 
 	all.SubscribeNext(func(b bool) { fmt.Println("All values less than 5?", b) }).Wait()
 

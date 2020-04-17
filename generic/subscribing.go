@@ -2,6 +2,7 @@ package rx
 
 import (
 	"fmt"
+	"sync/atomic"
 
 	"github.com/reactivego/subscriber"
 )
@@ -14,6 +15,11 @@ type Subscriber subscriber.Subscriber
 // Subscription is an alias for the subscriber.Subscription interface type.
 type Subscription subscriber.Subscription
 
+// NewSubscriber creates a new subscriber.
+func NewSubscriber() Subscriber {
+	return subscriber.New()
+}
+
 //jig:template Observable<Foo> Println
 //jig:needs Schedulers, Subscriber
 
@@ -22,7 +28,7 @@ type Subscription subscriber.Subscription
 // when the Observable completed normally.
 // Println is performed on the Trampoline scheduler.
 func (o ObservableFoo) Println() (err error) {
-	subscriber := subscriber.New()
+	subscriber := NewSubscriber()
 	scheduler := TrampolineScheduler()
 	observer := func(next foo, e error, done bool) {
 		if !done {
@@ -44,7 +50,7 @@ func (o ObservableFoo) Println() (err error) {
 // Returns either the error or nil when the Observable completed normally.
 // Subscription is performed on the Trampoline scheduler.
 func (o ObservableFoo) Wait() (err error) {
-	subscriber := subscriber.New()
+	subscriber := NewSubscriber()
 	scheduler := TrampolineScheduler()
 	observer := func(next foo, e error, done bool) {
 		if done {
@@ -55,6 +61,171 @@ func (o ObservableFoo) Wait() (err error) {
 	o(observer, scheduler, subscriber)
 	subscriber.Wait()
 	return
+}
+
+//jig:template Observable<Foo> ToSlice
+//jig:needs Schedulers, Subscriber
+
+// ToSlice collects all values from the ObservableFoo into an slice. The
+// complete slice and any error are returned.
+func (o ObservableFoo) ToSlice() (slice []foo, err error) {
+	subscriber := NewSubscriber()
+	scheduler := TrampolineScheduler()
+	observer := func(next foo, e error, done bool) {
+		if !done {
+			slice = append(slice, next)
+		} else {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
+}
+
+//jig:template Observable<Foo> ToSingle
+//jig:needs Schedulers, Subscriber
+
+// ToSingle blocks until the ObservableFoo emits exactly one value or an error.
+// The value and any error are returned.
+func (o ObservableFoo) ToSingle() (entry foo, err error) {
+	o = o.Single()
+	subscriber := NewSubscriber()
+	scheduler := TrampolineScheduler()
+	observer := func(next foo, e error, done bool) {
+		if !done {
+			entry = next
+		} else {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
+}
+
+//jig:template Observable ToChan
+//jig:needs Schedulers, Subscriber
+
+// ToChan returns a channel that emits interface{} values. If the source
+// observable does not emit values but emits an error or complete, then the
+// returned channel will enit any error and then close without emitting any
+// values.
+//
+// This method subscribes to the observable on the Goroutine scheduler because
+// it needs the concurrency so the returned channel can be used by used
+// by the calling code directly. To cancel ToChan you will need to supply a
+// subscriber that you hold on to.
+func (o Observable) ToChan(subscribers ...Subscriber) <-chan interface{} {
+	scheduler := GoroutineScheduler()
+	subscribers = append(subscribers, NewSubscriber())
+	donech := make(chan struct{})
+	nextch := make(chan interface{})
+	const (
+		idle = iota
+		busy
+		closed
+	)
+	state := int32(idle)
+	observer := func(next interface{}, err error, done bool) {
+		if atomic.CompareAndSwapInt32(&state, idle, busy) {
+			if err != nil {
+				next = err
+			}
+			if !done || err != nil {
+				select {
+				case <-donech:
+					atomic.StoreInt32(&state, closed)
+				default:
+					select {
+					case <-donech:
+						atomic.StoreInt32(&state, closed)
+					case nextch <- next:
+					}
+				}
+			}
+			if done {
+				atomic.StoreInt32(&state, closed)
+				subscribers[0].Unsubscribe()
+			}
+			if !atomic.CompareAndSwapInt32(&state, busy, idle) {
+				close(nextch)
+			}
+		}
+	}
+	subscribers[0].OnUnsubscribe(func() {
+		close(donech)
+		if atomic.CompareAndSwapInt32(&state, busy, closed) {
+			return
+		}
+		if atomic.CompareAndSwapInt32(&state, idle, closed) {
+			close(nextch)
+			return
+		}
+	})
+	o(observer, scheduler, subscribers[0])
+	return nextch
+}
+
+//jig:template Observable<Foo> ToChan
+//jig:needs Schedulers, Subscriber
+//jig:required-vars Foo
+
+// ToChan returns a channel that emits foo values. If the source observable does
+// not emit values but emits an error or complete, then the returned channel
+// will close without emitting any values.
+//
+// This method subscribes to the observable on the Goroutine scheduler because
+// it needs the concurrency so the returned channel can be used by used
+// by the calling code directly. To cancel ToChan you will need to supply a
+// subscriber that you hold on to.
+func (o ObservableFoo) ToChan(subscribers ...Subscriber) <-chan foo {
+	scheduler := GoroutineScheduler()
+	subscribers = append(subscribers, NewSubscriber())
+	donech := make(chan struct{})
+	nextch := make(chan foo)
+	const (
+		idle = iota
+		busy
+		closed
+	)
+	state := int32(idle)
+	observer := func(next foo, err error, done bool) {
+		if atomic.CompareAndSwapInt32(&state, idle, busy) {
+			if !done {
+				select {
+				case <-donech:
+					atomic.StoreInt32(&state, closed)
+				default:
+					select {
+					case <-donech:
+						atomic.StoreInt32(&state, closed)
+					case nextch <- next:
+					}
+				}
+			} else {
+				atomic.StoreInt32(&state, closed)
+				subscribers[0].Unsubscribe()
+			}
+			if !atomic.CompareAndSwapInt32(&state, busy, idle) {
+				close(nextch)
+			}
+		}
+	}
+	subscribers[0].OnUnsubscribe(func() {
+		close(donech)
+		if atomic.CompareAndSwapInt32(&state, busy, closed) {
+			return
+		}
+		if atomic.CompareAndSwapInt32(&state, idle, closed) {
+			close(nextch)
+			return
+		}
+	})
+	o(observer, scheduler, subscribers[0])
+	return nextch
 }
 
 //jig:template SubscribeOption
@@ -118,7 +289,7 @@ func newSchedulerAndSubscriber(setters []SubscribeOption) (Scheduler, Subscriber
 		setter(options)
 	}
 	if options.subscriber == nil {
-		options.subscriber = subscriber.New()
+		options.subscriber = NewSubscriber()
 	}
 	options.subscriber.OnUnsubscribe(options.onUnsubscribe)
 	if options.onSubscribe != nil {
@@ -159,109 +330,4 @@ func (o ObservableFoo) SubscribeNext(f func(next foo), options ...SubscribeOptio
 			f(next)
 		}
 	}, options...)
-}
-
-//jig:template Observable ToChan
-//jig:needs Observable Subscribe
-
-// ToChan returns a channel that emits interface{} values. If the source
-// observable does not emit values but emits an error or complete, then the
-// returned channel will enit any error and then close without emitting any
-// values.
-//
-// Because the channel is fed by subscribing to the observable, ToChan would
-// block when subscribed on the Trampoline scheduler which is initially
-// synchronous. That's why the subscribing is done on the Goroutine scheduler.
-// This also means that the code reading the channel can do so while running
-// on the main goroutine.
-//
-// To cancel the subscription created internally by ToChan you will need access
-// to the subscription used internally by ToChan. To get at this subscription,
-// pass the result of a call to option OnSubscribe(func(Subscription)) as a
-// parameter to ToChan. On suscription the callback will be called with the
-// subscription that was created.
-func (o Observable) ToChan(options ...SubscribeOption) <-chan interface{} {
-	scheduler := GoroutineScheduler()
-	nextch := make(chan interface{}, 1)
-	o.Subscribe(func(next interface{}, err error, done bool) {
-		if !done {
-			nextch <- next
-		} else {
-			if err != nil {
-				nextch <- err
-			}
-			close(nextch)
-		}
-	}, SubscribeOn(scheduler, options...))
-	return nextch
-}
-
-//jig:template Observable<Foo> ToChan
-//jig:needs Observable<Foo> Subscribe
-//jig:required-vars Foo
-
-// ToChan returns a channel that emits foo values. If the source observable does
-// not emit values but emits an error or complete, then the returned channel
-// will close without emitting any values.
-//
-// There is no way to determine whether the observable feeding into the
-// channel terminated with an error or completed normally.
-// Because the channel is fed by subscribing to the observable, ToChan would
-// block when subscribed on the standard Trampoline scheduler which is
-// initially synchronous. That's why the subscribing is done on the
-// Goroutine scheduler. It is not possible to cancel the subscription
-// created internally by ToChan.
-func (o ObservableFoo) ToChan(options ...SubscribeOption) <-chan foo {
-	scheduler := GoroutineScheduler()
-	nextch := make(chan foo, 1)
-	o.Subscribe(func(next foo, err error, done bool) {
-		if !done {
-			nextch <- next
-		} else {
-			close(nextch)
-		}
-	}, SubscribeOn(scheduler, options...))
-	return nextch
-}
-
-//jig:template Observable<Foo> ToSingle
-//jig:needs Observable<Foo> Subscribe
-
-// ToSingle blocks until the ObservableFoo emits exactly one value or an error.
-// The value and any error are returned.
-//
-// This function subscribes to the source observable on the Goroutine
-// scheduler. The Goroutine scheduler works in more situations for
-// complex chains of observables, like when merging the output of multiple
-// observables.
-func (o ObservableFoo) ToSingle(options ...SubscribeOption) (entry foo, err error) {
-	o.Single().Subscribe(func(next foo, e error, done bool) {
-		if !done {
-			entry = next
-		} else {
-			err = e
-		}
-	}, options...).Wait()
-	return
-}
-
-//jig:template Observable<Foo> ToSlice
-//jig:needs Observable<Foo> Subscribe
-
-// ToSlice collects all values from the ObservableFoo into an slice. The
-// complete slice and any error are returned.
-//
-// This function subscribes to the source observable on the Goroutine
-// scheduler. The Goroutine scheduler works in more situations for
-// complex chains of observables, like when merging the output of multiple
-// observables.
-func (o ObservableFoo) ToSlice(options ...SubscribeOption) (slice []foo, err error) {
-	o.Subscribe(func(next foo, e error, done bool) {
-		if !done {
-			slice = append(slice, next)
-		} else {
-			err = e
-		}
-	}, options...).Wait()
-	return
 }

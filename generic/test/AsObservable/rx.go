@@ -5,6 +5,8 @@
 package AsObservable
 
 import (
+	"fmt"
+
 	"github.com/reactivego/scheduler"
 	"github.com/reactivego/subscriber"
 )
@@ -22,54 +24,9 @@ type Subscriber subscriber.Subscriber
 // Subscription is an alias for the subscriber.Subscription interface type.
 type Subscription subscriber.Subscription
 
-//jig:name StringObserveFunc
-
-// StringObserveFunc is the observer, a function that gets called whenever the
-// observable has something to report. The next argument is the item value that
-// is only valid when the done argument is false. When done is true and the err
-// argument is not nil, then the observable has terminated with an error.
-// When done is true and the err argument is nil, then the observable has
-// completed normally.
-type StringObserveFunc func(next string, err error, done bool)
-
-//jig:name zeroString
-
-var zeroString string
-
-//jig:name ObservableString
-
-// ObservableString is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableString func(StringObserveFunc, Scheduler, Subscriber)
-
-//jig:name FromSliceString
-
-// FromSliceString creates an ObservableString from a slice of string values passed in.
-func FromSliceString(slice []string) ObservableString {
-	observable := func(observe StringObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		i := 0
-		subscribeOn.ScheduleRecursive(func(self func()) {
-			if !subscriber.Canceled() {
-				if i < len(slice) {
-					observe(slice[i], nil, false)
-					if !subscriber.Canceled() {
-						i++
-						self()
-					}
-				} else {
-					observe(zeroString, nil, true)
-				}
-			}
-		})
-	}
-	return observable
-}
-
-//jig:name FromString
-
-// FromString creates an ObservableString from multiple string values passed in.
-func FromString(slice ...string) ObservableString {
-	return FromSliceString(slice)
+// NewSubscriber creates a new subscriber.
+func NewSubscriber() Subscriber {
+	return subscriber.New()
 }
 
 //jig:name ObserveFunc
@@ -96,9 +53,9 @@ type Observable func(ObserveFunc, Scheduler, Subscriber)
 
 // FromSlice creates an Observable from a slice of interface{} values passed in.
 func FromSlice(slice []interface{}) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
-		subscribeOn.ScheduleRecursive(func(self func()) {
+		scheduler.ScheduleRecursive(func(self func()) {
 			if !subscriber.Canceled() {
 				if i < len(slice) {
 					observe(slice[i], nil, false)
@@ -122,17 +79,54 @@ func From(slice ...interface{}) Observable {
 	return FromSlice(slice)
 }
 
-//jig:name ObservableStringAsObservable
+//jig:name StringObserveFunc
 
-// AsObservable turns a typed ObservableString into an Observable of interface{}.
-func (o ObservableString) AsObservable() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next string, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
+// StringObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type StringObserveFunc func(next string, err error, done bool)
+
+//jig:name zeroString
+
+var zeroString string
+
+//jig:name ObservableString
+
+// ObservableString is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type ObservableString func(StringObserveFunc, Scheduler, Subscriber)
+
+//jig:name FromSliceString
+
+// FromSliceString creates an ObservableString from a slice of string values passed in.
+func FromSliceString(slice []string) ObservableString {
+	observable := func(observe StringObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		i := 0
+		scheduler.ScheduleRecursive(func(self func()) {
+			if !subscriber.Canceled() {
+				if i < len(slice) {
+					observe(slice[i], nil, false)
+					if !subscriber.Canceled() {
+						i++
+						self()
+					}
+				} else {
+					observe(zeroString, nil, true)
+				}
+			}
+		})
 	}
 	return observable
+}
+
+//jig:name FromString
+
+// FromString creates an ObservableString from multiple string values passed in.
+func FromString(slice ...string) ObservableString {
+	return FromSliceString(slice)
 }
 
 //jig:name Float64ObserveFunc
@@ -189,151 +183,79 @@ func (o Observable) AsObservableFloat64() ObservableFloat64 {
 	return observable
 }
 
+//jig:name ObservableStringAsObservable
+
+// AsObservable turns a typed ObservableString into an Observable of interface{}.
+func (o ObservableString) AsObservable() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next string, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name Schedulers
 
 func TrampolineScheduler() Scheduler	{ return scheduler.Trampoline }
 
 func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
 
-//jig:name SubscribeOption
+//jig:name ObservableFloat64Println
 
-// SubscribeOption is an option that can be passed to the Subscribe method.
-type SubscribeOption func(options *subscribeOptions)
-
-type subscribeOptions struct {
-	scheduler	Scheduler
-	subscriber	Subscriber
-	onSubscribe	func(subscription Subscription)
-	onUnsubscribe	func()
-}
-
-// SubscribeOn returns an option that can be passed to the Subscribe method.
-// It takes the scheduler to subscribe the observable on. The tasks that
-// actually perform the observable functionality are scheduled on this
-// scheduler. The other options that can be passed here are applied after the
-// scheduler was set so any schedulers passed in via other will override
-// the scheduler passed here.
-func SubscribeOn(scheduler Scheduler, other ...SubscribeOption) SubscribeOption {
-	return func(options *subscribeOptions) {
-		options.scheduler = scheduler
-		for _, setter := range other {
-			setter(options)
-		}
-	}
-}
-
-// WithSubscriber returns an option that can be passed to the Subscribe method.
-// The Subscribe method will use the subscriber passed here instead of creating
-// a new one.
-func WithSubscriber(subscriber Subscriber) SubscribeOption {
-	return func(options *subscribeOptions) {
-		options.subscriber = subscriber
-	}
-}
-
-// OnSubscribe returns an option that can be passed to the Subscribe method.
-// It takes a callback that is called from the Subscribe method just before
-// subscribing continues further.
-func OnSubscribe(callback func(Subscription)) SubscribeOption {
-	return func(options *subscribeOptions) { options.onSubscribe = callback }
-}
-
-// OnUnsubscribe returns an option that can be passed to the Subscribe method.
-// It takes a callback that is called by the Subscribe method to notify the
-// client that the subscription has been canceled.
-func OnUnsubscribe(callback func()) SubscribeOption {
-	return func(options *subscribeOptions) { options.onUnsubscribe = callback }
-}
-
-// newSchedulerAndSubscriber will return either return the scheduler and subscriber
-// passed in through the SubscribeOn() and WithSubscriber() options or it will
-// return newly created scheduler and subscriber. Before returning the callback
-// passed in through OnSubscribe() will already have been called.
-func newSchedulerAndSubscriber(setters []SubscribeOption) (Scheduler, Subscriber) {
-	options := &subscribeOptions{scheduler: TrampolineScheduler()}
-	for _, setter := range setters {
-		setter(options)
-	}
-	if options.subscriber == nil {
-		options.subscriber = subscriber.New()
-	}
-	options.subscriber.OnUnsubscribe(options.onUnsubscribe)
-	if options.onSubscribe != nil {
-		options.onSubscribe(options.subscriber)
-	}
-	return options.scheduler, options.subscriber
-}
-
-//jig:name ObservableSubscribe
-
-// Subscribe operates upon the emissions and notifications from an Observable.
-// This method returns a Subscription.
-func (o Observable) Subscribe(observe ObserveFunc, options ...SubscribeOption) Subscription {
-	scheduler, subscriber := newSchedulerAndSubscriber(options)
-	observer := func(next interface{}, err error, done bool) {
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println is performed on the Trampoline scheduler.
+func (o ObservableFloat64) Println() (err error) {
+	subscriber := NewSubscriber()
+	scheduler := TrampolineScheduler()
+	observer := func(next float64, e error, done bool) {
 		if !done {
-			observe(next, err, done)
+			fmt.Println(next)
 		} else {
-			observe(zero, err, true)
+			err = e
 			subscriber.Unsubscribe()
 		}
 	}
 	o(observer, scheduler, subscriber)
-	return subscriber
-}
-
-//jig:name ObservableSubscribeNext
-
-// SubscribeNext operates upon the emissions from an Observable only.
-// This method returns a Subscription.
-func (o Observable) SubscribeNext(f func(next interface{}), options ...SubscribeOption) Subscription {
-	return o.Subscribe(func(next interface{}, err error, done bool) {
-		if !done {
-			f(next)
-		}
-	}, options...)
-}
-
-//jig:name ObservableFloat64Subscribe
-
-// Subscribe operates upon the emissions and notifications from an Observable.
-// This method returns a Subscription.
-func (o ObservableFloat64) Subscribe(observe Float64ObserveFunc, options ...SubscribeOption) Subscription {
-	scheduler, subscriber := newSchedulerAndSubscriber(options)
-	observer := func(next float64, err error, done bool) {
-		if !done {
-			observe(next, err, done)
-		} else {
-			observe(zeroFloat64, err, true)
-			subscriber.Unsubscribe()
-		}
-	}
-	o(observer, scheduler, subscriber)
-	return subscriber
-}
-
-//jig:name ObservableFloat64SubscribeNext
-
-// SubscribeNext operates upon the emissions from an Observable only.
-// This method returns a Subscription.
-func (o ObservableFloat64) SubscribeNext(f func(next float64), options ...SubscribeOption) Subscription {
-	return o.Subscribe(func(next float64, err error, done bool) {
-		if !done {
-			f(next)
-		}
-	}, options...)
+	subscriber.Wait()
+	return
 }
 
 //jig:name ObservableFloat64Wait
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
-// Subscription is performed on the normal Trampoline scheduler.
+// Subscription is performed on the Trampoline scheduler.
 func (o ObservableFloat64) Wait() (err error) {
-	subscriber := subscriber.New()
+	subscriber := NewSubscriber()
 	scheduler := TrampolineScheduler()
 	observer := func(next float64, e error, done bool) {
 		if done {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
+}
+
+//jig:name ObservablePrintln
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println is performed on the Trampoline scheduler.
+func (o Observable) Println() (err error) {
+	subscriber := NewSubscriber()
+	scheduler := TrampolineScheduler()
+	observer := func(next interface{}, e error, done bool) {
+		if !done {
+			fmt.Println(next)
+		} else {
 			err = e
 			subscriber.Unsubscribe()
 		}

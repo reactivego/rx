@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-func Example_once() {
+func Example_basic() {
 	slice, err := Range(1, 9).ToSlice()
 
 	fmt.Println(slice)
@@ -14,20 +14,14 @@ func Example_once() {
 	// <nil>
 }
 
-func Example_twice() {
-	source := FromSliceInt([]int{1, 2, 3, 4})
+func Example_error() {
+	source := Throw(RxError("crash"))
 
-	result, err := source.ToSlice()
-	fmt.Println(result)
-	fmt.Println(err)
-
-	slice, err = source.ToSlice()
+	slice, err := source.ToSlice()
 
 	fmt.Println(slice)
 	fmt.Println(err)
 	// Output:
-	// [1 2 3 4]
-	// <nil>
-	// [1 2 3 4]
-	// <nil>
+	// []
+	// crash
 }

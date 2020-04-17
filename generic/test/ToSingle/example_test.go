@@ -3,7 +3,7 @@ package ToSingle
 import	"fmt"
 
 
-func Example_correct() {
+func Example_basic() {
 	value, err := FromInts(3).ToSingle()
 
 	fmt.Println(value)
@@ -15,7 +15,7 @@ func Example_correct() {
 
 // ToSingle will return an error when the observable completes without emitting
 // a single value.
-func Example_empty() {
+func Example_emptyError() {
 	value, err := EmptyInt().ToSingle()
 
 	fmt.Println(value)
@@ -26,7 +26,7 @@ func Example_empty() {
 }
 
 // ToSingle will return an error when the observable emits multiple values.
-func Example_multiple() {
+func Example_multipleError() {
 	value, err := FromInts(19, 20).ToSingle()
 
 	fmt.Println(value)

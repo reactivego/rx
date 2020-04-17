@@ -1,24 +1,58 @@
 package ToChan
 
-import (
-	"fmt"
-)
+import "fmt"
 
-// ToChan is used to convert the observable to a channel. The range
-// ObservableInt is first converted to an Observable of interface{} so errors
-// will be emitted in-band.
-func Example_toChan() {
-	for value := range Range(1, 9).AsObservable().ToChan() {
-		switch value.(type) {
-		case int:
-			fmt.Print(value)
-		case error:
-			fmt.Println(value)
-		}
+func Example_basic() {
+	ch := From(1, 2, "middle", 2, 1).ToChan()
+	for v := range ch {
+		fmt.Println(v)
 	}
 
 	// Output:
-	// 123456789
+	// 1
+	// 2
+	// middle
+	// 2
+	// 1
+}
+
+func Example_unsubscribeDirect() {
+	sub := NewSubscriber()
+	ch := From(1, 2, "middle", 2, 1).ToChan(sub)
+	if i, ok := <-ch; ok {
+		fmt.Println(i)
+	}
+	sub.Unsubscribe()
+	// if i, ok := <-ch; ok {
+	// 	fmt.Println(i)
+	// }
+	// if i, ok := <-ch; ok {
+	// 	fmt.Println(i)
+	// }
+	fmt.Println("closed:", sub.Closed())
+
+	// Output:
+	// 1
+	// closed: true
+}
+
+func Example_unsubscribeLoop() {
+	sub := NewSubscriber()
+	ch := From(1, 2, "middle", 2, 1).ToChan(sub)
+	for i := range ch {
+		switch v := i.(type) {
+		case int:
+			fmt.Println(v)
+		case string:
+			sub.Unsubscribe()
+		}
+	}
+	fmt.Println("closed:", sub.Closed())
+
+	// Output:
+	// 1
+	// 2
+	// closed: true
 }
 
 // The source ObservableInt created by Range(1,9) will emit values in the range
@@ -28,19 +62,18 @@ func Example_toChan() {
 // uses for subscribing from the default synchronous trampoline to an
 // asynchronous one. The subscription runs concurrently with the channel reading
 // for loop.
-func Example_toChanInt() {
+func Example_intChannel() {
 	for value := range Range(1, 9).ToChan() {
 		fmt.Print(value)
 	}
 
-	// Output:
-	// 123456789
+	// Output: 123456789
 }
 
 // First a source Observable is created that emits 1 to 8 followed by an error.
 // ToChan will take the error and output it as the last item emitted by the
 // channel.
-func Example_toChanError() {
+func Example_inlineError() {
 	source := Create(func(observer Observer) {
 		for i := 1; i < 9; i++ {
 			observer.Next(i)
@@ -57,6 +90,5 @@ func Example_toChanError() {
 		}
 	}
 
-	// Output:
-	// 12345678<sad>
+	// Output: 12345678<sad>
 }
