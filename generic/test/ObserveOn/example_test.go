@@ -1,24 +1,20 @@
 package ObserveOn
 
-import (
-	"fmt"
-	"time"
-)
+import "fmt"
 
-type TestScheduler struct { Tasks []func() }
-func (s *TestScheduler) Now() time.Time { return time.Now() }
-func (s *TestScheduler) Schedule(task func()) { s.Tasks = append(s.Tasks, task) }
-func (s *TestScheduler) ScheduleRecursive(task func(self func())) {}
-func (s *TestScheduler) ScheduleFuture(due time.Duration, task func()) {}
-func (s *TestScheduler) ScheduleFutureRecursive(due time.Duration, task func(self func(time.Duration))) {}
-func (s *TestScheduler) Cancel() {}
-func (s *TestScheduler) IsAsynchronous() bool { return len(s.Tasks) > 0 }
+type TestScheduler struct {
+	Tasks []func()
+}
+
+func (s *TestScheduler) Schedule(task func()) {
+	s.Tasks = append(s.Tasks, task)
+}
 
 func Example_observeOn() {
 	testScheduler := &TestScheduler{}
 
 	// Observe by parking all next calls and the complete call on a custom scheduler
-	source := FromInts(1, 2, 3, 4, 5).ObserveOn(testScheduler)
+	source := FromInts(1, 2, 3, 4, 5).ObserveOn(testScheduler.Schedule)
 	subscription := source.Subscribe(func(next int, err error, done bool) {
 		if !done {
 			fmt.Printf("task %d\n", next)
@@ -26,6 +22,7 @@ func Example_observeOn() {
 			fmt.Println("complete")
 		}
 	})
+	subscription.Wait()
 
 	// Observable ran to completion but nothing happended yet, all tasks have been parked
 	fmt.Printf("%d parked tasks\n", len(testScheduler.Tasks))
@@ -57,4 +54,3 @@ func Example_observeOn() {
 	// --------
 	// unsubscribed
 }
-

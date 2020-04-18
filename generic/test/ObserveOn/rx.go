@@ -22,6 +22,11 @@ type Subscriber subscriber.Subscriber
 // Subscription is an alias for the subscriber.Subscription interface type.
 type Subscription subscriber.Subscription
 
+// NewSubscriber creates a new subscriber.
+func NewSubscriber() Subscriber {
+	return subscriber.New()
+}
+
 //jig:name IntObserveFunc
 
 // IntObserveFunc is the observer, a function that gets called whenever the
@@ -46,9 +51,9 @@ type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 
 // FromSliceInt creates an ObservableInt from a slice of int values passed in.
 func FromSliceInt(slice []int) ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
-		subscribeOn.ScheduleRecursive(func(self func()) {
+		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if !subscriber.Canceled() {
 				if i < len(slice) {
 					observe(slice[i], nil, false)
@@ -61,6 +66,7 @@ func FromSliceInt(slice []int) ObservableInt {
 				}
 			}
 		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }
@@ -74,14 +80,14 @@ func FromInts(slice ...int) ObservableInt {
 
 //jig:name ObservableIntObserveOn
 
-// ObserveOn specifies the scheduler on which an observer will observe this
-// ObservableInt.
-func (o ObservableInt) ObserveOn(observeOn Scheduler) ObservableInt {
+// ObserveOn specifies a schedule function to use for delivering values to the observer.
+func (o ObservableInt) ObserveOn(schedule func(task func())) ObservableInt {
 	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next int, err error, done bool) {
-			observeOn.Schedule(func() {
+			task := func() {
 				observe(next, err, done)
-			})
+			}
+			schedule(task)
 		}
 		o(observer, subscribeOn, subscriber)
 	}
@@ -154,7 +160,7 @@ func newSchedulerAndSubscriber(setters []SubscribeOption) (Scheduler, Subscriber
 		setter(options)
 	}
 	if options.subscriber == nil {
-		options.subscriber = subscriber.New()
+		options.subscriber = NewSubscriber()
 	}
 	options.subscriber.OnUnsubscribe(options.onUnsubscribe)
 	if options.onSubscribe != nil {
@@ -167,6 +173,7 @@ func newSchedulerAndSubscriber(setters []SubscribeOption) (Scheduler, Subscriber
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
+// Subscribe by default is performed on the Trampoline scheduler.
 func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOption) Subscription {
 	scheduler, subscriber := newSchedulerAndSubscriber(options)
 	observer := func(next int, err error, done bool) {
@@ -178,5 +185,6 @@ func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOpt
 		}
 	}
 	o(observer, scheduler, subscriber)
+	subscriber.OnWait(scheduler.Wait)
 	return subscriber
 }

@@ -12,20 +12,19 @@ type Scheduler scheduler.Scheduler
 //jig:template Schedulers
 //jig:needs Scheduler
 
-
 func TrampolineScheduler() Scheduler { return scheduler.Trampoline }
 func GoroutineScheduler() Scheduler  { return scheduler.Goroutine }
 
 //jig:template Observable<Foo> ObserveOn
 
-// ObserveOn specifies the scheduler on which an observer will observe this
-// ObservableFoo.
-func (o ObservableFoo) ObserveOn(observeOn Scheduler) ObservableFoo {
+// ObserveOn specifies a schedule function to use for delivering values to the observer.
+func (o ObservableFoo) ObserveOn(schedule func(task func())) ObservableFoo {
 	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next foo, err error, done bool) {
-			observeOn.Schedule(func() {
+			task := func() {
 				observe(next, err, done)
-			})
+			}
+			schedule(task)
 		}
 		o(observer, subscribeOn, subscriber)
 	}
