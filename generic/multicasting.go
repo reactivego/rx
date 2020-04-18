@@ -77,7 +77,7 @@ func (o ObservableFoo) Multicast(factory func() SubjectFoo) ConnectableFoo {
 			subjectValue.Store(factory())
 		}
 		if atomic.CompareAndSwapInt32(&subscriberValue.state, unsubscribed, subscribed) {
-			scheduler := TrampolineScheduler()
+			scheduler := GoroutineScheduler()
 			subscriber := subscriber.New()
 			o.Subscribe(observer, SubscribeOn(scheduler, options...), WithSubscriber(subscriber))
 			subscriberValue.Store(subscriber)
