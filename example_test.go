@@ -20,10 +20,9 @@ func Example_basic() {
 func Example_subscriberLoop() {
 	parent := &subscriber{}
 
-	child1 := parent.AddChild()
-	child2 := parent.AddChild()
-	child2.OnUnsubscribe(parent.Unsubscribe)
-	child3 := parent.AddChild()
+	child1 := parent.Add()
+	child2 := parent.Add(parent.Unsubscribe)
+	child3 := parent.Add()
 
 	if parent.Canceled() || child1.Canceled() || child2.Canceled() || child3.Canceled() {
 		fmt.Println("none of the subscribers should be cancelled here")

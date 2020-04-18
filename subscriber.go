@@ -42,28 +42,21 @@ type Subscriber interface {
 	Subscription
 
 	// Add will create and return a new child Subscriber with the given
-	// callback function. The callback will be called when either the
+	// callback functions. The callbacks will be called when either the
 	// Unsubscribe of the parent or of the returned child subscriber is called.
 	// Calling the Unsubscribe method on the child will NOT propagate to the
 	// parent! The Unsubscribe will start calling callbacks only after it has
 	// set the subscription state to canceled. Even if you call Unsubscribe
 	// multiple times, callbacks will only be invoked once.
-	Add(func()) Subscriber
-
-	// AddChild will create and return a new child Subscriber. Calling the
-	// Unsubscribe method on the child will NOT propagate to the parent!
-	// The Unsubscribe will start calling callbacks only after it has
-	// set the subscription state to canceled. Even if you call Unsubscribe
-	// multiple times, callbacks will only be invoked once.
-	AddChild() Subscriber
+	Add(callbacks ...func()) Subscriber
 
 	// OnUnsubscribe will add the given callback function to the subscriber.
 	// The callback will be called when either the Unsubscribe of the parent
-	// or of the subscriber itself is called.
-	OnUnsubscribe(func())
+	// or of the subscriber itself is called. If the 
+	OnUnsubscribe(callback func())
 
 	// OnWait will register a callback to  call when subscription Wait is called.
-	OnWait(func())
+	OnWait(callback func())
 }
 
 // New will create and return a new Subscriber.
@@ -117,20 +110,8 @@ func (s *subscriber) Wait() {
 	}
 }
 
-func (s *subscriber) Add(callback func()) Subscriber {
-	child := &subscriber{callbacks: []func(){callback}}
-	s.Lock()
-	if atomic.LoadInt32(&s.state) != subscribed {
-		child.Unsubscribe()
-	} else {
-		s.callbacks = append(s.callbacks, child.Unsubscribe)
-	}
-	s.Unlock()
-	return child
-}
-
-func (s *subscriber) AddChild() Subscriber {
-	child := &subscriber{}
+func (s *subscriber) Add(callbacks ...func()) Subscriber {
+	child := &subscriber{callbacks: callbacks}
 	s.Lock()
 	if atomic.LoadInt32(&s.state) != subscribed {
 		child.Unsubscribe()
