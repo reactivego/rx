@@ -34,11 +34,11 @@ type Subscription interface {
 
 // Subscriber embeds a Subscription interface. Additionally the Add method
 // allows for creating a child subscription. Calling Unsubscribe will close
-// the current subscription but will not propagate to parent or children.
-// Calling Unsubscribe will traverse recursively all child subcriptions and
-// call Unsubscribe on them before settings the subsription state to lifeless.
+// the current subscription but will not propagate up to the parent.
+// It will traverse recursively all child subcriptions and call Unsubscribe
+// on them before settings the subscription state to lifeless.
 type Subscriber interface {
-	// Subscription is embedded in a Subscriber to make it act like one.
+	// A Subscriber is also a Subscription.
 	Subscription
 
 	// Add will create and return a new child Subscriber with the given
