@@ -19,7 +19,7 @@ type MakeFooFunc func(Next func(foo), Error func(error), Complete func())
 func MakeFoo(make MakeFooFunc) ObservableFoo {
 	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		done := false
-		scheduler.ScheduleRecursive(func(self func()) {
+		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Canceled() {
 				return
 			}
@@ -45,6 +45,7 @@ func MakeFoo(make MakeFooFunc) ObservableFoo {
 				self()
 			}
 		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }
@@ -68,7 +69,7 @@ type MakeTimedFooFunc func(Next func(foo), Error func(error), Complete func()) t
 func MakeTimedFoo(timeout time.Duration, make MakeTimedFooFunc) ObservableFoo {
 	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		done := false
-		scheduler.ScheduleFutureRecursive(timeout, func(self func(time.Duration)) {
+		runner := scheduler.ScheduleFutureRecursive(timeout, func(self func(time.Duration)) {
 			if subscriber.Canceled() {
 				return
 			}
@@ -94,6 +95,7 @@ func MakeTimedFoo(timeout time.Duration, make MakeTimedFooFunc) ObservableFoo {
 				self(timeout)
 			}
 		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }
@@ -121,7 +123,7 @@ type FooObserver interface {
 // programmatically.
 func CreateFoo(f func(FooObserver)) ObservableFoo {
 	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		scheduler.Schedule(func() {
+		runner := scheduler.Schedule(func() {
 			if subscriber.Closed() {
 				return
 			}
@@ -136,6 +138,7 @@ func CreateFoo(f func(FooObserver)) ObservableFoo {
 			}
 			f(&ObserverSubscriber{observer, subscriber})
 		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }
@@ -158,11 +161,12 @@ func DeferFoo(factory func() ObservableFoo) ObservableFoo {
 // EmptyFoo creates an Observable that emits no items but terminates normally.
 func EmptyFoo() ObservableFoo {
 	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		scheduler.Schedule(func() {
+		runner := scheduler.Schedule(func() {
 			if !subscriber.Canceled() {
 				observe(zeroFoo, nil, true)
 			}
 		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }
@@ -174,11 +178,12 @@ func EmptyFoo() ObservableFoo {
 // error.
 func ErrorFoo(err error) ObservableFoo {
 	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		scheduler.Schedule(func() {
+		runner := scheduler.Schedule(func() {
 			if !subscriber.Canceled() {
 				observe(zeroFoo, err, true)
 			}
 		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }
@@ -192,7 +197,7 @@ func ErrorFoo(err error) ObservableFoo {
 // channel will be seen as completion.
 func FromChanFoo(ch <-chan foo) ObservableFoo {
 	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		scheduler.ScheduleRecursive(func(self func()) {
+		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Canceled() {
 				return
 			}
@@ -209,6 +214,7 @@ func FromChanFoo(ch <-chan foo) ObservableFoo {
 				observe(zeroFoo, nil, true)
 			}
 		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }
@@ -224,7 +230,7 @@ func FromChanFoo(ch <-chan foo) ObservableFoo {
 // indicate termination with error.
 func FromChan(ch <-chan interface{}) Observable {
 	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		scheduler.ScheduleRecursive(func(self func()) {
+		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Canceled() {
 				return
 			}
@@ -246,6 +252,7 @@ func FromChan(ch <-chan interface{}) Observable {
 				observe(zero, nil, true)
 			}
 		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }
@@ -273,7 +280,7 @@ func FromFoos(slice ...foo) ObservableFoo {
 func FromSliceFoo(slice []foo) ObservableFoo {
 	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
-		scheduler.ScheduleRecursive(func(self func()) {
+		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if !subscriber.Canceled() {
 				if i < len(slice) {
 					observe(slice[i], nil, false)
@@ -286,6 +293,7 @@ func FromSliceFoo(slice []foo) ObservableFoo {
 				}
 			}
 		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }
@@ -298,7 +306,7 @@ func FromSliceFoo(slice []foo) ObservableFoo {
 func Interval(interval time.Duration) ObservableInt {
 	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
-		scheduler.ScheduleFutureRecursive(interval, func(self func(time.Duration)) {
+		runner := scheduler.ScheduleFutureRecursive(interval, func(self func(time.Duration)) {
 			if subscriber.Canceled() {
 				return
 			}
@@ -309,6 +317,7 @@ func Interval(interval time.Duration) ObservableInt {
 			i++
 			self(interval)
 		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }
@@ -320,7 +329,7 @@ func Interval(interval time.Duration) ObservableInt {
 func JustFoo(element foo) ObservableFoo {
 	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		done := false
-		scheduler.ScheduleRecursive(func(self func()) {
+		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if !subscriber.Canceled() {
 				if !done {
 					observe(element, nil, false)
@@ -333,6 +342,7 @@ func JustFoo(element foo) ObservableFoo {
 				}
 			}
 		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }
@@ -355,7 +365,7 @@ func Range(start, count int) ObservableInt {
 	end := start + count
 	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := start
-		scheduler.ScheduleRecursive(func(self func()) {
+		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if !subscriber.Canceled() {
 				if i < end {
 					observe(i, nil, false)
@@ -368,6 +378,7 @@ func Range(start, count int) ObservableInt {
 				}
 			}
 		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }
@@ -415,7 +426,7 @@ func (o ObservableFoo) Repeat(count int) ObservableFoo {
 func RepeatFoo(value foo, count int) ObservableFoo {
 	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
-		scheduler.ScheduleRecursive(func(self func()) {
+		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if !subscriber.Canceled() {
 				if i < count {
 					observe(value, nil, false)
@@ -428,6 +439,7 @@ func RepeatFoo(value foo, count int) ObservableFoo {
 				}
 			}
 		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }
@@ -442,7 +454,7 @@ func RepeatFoo(value foo, count int) ObservableFoo {
 func StartFoo(f func() (foo, error)) ObservableFoo {
 	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		done := false
-		scheduler.ScheduleRecursive(func(self func()) {
+		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if !subscriber.Canceled() {
 				if !done {
 					if next, err := f(); err == nil {
@@ -459,6 +471,7 @@ func StartFoo(f func() (foo, error)) ObservableFoo {
 				}
 			}
 		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }
@@ -470,11 +483,12 @@ func StartFoo(f func() (foo, error)) ObservableFoo {
 // error.
 func ThrowFoo(err error) ObservableFoo {
 	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		scheduler.Schedule(func() {
+		runner := scheduler.Schedule(func() {
 			if !subscriber.Canceled() {
 				observe(zeroFoo, err, true)
 			}
 		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }

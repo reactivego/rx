@@ -39,7 +39,7 @@ func (o ObservableFoo) Println() (err error) {
 		}
 	}
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
+	scheduler.Wait()
 	return
 }
 
@@ -59,7 +59,7 @@ func (o ObservableFoo) Wait() (err error) {
 		}
 	}
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
+	scheduler.Wait()
 	return
 }
 
@@ -80,7 +80,7 @@ func (o ObservableFoo) ToSlice() (slice []foo, err error) {
 		}
 	}
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
+	scheduler.Wait()
 	return
 }
 
@@ -102,7 +102,7 @@ func (o ObservableFoo) ToSingle() (entry foo, err error) {
 		}
 	}
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
+	scheduler.Wait()
 	return
 }
 
@@ -315,6 +315,7 @@ func (o ObservableFoo) Subscribe(observe FooObserveFunc, options ...SubscribeOpt
 		}
 	}
 	o(observer, scheduler, subscriber)
+	subscriber.OnWait(scheduler.Wait)
 	return subscriber
 }
 
