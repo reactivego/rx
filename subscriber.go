@@ -19,11 +19,6 @@ type Subscription interface {
 	// subscription and performs no operation.
 	Unsubscribe()
 
-	// Closed returns true when the subscription has been canceled. There
-	// is not need to check if the subscription is canceled before calling
-	// Unsubscribe. This is an alias for the Canceled() method.
-	Closed() bool
-
 	// Canceled returns true when the subscription has been canceled. There
 	// is not need to check if the subscription is canceled before calling
 	// Unsubscribe.
@@ -94,10 +89,6 @@ func (s *subscriber) Unsubscribe() {
 		s.callbacks = nil
 		s.Unlock()
 	}
-}
-
-func (s *subscriber) Closed() bool {
-	return atomic.LoadInt32(&s.state) != subscribed
 }
 
 func (s *subscriber) Canceled() bool {
