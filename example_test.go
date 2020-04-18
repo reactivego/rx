@@ -4,12 +4,15 @@ import  "fmt"
 
 func Example_basic() {
 	var s subscriber
-	if s.Closed() {
-		fmt.Println("subscriber should not be closed by default")
+	if s.Subscribed() == s.Canceled() {
+		fmt.Println("subscriber can't be both subscribed and canceled")
+	}
+	if s.Canceled() {
+		fmt.Println("subscriber should be subscribed by default")
 	}
 	s.Unsubscribe()
-	if !s.Closed() {
-		fmt.Println("subscriber should be closed after Unsubscribe call")
+	if s.Subscribed() {
+		fmt.Println("subscriber should be canceled after Unsubscribe call")
 	}
 
 	fmt.Println("OK")

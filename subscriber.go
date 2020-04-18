@@ -8,10 +8,13 @@ import (
 // Subscription is an interface that allows code to monitor and control a
 // subscription it received.
 type Subscription interface {
+	// Subscribed returns true when the subscription is currently valid.
+	Subscribed() bool
+
 	// Unsubscribe will cancel the subscription (when one is active).
 	// Subsequently it will then call Unsubscribe on all child subscriptions
 	// added through Add. After a call to Unsubscribe returns, calling
-	// Closed on the same interface or any of its child subscriptions
+	// Canceled() on the same interface or any of its child subscriptions
 	// will return true. Unsubscribe can be safely called on a closed
 	// subscription and performs no operation.
 	Unsubscribe()
@@ -52,7 +55,8 @@ type Subscriber interface {
 
 	// OnUnsubscribe will add the given callback function to the subscriber.
 	// The callback will be called when either the Unsubscribe of the parent
-	// or of the subscriber itself is called. If the 
+	// or of the subscriber itself is called. If the subscription was already
+	// canceled, then the callback function will just be called immediately.
 	OnUnsubscribe(callback func())
 
 	// OnWait will register a callback to  call when subscription Wait is called.
@@ -75,6 +79,10 @@ type subscriber struct {
 	sync.Mutex
 	callbacks []func()
 	onWait    func()
+}
+
+func (s *subscriber) Subscribed() bool {
+	return atomic.LoadInt32(&s.state) == subscribed
 }
 
 func (s *subscriber) Unsubscribe() {
