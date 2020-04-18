@@ -136,62 +136,51 @@ const ErrTimeout = RxError("timeout")
 
 // Timeout mirrors the source Observable, but issues an error notification if a
 // particular period of time elapses without any emitted items.
-//
-// This observer starts a goroutine for every subscription to monitor the
-// timeout deadline. It is guaranteed that calls to the observer for this
-// subscription will never be called concurrently. It is however almost certain
-// that any timeout error will be delivered on a goroutine other than the one
-// delivering the next values.
+// Timeout schedules tasks on the scheduler passed to this 
 func (o Observable) Timeout(timeout time.Duration) Observable {
 	observable := Observable(func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		operator := func() {
-			if subscriber.Canceled() {
+		if subscriber.Canceled() {
+			return
+		}
+		var last struct {
+			sync.Mutex
+			at time.Time
+			done bool
+		}
+		last.at = subscribeOn.Now()
+		timer := func(self func(time.Duration)){
+			last.Lock()
+			defer last.Unlock()
+			if last.done || subscriber.Canceled() {
 				return
 			}
-			var last struct {
-				sync.Mutex
-				at time.Time
-				done bool
+			deadline := last.at.Add(timeout)
+			now := subscribeOn.Now()
+			if now.Before(deadline) {
+				self(deadline.Sub(now))
+				return
 			}
-			last.at = subscribeOn.Now()
-			timer := func(self func(time.Duration)){
-				last.Lock()
-				defer last.Unlock()
-				if last.done || subscriber.Canceled() {
-					return
-				}
-				deadline := last.at.Add(timeout)
-				now := subscribeOn.Now()
-				if now.Before(deadline) {
-					self(deadline.Sub(now))
-					return
-				}
-				last.done = true
-				observe(zero, ErrTimeout, true)
-			}
-			subscribeOn.ScheduleFutureRecursive(timeout, timer)
-			observer := func(next interface{}, err error, done bool) {
-				last.Lock()
-				defer last.Unlock()
-				if last.done || subscriber.Canceled() {
-					return
-				}
-				now := subscribeOn.Now()
-				deadline := last.at.Add(timeout) 
-				if !now.Before(deadline) {
-					return
-				}
-				last.done = done
-				last.at = now
-				observe(next, err, done)
-			}
-			o(observer, subscribeOn, subscriber)
+			last.done = true
+			observe(zero, ErrTimeout, true)
 		}
-		if subscribeOn.IsAsynchronous() {
-			operator()
-		} else {
-			subscribeOn.Schedule(operator)
+		runner := subscribeOn.ScheduleFutureRecursive(timeout, timer)
+		subscriber.OnUnsubscribe(runner.Cancel)
+		observer := func(next interface{}, err error, done bool) {
+			last.Lock()
+			defer last.Unlock()
+			if last.done || subscriber.Canceled() {
+				return
+			}
+			now := subscribeOn.Now()
+			deadline := last.at.Add(timeout) 
+			if !now.Before(deadline) {
+				return
+			}
+			last.done = done
+			last.at = now
+			observe(next, err, done)
 		}
+		o(observer, subscribeOn, subscriber)
 	})
 	return observable.Serialize()
 }

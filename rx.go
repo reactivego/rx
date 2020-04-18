@@ -1971,11 +1971,7 @@ func (o Observable) Timeout(timeout time.Duration) Observable {
 			}
 			o(observer, subscribeOn, subscriber)
 		}
-		if subscribeOn.IsAsynchronous() {
-			operator()
-		} else {
-			subscribeOn.Schedule(operator)
-		}
+		operator()
 	})
 	return observable.Serialize()
 }
