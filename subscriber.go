@@ -148,6 +148,8 @@ func (s *subscriber) OnUnsubscribe(callback func()) {
 	s.Lock()
 	if atomic.LoadInt32(&s.state) == subscribed {
 		s.callbacks = append(s.callbacks, callback)
+	} else {
+		callback()
 	}
 	s.Unlock()
 }
