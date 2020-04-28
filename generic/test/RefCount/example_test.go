@@ -24,7 +24,11 @@ func Example_introToRx() {
 	observable = observable.SubscribeOn(scheduler)
 
 	fmt.Println(">> Subscribing")
-	subscription := observable.SubscribeNext(func(next int) { fmt.Printf("subscription : %d\n", next) })
+	subscription := observable.Subscribe(func(next int, err error, done bool) {
+		if !done {
+			fmt.Printf("subscription : %d\n", next)
+		}
+	})
 
 	// The observable is hot for the next 100 milliseconds. It then will go
 	// cold, unless another observer subscribes in that period.
@@ -56,15 +60,19 @@ func Example_refCountMultipleSubscriptions() {
 	channel := make(chan int, 30)
 	source := FromChanInt(channel).Publish().RefCount().SubscribeOn(scheduler)
 
-	sub1 := source.SubscribeNext(func(n int) {
-		fmt.Println(n)
-		os.Stdout.Sync()
-		wg.Done()
+	sub1 := source.Subscribe(func(n int, err error, done bool) {
+		if !done {
+			fmt.Println(n)
+			os.Stdout.Sync()
+			wg.Done()
+		}
 	})
-	sub2 := source.SubscribeNext(func(n int) {
-		fmt.Println(n)
-		os.Stdout.Sync()
-		wg.Done()
+	sub2 := source.Subscribe(func(n int, err error, done bool) {
+		if !done {
+			fmt.Println(n)
+			os.Stdout.Sync()
+			wg.Done()
+		}
 	})
 
 	// 3 goroutines are now starting, 1 for publishing and 2 for subscribing.

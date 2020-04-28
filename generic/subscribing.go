@@ -38,8 +38,9 @@ func (o ObservableFoo) Println() (err error) {
 			subscriber.Unsubscribe()
 		}
 	}
+	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	scheduler.Wait()
+	subscriber.Wait()
 	return
 }
 
@@ -58,8 +59,9 @@ func (o ObservableFoo) Wait() (err error) {
 			subscriber.Unsubscribe()
 		}
 	}
+	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	scheduler.Wait()
+	subscriber.Wait()
 	return
 }
 
@@ -79,8 +81,9 @@ func (o ObservableFoo) ToSlice() (slice []foo, err error) {
 			subscriber.Unsubscribe()
 		}
 	}
+	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	scheduler.Wait()
+	subscriber.Wait()
 	return
 }
 
@@ -101,8 +104,9 @@ func (o ObservableFoo) ToSingle() (entry foo, err error) {
 			subscriber.Unsubscribe()
 		}
 	}
+	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	scheduler.Wait()
+	subscriber.Wait()
 	return
 }
 
@@ -314,21 +318,7 @@ func (o ObservableFoo) Subscribe(observe FooObserveFunc, options ...SubscribeOpt
 			subscriber.Unsubscribe()
 		}
 	}
-	o(observer, scheduler, subscriber)
 	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
 	return subscriber
-}
-
-//jig:template Observable<Foo> SubscribeNext
-//jig:needs Observable<Foo> Subscribe
-
-// SubscribeNext operates upon the emissions from an Observable only.
-// This method returns a Subscription.
-// SubscribeNext by default is performed on the Trampoline scheduler.
-func (o ObservableFoo) SubscribeNext(f func(next foo), options ...SubscribeOption) Subscription {
-	return o.Subscribe(func(next foo, err error, done bool) {
-		if !done {
-			f(next)
-		}
-	}, options...)
 }

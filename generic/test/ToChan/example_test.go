@@ -29,11 +29,11 @@ func Example_unsubscribeDirect() {
 	// if i, ok := <-ch; ok {
 	// 	fmt.Println(i)
 	// }
-	fmt.Println("closed:", sub.Closed())
+	fmt.Println("unsubscribed:", sub.Canceled())
 
 	// Output:
 	// 1
-	// closed: true
+	// unsubscribed: true
 }
 
 func Example_unsubscribeLoop() {
@@ -47,12 +47,12 @@ func Example_unsubscribeLoop() {
 			sub.Unsubscribe()
 		}
 	}
-	fmt.Println("closed:", sub.Closed())
+	fmt.Println("unsubscribed:", sub.Canceled())
 
 	// Output:
 	// 1
 	// 2
-	// closed: true
+	// unsubscribed: true
 }
 
 // The source ObservableInt created by Range(1,9) will emit values in the range

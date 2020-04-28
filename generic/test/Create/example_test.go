@@ -4,8 +4,6 @@ import (
 	"fmt"
 )
 
-//jig:no-doc
-
 // Shows how to use CreateString to create an observable of strings
 func Example_createString() {
 	source := CreateString(func(observer StringObserver) {

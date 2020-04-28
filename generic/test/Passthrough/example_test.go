@@ -1,9 +1,7 @@
 package Passthrough
 
-import "fmt"
-
 func Example_passthrough() {
-	Range(1, 3).Passthrough().SubscribeNext(func(next int) { fmt.Println(next) })
+	Range(1, 3).Passthrough().Println()
 	// Output:
 	// 1
 	// 2

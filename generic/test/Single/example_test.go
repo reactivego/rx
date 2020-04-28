@@ -15,7 +15,7 @@ func Example_single() {
 		default:
 			fmt.Println("complete")
 		}
-	})
+	}).Wait()
 
 	// Now output 2 ints.
 	FromInts(19, 20).Single().Subscribe(func(next int, err error, done bool) {
@@ -27,7 +27,7 @@ func Example_single() {
 		default:
 			fmt.Println("complete")
 		}
-	})
+	}).Wait()
 
 	// Output:
 	// 19

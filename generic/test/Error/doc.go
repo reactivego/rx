@@ -1,9 +1,8 @@
 /*
-Error tests.
+	Error	http://reactivex.io/documentation/operators/empty-never-throw.html
 
-Error is just an alias for the Throw function.
-
-	Throw	http://reactivex.io/documentation/operators/empty-never-throw.html
+Error creates an Observable that emits no items and terminates with an error.
+It is an alternative name for Throw.
 */
 package Error
 

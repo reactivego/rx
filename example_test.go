@@ -12,12 +12,19 @@ func ExampleObservable_Concat() {
 	ob := rx.From(4, 5)
 	oc := rx.From(6)
 	od := rx.From(7, 8, 9)
-	oa.Concat(ob, oc).Concat(od).SubscribeNext(func(next interface{}) {
-		fmt.Printf("%d,", next.(int))
-	})
+	oa.Concat(ob, oc).Concat(od).Subscribe(func(next interface{}, err error, done bool) {
+		switch {
+		case !done:
+			fmt.Printf("%d,", next.(int))
+		case err != nil:
+			fmt.Print("err", err)
+		default:
+			fmt.Printf("complete")
+		}
+	}).Wait()
 
 	// Output:
-	// 0,1,2,3,4,5,6,7,8,9,
+	// 0,1,2,3,4,5,6,7,8,9,complete
 }
 
 func ExampleObservable_Do() {

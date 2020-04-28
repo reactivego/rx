@@ -11,10 +11,6 @@ Unlike RefCount, AutoConnect never automatically Connects again and also will
 never call Unsubscribe on the subscription returned by the call to Connect. So
 even when the number of subscribers to AutoConnect drops to zero, the
 subscription from the Connectable to its source will remain alive.
-
-You can pass multiple function options; OnSubscribe(), OnUnsubscribe() and
-SubscribeOn() to AutoConnect. These will be passed verbatim to the Connect
-method when it is called.
 */
 package AutoConnect
 

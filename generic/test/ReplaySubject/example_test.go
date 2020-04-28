@@ -20,16 +20,22 @@ func Example_replaySubject() {
 	}()
 
 	// Subscribe to subject on the default Trampoline scheduler.
-	subject.SubscribeNext(func(next int) {
-		fmt.Println("first", next)
+	subcription := subject.Subscribe(func(next int, err error, done bool) {
+		if !done {
+			fmt.Println("first", next)
+		}
 	})
+	subcription.Wait()
 
 	fmt.Println("--")
 
 	// Subscribe to subject again on the default Trampoline scheduler.
-	subject.SubscribeNext(func(next int) {
-		fmt.Println("second", next)
+	subcription = subject.Subscribe(func(next int, err error, done bool) {
+		if !done {
+			fmt.Println("second", next)
+		}
 	})
+	subcription.Wait()
 
 	// Output:
 	// first 123
@@ -56,8 +62,10 @@ func Example_replaySubjectMultiple() {
 	for i := 0; i < 16; i++ {
 		result := make([]string, 0, 1000)
 		results = append(results, &result)
-		subscription := source.SubscribeNext(func(next string) {
-			result = append(result, next)
+		subscription := source.Subscribe(func(next string, err error, done bool) {
+			if !done {
+				result = append(result, next)
+			}
 		})
 		subscriptions = append(subscriptions, subscription)
 	}

@@ -54,7 +54,7 @@ func newInitialLinkFoo() *linkFoo {
 func newLinkFoo(observe linkFooObserveFunc, subscriber Subscriber) *linkFoo {
 	return &linkFoo{
 		observe:    observe,
-		subscriber: subscriber.AddChild(),
+		subscriber: subscriber.Add(),
 	}
 }
 

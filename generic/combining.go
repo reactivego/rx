@@ -9,6 +9,15 @@ import (
 
 type FooSlice []foo
 
+//jig:template CombineLatest<Foo>
+//jig:needs ObservableObservable<Foo> CombineAll
+
+// Combines multiple Observables to create an Observable whose values are
+// calculated from the latest values of each of its input Observables.
+func CombineLatestFoo(observables ...ObservableFoo) ObservableFooSlice {
+	return FromSliceObservableFoo(observables).CombineAll()
+}
+
 //jig:template ObservableObservable<Foo> CombineAll
 //jig:needs <Foo>Slice, zero<Foo>
 
@@ -143,7 +152,7 @@ func (o ObservableObservableFoo) ConcatAll() ObservableFoo {
 				}
 			}
 		}
-		sourceSubscriber := subscriber.AddChild()
+		sourceSubscriber := subscriber.Add()
 		concatenator := func(next ObservableFoo, err error, done bool) {
 			if !done {
 				mutex.Lock()
@@ -335,7 +344,7 @@ func (o ObservableObservableFoo) SwitchAll() ObservableFoo {
 		}
 		currentLink := newInitialLinkFoo()
 		var switcherMutex sync.Mutex
-		switcherSubscriber := subscriber.AddChild()
+		switcherSubscriber := subscriber.Add()
 		switcher := func(next ObservableFoo, err error, done bool) {
 			switch {
 			case !done:

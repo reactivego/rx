@@ -21,7 +21,7 @@ func Example_autoConnect() {
 	observe := func(next int, err error, done bool) {
 		switch {
 		case !done:
-			fmt.Print(next)
+			fmt.Print(next, ",")
 		case err != nil:
 			fmt.Println(err)
 		default:
@@ -30,16 +30,16 @@ func Example_autoConnect() {
 	}
 
 	fmt.Println("first...")
-	source.Subscribe(observe)
+	source.Subscribe(observe).Wait()
 	fmt.Println("second...")
-	source.Subscribe(observe)
+	source.Subscribe(observe).Wait()
 
 	// Output:
 	// first...
 	// subscribed
-	// 123456789complete
+	// 1,2,3,4,5,6,7,8,9,complete
 	// second...
-	// 123456789complete
+	// 1,2,3,4,5,6,7,8,9,complete
 }
 
 // This example how to use an asynchronous scheduler, so multiple subscribe

@@ -5,21 +5,29 @@ import (
 	"time"
 )
 
-func Example_ignoreCompletion() {
+func Example_ignoreComplete() {
 	source := Range(1, 5).IgnoreCompletion()
 
-	// Subscribe asynchronously
-	subscription := source.SubscribeNext(func(next int) {
-		fmt.Println(next)
-	}, SubscribeOn( /*must be async*/ GoroutineScheduler()))
+	// NOTE: subscription must run concurrently with main goroutine
+	concurrent := GoroutineScheduler()
+	subscription := source.SubscribeOn(concurrent).Subscribe(func(next int, err error, done bool) {
+		switch {
+		case !done:
+			fmt.Println(next)
+		case err != nil:
+			fmt.Println(err)
+		default:
+			fmt.Println("complete")
+		}
+	})
 
 	time.Sleep(100 * time.Millisecond)
 
-	if !subscription.Closed() {
+	if subscription.Subscribed() {
 		fmt.Println("subscription alive, as expected")
 	}
 	subscription.Unsubscribe()
-
+	subscription.Wait()
 	// Output:
 	// 1
 	// 2
@@ -29,7 +37,7 @@ func Example_ignoreCompletion() {
 	// subscription alive, as expected
 }
 
-func Example_ignoreCompletionError() {
+func Example_ignoreError() {
 	source := CreateInt(func(observer IntObserver) {
 		for i := 1; i < 6; i++ {
 			observer.Next(i)
@@ -37,18 +45,26 @@ func Example_ignoreCompletionError() {
 		observer.Error(RxError("error"))
 	}).IgnoreCompletion()
 
-	// Subscribe asynchronously
-	subscription := source.SubscribeNext(func(next int) {
-		fmt.Println(next)
-	}, SubscribeOn( /*must be async*/ GoroutineScheduler()))
+	// NOTE: subscription must run concurrently with main goroutine
+	concurrent := GoroutineScheduler()
+	subscription := source.SubscribeOn(concurrent).Subscribe(func(next int, err error, done bool) {
+		switch {
+		case !done:
+			fmt.Println(next)
+		case err != nil:
+			fmt.Println(err)
+		default:
+			fmt.Println("complete")
+		}
+	})
 
 	time.Sleep(100 * time.Millisecond)
 
-	if !subscription.Closed() {
+	if subscription.Subscribed() {
 		fmt.Println("subscription alive, as expected")
 	}
 	subscription.Unsubscribe()
-
+	subscription.Wait()
 	// Output:
 	// 1
 	// 2

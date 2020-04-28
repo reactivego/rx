@@ -2,10 +2,9 @@ package Defer
 
 import "fmt"
 
-// Defer is used to postpone creating an observable until the moment somebody
-// actually subscribes.
 func Example_defer() {
-
+	// Defer is used to postpone creating an observable until the moment somebody
+	// actually subscribes.
 	count := 0
 	source := DeferInt(func() ObservableInt {
 		count++

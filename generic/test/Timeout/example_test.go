@@ -5,15 +5,13 @@ import (
 	"time"
 )
 
-//jig:no-doc
-
 func Example_timeout() {
 	const _0ms = 0
 	const _250ms = 250 * time.Millisecond
 	const _500ms = 500 * time.Millisecond
 
 	scheduler := TrampolineScheduler()
-	// scheduler := GoroutineScheduler()
+	//scheduler := GoroutineScheduler()
 	start := scheduler.Now()
 
 	active := true
@@ -35,14 +33,12 @@ func Example_timeout() {
 		fmt.Println(ErrTimeout.Error())
 	}
 
-	elapsed := scheduler.Now().Sub(start)
+	elapsed := scheduler.Since(start)
 	if elapsed > _250ms && elapsed < _500ms {
 		fmt.Println("elapsed time is be between 250 and 500 ms")
 	} else {
 		fmt.Println("elapsed", elapsed)
 	}
-
-
 
 	// Output:
 	// Next(1) ->

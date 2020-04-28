@@ -35,12 +35,14 @@ func Example_goroutine() {
 }
 
 func Example_trampoline() {
+	scheduler := TrampolineScheduler()
 	err := Interval(42 * time.Millisecond).
 		Take(4).
 		MapObservableInt(func(i int) ObservableInt {
 			return Interval(16 * time.Millisecond).Take(4)
 		}).
 		SwitchAll().
+		SubscribeOn(scheduler).
 		Println()
 
 	if err == nil {
@@ -49,8 +51,11 @@ func Example_trampoline() {
 
 	// Output:
 	// 0
+	// 1
 	// 0
+	// 1
 	// 0
+	// 1
 	// 0
 	// 1
 	// 2

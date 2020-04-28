@@ -1,7 +1,7 @@
 /*
-DoOnError operator tests.
-
 	DoOnError	http://reactivex.io/documentation/operators/do.html
+
+DoOnError calls a function for any error on the stream.
 */
 package DoOnError
 

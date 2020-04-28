@@ -2,9 +2,11 @@ package Publish
 
 import (
 	"fmt"
+	"runtime"
+	"time"
 )
 
-func Example_publish() {
+func Example_basic() {
 	// source is an ObservableInt
 	source := FromInts(1, 2)
 
@@ -59,4 +61,43 @@ func Example_publish() {
 	// sub2 true
 	// sub3 1
 	// sub3 2
+}
+
+func Example_publishRefCount() {
+	scheduler := GoroutineScheduler()
+	ch := make(chan int, 30)
+	s := FromChanInt(ch).Publish().RefCount().SubscribeOn(scheduler)
+	a := []int{}
+	b := []int{}
+	appendToSlice := func(slice *[]int) IntObserveFunc {
+		return func(next int, err error, done bool) {
+			if !done {
+				*slice = append(*slice, next)
+			}
+		}
+	}
+	asub := s.Subscribe(appendToSlice(&a))
+	bsub := s.Subscribe(appendToSlice(&b))
+	ch <- 1
+	ch <- 2
+	ch <- 3
+	// make sure the channel gets enough time to be fully processed.
+	for i := 0; i < 10; i++ {
+		time.Sleep(20 * time.Millisecond)
+		runtime.Gosched()
+	}
+	asub.Unsubscribe()
+	if asub.Subscribed() {
+		fmt.Println("asub should be closed")
+	}
+	ch <- 4
+	close(ch)
+	bsub.Wait()
+
+	fmt.Println("a", a)
+	fmt.Println("b", b)
+
+	// Output:
+	// a [1 2 3]
+	// b [1 2 3 4]
 }

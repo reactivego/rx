@@ -16,14 +16,19 @@ func Example_all() {
 	source.Println()
 	fmt.Println("Source observable completed")
 
-	// Setup All operator to produce true only when all source values are less than 5
-	predicate := func(i int) bool { return i < 5 }
-	all := source.All(predicate)
+	// Setup All to produce true only when all source values are less than 5
+	predicate := func(i int) bool {
+		return i < 5
+	}
 
-	all.SubscribeNext(func(b bool) { fmt.Println("All values less than 5?", b) }).Wait()
+	// Observer prints a message describing the next value it observes.
+	observer := func(next bool, err error, done bool) {
+		if !done {
+			fmt.Println("All values less than 5?", next)
+		}
+	}
 
-	fmt.Println("All operator completed")
-
+	source.All(predicate).Subscribe(observer).Wait()
 	// Output:
 	// 1
 	// 2
@@ -32,5 +37,4 @@ func Example_all() {
 	// 1
 	// Source observable completed
 	// All values less than 5? false
-	// All operator completed
 }

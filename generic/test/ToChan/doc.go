@@ -1,19 +1,15 @@
 /*
 	ToChan		http://reactivex.io/documentation/operators/to.html
 
-ToChan returns a channel that emits values. For Observables of type
-interface{}, any error is emitted through the channel itself.
+ToChan returns a channel that emits interface{} values. If the source
+observable does not emit values but emits an error or complete, then the
+returned channel will emit any error and then close without emitting any
+values.
 
-Because the channel is fed by subscribing to the observable, ToChan would
-block when subscribed on the Trampoline scheduler which is initially synchronous.
-That's why the subscribing is done on the Goroutine scheduler. This also means
-that the code reading the channel can do so while running on the main goroutine.
-
-To cancel the subscription created internally by ToChan you will need access to
-the subscription used internally by ToChan. To get at this subscription, pass
-the result of a call to option OnSubscribe(func(Subscription)) as a parameter
-to ToChan. On subcription the callback will be called with the subscription
-that was created.
+This method subscribes to the observable on the Goroutine scheduler because
+it needs the concurrency so the returned channel can be used by used
+by the calling code directly. To cancel ToChan you will need to supply a
+subscriber that you hold on to.
 */
 package ToChan
 

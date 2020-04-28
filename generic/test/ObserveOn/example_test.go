@@ -2,19 +2,28 @@ package ObserveOn
 
 import "fmt"
 
-type TestScheduler struct {
+type TaskList struct {
 	Tasks []func()
 }
 
-func (s *TestScheduler) Schedule(task func()) {
+func (s *TaskList) Schedule(task func()) {
 	s.Tasks = append(s.Tasks, task)
 }
 
-func Example_observeOn() {
-	testScheduler := &TestScheduler{}
+func (s *TaskList) Run() {
+	for _, task := range s.Tasks {
+		task()
+	}
+}
 
-	// Observe by parking all next calls and the complete call on a custom scheduler
-	source := FromInts(1, 2, 3, 4, 5).ObserveOn(testScheduler.Schedule)
+func Example_observeOn() {
+	tasks := &TaskList{}
+
+	// Create a source that uses ObserveOn to park all next calls and the
+	// complete call on a custom tasklist.
+	source := FromInts(1, 2, 3, 4, 5).ObserveOn(tasks.Schedule)
+
+	// Subscribe to the source and wait for it to complete.
 	subscription := source.Subscribe(func(next int, err error, done bool) {
 		if !done {
 			fmt.Printf("task %d\n", next)
@@ -24,21 +33,20 @@ func Example_observeOn() {
 	})
 	subscription.Wait()
 
-	// Observable ran to completion but nothing happended yet, all tasks have been parked
-	fmt.Printf("%d parked tasks\n", len(testScheduler.Tasks))
-	if !subscription.Closed() {
-		fmt.Println("subscribed") // still subscribed, as complete is not yet delivered.
+	// Source ran to completion but nothing happended yet, all tasks have been
+	// parked.
+	fmt.Printf("%d parked tasks\n", len(tasks.Tasks))
+	if subscription.Subscribed() {
+		fmt.Println("subscribed") // complete has not yet been delivered.
 	}
 
 	// Now let's run those tasks
 	fmt.Println("---Hey Ho Let's Go!---")
-	for _, task := range testScheduler.Tasks {
-		task()
-	}
+	tasks.Run()
 	fmt.Println("--------")
 
-	if subscription.Closed() {
-		fmt.Println("unsubscribed") // complete should have caused subscription to close.
+	if subscription.Canceled() {
+		fmt.Println("unsubscribed") // complete has been delivered.
 	}
 
 	// Output:

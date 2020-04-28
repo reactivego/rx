@@ -8,7 +8,7 @@ import (
 func TestGenerate(t *testing.T) {
 	// This test sole purpose is to guide code generation by explicitly using
 	// the generics we want expanded into this package.
-	return 
+	return
 
 	/*
 		Observable Types
@@ -55,7 +55,7 @@ func TestGenerate(t *testing.T) {
 	o.MergeDelayError()
 	o.MergeMap(func(interface{}) Observable { return o })
 	i.Min()
-	o.ObserveOn(TrampolineScheduler())
+	o.ObserveOn(func(task func()) { task() })
 	o.OnlyBool()
 	o.OnlyInt()
 	// Passthrough
@@ -112,9 +112,6 @@ func TestGenerate(t *testing.T) {
 	o.Subscribe(func(interface{}, error, bool) {})
 	b.Subscribe(func(bool, error, bool) {})
 	i.Subscribe(func(int, error, bool) {})
-	o.SubscribeNext(func(interface{}) {})
-	b.SubscribeNext(func(bool) {})
-	i.SubscribeNext(func(int) {})
 	o.ToChan()
 	b.ToChan()
 	i.ToChan()

@@ -1,6 +1,4 @@
 /*
-PublishReplay operator tests.
-
 	Replay	http://reactivex.io/documentation/operators/replay.html
 
 PublishReplay uses Multicast to control the subscription of a ReplaySubject to a

@@ -15,3 +15,6 @@ Observable evaluates as false according to the predicate.
 package All
 
 import _ "github.com/reactivego/rx"
+
+// Don't generate documentation into rx.go
+//off jig:no-doc

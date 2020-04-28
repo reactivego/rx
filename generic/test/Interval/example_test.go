@@ -5,10 +5,9 @@ import (
 	"time"
 )
 
-// This example showcases the Interval operator. After 100ms the example
-// cancels the observable subscription by calling the Unsubscribe method on the
-// returned subscription.
-func Example_GoroutineScheduler() {
+// After 100ms the example cancels the observable subscription by calling the
+// Unsubscribe method on the returned subscription.
+func Example_goroutineScheduler() {
 	const _10ms = 10 * time.Millisecond
 	const _28ms = 28 * time.Millisecond
 
@@ -17,20 +16,23 @@ func Example_GoroutineScheduler() {
 
 	// Print time since start of the subcribe.
 	start := time.Now()
-	printSinceStart := func(int) {
-		elapsed := time.Since(start)
-		fmt.Println(elapsed.Round(_10ms))
+	printSinceStart := func(next int, err error, done bool) {
+		if !done {
+			elapsed := time.Since(start)
+			fmt.Println(elapsed.Round(_10ms))
+		}
 	}
 
 	// Interval 30ms usually takes up to 4ms longer, so we'er using 28ms.
 	// Subscribe (asynchronous through Goroutine) and print ms since start.
-	subscription := Interval(_28ms).SubscribeOn(scheduler).SubscribeNext(printSinceStart)
+	subscription := Interval(_28ms).SubscribeOn(scheduler).Subscribe(printSinceStart)
 
 	// Sleep for 100ms
 	time.Sleep(100 * time.Millisecond)
 
 	// Cancel the subscription, Interval doesn't stop by itself.
 	subscription.Unsubscribe()
+	subscription.Wait()
 
 	// Output:
 	// 30ms
@@ -39,8 +41,7 @@ func Example_GoroutineScheduler() {
 }
 
 // Interval operator used together with the default Trampoline scheduler.
-// 
-func Example_TrampolineScheduler() {
+func Example_trampolineScheduler() {
 	const _10ms = 10 * time.Millisecond
 	const _15ms = 15 * time.Millisecond
 

@@ -31,9 +31,11 @@ func Example_trampoline() {
 	})
 	slice, err := source.Repeat(_1M).TakeLast(9).SubscribeOn(TrampolineScheduler()).ToSlice()
 
+	fmt.Println(TrampolineScheduler())
 	fmt.Println(slice)
 	fmt.Println(err)
 	// Output:
+	// Trampoline{ Asynchronous:Serial(0) }
 	// [1 2 3 1 2 3 1 2 3]
 	// <nil>
 }
@@ -54,10 +56,12 @@ func Example_goroutine() {
 		observer.Complete()
 	})
 	slice, err := source.Repeat(_1M).TakeLast(9).SubscribeOn(GoroutineScheduler()).ToSlice()
-
+	
+	fmt.Println(GoroutineScheduler())
 	fmt.Println(slice)
 	fmt.Println(err)
 	// Output:
+	// Goroutine{ Asynchronous:Concurrent(0) }
 	// [1 2 3 1 2 3 1 2 3]
 	// <nil>
 }

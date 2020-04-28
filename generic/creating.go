@@ -24,24 +24,24 @@ func MakeFoo(make MakeFooFunc) ObservableFoo {
 				return
 			}
 			next := func(n foo) {
-				if !subscriber.Canceled() {
+				if subscriber.Subscribed() {
 					observe(n, nil, false)
 				}
 			}
 			err := func(e error) {
 				done = true
-				if !subscriber.Canceled() {
+				if subscriber.Subscribed() {
 					observe(zeroFoo, e, true)
 				}
 			}
 			complete := func() {
 				done = true
-				if !subscriber.Canceled() {
+				if subscriber.Subscribed() {
 					observe(zeroFoo, nil, true)
 				}
 			}
 			make(next, err, complete)
-			if !done && !subscriber.Canceled() {
+			if !done && subscriber.Subscribed() {
 				self()
 			}
 		})
@@ -74,24 +74,24 @@ func MakeTimedFoo(timeout time.Duration, make MakeTimedFooFunc) ObservableFoo {
 				return
 			}
 			next := func(n foo) {
-				if !subscriber.Canceled() {
+				if subscriber.Subscribed() {
 					observe(n, nil, false)
 				}
 			}
 			error := func(e error) {
 				done = true
-				if !subscriber.Canceled() {
+				if subscriber.Subscribed() {
 					observe(zeroFoo, e, true)
 				}
 			}
 			complete := func() {
 				done = true
-				if !subscriber.Canceled() {
+				if subscriber.Subscribed() {
 					observe(zeroFoo, nil, true)
 				}
 			}
 			timeout = make(next, error, complete)
-			if !done && !subscriber.Canceled() {
+			if !done && subscriber.Subscribed() {
 				self(timeout)
 			}
 		})
@@ -112,8 +112,8 @@ type FooObserver interface {
 	Error(error)
 	// Complete signals that no more data is to be expected.
 	Complete()
-	// Closed returns true when the subscription has been canceled.
-	Closed() bool
+	// Subscribed returns true when the subscription is currently valid.
+	Subscribed() bool
 }
 
 //jig:template Create<Foo>
@@ -124,11 +124,11 @@ type FooObserver interface {
 func CreateFoo(f func(FooObserver)) ObservableFoo {
 	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
-			if subscriber.Closed() {
+			if !subscriber.Subscribed() {
 				return
 			}
 			observer := func(next foo, err error, done bool) {
-				if !subscriber.Closed() {
+				if subscriber.Subscribed() {
 					observe(next, err, done)
 				}
 			}
@@ -162,7 +162,7 @@ func DeferFoo(factory func() ObservableFoo) ObservableFoo {
 func EmptyFoo() ObservableFoo {
 	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
-			if !subscriber.Canceled() {
+			if subscriber.Subscribed() {
 				observe(zeroFoo, nil, true)
 			}
 		})
@@ -179,7 +179,7 @@ func EmptyFoo() ObservableFoo {
 func ErrorFoo(err error) ObservableFoo {
 	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
-			if !subscriber.Canceled() {
+			if subscriber.Subscribed() {
 				observe(zeroFoo, err, true)
 			}
 		})
@@ -207,7 +207,7 @@ func FromChanFoo(ch <-chan foo) ObservableFoo {
 			}
 			if ok {
 				observe(next, nil, false)
-				if !subscriber.Canceled() {
+				if subscriber.Subscribed() {
 					self()
 				}
 			} else {
@@ -242,7 +242,7 @@ func FromChan(ch <-chan interface{}) Observable {
 				err, ok := next.(error)
 				if !ok {
 					observe(next, nil, false)
-					if !subscriber.Canceled() {
+					if subscriber.Subscribed() {
 						self()
 					}
 				} else {
@@ -281,10 +281,10 @@ func FromSliceFoo(slice []foo) ObservableFoo {
 	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
-			if !subscriber.Canceled() {
+			if subscriber.Subscribed() {
 				if i < len(slice) {
 					observe(slice[i], nil, false)
-					if !subscriber.Canceled() {
+					if subscriber.Subscribed() {
 						i++
 						self()
 					}
@@ -302,7 +302,8 @@ func FromSliceFoo(slice []foo) ObservableFoo {
 //jig:needs ObservableInt
 
 // Interval creates an ObservableInt that emits a sequence of integers spaced
-// by a particular time interval.
+// by a particular time interval. First integer is emitted after the first time
+// interval expires.
 func Interval(interval time.Duration) ObservableInt {
 	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
@@ -330,10 +331,10 @@ func JustFoo(element foo) ObservableFoo {
 	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		done := false
 		runner := scheduler.ScheduleRecursive(func(self func()) {
-			if !subscriber.Canceled() {
+			if subscriber.Subscribed() {
 				if !done {
 					observe(element, nil, false)
-					if !subscriber.Canceled() {
+					if subscriber.Subscribed() {
 						done = true
 						self()
 					}
@@ -366,10 +367,10 @@ func Range(start, count int) ObservableInt {
 	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := start
 		runner := scheduler.ScheduleRecursive(func(self func()) {
-			if !subscriber.Canceled() {
+			if subscriber.Subscribed() {
 				if i < end {
 					observe(i, nil, false)
-					if !subscriber.Canceled() {
+					if subscriber.Subscribed() {
 						i++
 						self()
 					}
@@ -427,10 +428,10 @@ func RepeatFoo(value foo, count int) ObservableFoo {
 	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
-			if !subscriber.Canceled() {
+			if subscriber.Subscribed() {
 				if i < count {
 					observe(value, nil, false)
-					if !subscriber.Canceled() {
+					if subscriber.Subscribed() {
 						i++
 						self()
 					}
@@ -455,11 +456,11 @@ func StartFoo(f func() (foo, error)) ObservableFoo {
 	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		done := false
 		runner := scheduler.ScheduleRecursive(func(self func()) {
-			if !subscriber.Canceled() {
+			if subscriber.Subscribed() {
 				if !done {
 					if next, err := f(); err == nil {
 						observe(next, nil, false)
-						if !subscriber.Canceled() {
+						if subscriber.Subscribed() {
 							done = true
 							self()
 						}
@@ -484,7 +485,7 @@ func StartFoo(f func() (foo, error)) ObservableFoo {
 func ThrowFoo(err error) ObservableFoo {
 	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
-			if !subscriber.Canceled() {
+			if subscriber.Subscribed() {
 				observe(zeroFoo, err, true)
 			}
 		})

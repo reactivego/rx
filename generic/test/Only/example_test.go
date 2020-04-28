@@ -19,12 +19,27 @@ func Example_only() {
 		observer.Next([]point{{50, 100}, {75, 25}}) // []point
 		observer.Complete()
 	})
-	// OnlyString() will filter on string values
-	source.OnlyString().SubscribeNext(func(next string) { fmt.Printf("String: %s\n", next) })
-	// OnlySize() will filter on Size values
-	source.OnlySize().SubscribeNext(func(next Size) { fmt.Printf("Size: %+v\n", next) })
-	// OnlyPoint() will filter on []point values
-	source.OnlyPoint().SubscribeNext(func(next []point) { fmt.Printf("Point: %+v\n", next) })
+
+	subscription := source.OnlyString().Subscribe(func(next string, err error, done bool) {
+		if !done {
+			fmt.Printf("String: %s\n", next)	
+		}		
+	})
+	subscription.Wait()
+
+	subscription = source.OnlySize().Subscribe(func(next Size, err error, done bool) {
+		if !done {
+			fmt.Printf("Size: %+v\n", next)	
+		}		
+	})
+	subscription.Wait()
+
+	subscription = source.OnlyPoint().Subscribe(func(next []point, err error, done bool) {
+		if !done {
+			fmt.Printf("Point: %+v\n", next)	
+		}		
+	})
+	subscription.Wait()
 
 	// Output:
 	// String: Hello

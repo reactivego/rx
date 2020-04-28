@@ -13,9 +13,9 @@ func Example_mergeAll() {
 			observer.Next(JustString(fmt.Sprintf("Second %d", i)))
 		}
 		observer.Complete()
-	}).MergeAll()
+	})
 
-	source.SubscribeNext(func(next string) { fmt.Println(next) })
+	source.MergeAll().Println()
 	// Output:
 	// First 0
 	// Second 0

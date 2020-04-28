@@ -58,7 +58,7 @@ func NewSubjectFoo() SubjectFoo {
 				} else {
 					observer.Error(err)
 				}
-				return !observer.Closed()
+				return observer.Subscribed()
 			}
 			ep.Range(receive, 0)
 		})
@@ -110,7 +110,7 @@ func NewReplaySubjectFoo(bufferCapacity int, windowDuration time.Duration) Subje
 				} else {
 					observer.Error(err)
 				}
-				return !observer.Closed()
+				return observer.Subscribed()
 			}
 			ep.Range(receive, windowDuration)
 		})

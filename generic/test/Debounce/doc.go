@@ -1,9 +1,8 @@
 /*
-Debounce operator tests.
-
 	Debounce	http://reactivex.io/documentation/operators/debounce.html
 
-This operator uses a goroutine internally.
+Debounce only emits the last item of a burst from an Observable if a particular
+timespan has passed without it emitting another item.
 */
 package Debounce
 

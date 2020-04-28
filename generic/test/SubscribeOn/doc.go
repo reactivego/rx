@@ -1,7 +1,8 @@
 /*
 	SubscribeOn	http://reactivex.io/documentation/operators/subscribeon.html
 
-SubscribeOn operator tests.
+SubscribeOn specifies the scheduler an ObservableInt should use when it is
+subscribed to.
 */
 package SubscribeOn
 

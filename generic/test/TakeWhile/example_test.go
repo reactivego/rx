@@ -1,7 +1,16 @@
 package TakeWhile
 
+type predicate func (int) bool
+
+func smallerThan(value int) predicate {
+	return func(next int ) bool {
+		return next < value
+	}
+}
+
 func Example_takeWhile() {
-	FromInt(1, 2, 3, 4, 5).TakeWhile(func (next int) bool { return next < 4 }).Println()
+
+	FromInt(1, 2, 3, 4, 5).TakeWhile(smallerThan(4)).Println()
 
 	// Output:
 	// 1

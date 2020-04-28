@@ -1,10 +1,9 @@
 /*
-Only operator tests.
-
 	Only
 
-OnlyFoo filters the value stream of an Observable of interface{} and outputs
-only the foo typed values.
+Only (e.g. OnlyInt32) filters the value stream of an observable and lets
+only the values of a specific type pass. So in case of OnlyInt32 it will only 
+let int32 values pass through.
 */
 package Only
 

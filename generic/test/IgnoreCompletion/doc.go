@@ -1,9 +1,8 @@
 /*
-IgnoreCompletion operator tests.
-
 	IgnoreCompletion
 
-IgnoreCompletion only emits items and never completes, neither with Error nor with Complete.
+IgnoreCompletion only emits items and never completes, neither with Error nor
+with Complete.
 */
 package IgnoreCompletion
 

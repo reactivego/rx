@@ -17,10 +17,7 @@ func main() {
 	FromStrings("You!", "Gophers!", "World!").
 		MapString(func(x string) string {
 			return "Hello, " + x
-		}).
-		SubscribeNext(func(next string) {
-			println(next)
-		})
+		}).Println()
 
 	// Output:
 	// Hello, You!
@@ -226,11 +223,7 @@ Subscribing breathes life into a chain of observables. An observable may be subs
 
 - (Observable) [**Println**](https://godoc.org/github.com/reactivego/rx/generic/test/Println)() error
 - (Observable) [**Subscribe**](https://godoc.org/github.com/reactivego/rx/generic/test/Subscribe)() Subscription
-
-**Subscribe** is called internally by **Connect**, **SubscribeNext**, **ToChan**, **ToSingle**, **ToSlice** and **Wait**.
-
 - (Connectable) [**Connect**](https://godoc.org/github.com/reactivego/rx/generic/test/Connect)() Subscription
-- (Observable) [**SubscribeNext**](https://godoc.org/github.com/reactivego/rx/generic/test/SubscribeNext) Subscription
 - (Observable) [**ToChan**](https://godoc.org/github.com/reactivego/rx/generic/test/ToChan)() chan foo
 - (Observable) [**ToSingle**](https://godoc.org/github.com/reactivego/rx/generic/test/ToSingle)() (foo, error)
 - (Observable) [**ToSlice**](https://godoc.org/github.com/reactivego/rx/generic/test/ToSlice)() ([]foo, error)

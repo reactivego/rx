@@ -1,7 +1,7 @@
 /*
-Distinct operator tests.
-
 	Distinct	http://reactivex.io/documentation/operators/distinct.html
+
+Distinct suppress duplicate items emitted by an Observable.
 */
 package Distinct
 

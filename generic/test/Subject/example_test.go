@@ -9,10 +9,13 @@ import (
 // Subject is both an observer and an observable.
 func Example_subject() {
 	subject := NewSubjectInt()
+	scheduler := GoroutineScheduler()
 
-	subscription := subject.SubscribeNext(func(next int) {
-		fmt.Println(next)
-	}, SubscribeOn(GoroutineScheduler()))
+	subscription := subject.SubscribeOn(scheduler).Subscribe(func(next int, err error, done bool) {
+		if !done {
+			fmt.Println(next)
+		}
+	})
 
 	subject.Next(123)
 	subject.Next(456)
@@ -44,8 +47,8 @@ func Example_subjectError() {
 // Subject has an observable side that provides multicasting. This means that
 // two subscribers will receive the same data at approximately the same time.
 func Example_subjectMultiple() {
-	scheduler := GoroutineScheduler()
 	subject := NewSubjectInt()
+	scheduler := GoroutineScheduler()
 
 	var messages struct {
 		sync.Mutex
@@ -55,14 +58,15 @@ func Example_subjectMultiple() {
 	var subscriptions []Subscription
 	for i := 0; i < 5; i++ {
 		index := i
-		subscription := subject.SubscribeNext(func(next int) {
+		subscription := subject.SubscribeOn(scheduler).Subscribe(func(next int, err error, done bool) {
+			if !done {
+				message := fmt.Sprint(index, next)
 
-			message := fmt.Sprint(index, next)
-
-			messages.Lock()
-			messages.values = append(messages.values, message)
-			messages.Unlock()
-		}, SubscribeOn(scheduler))
+				messages.Lock()
+				messages.values = append(messages.values, message)
+				messages.Unlock()
+			}
+		})
 		subscriptions = append(subscriptions, subscription)
 	}
 
