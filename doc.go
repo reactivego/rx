@@ -15,9 +15,15 @@ This implementation of rx uses interface{} for value types, so you can
 mix different types of values in function and method calls. To create an
 observable you might write the following:
 
-	From(1,"hi",2.3).Println()
+	package main
 
-The call above creates an observable from numbers and strings and then prints
+	import "github.com/reactivego/rx"
+
+	func main() {
+		rx.From(1,"hi",2.3).Println()
+	}
+
+The code above creates an observable from numbers and strings and then prints
 them.
 
 Creating Observables
@@ -60,8 +66,8 @@ regenerating this package, then read on. Jig works by replacing the
 place-holder types of templated types with interface{}. To regenerate
 this rx implementation, run jig inside this package directory as follows:
 
-	go get -d github.com/reactivego/jig
-	go run github.com/reactivego/jig -rv
+	go get -d github.com/reactivego/generics/cmd/jig
+	go run github.com/reactivego/generics/cmd/jig -v
 */
 package rx
 

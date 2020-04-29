@@ -438,6 +438,26 @@ func Create(f func(Observer)) Observable {
 	return observable
 }
 
+//jig:name ObservableStringSubscribe
+
+// Subscribe operates upon the emissions and notifications from an Observable.
+// This method returns a Subscription.
+// Subscribe by default is performed on the Trampoline scheduler.
+func (o ObservableString) Subscribe(observe StringObserveFunc, options ...SubscribeOption) Subscription {
+	scheduler, subscriber := newSchedulerAndSubscriber(options)
+	observer := func(next string, err error, done bool) {
+		if !done {
+			observe(next, err, done)
+		} else {
+			observe(zeroString, err, true)
+			subscriber.Unsubscribe()
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	return subscriber
+}
+
 //jig:name RxError
 
 type RxError string
@@ -498,24 +518,4 @@ func (o Observable) AsObservableString() ObservableString {
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
-}
-
-//jig:name ObservableStringSubscribe
-
-// Subscribe operates upon the emissions and notifications from an Observable.
-// This method returns a Subscription.
-// Subscribe by default is performed on the Trampoline scheduler.
-func (o ObservableString) Subscribe(observe StringObserveFunc, options ...SubscribeOption) Subscription {
-	scheduler, subscriber := newSchedulerAndSubscriber(options)
-	observer := func(next string, err error, done bool) {
-		if !done {
-			observe(next, err, done)
-		} else {
-			observe(zeroString, err, true)
-			subscriber.Unsubscribe()
-		}
-	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	return subscriber
 }

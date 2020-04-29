@@ -404,6 +404,31 @@ func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
 	return observable
 }
 
+//jig:name ConnectableIntRefCount
+
+// RefCount makes a ConnectableInt behave like an ordinary ObservableInt. On
+// first Subscribe it will call Connect on its ConnectableInt and when its last
+// subscriber is Unsubscribed it will cancel the connection by calling
+// Unsubscribe on the subscription returned by the call to Connect.
+func (o ConnectableInt) RefCount(options ...SubscribeOption) ObservableInt {
+	var (
+		refcount	int32
+		connection	Subscription
+	)
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		if atomic.AddInt32(&refcount, 1) == 1 {
+			connection = o.connect(options)
+		}
+		subscriber.OnUnsubscribe(func() {
+			if atomic.AddInt32(&refcount, -1) == 0 {
+				connection.Unsubscribe()
+			}
+		})
+		o.ObservableInt(observe, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name ObserveFunc
 
 // ObserveFunc is the observer, a function that gets called whenever the
@@ -480,31 +505,6 @@ func Create(f func(Observer)) Observable {
 			f(&ObserverSubscriber{observer, subscriber})
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
-}
-
-//jig:name ConnectableIntRefCount
-
-// RefCount makes a ConnectableInt behave like an ordinary ObservableInt. On
-// first Subscribe it will call Connect on its ConnectableInt and when its last
-// subscriber is Unsubscribed it will cancel the connection by calling
-// Unsubscribe on the subscription returned by the call to Connect.
-func (o ConnectableInt) RefCount(options ...SubscribeOption) ObservableInt {
-	var (
-		refcount	int32
-		connection	Subscription
-	)
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		if atomic.AddInt32(&refcount, 1) == 1 {
-			connection = o.connect(options)
-		}
-		subscriber.OnUnsubscribe(func() {
-			if atomic.AddInt32(&refcount, -1) == 0 {
-				connection.Unsubscribe()
-			}
-		})
-		o.ObservableInt(observe, subscribeOn, subscriber)
 	}
 	return observable
 }

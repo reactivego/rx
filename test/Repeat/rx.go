@@ -213,6 +213,34 @@ var zero interface{}
 // function, scheduler and an subscriber.
 type Observable func(ObserveFunc, Scheduler, Subscriber)
 
+//jig:name Empty
+
+// Empty creates an Observable that emits no items but terminates normally.
+func Empty() Observable {
+	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		runner := scheduler.Schedule(func() {
+			if subscriber.Subscribed() {
+				observe(zero, nil, true)
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
+}
+
+//jig:name ObservableIntAsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name ObservableTakeLast
 
 // TakeLast emits only the last n items emitted by an Observable.
@@ -249,46 +277,6 @@ func (o ObservableInt) TakeLast(n int) ObservableInt {
 	return o.AsObservable().TakeLast(n).AsObservableInt()
 }
 
-//jig:name Empty
-
-// Empty creates an Observable that emits no items but terminates normally.
-func Empty() Observable {
-	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		runner := scheduler.Schedule(func() {
-			if subscriber.Subscribed() {
-				observe(zero, nil, true)
-			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
-}
-
-//jig:name ObservableIntAsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableIntSubscribeOn
-
-// SubscribeOn specifies the scheduler an ObservableInt should use when it is
-// subscribed to.
-func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
-	observable := func(observe IntObserveFunc, _ Scheduler, subscriber Subscriber) {
-		subscriber.OnWait(subscribeOn.Wait)
-		o(observe, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name RxError
 
 type RxError string
@@ -319,6 +307,18 @@ func (o Observable) AsObservableInt() ObservableInt {
 			}
 		}
 		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableIntSubscribeOn
+
+// SubscribeOn specifies the scheduler an ObservableInt should use when it is
+// subscribed to.
+func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
+	observable := func(observe IntObserveFunc, _ Scheduler, subscriber Subscriber) {
+		subscriber.OnWait(subscribeOn.Wait)
+		o(observe, subscribeOn, subscriber)
 	}
 	return observable
 }

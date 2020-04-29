@@ -156,6 +156,19 @@ var zero interface{}
 // function, scheduler and an subscriber.
 type Observable func(ObserveFunc, Scheduler, Subscriber)
 
+//jig:name ObservableIntAsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name ObservableTake
 
 // Take emits only the first n items emitted by an Observable.
@@ -183,19 +196,6 @@ func (o Observable) Take(n int) Observable {
 // Take emits only the first n items emitted by an ObservableInt.
 func (o ObservableInt) Take(n int) ObservableInt {
 	return o.AsObservable().Take(n).AsObservableInt()
-}
-
-//jig:name ObservableIntAsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
 }
 
 //jig:name Schedulers

@@ -261,6 +261,34 @@ func Create(f func(Observer)) Observable {
 	return observable
 }
 
+//jig:name ErrTypecastToInt
+
+// ErrTypecastToInt is delivered to an observer if the generic value cannot be
+// typecast to int.
+const ErrTypecastToInt = RxError("typecast to int failed")
+
+//jig:name ObservableAsObservableInt
+
+// AsInt turns an Observable of interface{} into an ObservableInt. If during
+// observing a typecast fails, the error ErrTypecastToInt will be emitted.
+func (o Observable) AsObservableInt() ObservableInt {
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				if nextInt, ok := next.(int); ok {
+					observe(nextInt, err, done)
+				} else {
+					observe(zeroInt, ErrTypecastToInt, true)
+				}
+			} else {
+				observe(zeroInt, err, true)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name SubscribeOption
 
 // SubscribeOption is an option that can be passed to the Subscribe method.
@@ -348,32 +376,4 @@ func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOpt
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
 	return subscriber
-}
-
-//jig:name ErrTypecastToInt
-
-// ErrTypecastToInt is delivered to an observer if the generic value cannot be
-// typecast to int.
-const ErrTypecastToInt = RxError("typecast to int failed")
-
-//jig:name ObservableAsObservableInt
-
-// AsInt turns an Observable of interface{} into an ObservableInt. If during
-// observing a typecast fails, the error ErrTypecastToInt will be emitted.
-func (o Observable) AsObservableInt() ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				if nextInt, ok := next.(int); ok {
-					observe(nextInt, err, done)
-				} else {
-					observe(zeroInt, ErrTypecastToInt, true)
-				}
-			} else {
-				observe(zeroInt, err, true)
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
 }

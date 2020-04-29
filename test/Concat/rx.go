@@ -120,6 +120,21 @@ func ConcatInt(observables ...ObservableInt) ObservableInt {
 	return observables[0].Concat(observables[1:]...)
 }
 
+//jig:name EmptyInt
+
+// EmptyInt creates an Observable that emits no items but terminates normally.
+func EmptyInt() ObservableInt {
+	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		runner := scheduler.Schedule(func() {
+			if subscriber.Subscribed() {
+				observe(zeroInt, nil, true)
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
+}
+
 //jig:name Schedulers
 
 func TrampolineScheduler() Scheduler	{ return scheduler.Trampoline }
@@ -147,19 +162,4 @@ func (o ObservableInt) Println() (err error) {
 	o(observer, scheduler, subscriber)
 	subscriber.Wait()
 	return
-}
-
-//jig:name EmptyInt
-
-// EmptyInt creates an Observable that emits no items but terminates normally.
-func EmptyInt() ObservableInt {
-	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		runner := scheduler.Schedule(func() {
-			if subscriber.Subscribed() {
-				observe(zeroInt, nil, true)
-			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
 }

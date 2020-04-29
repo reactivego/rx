@@ -312,19 +312,6 @@ func (o ObservableInt) Take(n int) ObservableInt {
 	return o.AsObservable().Take(n).AsObservableInt()
 }
 
-//jig:name ObservableIntAsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name ObservableCatch
 
 // Catch recovers from an error notification by continuing the sequence without
@@ -353,6 +340,46 @@ func (o Observable) Catch(catch Observable) Observable {
 // from the newly emitted one.
 func (o ObservableInt) SwitchMapString(project func(int) ObservableString) ObservableString {
 	return o.MapObservableString(project).SwitchAll()
+}
+
+//jig:name ObservableIntAsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name Schedulers
+
+func TrampolineScheduler() Scheduler	{ return scheduler.Trampoline }
+
+func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
+
+//jig:name ObservableStringToSlice
+
+// ToSlice collects all values from the ObservableString into an slice. The
+// complete slice and any error are returned.
+func (o ObservableString) ToSlice() (slice []string, err error) {
+	subscriber := NewSubscriber()
+	scheduler := TrampolineScheduler()
+	observer := func(next string, e error, done bool) {
+		if !done {
+			slice = append(slice, next)
+		} else {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
 }
 
 //jig:name ErrTypecastToInt
@@ -399,33 +426,6 @@ func (o ObservableInt) MapObservableString(project func(int) ObservableString) O
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
-}
-
-//jig:name Schedulers
-
-func TrampolineScheduler() Scheduler	{ return scheduler.Trampoline }
-
-func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
-
-//jig:name ObservableStringToSlice
-
-// ToSlice collects all values from the ObservableString into an slice. The
-// complete slice and any error are returned.
-func (o ObservableString) ToSlice() (slice []string, err error) {
-	subscriber := NewSubscriber()
-	scheduler := TrampolineScheduler()
-	observer := func(next string, e error, done bool) {
-		if !done {
-			slice = append(slice, next)
-		} else {
-			err = e
-			subscriber.Unsubscribe()
-		}
-	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
 }
 
 //jig:name ObservableStringObserveFunc
