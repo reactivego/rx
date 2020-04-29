@@ -1,15 +1,10 @@
+// +build ignore
+
 package rx
 
-import (
-	"testing"
-	"time"
-)
+import "time"
 
-func TestGenerate(t *testing.T) {
-	// This test sole purpose is to guide code generation by explicitly using
-	// the generics we want expanded into this package.
-	return
-
+func require() {
 	/*
 		Observable Types
 	*/
