@@ -1,6 +1,10 @@
 package ObserveOn
 
-import "fmt"
+import (
+	"fmt"
+
+	_ "github.com/reactivego/rx"
+)
 
 type TaskList struct {
 	Tasks []func()
@@ -21,7 +25,7 @@ func Example_observeOn() {
 
 	// Create a source that uses ObserveOn to park all next calls and the
 	// complete call on a custom tasklist.
-	source := FromInts(1, 2, 3, 4, 5).ObserveOn(tasks.Schedule)
+	source := FromInt(1, 2, 3, 4, 5).ObserveOn(tasks.Schedule)
 
 	// Subscribe to the source and wait for it to complete.
 	subscription := source.Subscribe(func(next int, err error, done bool) {

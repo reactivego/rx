@@ -1,8 +1,6 @@
 /*
-	ObserveOn	http://reactivex.io/documentation/operators/observeon.html
+ObserveOn specifies a schedule function to use for delivering values to the observer.
 
-ObserveOn specifies the scheduler on which an observer will observe this ObservableFoo.
+	ObserveOn	http://reactivex.io/documentation/operators/observeon.html
 */
 package ObserveOn
-
-import _ "github.com/reactivego/rx"

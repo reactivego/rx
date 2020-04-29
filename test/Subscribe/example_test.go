@@ -1,6 +1,10 @@
 package Subscribe
 
-import "fmt"
+import (
+	"fmt"
+
+	_ "github.com/reactivego/rx"
+)
 
 // Shows how to correctly subscribe to an observable by calling the Subscribe
 // method.
@@ -91,4 +95,3 @@ func Example_direct() {
 	// complete
 	// error
 }
-

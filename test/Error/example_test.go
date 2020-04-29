@@ -1,6 +1,10 @@
 package Error
 
-import "fmt"
+import (
+	"fmt"
+
+	_ "github.com/reactivego/rx"
+)
 
 func Example_toSlice() {
 	slice, err := ErrorInt(RxError("rx-error")).ToSlice()

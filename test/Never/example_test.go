@@ -3,6 +3,8 @@ package Never
 import (
 	"fmt"
 	"time"
+
+	_ "github.com/reactivego/rx"
 )
 
 func Example_never() {

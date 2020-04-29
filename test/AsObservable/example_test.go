@@ -2,6 +2,8 @@ package AsObservable
 
 import (
 	"fmt"
+
+	_ "github.com/reactivego/rx"
 )
 
 func Example_asObservableFloat64() {

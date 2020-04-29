@@ -1,6 +1,10 @@
 package TakeUntil
 
-import "time"
+import (
+	"time"
+
+	_ "github.com/reactivego/rx"
+)
 
 func Example_takeUntil() {
 	const _100ms = 100 * time.Millisecond

@@ -3,6 +3,8 @@ package PublishReplay
 import (
 	"fmt"
 	"time"
+
+	_ "github.com/reactivego/rx"
 )
 
 func Example_channel() {

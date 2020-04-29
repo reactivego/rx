@@ -10,15 +10,17 @@ import (
 //jig:template Subscriber
 
 // Subscriber is an alias for the subscriber.Subscriber interface type.
-type Subscriber subscriber.Subscriber
-
-// Subscription is an alias for the subscriber.Subscription interface type.
-type Subscription subscriber.Subscription
+type Subscriber = subscriber.Subscriber
 
 // NewSubscriber creates a new subscriber.
 func NewSubscriber() Subscriber {
 	return subscriber.New()
 }
+
+//jig:template Subscription
+
+// Subscription is an alias for the subscriber.Subscription interface type.
+type Subscription = subscriber.Subscription
 
 //jig:template Observable<Foo> Println
 //jig:needs Schedulers, Subscriber
@@ -49,7 +51,7 @@ func (o ObservableFoo) Println() (err error) {
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
-// Subscription is performed on the Trampoline scheduler.
+// Subscribing is performed on the Trampoline scheduler.
 func (o ObservableFoo) Wait() (err error) {
 	subscriber := NewSubscriber()
 	scheduler := TrampolineScheduler()
@@ -233,7 +235,7 @@ func (o ObservableFoo) ToChan(subscribers ...Subscriber) <-chan foo {
 }
 
 //jig:template Observable<Foo> Subscribe
-//jig:needs Schedulers, Subscriber
+//jig:needs Schedulers, Subscriber, Subscription
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.

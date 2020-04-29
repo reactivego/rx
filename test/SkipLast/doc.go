@@ -1,8 +1,6 @@
 /*
-	SkipLast	http://reactivex.io/documentation/operators/skiplast.html
+SkipLast suppresses the last n items emitted by an Observable.
 
-SkipLast operator tests.
+	SkipLast	http://reactivex.io/documentation/operators/skiplast.html
 */
 package SkipLast
-
-import _ "github.com/reactivego/rx"

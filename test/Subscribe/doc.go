@@ -1,9 +1,10 @@
 /*
-	Subscribe	http://reactivex.io/documentation/operators/subscribe.html
-
 Subscribe operates upon the emissions and notifications from an Observable.
-The method returns a Subscription.
+
+This method returns a Subscription.
+
+Subscribe by default is performed on the Trampoline scheduler.
+
+	Subscribe	http://reactivex.io/documentation/operators/subscribe.html
 */
 package Subscribe
-
-import _ "github.com/reactivego/rx"

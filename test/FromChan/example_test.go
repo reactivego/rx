@@ -1,6 +1,10 @@
 package FromChan
 
-import "fmt"
+import (
+	"fmt"
+
+	_ "github.com/reactivego/rx"
+)
 
 func Example_fromChan() {
 	ch := make(chan interface{}, 6)
@@ -28,7 +32,7 @@ func Example_fromChanInt() {
 		ch <- i
 	}
 	close(ch)
-	
+
 	err := FromChanInt(ch).Println()
 	fmt.Println(err)
 

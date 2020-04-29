@@ -12,15 +12,12 @@ import (
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler scheduler.Scheduler
+type Scheduler = scheduler.Scheduler
 
 //jig:name Subscriber
 
 // Subscriber is an alias for the subscriber.Subscriber interface type.
-type Subscriber subscriber.Subscriber
-
-// Subscription is an alias for the subscriber.Subscription interface type.
-type Subscription subscriber.Subscription
+type Subscriber = subscriber.Subscriber
 
 // NewSubscriber creates a new subscriber.
 func NewSubscriber() Subscriber {
@@ -47,10 +44,10 @@ var zeroInt int
 // function, scheduler and an subscriber.
 type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 
-//jig:name FromSliceInt
+//jig:name FromInt
 
-// FromSliceInt creates an ObservableInt from a slice of int values passed in.
-func FromSliceInt(slice []int) ObservableInt {
+// FromInt creates an ObservableInt from multiple int values passed in.
+func FromInt(slice ...int) ObservableInt {
 	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -71,13 +68,6 @@ func FromSliceInt(slice []int) ObservableInt {
 	return observable
 }
 
-//jig:name FromInts
-
-// FromInts creates an ObservableInt from multiple int values passed in.
-func FromInts(slice ...int) ObservableInt {
-	return FromSliceInt(slice)
-}
-
 //jig:name ObservableIntObserveOn
 
 // ObserveOn specifies a schedule function to use for delivering values to the observer.
@@ -96,9 +86,18 @@ func (o ObservableInt) ObserveOn(schedule func(task func())) ObservableInt {
 
 //jig:name Schedulers
 
-func TrampolineScheduler() Scheduler	{ return scheduler.Trampoline }
+func TrampolineScheduler() Scheduler {
+	return scheduler.Trampoline
+}
 
-func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
+func GoroutineScheduler() Scheduler {
+	return scheduler.Goroutine
+}
+
+//jig:name Subscription
+
+// Subscription is an alias for the subscriber.Subscription interface type.
+type Subscription = subscriber.Subscription
 
 //jig:name ObservableIntSubscribe
 

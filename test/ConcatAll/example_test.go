@@ -1,6 +1,10 @@
 package ConcatAll
 
-import "time"
+import (
+	"time"
+
+	_ "github.com/reactivego/rx"
+)
 
 func Example_concatAll() {
 	Interval(time.Millisecond).Take(3).MapObservableInt(func(next int) ObservableInt {

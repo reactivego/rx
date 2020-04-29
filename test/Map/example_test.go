@@ -2,24 +2,24 @@ package Map
 
 import (
 	"fmt"
+
+	_ "github.com/reactivego/rx"
 )
 
 func Example_mapString() {
-	err := FromInts(1, 2, 3, 4).MapString(func(i int) string { return fmt.Sprintf("%d!", i) }).Println()
-	fmt.Println(err)
-	
+	FromInt(1, 2, 3, 4).MapString(func(i int) string { return fmt.Sprintf("%d!", i) }).Println()
+
 	//Output:
 	// 1!
 	// 2!
 	// 3!
 	// 4!
-	// <nil>
 }
 
 func Example_mapVector() {
-	// type Vector []int
-	
-	FromVector(Vector{1, 2, 3}, Vector{5, 6, 7}).MapInt(func(x Vector) int {
+	//jig:type Vector []int
+
+	FromVector([]int{1, 2, 3}, []int{5, 6, 7}).MapInt(func(x []int) int {
 		sum := 0
 		for _, v := range x {
 			sum += v

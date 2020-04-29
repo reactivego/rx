@@ -3,8 +3,10 @@ package RefCount
 import (
 	"fmt"
 	"os"
-	"time"
 	"sync"
+	"time"
+
+	_ "github.com/reactivego/rx"
 )
 
 // This example is a variant of the example in the book "Introduction to Rx"
@@ -37,7 +39,6 @@ func Example_introToRx() {
 	fmt.Println(">> Unsubscribing")
 	subscription.Unsubscribe()
 	fmt.Println(">> Finished")
-
 	// Output:
 	// >> Subscribing
 	// published: 0
@@ -96,7 +97,6 @@ func Example_refCountMultipleSubscriptions() {
 
 	sub2.Wait()
 	wg.Wait()
-
 	// Output:
 	// 1
 	// 1

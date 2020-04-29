@@ -7,13 +7,18 @@ import (
 //jig:template Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler scheduler.Scheduler
+type Scheduler = scheduler.Scheduler
 
 //jig:template Schedulers
 //jig:needs Scheduler
 
-func TrampolineScheduler() Scheduler { return scheduler.Trampoline }
-func GoroutineScheduler() Scheduler  { return scheduler.Goroutine }
+func TrampolineScheduler() Scheduler {
+	return scheduler.Trampoline
+}
+
+func GoroutineScheduler() Scheduler  {
+	return scheduler.Goroutine
+}
 
 //jig:template Observable<Foo> ObserveOn
 

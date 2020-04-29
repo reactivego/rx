@@ -12,15 +12,12 @@ import (
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler scheduler.Scheduler
+type Scheduler = scheduler.Scheduler
 
 //jig:name Subscriber
 
 // Subscriber is an alias for the subscriber.Subscriber interface type.
-type Subscriber subscriber.Subscriber
-
-// Subscription is an alias for the subscriber.Subscription interface type.
-type Subscription subscriber.Subscription
+type Subscriber = subscriber.Subscriber
 
 // NewSubscriber creates a new subscriber.
 func NewSubscriber() Subscriber {
@@ -103,21 +100,24 @@ func (o ObservableInt) Finally(f func()) ObservableInt {
 
 //jig:name Schedulers
 
-func TrampolineScheduler() Scheduler	{ return scheduler.Trampoline }
+func TrampolineScheduler() Scheduler {
+	return scheduler.Trampoline
+}
 
-func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
+func GoroutineScheduler() Scheduler {
+	return scheduler.Goroutine
+}
 
-//jig:name ObservableIntToSlice
+//jig:name ObservableIntWait
 
-// ToSlice collects all values from the ObservableInt into an slice. The
-// complete slice and any error are returned.
-func (o ObservableInt) ToSlice() (slice []int, err error) {
+// Wait subscribes to the Observable and waits for completion or error.
+// Returns either the error or nil when the Observable completed normally.
+// Subscribing is performed on the Trampoline scheduler.
+func (o ObservableInt) Wait() (err error) {
 	subscriber := NewSubscriber()
 	scheduler := TrampolineScheduler()
 	observer := func(next int, e error, done bool) {
-		if !done {
-			slice = append(slice, next)
-		} else {
+		if done {
 			err = e
 			subscriber.Unsubscribe()
 		}

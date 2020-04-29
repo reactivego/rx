@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync/atomic"
 	"time"
+
+	_ "github.com/reactivego/rx"
 )
 
 // In this example we deliberately create a badly behaved observable that
@@ -57,7 +59,6 @@ func Example_serialize() {
 	time.Sleep(time.Millisecond)
 	subscription.Unsubscribe()
 	fmt.Printf("Observable contract violated = %v\n", violations > 0)
-
 	// Output:
 	// Observable contract violated = true
 	// Observable contract violated = false

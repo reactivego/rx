@@ -3,6 +3,8 @@ package IgnoreCompletion
 import (
 	"fmt"
 	"time"
+
+	_ "github.com/reactivego/rx"
 )
 
 func Example_ignoreComplete() {

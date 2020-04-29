@@ -13,20 +13,27 @@ import (
 
 //jig:name Scheduler
 
-type Scheduler scheduler.Scheduler
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler = scheduler.Scheduler
 
 //jig:name Subscriber
 
-type Subscriber subscriber.Subscriber
+// Subscriber is an alias for the subscriber.Subscriber interface type.
+type Subscriber = subscriber.Subscriber
 
-type Subscription subscriber.Subscription
-
+// NewSubscriber creates a new subscriber.
 func NewSubscriber() Subscriber {
 	return subscriber.New()
 }
 
 //jig:name IntObserveFunc
 
+// IntObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
 type IntObserveFunc func(next int, err error, done bool)
 
 //jig:name zeroInt
@@ -35,10 +42,13 @@ var zeroInt int
 
 //jig:name ObservableInt
 
+// ObservableInt is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
 type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 
 //jig:name Range
 
+// Range creates an ObservableInt that emits a range of sequential integers.
 func Range(start, count int) ObservableInt {
 	end := start + count
 	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
@@ -63,6 +73,7 @@ func Range(start, count int) ObservableInt {
 
 //jig:name ObservableIntPassthrough
 
+// Passthrough just passes through all output from the ObservableInt.
 func (o ObservableInt) Passthrough() ObservableInt {
 
 	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
@@ -78,12 +89,20 @@ func (o ObservableInt) Passthrough() ObservableInt {
 
 //jig:name Schedulers
 
-func TrampolineScheduler() Scheduler	{ return scheduler.Trampoline }
+func TrampolineScheduler() Scheduler {
+	return scheduler.Trampoline
+}
 
-func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
+func GoroutineScheduler() Scheduler {
+	return scheduler.Goroutine
+}
 
 //jig:name ObservableIntPrintln
 
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println is performed on the Trampoline scheduler.
 func (o ObservableInt) Println() (err error) {
 	subscriber := NewSubscriber()
 	scheduler := TrampolineScheduler()

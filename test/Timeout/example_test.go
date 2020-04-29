@@ -3,6 +3,8 @@ package Timeout
 import (
 	"fmt"
 	"time"
+
+	_ "github.com/reactivego/rx"
 )
 
 func Example_timeout() {
@@ -26,7 +28,7 @@ func Example_timeout() {
 		}
 		return _500ms
 	})
-	
+
 	timed := source.Timeout(_250ms).SubscribeOn(scheduler)
 
 	if err := timed.Println(); err == ErrTimeout {

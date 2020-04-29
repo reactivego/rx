@@ -3,6 +3,8 @@ package Interval
 import (
 	"fmt"
 	"time"
+
+	_ "github.com/reactivego/rx"
 )
 
 // After 100ms the example cancels the observable subscription by calling the

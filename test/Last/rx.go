@@ -5,6 +5,8 @@
 package Last
 
 import (
+	"fmt"
+
 	"github.com/reactivego/scheduler"
 	"github.com/reactivego/subscriber"
 )
@@ -12,15 +14,12 @@ import (
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler scheduler.Scheduler
+type Scheduler = scheduler.Scheduler
 
 //jig:name Subscriber
 
 // Subscriber is an alias for the subscriber.Subscriber interface type.
-type Subscriber subscriber.Subscriber
-
-// Subscription is an alias for the subscriber.Subscription interface type.
-type Subscription subscriber.Subscription
+type Subscriber = subscriber.Subscriber
 
 // NewSubscriber creates a new subscriber.
 func NewSubscriber() Subscriber {
@@ -47,10 +46,10 @@ var zeroInt int
 // function, scheduler and an subscriber.
 type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 
-//jig:name FromSliceInt
+//jig:name FromInt
 
-// FromSliceInt creates an ObservableInt from a slice of int values passed in.
-func FromSliceInt(slice []int) ObservableInt {
+// FromInt creates an ObservableInt from multiple int values passed in.
+func FromInt(slice ...int) ObservableInt {
 	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -69,13 +68,6 @@ func FromSliceInt(slice []int) ObservableInt {
 		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
-}
-
-//jig:name FromInts
-
-// FromInts creates an ObservableInt from multiple int values passed in.
-func FromInts(slice ...int) ObservableInt {
-	return FromSliceInt(slice)
 }
 
 //jig:name ObservableLast
@@ -128,6 +120,39 @@ var zero interface{}
 // function, scheduler and an subscriber.
 type Observable func(ObserveFunc, Scheduler, Subscriber)
 
+//jig:name Schedulers
+
+func TrampolineScheduler() Scheduler {
+	return scheduler.Trampoline
+}
+
+func GoroutineScheduler() Scheduler {
+	return scheduler.Goroutine
+}
+
+//jig:name ObservableIntPrintln
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println is performed on the Trampoline scheduler.
+func (o ObservableInt) Println() (err error) {
+	subscriber := NewSubscriber()
+	scheduler := TrampolineScheduler()
+	observer := func(next int, e error, done bool) {
+		if !done {
+			fmt.Println(next)
+		} else {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
+}
+
 //jig:name ObservableIntAsObservable
 
 // AsObservable turns a typed ObservableInt into an Observable of interface{}.
@@ -139,34 +164,6 @@ func (o ObservableInt) AsObservable() Observable {
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
-}
-
-//jig:name Schedulers
-
-func TrampolineScheduler() Scheduler	{ return scheduler.Trampoline }
-
-func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
-
-//jig:name ObservableIntToSingle
-
-// ToSingle blocks until the ObservableInt emits exactly one value or an error.
-// The value and any error are returned.
-func (o ObservableInt) ToSingle() (entry int, err error) {
-	o = o.Single()
-	subscriber := NewSubscriber()
-	scheduler := TrampolineScheduler()
-	observer := func(next int, e error, done bool) {
-		if !done {
-			entry = next
-		} else {
-			err = e
-			subscriber.Unsubscribe()
-		}
-	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
 }
 
 //jig:name RxError
@@ -196,54 +193,6 @@ func (o Observable) AsObservableInt() ObservableInt {
 				}
 			} else {
 				observe(zeroInt, err, true)
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableIntSingle
-
-// Single enforces that the observableInt sends exactly one data item and then
-// completes. If the observable sends no data before completing or sends more
-// than 1 item before completing  this reported as an error to the observer.
-func (o ObservableInt) Single() ObservableInt {
-	return o.AsObservable().Single().AsObservableInt()
-}
-
-//jig:name ObservableSingle
-
-// Single enforces that the observable sends exactly one data item and then
-// completes. If the observable sends no data before completing or sends more
-// than 1 item before completing  this reported as an error to the observer.
-func (o Observable) Single() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		var (
-			count	int
-			latest	interface{}
-		)
-		observer := func(next interface{}, err error, done bool) {
-			if count < 2 {
-				if done {
-					if err != nil {
-						observe(nil, err, true)
-					} else {
-						if count == 1 {
-							observe(latest, nil, false)
-							observe(nil, nil, true)
-						} else {
-							observe(nil, RxError("expected one value, got none"), true)
-						}
-					}
-				} else {
-					count++
-					if count == 1 {
-						latest = next
-					} else {
-						observe(nil, RxError("expected one value, got multiple"), true)
-					}
-				}
 			}
 		}
 		o(observer, subscribeOn, subscriber)

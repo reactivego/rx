@@ -1,10 +1,13 @@
 package Range
 
-import "fmt"
+import (
+	"fmt"
+
+	_ "github.com/reactivego/rx"
+)
 
 func Example_basic() {
 	Range(1, 3).Println()
-
 	//Output:
 	// 1
 	// 2
@@ -17,7 +20,6 @@ func Example_complex() {
 		MapInt(func(x int) int { return x + x }).
 		DoOnComplete(func() { fmt.Println("done") }).
 		Println()
-
 	//Output:
 	// 2
 	// 6

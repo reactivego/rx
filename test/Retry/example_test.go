@@ -1,12 +1,12 @@
 package Retry
 
 import (
-	"testing"
+	"fmt"
 
-	"github.com/stretchr/testify/assert"
+	_ "github.com/reactivego/rx"
 )
 
-func TestRetryTrampoline(t *testing.T) {
+func Example_retry() {
 	errored := false
 	a := CreateInt(func(observer IntObserver) {
 		observer.Next(1)
@@ -20,13 +20,21 @@ func TestRetryTrampoline(t *testing.T) {
 			errored = true
 		}
 	}).SubscribeOn(TrampolineScheduler())
-	b, e := a.Retry().ToSlice()
-	assert.NoError(t, e)
-	assert.Equal(t, []int{1, 2, 3, 1, 2, 3}, b)
-	assert.True(t, errored)
+	err := a.Retry().Println()
+	fmt.Println(errored)
+	fmt.Println(err)
+	// Output:
+	// 1
+	// 2
+	// 3
+	// 1
+	// 2
+	// 3
+	// true
+	// <nil>
 }
 
-func TestRetryGoroutine(t *testing.T) {
+func Example_retryConcurrent() {
 	errored := false
 	a := CreateInt(func(observer IntObserver) {
 		observer.Next(1)
@@ -39,8 +47,16 @@ func TestRetryGoroutine(t *testing.T) {
 			errored = true
 		}
 	}).SubscribeOn(GoroutineScheduler())
-	b, e := a.Retry().ToSlice()
-	assert.NoError(t, e)
-	assert.Equal(t, []int{1, 2, 3, 1, 2, 3}, b)
-	assert.True(t, errored)
+	err := a.Retry().Println()
+	fmt.Println(errored)
+	fmt.Println(err)
+	// Output:
+	// 1
+	// 2
+	// 3
+	// 1
+	// 2
+	// 3
+	// true
+	// <nil>
 }

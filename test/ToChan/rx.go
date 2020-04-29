@@ -14,15 +14,12 @@ import (
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler scheduler.Scheduler
+type Scheduler = scheduler.Scheduler
 
 //jig:name Subscriber
 
 // Subscriber is an alias for the subscriber.Subscriber interface type.
-type Subscriber subscriber.Subscriber
-
-// Subscription is an alias for the subscriber.Subscription interface type.
-type Subscription subscriber.Subscription
+type Subscriber = subscriber.Subscriber
 
 // NewSubscriber creates a new subscriber.
 func NewSubscriber() Subscriber {
@@ -49,10 +46,10 @@ var zero interface{}
 // function, scheduler and an subscriber.
 type Observable func(ObserveFunc, Scheduler, Subscriber)
 
-//jig:name FromSlice
+//jig:name From
 
-// FromSlice creates an Observable from a slice of interface{} values passed in.
-func FromSlice(slice []interface{}) Observable {
+// From creates an Observable from multiple interface{} values passed in.
+func From(slice ...interface{}) Observable {
 	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -71,13 +68,6 @@ func FromSlice(slice []interface{}) Observable {
 		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
-}
-
-//jig:name From
-
-// From creates an Observable from multiple interface{} values passed in.
-func From(slice ...interface{}) Observable {
-	return FromSlice(slice)
 }
 
 //jig:name IntObserveFunc
@@ -193,9 +183,13 @@ func (e RxError) Error() string	{ return string(e) }
 
 //jig:name Schedulers
 
-func TrampolineScheduler() Scheduler	{ return scheduler.Trampoline }
+func TrampolineScheduler() Scheduler {
+	return scheduler.Trampoline
+}
 
-func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
+func GoroutineScheduler() Scheduler {
+	return scheduler.Goroutine
+}
 
 //jig:name ObservableToChan
 

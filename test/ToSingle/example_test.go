@@ -1,10 +1,13 @@
 package ToSingle
 
-import	"fmt"
+import (
+	"fmt"
 
+	_ "github.com/reactivego/rx"
+)
 
 func Example_basic() {
-	value, err := FromInts(3).ToSingle()
+	value, err := FromInt(3).ToSingle()
 
 	fmt.Println(value)
 	fmt.Println(err)
@@ -27,7 +30,7 @@ func Example_emptyError() {
 
 // ToSingle will return an error when the observable emits multiple values.
 func Example_multipleError() {
-	value, err := FromInts(19, 20).ToSingle()
+	value, err := FromInt(19, 20).ToSingle()
 
 	fmt.Println(value)
 	fmt.Println(err)
@@ -35,6 +38,3 @@ func Example_multipleError() {
 	// 0
 	// expected one value, got multiple
 }
-
-
-

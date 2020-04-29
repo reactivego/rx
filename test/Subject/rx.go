@@ -46,15 +46,12 @@ func (f IntObserveFunc) Complete() {
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler scheduler.Scheduler
+type Scheduler = scheduler.Scheduler
 
 //jig:name Subscriber
 
 // Subscriber is an alias for the subscriber.Subscriber interface type.
-type Subscriber subscriber.Subscriber
-
-// Subscription is an alias for the subscriber.Subscription interface type.
-type Subscription subscriber.Subscription
+type Subscriber = subscriber.Subscriber
 
 // NewSubscriber creates a new subscriber.
 func NewSubscriber() Subscriber {
@@ -143,6 +140,11 @@ type RxError string
 
 func (e RxError) Error() string	{ return string(e) }
 
+//jig:name Subscription
+
+// Subscription is an alias for the subscriber.Subscription interface type.
+type Subscription = subscriber.Subscription
+
 //jig:name ObservableIntSubscribeOn
 
 // SubscribeOn specifies the scheduler an ObservableInt should use when it is
@@ -157,15 +159,19 @@ func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
 
 //jig:name Schedulers
 
-func TrampolineScheduler() Scheduler	{ return scheduler.Trampoline }
+func TrampolineScheduler() Scheduler {
+	return scheduler.Trampoline
+}
 
-func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
+func GoroutineScheduler() Scheduler {
+	return scheduler.Goroutine
+}
 
 //jig:name ObservableIntWait
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
-// Subscription is performed on the Trampoline scheduler.
+// Subscribing is performed on the Trampoline scheduler.
 func (o ObservableInt) Wait() (err error) {
 	subscriber := NewSubscriber()
 	scheduler := TrampolineScheduler()

@@ -1,8 +1,6 @@
 /*
-Min operator tests.
+Min determines, and emits, the minimum-valued item emitted by an Observable.
 
 	Min	http://reactivex.io/documentation/operators/min.html
 */
 package Min
-
-import _ "github.com/reactivego/rx"

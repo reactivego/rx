@@ -1,6 +1,10 @@
 package MakeTimed
 
-import "time"
+import (
+	"time"
+
+	_ "github.com/reactivego/rx"
+)
 
 func Example_makeTimedInt() {
 	const _10ms = 10 * time.Millisecond

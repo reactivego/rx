@@ -9,6 +9,7 @@ import (
 
 //jig:template Connectable<Foo>
 //jig:embeds Observable<Foo>
+//jig:needs Subscription
 
 // ConnectableFoo is an ObservableFoo that has an additional method Connect()
 // used to Subscribe to the parent observable and then multicasting values to
@@ -19,7 +20,7 @@ type ConnectableFoo struct {
 }
 
 //jig:template Connectable<Foo> Connect
-//jig:needs Connectable<Foo>
+//jig:needs Connectable<Foo>, Subscription
 
 // Connect instructs a connectable Observable to begin emitting items to its
 // subscribers. All values will then be passed on to the observers that
@@ -29,7 +30,7 @@ func (c ConnectableFoo) Connect() Subscription {
 }
 
 //jig:template Observable<Foo> Multicast
-//jig:needs Observable<Foo> Subscribe, Connectable<Foo>, Schedulers
+//jig:needs Observable<Foo> Subscribe, Connectable<Foo>
 
 // Multicast converts an ordinary Observable into a connectable Observable.
 // A connectable observable will only start emitting values after its Connect

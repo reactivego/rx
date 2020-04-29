@@ -1,6 +1,10 @@
 package Repeat
 
-import "fmt"
+import (
+	"fmt"
+
+	_ "github.com/reactivego/rx"
+)
 
 func Example_basic() {
 	source := RepeatInt(5, 3)
@@ -56,7 +60,7 @@ func Example_goroutine() {
 		observer.Complete()
 	})
 	slice, err := source.Repeat(_1M).TakeLast(9).SubscribeOn(GoroutineScheduler()).ToSlice()
-	
+
 	fmt.Println(GoroutineScheduler())
 	fmt.Println(slice)
 	fmt.Println(err)

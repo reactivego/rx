@@ -2,9 +2,11 @@
 
 //go:generate jig
 
-package FromSlice
+package Of
 
 import (
+	"fmt"
+
 	"github.com/reactivego/scheduler"
 	"github.com/reactivego/subscriber"
 )
@@ -12,46 +14,44 @@ import (
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler scheduler.Scheduler
+type Scheduler = scheduler.Scheduler
 
 //jig:name Subscriber
 
 // Subscriber is an alias for the subscriber.Subscriber interface type.
-type Subscriber subscriber.Subscriber
-
-// Subscription is an alias for the subscriber.Subscription interface type.
-type Subscription subscriber.Subscription
+type Subscriber = subscriber.Subscriber
 
 // NewSubscriber creates a new subscriber.
 func NewSubscriber() Subscriber {
 	return subscriber.New()
 }
 
-//jig:name IntObserveFunc
+//jig:name ObserveFunc
 
-// IntObserveFunc is the observer, a function that gets called whenever the
+// ObserveFunc is the observer, a function that gets called whenever the
 // observable has something to report. The next argument is the item value that
 // is only valid when the done argument is false. When done is true and the err
 // argument is not nil, then the observable has terminated with an error.
 // When done is true and the err argument is nil, then the observable has
 // completed normally.
-type IntObserveFunc func(next int, err error, done bool)
+type ObserveFunc func(next interface{}, err error, done bool)
 
-//jig:name zeroInt
+//jig:name zero
 
-var zeroInt int
+var zero interface{}
 
-//jig:name ObservableInt
+//jig:name Observable
 
-// ObservableInt is essentially a subscribe function taking an observe
+// Observable is essentially a subscribe function taking an observe
 // function, scheduler and an subscriber.
-type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
+type Observable func(ObserveFunc, Scheduler, Subscriber)
 
-//jig:name FromSliceInt
+//jig:name Of
 
-// FromSliceInt creates an ObservableInt from a slice of int values passed in.
-func FromSliceInt(slice []int) ObservableInt {
-	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+// Of emits a variable amount of values in a sequence and then emits a
+// complete notification.
+func Of(slice ...interface{}) Observable {
+	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Subscribed() {
@@ -62,7 +62,7 @@ func FromSliceInt(slice []int) ObservableInt {
 						self()
 					}
 				} else {
-					observe(zeroInt, nil, true)
+					observe(zero, nil, true)
 				}
 			}
 		})
@@ -73,20 +73,26 @@ func FromSliceInt(slice []int) ObservableInt {
 
 //jig:name Schedulers
 
-func TrampolineScheduler() Scheduler	{ return scheduler.Trampoline }
+func TrampolineScheduler() Scheduler {
+	return scheduler.Trampoline
+}
 
-func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
+func GoroutineScheduler() Scheduler {
+	return scheduler.Goroutine
+}
 
-//jig:name ObservableIntToSlice
+//jig:name ObservablePrintln
 
-// ToSlice collects all values from the ObservableInt into an slice. The
-// complete slice and any error are returned.
-func (o ObservableInt) ToSlice() (slice []int, err error) {
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println is performed on the Trampoline scheduler.
+func (o Observable) Println() (err error) {
 	subscriber := NewSubscriber()
 	scheduler := TrampolineScheduler()
-	observer := func(next int, e error, done bool) {
+	observer := func(next interface{}, e error, done bool) {
 		if !done {
-			slice = append(slice, next)
+			fmt.Println(next)
 		} else {
 			err = e
 			subscriber.Unsubscribe()

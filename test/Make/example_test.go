@@ -1,5 +1,7 @@
 package Make
 
+import _ "github.com/reactivego/rx"
+
 func Example_makeInt() {
 	example := func() ObservableInt {
 		done := false

@@ -1,9 +1,7 @@
 /*
-	SubscribeOn	http://reactivex.io/documentation/operators/subscribeon.html
-
-SubscribeOn specifies the scheduler an ObservableInt should use when it is
+SubscribeOn specifies the scheduler an Observable should use when it is
 subscribed to.
+
+	SubscribeOn	http://reactivex.io/documentation/operators/subscribeon.html
 */
 package SubscribeOn
-
-import _ "github.com/reactivego/rx"

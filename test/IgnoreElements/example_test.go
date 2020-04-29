@@ -1,12 +1,8 @@
 package IgnoreElements
 
-import
-	"fmt"
+import _ "github.com/reactivego/rx"
 
 func Example_ignoreElements() {
-	err := FromInts(1, 2, 3, 4, 5).IgnoreElements().Println()
-	fmt.Println("error", err)
-
+	FromInt(1, 2, 3, 4, 5).IgnoreElements().Println()
 	// Output:
-	// error <nil>
 }

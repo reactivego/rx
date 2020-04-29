@@ -1,8 +1,6 @@
 /*
-	Take	http://reactivex.io/documentation/operators/take.html
+Take emits only the first n items emitted by an Observable.
 
-Take operator tests.
+	Take	http://reactivex.io/documentation/operators/take.html
 */
 package Take
-
-import _ "github.com/reactivego/rx"

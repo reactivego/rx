@@ -1,9 +1,10 @@
 /*
-	Wait
+Wait subscribes to the Observable and waits for completion or error.
 
-Wait subscribes to an observable and waits for it to finish without doing
-anything with the emitted items.
+Returns either the error or nil when the Observable completed normally.
+
+Subscribing is performed on the Trampoline scheduler.
+
+	Wait
 */
 package Wait
-
-import _ "github.com/reactivego/rx"

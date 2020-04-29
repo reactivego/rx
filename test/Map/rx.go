@@ -14,15 +14,12 @@ import (
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler scheduler.Scheduler
+type Scheduler = scheduler.Scheduler
 
 //jig:name Subscriber
 
 // Subscriber is an alias for the subscriber.Subscriber interface type.
-type Subscriber subscriber.Subscriber
-
-// Subscription is an alias for the subscriber.Subscription interface type.
-type Subscription subscriber.Subscription
+type Subscriber = subscriber.Subscriber
 
 // NewSubscriber creates a new subscriber.
 func NewSubscriber() Subscriber {
@@ -49,10 +46,10 @@ var zeroInt int
 // function, scheduler and an subscriber.
 type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 
-//jig:name FromSliceInt
+//jig:name FromInt
 
-// FromSliceInt creates an ObservableInt from a slice of int values passed in.
-func FromSliceInt(slice []int) ObservableInt {
+// FromInt creates an ObservableInt from multiple int values passed in.
+func FromInt(slice ...int) ObservableInt {
 	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -73,13 +70,6 @@ func FromSliceInt(slice []int) ObservableInt {
 	return observable
 }
 
-//jig:name FromInts
-
-// FromInts creates an ObservableInt from multiple int values passed in.
-func FromInts(slice ...int) ObservableInt {
-	return FromSliceInt(slice)
-}
-
 //jig:name VectorObserveFunc
 
 // VectorObserveFunc is the observer, a function that gets called whenever the
@@ -88,11 +78,11 @@ func FromInts(slice ...int) ObservableInt {
 // argument is not nil, then the observable has terminated with an error.
 // When done is true and the err argument is nil, then the observable has
 // completed normally.
-type VectorObserveFunc func(next Vector, err error, done bool)
+type VectorObserveFunc func(next []int, err error, done bool)
 
 //jig:name zeroVector
 
-var zeroVector Vector
+var zeroVector []int
 
 //jig:name ObservableVector
 
@@ -100,10 +90,10 @@ var zeroVector Vector
 // function, scheduler and an subscriber.
 type ObservableVector func(VectorObserveFunc, Scheduler, Subscriber)
 
-//jig:name FromSliceVector
+//jig:name FromVector
 
-// FromSliceVector creates an ObservableVector from a slice of Vector values passed in.
-func FromSliceVector(slice []Vector) ObservableVector {
+// FromVector creates an ObservableVector from multiple []int values passed in.
+func FromVector(slice ...[]int) ObservableVector {
 	observable := func(observe VectorObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -122,13 +112,6 @@ func FromSliceVector(slice []Vector) ObservableVector {
 		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
-}
-
-//jig:name FromVector
-
-// FromVector creates an ObservableVector from multiple Vector values passed in.
-func FromVector(slice ...Vector) ObservableVector {
-	return FromSliceVector(slice)
 }
 
 //jig:name ObservableIntMapString
@@ -153,9 +136,9 @@ func (o ObservableInt) MapString(project func(int) string) ObservableString {
 
 // MapInt transforms the items emitted by an ObservableVector by applying a
 // function to each item.
-func (o ObservableVector) MapInt(project func(Vector) int) ObservableInt {
+func (o ObservableVector) MapInt(project func([]int) int) ObservableInt {
 	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next Vector, err error, done bool) {
+		observer := func(next []int, err error, done bool) {
 			var mapped int
 			if !done {
 				mapped = project(next)
@@ -189,9 +172,13 @@ type ObservableString func(StringObserveFunc, Scheduler, Subscriber)
 
 //jig:name Schedulers
 
-func TrampolineScheduler() Scheduler	{ return scheduler.Trampoline }
+func TrampolineScheduler() Scheduler {
+	return scheduler.Trampoline
+}
 
-func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
+func GoroutineScheduler() Scheduler {
+	return scheduler.Goroutine
+}
 
 //jig:name ObservableIntPrintln
 

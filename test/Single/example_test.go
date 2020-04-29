@@ -1,6 +1,10 @@
 package Single
 
-import "fmt"
+import (
+	"fmt"
+
+	_ "github.com/reactivego/rx"
+)
 
 // Single is used to make sure only a single value was produced by the
 // observable.
@@ -18,7 +22,7 @@ func Example_single() {
 	}).Wait()
 
 	// Now output 2 ints.
-	FromInts(19, 20).Single().Subscribe(func(next int, err error, done bool) {
+	FromInt(19, 20).Single().Subscribe(func(next int, err error, done bool) {
 		switch {
 		case !done:
 			fmt.Println(next)
@@ -28,7 +32,6 @@ func Example_single() {
 			fmt.Println("complete")
 		}
 	}).Wait()
-
 	// Output:
 	// 19
 	// complete

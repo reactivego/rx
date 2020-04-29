@@ -302,7 +302,7 @@ func (o ObservableFoo) Sample(window time.Duration) ObservableFoo {
 
 // Single enforces that the observable sends exactly one data item and then
 // completes. If the observable sends no data before completing or sends more
-// than 1 item before completing  this reported as an error to the observer.
+// than 1 item before completing, this is reported as an error to the observer.
 func (o Observable) Single() Observable {
 	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		var (

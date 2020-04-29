@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"runtime"
 	"time"
+
+	_ "github.com/reactivego/rx"
 )
 
 func Example_basic() {
 	// source is an ObservableInt
-	source := FromInts(1, 2)
+	source := FromInt(1, 2)
 
 	// pub is a ConnectableInt
 	pub := source.Publish()

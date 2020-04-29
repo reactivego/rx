@@ -258,26 +258,35 @@ func FromChan(ch <-chan interface{}) Observable {
 }
 
 //jig:template From<Foo>
-//jig:needs FromSlice<Foo>
+//jig:needs Observable<Foo>
 
 // FromFoo creates an ObservableFoo from multiple foo values passed in.
 func FromFoo(slice ...foo) ObservableFoo {
-	return FromSliceFoo(slice)
+	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		i := 0
+		runner := scheduler.ScheduleRecursive(func(self func()) {
+			if subscriber.Subscribed() {
+				if i < len(slice) {
+					observe(slice[i], nil, false)
+					if subscriber.Subscribed() {
+						i++
+						self()
+					}
+				} else {
+					observe(zeroFoo, nil, true)
+				}
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
 }
 
 //jig:template From<Foo>s
-//jig:needs FromSlice<Foo>
+//jig:needs Observable<Foo>
 
 // FromFoos creates an ObservableFoo from multiple foo values passed in.
 func FromFoos(slice ...foo) ObservableFoo {
-	return FromSliceFoo(slice)
-}
-
-//jig:template FromSlice<Foo>
-//jig:needs Observable<Foo>
-
-// FromSliceFoo creates an ObservableFoo from a slice of foo values passed in.
-func FromSliceFoo(slice []foo) ObservableFoo {
 	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -354,6 +363,32 @@ func JustFoo(element foo) ObservableFoo {
 // NeverFoo creates an ObservableFoo that emits no items and does't terminate.
 func NeverFoo() ObservableFoo {
 	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+	}
+	return observable
+}
+
+//jig:template Of<Foo>
+//jig:needs Observable<Foo>
+
+// OfFoo emits a variable amount of values in a sequence and then emits a
+// complete notification.
+func OfFoo(slice ...foo) ObservableFoo {
+	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		i := 0
+		runner := scheduler.ScheduleRecursive(func(self func()) {
+			if subscriber.Subscribed() {
+				if i < len(slice) {
+					observe(slice[i], nil, false)
+					if subscriber.Subscribed() {
+						i++
+						self()
+					}
+				} else {
+					observe(zeroFoo, nil, true)
+				}
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }
@@ -450,8 +485,8 @@ func RepeatFoo(value foo, count int) ObservableFoo {
 
 // StartFoo creates an ObservableFoo that emits the return value of a function.
 // It is designed to be used with a function that returns a (foo, error) tuple.
-// If the error is non-nil the returned ObservableFoo will be that error,
-// otherwise it will be a single-value stream of foo.
+// If the error is non-nil the returned ObservableFoo will be an Observable that
+// emits and error, otherwise it will be a single-value ObservableFoo of the value.
 func StartFoo(f func() (foo, error)) ObservableFoo {
 	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		done := false

@@ -1,10 +1,8 @@
 /*
-	ToSingle	http://reactivex.io/documentation/operators/to.html
+ToSingle blocks until the Observable emits exactly one value or an error.
 
-This method subscribes to an observable and makes sure only a single value was
-produced by the observable. ToSingle will only return when the observable was
-complete or if an error was emitted.
+The value and any error are returned.
+
+	ToSingle	http://reactivex.io/documentation/operators/to.html
 */
 package ToSingle
-
-import _ "github.com/reactivego/rx"

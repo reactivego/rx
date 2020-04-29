@@ -3,6 +3,8 @@ package SwitchAll
 import (
 	"fmt"
 	"time"
+
+	_ "github.com/reactivego/rx"
 )
 
 func Example_goroutine() {
@@ -19,7 +21,6 @@ func Example_goroutine() {
 	if err == nil {
 		fmt.Println("success")
 	}
-
 	// Output:
 	// 0
 	// 1
@@ -48,7 +49,6 @@ func Example_trampoline() {
 	if err == nil {
 		fmt.Println("success")
 	}
-
 	// Output:
 	// 0
 	// 1

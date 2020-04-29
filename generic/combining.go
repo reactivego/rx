@@ -15,7 +15,7 @@ type FooSlice []foo
 // Combines multiple Observables to create an Observable whose values are
 // calculated from the latest values of each of its input Observables.
 func CombineLatestFoo(observables ...ObservableFoo) ObservableFooSlice {
-	return FromSliceObservableFoo(observables).CombineAll()
+	return FromObservableFoo(observables...).CombineAll()
 }
 
 //jig:template ObservableObservable<Foo> CombineAll

@@ -1,9 +1,8 @@
 /*
-	Sample	http://reactivex.io/documentation/operators/sample.html
+Sample emits the most recent item emitted by an Observable within periodic time intervals.
 
-Sample operator tests.
-This operator uses a goroutine internally.
+Sample uses a bare goroutine internally in its implementation.
+
+	Sample	http://reactivex.io/documentation/operators/sample.html
 */
 package Sample
-
-import _ "github.com/reactivego/rx"

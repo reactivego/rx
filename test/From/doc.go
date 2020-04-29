@@ -1,8 +1,6 @@
 /*
-From tests.
+From creates an observable from multiple values passed in.
 
-	FromFoo		http://reactivex.io/documentation/operators/from.html
+	From	http://reactivex.io/documentation/operators/from.html
 */
 package From
-
-import _ "github.com/reactivego/rx"

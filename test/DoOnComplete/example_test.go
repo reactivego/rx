@@ -1,7 +1,10 @@
-
 package DoOnComplete
 
-import "fmt"
+import (
+	"fmt"
+
+	_ "github.com/reactivego/rx"
+)
 
 func Example_doOnComplete() {
 	complete := false
@@ -12,11 +15,11 @@ func Example_doOnComplete() {
 
 func Example_doOnCompleteSubscribe() {
 	wait := make(chan struct{})
-	source := FromInts(1, 2, 3, 4, 5).DoOnComplete(func() { close(wait) })
+	source := FromInt(1, 2, 3, 4, 5).DoOnComplete(func() { close(wait) })
 
 	result := []int{}
 	concurrent := GoroutineScheduler()
-	source.SubscribeOn(concurrent).Subscribe(func(next int,err error, done bool) {
+	source.SubscribeOn(concurrent).Subscribe(func(next int, err error, done bool) {
 		if !done {
 			result = append(result, next)
 		}

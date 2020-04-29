@@ -5,6 +5,7 @@
 package SwitchMap
 
 import (
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -16,15 +17,12 @@ import (
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler scheduler.Scheduler
+type Scheduler = scheduler.Scheduler
 
 //jig:name Subscriber
 
 // Subscriber is an alias for the subscriber.Subscriber interface type.
-type Subscriber subscriber.Subscriber
-
-// Subscription is an alias for the subscriber.Subscription interface type.
-type Subscription subscriber.Subscription
+type Subscriber = subscriber.Subscriber
 
 // NewSubscriber creates a new subscriber.
 func NewSubscriber() Subscriber {
@@ -80,10 +78,10 @@ var zeroString string
 // function, scheduler and an subscriber.
 type ObservableString func(StringObserveFunc, Scheduler, Subscriber)
 
-//jig:name FromSlice
+//jig:name From
 
-// FromSlice creates an Observable from a slice of interface{} values passed in.
-func FromSlice(slice []interface{}) Observable {
+// From creates an Observable from multiple interface{} values passed in.
+func From(slice ...interface{}) Observable {
 	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -102,13 +100,6 @@ func FromSlice(slice []interface{}) Observable {
 		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
-}
-
-//jig:name From
-
-// From creates an Observable from multiple interface{} values passed in.
-func From(slice ...interface{}) Observable {
-	return FromSlice(slice)
 }
 
 //jig:name IntObserveFunc
@@ -357,20 +348,26 @@ func (o ObservableInt) AsObservable() Observable {
 
 //jig:name Schedulers
 
-func TrampolineScheduler() Scheduler	{ return scheduler.Trampoline }
+func TrampolineScheduler() Scheduler {
+	return scheduler.Trampoline
+}
 
-func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
+func GoroutineScheduler() Scheduler {
+	return scheduler.Goroutine
+}
 
-//jig:name ObservableStringToSlice
+//jig:name ObservableStringPrintln
 
-// ToSlice collects all values from the ObservableString into an slice. The
-// complete slice and any error are returned.
-func (o ObservableString) ToSlice() (slice []string, err error) {
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println is performed on the Trampoline scheduler.
+func (o ObservableString) Println() (err error) {
 	subscriber := NewSubscriber()
 	scheduler := TrampolineScheduler()
 	observer := func(next string, e error, done bool) {
 		if !done {
-			slice = append(slice, next)
+			fmt.Println(next)
 		} else {
 			err = e
 			subscriber.Unsubscribe()

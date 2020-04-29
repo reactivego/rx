@@ -1,8 +1,6 @@
 /*
-	Sum	http://reactivex.io/documentation/operators/sum.html
+Sum calculates the sum of numbers emitted by an Observable and emits this sum.
 
-Sum operator tests.
+	Sum	http://reactivex.io/documentation/operators/sum.html
 */
 package Sum
-
-import _ "github.com/reactivego/rx"

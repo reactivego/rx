@@ -1,12 +1,7 @@
 /*
-Map operator tests.
+Map transforms the items emitted by an Observable by applying a
+function to each item.
 
 	Map	http://reactivex.io/documentation/operators/map.html
 */
 package Map
-
-import _ "github.com/reactivego/rx"
-
-// Vector is a slice of ints, used as a type in the examples.
-type Vector []int
-

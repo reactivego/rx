@@ -1,6 +1,10 @@
 package All
 
-import "fmt"
+import (
+	"fmt"
+
+	_ "github.com/reactivego/rx"
+)
 
 func Example_all() {
 	source := CreateInt(func(observer IntObserver) {

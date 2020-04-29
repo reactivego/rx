@@ -1,6 +1,10 @@
 package DoOnError
 
-import "fmt"
+import (
+	"fmt"
+
+	_ "github.com/reactivego/rx"
+)
 
 func Example_doOnError() {
 	var oerr error

@@ -1,8 +1,8 @@
 /*
-Finally operator tests.
+Finally applies a function for any error or completion on the stream.
 
-	Finally		http://reactivex.io/documentation/operators/do.html
+This doesn't expose whether this was an error or a completion.
+
+	Finally	http://reactivex.io/documentation/operators/do.html
 */
 package Finally
-
-import _ "github.com/reactivego/rx"

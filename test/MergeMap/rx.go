@@ -5,6 +5,7 @@
 package MergeMap
 
 import (
+	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -15,15 +16,12 @@ import (
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler scheduler.Scheduler
+type Scheduler = scheduler.Scheduler
 
 //jig:name Subscriber
 
 // Subscriber is an alias for the subscriber.Subscriber interface type.
-type Subscriber subscriber.Subscriber
-
-// Subscription is an alias for the subscriber.Subscription interface type.
-type Subscription subscriber.Subscription
+type Subscriber = subscriber.Subscriber
 
 // NewSubscriber creates a new subscriber.
 func NewSubscriber() Subscriber {
@@ -84,6 +82,39 @@ func (o ObservableInt) MergeMapInt(project func(int) ObservableInt) ObservableIn
 	return o.MapObservableInt(project).MergeAll()
 }
 
+//jig:name Schedulers
+
+func TrampolineScheduler() Scheduler {
+	return scheduler.Trampoline
+}
+
+func GoroutineScheduler() Scheduler {
+	return scheduler.Goroutine
+}
+
+//jig:name ObservableIntPrintln
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println is performed on the Trampoline scheduler.
+func (o ObservableInt) Println() (err error) {
+	subscriber := NewSubscriber()
+	scheduler := TrampolineScheduler()
+	observer := func(next int, e error, done bool) {
+		if !done {
+			fmt.Println(next)
+		} else {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
+}
+
 //jig:name ObservableIntMapObservableInt
 
 // MapObservableInt transforms the items emitted by an ObservableInt by applying a
@@ -100,33 +131,6 @@ func (o ObservableInt) MapObservableInt(project func(int) ObservableInt) Observa
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
-}
-
-//jig:name Schedulers
-
-func TrampolineScheduler() Scheduler	{ return scheduler.Trampoline }
-
-func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
-
-//jig:name ObservableIntToSlice
-
-// ToSlice collects all values from the ObservableInt into an slice. The
-// complete slice and any error are returned.
-func (o ObservableInt) ToSlice() (slice []int, err error) {
-	subscriber := NewSubscriber()
-	scheduler := TrampolineScheduler()
-	observer := func(next int, e error, done bool) {
-		if !done {
-			slice = append(slice, next)
-		} else {
-			err = e
-			subscriber.Unsubscribe()
-		}
-	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
 }
 
 //jig:name ObservableIntObserveFunc

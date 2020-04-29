@@ -2,6 +2,8 @@ package Wait
 
 import (
 	"fmt"
+
+	_ "github.com/reactivego/rx"
 )
 
 func Example_basic() {

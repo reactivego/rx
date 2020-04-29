@@ -3,6 +3,8 @@ package ReplaySubject
 import (
 	"fmt"
 	"time"
+
+	_ "github.com/reactivego/rx"
 )
 
 // ReplaySubject is both an observer and an observable. The maximum buffersize
@@ -36,7 +38,6 @@ func Example_replaySubject() {
 		}
 	})
 	subcription.Wait()
-
 	// Output:
 	// first 123
 	// first 456
@@ -100,7 +101,6 @@ func Example_replaySubjectMultiple() {
 			fmt.Printf("results %d as expected\n", index)
 		}
 	}
-
 	// Output:
 	// results 0 as expected
 	// results 1 as expected

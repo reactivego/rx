@@ -1,6 +1,10 @@
 package ToChan
 
-import "fmt"
+import (
+	"fmt"
+
+	_ "github.com/reactivego/rx"
+)
 
 func Example_basic() {
 	ch := From(1, 2, "middle", 2, 1).ToChan()

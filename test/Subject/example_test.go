@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+
+	_ "github.com/reactivego/rx"
 )
 
 // Subject is both an observer and an observable.
@@ -22,7 +24,6 @@ func Example_subject() {
 	subject.Complete()
 
 	subscription.Wait()
-
 	// Output:
 	// 123
 	// 456
@@ -39,7 +40,6 @@ func Example_subjectError() {
 
 	err := subject.Wait()
 	fmt.Println(err)
-
 	// Output:
 	// something bad happened
 }

@@ -2,11 +2,13 @@ package Connect
 
 import (
 	"fmt"
+
+	_ "github.com/reactivego/rx/generic"
 )
 
 func Example_connect() {
 	// source is an ObservableInt
-	source := FromInts(1, 2)
+	source := FromInt(1, 2)
 
 	// pub is a ConnectableInt
 	pub := source.Publish()
@@ -52,7 +54,7 @@ func Example_connect() {
 	sub3.Wait()
 
 	subc.Wait()
-	
+
 	// Unordered output:
 	// sub1 value is 1
 	// sub2 false

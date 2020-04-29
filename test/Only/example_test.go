@@ -1,6 +1,10 @@
 package Only
 
-import "fmt"
+import (
+	"fmt"
+
+	_ "github.com/reactivego/rx"
+)
 
 // Size is recognized by jig directly because refer type and actual type are both "Size"
 type Size struct{ width, height float64 }
@@ -22,25 +26,24 @@ func Example_only() {
 
 	subscription := source.OnlyString().Subscribe(func(next string, err error, done bool) {
 		if !done {
-			fmt.Printf("String: %s\n", next)	
-		}		
+			fmt.Printf("String: %s\n", next)
+		}
 	})
 	subscription.Wait()
 
 	subscription = source.OnlySize().Subscribe(func(next Size, err error, done bool) {
 		if !done {
-			fmt.Printf("Size: %+v\n", next)	
-		}		
+			fmt.Printf("Size: %+v\n", next)
+		}
 	})
 	subscription.Wait()
 
 	subscription = source.OnlyPoint().Subscribe(func(next []point, err error, done bool) {
 		if !done {
-			fmt.Printf("Point: %+v\n", next)	
-		}		
+			fmt.Printf("Point: %+v\n", next)
+		}
 	})
 	subscription.Wait()
-
 	// Output:
 	// String: Hello
 	// Size: {width:1024 height:768}

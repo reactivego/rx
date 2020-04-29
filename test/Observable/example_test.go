@@ -2,6 +2,8 @@ package Observable
 
 import (
 	"fmt"
+
+	_ "github.com/reactivego/rx"
 )
 
 // An ObserveFunc is just a callback function meant to be passed to an
@@ -25,7 +27,6 @@ func Example_observeFunc() {
 	observe(zero, RxError("error"), true)
 	// Complete
 	observe(zero, nil, true)
-
 	// Output:
 	// 123
 	// error
@@ -58,7 +59,6 @@ func Example_observable() {
 	}
 
 	observable(observe, nil, nil)
-
 	// Output:
 	// 123
 	// error

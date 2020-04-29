@@ -2,6 +2,8 @@ package Create
 
 import (
 	"fmt"
+
+	_ "github.com/reactivego/rx/generic"
 )
 
 // Shows how to use CreateString to create an observable of strings

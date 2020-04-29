@@ -1,10 +1,14 @@
 package Catch
 
-import "fmt"
+import (
+	"fmt"
+
+	_ "github.com/reactivego/rx"
+)
 
 func Example_catch() {
-	o123 := FromInts(1, 2, 3)
-	o45 := FromInts(4, 5)
+	o123 := FromInt(1, 2, 3)
+	o45 := FromInt(4, 5)
 	oThrowError := ThrowInt(RxError("error"))
 
 	err := o123.Concat(oThrowError).Catch(o45).Println()

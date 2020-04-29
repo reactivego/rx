@@ -1,6 +1,4 @@
 /*
-	Subject		http://reactivex.io/documentation/subject.html
-
 Subject is a combination of an observer and observable. Subjects are
 special because they are the only reactive constructs that support
 multicasting. The items sent to it through its observer side are
@@ -17,8 +15,8 @@ handled according to the specific behavior of the subject. There are different
 types of subjects, see the NewReplaySubject function for more info about a 
 subject that is capable of replaying a sequence of emissions. The standard
 subject will not buffer any emissions but will just multicast them.
+
+	Subject		http://reactivex.io/documentation/subject.html
 */
 package Subject
-
-import _ "github.com/reactivego/rx"
 
