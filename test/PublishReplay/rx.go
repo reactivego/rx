@@ -5,6 +5,7 @@
 package PublishReplay
 
 import (
+	"fmt"
 	"sync/atomic"
 	"time"
 
@@ -302,6 +303,50 @@ func (o ObservableInt) PublishReplay(bufferCapacity int, windowDuration time.Dur
 // subscribed to this connectable observable
 func (c ConnectableInt) Connect() Subscription {
 	return c.connect()
+}
+
+//jig:name ObservableIntPrintln
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println is performed on the Trampoline scheduler.
+func (o ObservableInt) Println() (err error) {
+	subscriber := NewSubscriber()
+	scheduler := TrampolineScheduler()
+	observer := func(next int, e error, done bool) {
+		if !done {
+			fmt.Println(next)
+		} else {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
+}
+
+//jig:name ConnectableIntAutoConnect
+
+// AutoConnect makes a ConnectableInt behave like an ordinary ObservableInt that
+// automatically connects when the specified number of clients subscribe to it.
+// If count is 0, then AutoConnect will immediately call connect on the
+// ConnectableInt before returning the ObservableInt part of the ConnectableInt.
+func (o ConnectableInt) AutoConnect(count int) ObservableInt {
+	if count == 0 {
+		o.connect()
+		return o.ObservableInt
+	}
+	var refcount int32
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		if atomic.AddInt32(&refcount, 1) == int32(count) {
+			o.connect()
+		}
+		o.ObservableInt(observe, subscribeOn, subscriber)
+	}
+	return observable
 }
 
 //jig:name ObservableIntWait
