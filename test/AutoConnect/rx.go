@@ -117,93 +117,25 @@ func TrampolineScheduler() Scheduler	{ return scheduler.Trampoline }
 
 func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
 
-//jig:name SubscribeOption
-
-// SubscribeOption is an option that can be passed to the Subscribe method.
-type SubscribeOption func(options *subscribeOptions)
-
-type subscribeOptions struct {
-	scheduler	Scheduler
-	subscriber	Subscriber
-	onSubscribe	func(subscription Subscription)
-	onUnsubscribe	func()
-}
-
-// SubscribeOn returns an option that can be passed to the Subscribe method.
-// It takes the scheduler to subscribe the observable on. The tasks that
-// actually perform the observable functionality are scheduled on this
-// scheduler. The other options that can be passed here are applied after the
-// scheduler was set so any schedulers passed in via other will override
-// the scheduler passed here.
-func SubscribeOn(scheduler Scheduler, other ...SubscribeOption) SubscribeOption {
-	return func(options *subscribeOptions) {
-		options.scheduler = scheduler
-		for _, setter := range other {
-			setter(options)
-		}
-	}
-}
-
-// WithSubscriber returns an option that can be passed to the Subscribe method.
-// The Subscribe method will use the subscriber passed here instead of creating
-// a new one.
-func WithSubscriber(subscriber Subscriber) SubscribeOption {
-	return func(options *subscribeOptions) {
-		options.subscriber = subscriber
-	}
-}
-
-// OnSubscribe returns an option that can be passed to the Subscribe method.
-// It takes a callback that is called from the Subscribe method just before
-// subscribing continues further.
-func OnSubscribe(callback func(Subscription)) SubscribeOption {
-	return func(options *subscribeOptions) { options.onSubscribe = callback }
-}
-
-// OnUnsubscribe returns an option that can be passed to the Subscribe method.
-// It takes a callback that is called by the Subscribe method to notify the
-// client that the subscription has been canceled.
-func OnUnsubscribe(callback func()) SubscribeOption {
-	return func(options *subscribeOptions) { options.onUnsubscribe = callback }
-}
-
-// newSchedulerAndSubscriber will return either return the scheduler and subscriber
-// passed in through the SubscribeOn() and WithSubscriber() options or it will
-// return newly created scheduler and subscriber. Before returning the callback
-// passed in through OnSubscribe() will already have been called.
-func newSchedulerAndSubscriber(setters []SubscribeOption) (Scheduler, Subscriber) {
-	options := &subscribeOptions{scheduler: TrampolineScheduler()}
-	for _, setter := range setters {
-		setter(options)
-	}
-	if options.subscriber == nil {
-		options.subscriber = NewSubscriber()
-	}
-	options.subscriber.OnUnsubscribe(options.onUnsubscribe)
-	if options.onSubscribe != nil {
-		options.onSubscribe(options.subscriber)
-	}
-	return options.scheduler, options.subscriber
-}
-
 //jig:name ObservableIntSubscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
 // Subscribe by default is performed on the Trampoline scheduler.
-func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOption) Subscription {
-	scheduler, subscriber := newSchedulerAndSubscriber(options)
+func (o ObservableInt) Subscribe(observe IntObserveFunc, subscribers ...Subscriber) Subscription {
+	subscribers = append(subscribers, NewSubscriber())
+	scheduler := TrampolineScheduler()
 	observer := func(next int, err error, done bool) {
 		if !done {
 			observe(next, err, done)
 		} else {
 			observe(zeroInt, err, true)
-			subscriber.Unsubscribe()
+			subscribers[0].Unsubscribe()
 		}
 	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	return subscriber
+	subscribers[0].OnWait(scheduler.Wait)
+	o(observer, scheduler, subscribers[0])
+	return subscribers[0]
 }
 
 //jig:name ConnectableInt
@@ -213,7 +145,7 @@ func (o ObservableInt) Subscribe(observe IntObserveFunc, options ...SubscribeOpt
 // all subscribers of ConnectableInt.
 type ConnectableInt struct {
 	ObservableInt
-	connect	func(options []SubscribeOption) Subscription
+	connect	func() Subscription
 }
 
 //jig:name ObservableIntMulticast
@@ -258,14 +190,14 @@ func (o ObservableInt) Multicast(factory func() SubjectInt) ConnectableInt {
 		state	int32
 		atomic.Value
 	}
-	connect := func(options []SubscribeOption) Subscription {
+	connect := func() Subscription {
 		if atomic.CompareAndSwapInt32(&subjectValue.state, terminated, active) {
 			subjectValue.Store(factory())
 		}
 		if atomic.CompareAndSwapInt32(&subscriberValue.state, unsubscribed, subscribed) {
 			scheduler := GoroutineScheduler()
 			subscriber := subscriber.New()
-			o.Subscribe(observer, SubscribeOn(scheduler, options...), WithSubscriber(subscriber))
+			o.SubscribeOn(scheduler).Subscribe(observer, subscriber)
 			subscriberValue.Store(subscriber)
 			subscriber.OnUnsubscribe(func() {
 				atomic.CompareAndSwapInt32(&subscriberValue.state, subscribed, unsubscribed)
@@ -368,6 +300,39 @@ func (o ObservableInt) PublishReplay(bufferCapacity int, windowDuration time.Dur
 	return o.Multicast(factory)
 }
 
+//jig:name ConnectableIntAutoConnect
+
+// AutoConnect makes a ConnectableInt behave like an ordinary ObservableInt that
+// automatically connects when the specified number of clients subscribe to it.
+// If count is 0, then AutoConnect will immediately call connect on the
+// ConnectableInt before returning the ObservableInt part of the ConnectableInt.
+func (o ConnectableInt) AutoConnect(count int) ObservableInt {
+	if count == 0 {
+		o.connect()
+		return o.ObservableInt
+	}
+	var refcount int32
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		if atomic.AddInt32(&refcount, 1) == int32(count) {
+			o.connect()
+		}
+		o.ObservableInt(observe, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableIntSubscribeOn
+
+// SubscribeOn specifies the scheduler an ObservableInt should use when it is
+// subscribed to.
+func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
+	observable := func(observe IntObserveFunc, _ Scheduler, subscriber Subscriber) {
+		subscriber.OnWait(subscribeOn.Wait)
+		o(observe, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name ObserveFunc
 
 // ObserveFunc is the observer, a function that gets called whenever the
@@ -444,39 +409,6 @@ func Create(f func(Observer)) Observable {
 			f(&ObserverSubscriber{observer, subscriber})
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
-}
-
-//jig:name ConnectableIntAutoConnect
-
-// AutoConnect makes a ConnectableInt behave like an ordinary ObservableInt that
-// automatically connects when the specified number of clients subscribe to it.
-// If count is 0, then AutoConnect will immediately call connect on the
-// ConnectableInt before returning the ObservableInt part of the ConnectableInt.
-func (o ConnectableInt) AutoConnect(count int, options ...SubscribeOption) ObservableInt {
-	if count == 0 {
-		o.connect(options)
-		return o.ObservableInt
-	}
-	var refcount int32
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		if atomic.AddInt32(&refcount, 1) == int32(count) {
-			o.connect(options)
-		}
-		o.ObservableInt(observe, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableIntSubscribeOn
-
-// SubscribeOn specifies the scheduler an ObservableInt should use when it is
-// subscribed to.
-func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
-	observable := func(observe IntObserveFunc, _ Scheduler, subscriber Subscriber) {
-		subscriber.OnWait(subscribeOn.Wait)
-		o(observe, subscribeOn, subscriber)
 	}
 	return observable
 }
