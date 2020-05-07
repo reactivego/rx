@@ -21,7 +21,7 @@ package main
 import _ "github.com/reactivego/rx/generic"
 
 func main() {
-	FromStrings("You!", "Gophers!", "World!").
+	FromString("You!", "Gophers!", "World!").
 		MapString(func(x string) string {
 			return "Hello, " + x
 		}).Println()
@@ -37,16 +37,15 @@ Run *jig* to generate code into file `rx.go`.
 
 ```bash
 $ go run github.com/reactivego/generics/cmd/jig -v
+found 126 templates in package "rx" (github.com/reactivego/rx/generic)
 found 16 templates in package "multicast" (github.com/reactivego/multicast/generic)
-found 127 templates in package "rx" (github.com/reactivego/rx/generic)
-generating "FromStrings"
+generating "FromString"
   Scheduler
   Subscriber
   StringObserveFunc
   zeroString
   ObservableString
-  FromSliceString
-  FromStrings
+  FromString
 generating "ObservableString MapString"
   ObservableString MapString
 generating "ObservableString Println"
@@ -87,7 +86,7 @@ Using generics is easy. Just reference the generic in your code and specify a co
 So, to specialize on `int` write e.g. `MapInt`. See the following code for how that works: 
 
 ```go
-FromInts(1, 2).MapInt(func(x int) int {
+FromInt(1, 2).MapInt(func(x int) int {
 	return x + 10
 }).Println()
 
