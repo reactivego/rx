@@ -17,15 +17,12 @@ import (
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler scheduler.Scheduler
+type Scheduler = scheduler.Scheduler
 
 //jig:name Subscriber
 
 // Subscriber is an alias for the subscriber.Subscriber interface type.
-type Subscriber subscriber.Subscriber
-
-// Subscription is an alias for the subscriber.Subscription interface type.
-type Subscription subscriber.Subscription
+type Subscriber = subscriber.Subscriber
 
 // NewSubscriber creates a new subscriber.
 func NewSubscriber() Subscriber {
@@ -220,10 +217,10 @@ type RxError string
 
 func (e RxError) Error() string	{ return string(e) }
 
-//jig:name FromSlice
+//jig:name From
 
-// FromSlice creates an Observable from a slice of interface{} values passed in.
-func FromSlice(slice []interface{}) Observable {
+// From creates an Observable from multiple interface{} values passed in.
+func From(slice ...interface{}) Observable {
 	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -242,13 +239,6 @@ func FromSlice(slice []interface{}) Observable {
 		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
-}
-
-//jig:name From
-
-// From creates an Observable from multiple interface{} values passed in.
-func From(slice ...interface{}) Observable {
-	return FromSlice(slice)
 }
 
 //jig:name FromChan
@@ -286,13 +276,6 @@ func FromChan(ch <-chan interface{}) Observable {
 		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
-}
-
-//jig:name Froms
-
-// Froms creates an Observable from multiple interface{} values passed in.
-func Froms(slice ...interface{}) Observable {
-	return FromSlice(slice)
 }
 
 //jig:name Interval
@@ -504,8 +487,8 @@ func Repeat(value interface{}, count int) Observable {
 
 // Start creates an Observable that emits the return value of a function.
 // It is designed to be used with a function that returns a (interface{}, error) tuple.
-// If the error is non-nil the returned Observable will be that error,
-// otherwise it will be a single-value stream of interface{}.
+// If the error is non-nil the returned Observable will be an Observable that
+// emits and error, otherwise it will be a single-value Observable of the value.
 func Start(f func() (interface{}, error)) Observable {
 	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		done := false
@@ -1494,7 +1477,7 @@ func (o Observable) Scan(accumulator func(interface{}, interface{}) interface{},
 
 // Single enforces that the observable sends exactly one data item and then
 // completes. If the observable sends no data before completing or sends more
-// than 1 item before completing  this reported as an error to the observer.
+// than 1 item before completing, this is reported as an error to the observer.
 func (o Observable) Single() Observable {
 	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
 		var (
@@ -1984,9 +1967,13 @@ func (o Observable) Timeout(timeout time.Duration) Observable {
 
 //jig:name Schedulers
 
-func TrampolineScheduler() Scheduler	{ return scheduler.Trampoline }
+func TrampolineScheduler() Scheduler {
+	return scheduler.Trampoline
+}
 
-func GoroutineScheduler() Scheduler	{ return scheduler.Goroutine }
+func GoroutineScheduler() Scheduler {
+	return scheduler.Goroutine
+}
 
 //jig:name ObservablePrintln
 
@@ -2056,6 +2043,11 @@ func (o ObservableInt) Println() (err error) {
 	subscriber.Wait()
 	return
 }
+
+//jig:name Subscription
+
+// Subscription is an alias for the subscriber.Subscription interface type.
+type Subscription = subscriber.Subscription
 
 //jig:name ObservableSubscribe
 
@@ -2429,7 +2421,7 @@ func (o ObservableInt) ToSlice() (slice []int, err error) {
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
-// Subscription is performed on the Trampoline scheduler.
+// Subscribing is performed on the Trampoline scheduler.
 func (o Observable) Wait() (err error) {
 	subscriber := NewSubscriber()
 	scheduler := TrampolineScheduler()
@@ -2449,7 +2441,7 @@ func (o Observable) Wait() (err error) {
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
-// Subscription is performed on the Trampoline scheduler.
+// Subscribing is performed on the Trampoline scheduler.
 func (o ObservableBool) Wait() (err error) {
 	subscriber := NewSubscriber()
 	scheduler := TrampolineScheduler()
@@ -2469,7 +2461,7 @@ func (o ObservableBool) Wait() (err error) {
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
-// Subscription is performed on the Trampoline scheduler.
+// Subscribing is performed on the Trampoline scheduler.
 func (o ObservableInt) Wait() (err error) {
 	subscriber := NewSubscriber()
 	scheduler := TrampolineScheduler()

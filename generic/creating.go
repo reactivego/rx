@@ -282,31 +282,6 @@ func FromFoo(slice ...foo) ObservableFoo {
 	return observable
 }
 
-//jig:template From<Foo>s
-//jig:needs Observable<Foo>
-
-// FromFoos creates an ObservableFoo from multiple foo values passed in.
-func FromFoos(slice ...foo) ObservableFoo {
-	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		i := 0
-		runner := scheduler.ScheduleRecursive(func(self func()) {
-			if subscriber.Subscribed() {
-				if i < len(slice) {
-					observe(slice[i], nil, false)
-					if subscriber.Subscribed() {
-						i++
-						self()
-					}
-				} else {
-					observe(zeroFoo, nil, true)
-				}
-			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
-}
-
 //jig:template Interval
 //jig:needs ObservableInt
 

@@ -81,7 +81,7 @@ func ExampleFrom() {
 }
 
 func ExampleFromSlice() {
-	rx.FromSlice([]interface{}{1, 2, 3, 4, 5}).Println()
+	rx.From([]interface{}{1, 2, 3, 4, 5}...).Println()
 
 	// Output:
 	// 1

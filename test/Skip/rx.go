@@ -77,39 +77,6 @@ func (o ObservableInt) Skip(n int) ObservableInt {
 	return o.AsObservable().Skip(n).AsObservableInt()
 }
 
-//jig:name Schedulers
-
-func TrampolineScheduler() Scheduler {
-	return scheduler.Trampoline
-}
-
-func GoroutineScheduler() Scheduler {
-	return scheduler.Goroutine
-}
-
-//jig:name ObservableIntPrintln
-
-// Println subscribes to the Observable and prints every item to os.Stdout
-// while it waits for completion or error. Returns either the error or nil
-// when the Observable completed normally.
-// Println is performed on the Trampoline scheduler.
-func (o ObservableInt) Println() (err error) {
-	subscriber := NewSubscriber()
-	scheduler := TrampolineScheduler()
-	observer := func(next int, e error, done bool) {
-		if !done {
-			fmt.Println(next)
-		} else {
-			err = e
-			subscriber.Unsubscribe()
-		}
-	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
-}
-
 //jig:name ObserveFunc
 
 // ObserveFunc is the observer, a function that gets called whenever the
@@ -141,6 +108,39 @@ func (o ObservableInt) AsObservable() Observable {
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
+}
+
+//jig:name Schedulers
+
+func TrampolineScheduler() Scheduler {
+	return scheduler.Trampoline
+}
+
+func GoroutineScheduler() Scheduler {
+	return scheduler.Goroutine
+}
+
+//jig:name ObservableIntPrintln
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println is performed on the Trampoline scheduler.
+func (o ObservableInt) Println() (err error) {
+	subscriber := NewSubscriber()
+	scheduler := TrampolineScheduler()
+	observer := func(next int, e error, done bool) {
+		if !done {
+			fmt.Println(next)
+		} else {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
 }
 
 //jig:name ObservableSkip

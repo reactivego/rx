@@ -253,6 +253,49 @@ func NewReplaySubjectString(bufferCapacity int, windowDuration time.Duration) Su
 // Subscription is an alias for the subscriber.Subscription interface type.
 type Subscription = subscriber.Subscription
 
+//jig:name Schedulers
+
+func TrampolineScheduler() Scheduler {
+	return scheduler.Trampoline
+}
+
+func GoroutineScheduler() Scheduler {
+	return scheduler.Goroutine
+}
+
+//jig:name ObservableIntSubscribe
+
+// Subscribe operates upon the emissions and notifications from an Observable.
+// This method returns a Subscription.
+// Subscribe by default is performed on the Trampoline scheduler.
+func (o ObservableInt) Subscribe(observe IntObserveFunc, subscribers ...Subscriber) Subscription {
+	subscribers = append(subscribers, NewSubscriber())
+	scheduler := TrampolineScheduler()
+	observer := func(next int, err error, done bool) {
+		if !done {
+			observe(next, err, done)
+		} else {
+			observe(zeroInt, err, true)
+			subscribers[0].Unsubscribe()
+		}
+	}
+	subscribers[0].OnWait(scheduler.Wait)
+	o(observer, scheduler, subscribers[0])
+	return subscribers[0]
+}
+
+//jig:name ObservableStringSubscribeOn
+
+// SubscribeOn specifies the scheduler an ObservableString should use when it is
+// subscribed to.
+func (o ObservableString) SubscribeOn(subscribeOn Scheduler) ObservableString {
+	observable := func(observe StringObserveFunc, _ Scheduler, subscriber Subscriber) {
+		subscriber.OnWait(subscribeOn.Wait)
+		o(observe, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name ObserveFunc
 
 // ObserveFunc is the observer, a function that gets called whenever the
@@ -329,49 +372,6 @@ func Create(f func(Observer)) Observable {
 			f(&ObserverSubscriber{observer, subscriber})
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
-}
-
-//jig:name Schedulers
-
-func TrampolineScheduler() Scheduler {
-	return scheduler.Trampoline
-}
-
-func GoroutineScheduler() Scheduler {
-	return scheduler.Goroutine
-}
-
-//jig:name ObservableIntSubscribe
-
-// Subscribe operates upon the emissions and notifications from an Observable.
-// This method returns a Subscription.
-// Subscribe by default is performed on the Trampoline scheduler.
-func (o ObservableInt) Subscribe(observe IntObserveFunc, subscribers ...Subscriber) Subscription {
-	subscribers = append(subscribers, NewSubscriber())
-	scheduler := TrampolineScheduler()
-	observer := func(next int, err error, done bool) {
-		if !done {
-			observe(next, err, done)
-		} else {
-			observe(zeroInt, err, true)
-			subscribers[0].Unsubscribe()
-		}
-	}
-	subscribers[0].OnWait(scheduler.Wait)
-	o(observer, scheduler, subscribers[0])
-	return subscribers[0]
-}
-
-//jig:name ObservableStringSubscribeOn
-
-// SubscribeOn specifies the scheduler an ObservableString should use when it is
-// subscribed to.
-func (o ObservableString) SubscribeOn(subscribeOn Scheduler) ObservableString {
-	observable := func(observe StringObserveFunc, _ Scheduler, subscriber Subscriber) {
-		subscriber.OnWait(subscribeOn.Wait)
-		o(observe, subscribeOn, subscriber)
 	}
 	return observable
 }

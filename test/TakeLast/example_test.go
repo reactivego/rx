@@ -14,7 +14,7 @@ func Example_basic() {
 
 	err = source.TakeLast(3).Println()
 	fmt.Println(err)
-	// Output
+	// Output:
 	// 4
 	// 5
 	// <nil>

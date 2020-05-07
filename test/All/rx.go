@@ -211,6 +211,32 @@ func (o ObservableInt) AsObservable() Observable {
 	return observable
 }
 
+//jig:name Subscription
+
+// Subscription is an alias for the subscriber.Subscription interface type.
+type Subscription = subscriber.Subscription
+
+//jig:name ObservableBoolSubscribe
+
+// Subscribe operates upon the emissions and notifications from an Observable.
+// This method returns a Subscription.
+// Subscribe by default is performed on the Trampoline scheduler.
+func (o ObservableBool) Subscribe(observe BoolObserveFunc, subscribers ...Subscriber) Subscription {
+	subscribers = append(subscribers, NewSubscriber())
+	scheduler := TrampolineScheduler()
+	observer := func(next bool, err error, done bool) {
+		if !done {
+			observe(next, err, done)
+		} else {
+			observe(zeroBool, err, true)
+			subscribers[0].Unsubscribe()
+		}
+	}
+	subscribers[0].OnWait(scheduler.Wait)
+	o(observer, scheduler, subscribers[0])
+	return subscribers[0]
+}
+
 //jig:name ObservableAll
 
 // All determines whether all items emitted by an Observable meet some
@@ -242,30 +268,4 @@ func (o Observable) All(predicate func(next interface{}) bool) ObservableBool {
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
-}
-
-//jig:name Subscription
-
-// Subscription is an alias for the subscriber.Subscription interface type.
-type Subscription = subscriber.Subscription
-
-//jig:name ObservableBoolSubscribe
-
-// Subscribe operates upon the emissions and notifications from an Observable.
-// This method returns a Subscription.
-// Subscribe by default is performed on the Trampoline scheduler.
-func (o ObservableBool) Subscribe(observe BoolObserveFunc, subscribers ...Subscriber) Subscription {
-	subscribers = append(subscribers, NewSubscriber())
-	scheduler := TrampolineScheduler()
-	observer := func(next bool, err error, done bool) {
-		if !done {
-			observe(next, err, done)
-		} else {
-			observe(zeroBool, err, true)
-			subscribers[0].Unsubscribe()
-		}
-	}
-	subscribers[0].OnWait(scheduler.Wait)
-	o(observer, scheduler, subscribers[0])
-	return subscribers[0]
 }

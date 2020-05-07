@@ -306,27 +306,6 @@ func (o ObservableInt) PublishReplay(bufferCapacity int, windowDuration time.Dur
 	return o.Multicast(factory)
 }
 
-//jig:name ConnectableIntAutoConnect
-
-// AutoConnect makes a ConnectableInt behave like an ordinary ObservableInt that
-// automatically connects when the specified number of clients subscribe to it.
-// If count is 0, then AutoConnect will immediately call connect on the
-// ConnectableInt before returning the ObservableInt part of the ConnectableInt.
-func (o ConnectableInt) AutoConnect(count int) ObservableInt {
-	if count == 0 {
-		o.connect()
-		return o.ObservableInt
-	}
-	var refcount int32
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		if atomic.AddInt32(&refcount, 1) == int32(count) {
-			o.connect()
-		}
-		o.ObservableInt(observe, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name ObservableIntSubscribeOn
 
 // SubscribeOn specifies the scheduler an ObservableInt should use when it is
@@ -415,6 +394,27 @@ func Create(f func(Observer)) Observable {
 			f(&ObserverSubscriber{observer, subscriber})
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
+}
+
+//jig:name ConnectableIntAutoConnect
+
+// AutoConnect makes a ConnectableInt behave like an ordinary ObservableInt that
+// automatically connects when the specified number of clients subscribe to it.
+// If count is 0, then AutoConnect will immediately call connect on the
+// ConnectableInt before returning the ObservableInt part of the ConnectableInt.
+func (o ConnectableInt) AutoConnect(count int) ObservableInt {
+	if count == 0 {
+		o.connect()
+		return o.ObservableInt
+	}
+	var refcount int32
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		if atomic.AddInt32(&refcount, 1) == int32(count) {
+			o.connect()
+		}
+		o.ObservableInt(observe, subscribeOn, subscriber)
 	}
 	return observable
 }

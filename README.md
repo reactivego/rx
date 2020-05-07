@@ -59,13 +59,13 @@ The call above creates an observable from numbers and strings and then prints th
 ## Why you should use rx
 Observables in `rx` are somewhat similar to Go channels but have much richer semantics. Observables can be hot or cold, can complete normally or with an error, use subscriptions that can be cancelled from the subscriber side. Where a normal variable is just a place where you read and write values from, an observable captures how the value of this variable changes over time. Concurrency follows naturally from the fact that an observable is an ever changing stream of values.
 
-`rx` is a library of operators that work on one or more observables. The way in which observables can be combined using operators to form new observables is the real strength of ReactiveX. Operators specify how observables representing streams of values are e.g. merged, transformed, concatenated, split, multicasted, replayed, delayed and debounced.
+`rx` is a library of operators that work on one or more observables. The way in which observables can be combined using operators to form new observables is the real strength of Reactive Extensions. Operators specify how observables representing streams of values are e.g. merged, transformed, concatenated, split, multicasted, replayed, delayed and debounced.
 
-This implemenation takes cues from boh [RxJS 6](https://github.com/ReactiveX/rxjs) and [RxJava 2](https://github.com/ReactiveX/RxJava) that have been pushing the envelope in evolving ReactiveX operator semantics.
+This implemenation takes cues from boh [RxJS 6](https://github.com/ReactiveX/rxjs) and [RxJava 2](https://github.com/ReactiveX/RxJava) that have been pushing the envelope in evolving operator semantics.
 
 ## Operators 
 
-Folowing is a list of [ReactiveX operators](http://reactivex.io/documentation/operators.html) that have been implemented.
+Folowing is a list of [operators](http://reactivex.io/documentation/operators.html) that have been implemented.
 
 Note, the operators that are used most commonly have been marked with a :star:.
 

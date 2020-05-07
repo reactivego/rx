@@ -84,8 +84,6 @@ func require() {
 	Error(RxError("sad"))
 	From(1, 2)
 	FromChan(make(chan interface{}))
-	FromSlice([]interface{}{1, 2})
-	Froms(1, 2)
 	Interval(time.Millisecond)
 	Just(1)
 	Concat(o)
