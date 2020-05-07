@@ -4,21 +4,20 @@
 
 [![](https://godoc.org/github.com/reactivego/rx?status.png)](http://godoc.org/github.com/reactivego/rx)
 
-Package `rx` offers Reactive Extensions ([ReactiveX](http://reactivex.io/)) for [Go](https://golang.org/), an API for asynchronous programming with observable streams (Observables).
+Package `rx` provides reactive programming for Go. `rx` is short for [Reactive Extensions](http://reactivex.io/), an API for asynchronous programming with observables.
 
-## What ReactiveX is
+## Reactive Extensions
 
-Observables are the main focus of ReactiveX and they are (sort of) sets of events.
+The main focus of Reactive Extensions are [Observables](http://reactivex.io/documentation/observable.html):
 
+- They are streams of events.
 - They assume zero to many values over time.
 - They push values.
 - They can take any amount of time to complete (or may never).
 - They are cancellable.
 - They are lazy; they don't do anything until you subscribe.
 
-This implementation of rx uses `interface{}` for value types, so you can
-mix different types of values in function and method calls. To create an
-observable of three values with different types you might write the following:
+The `rx` package found here uses the type `interface{}` for values of the observable. The `interface{}` type allows different types of values to be mixed and emitted by an observable. To create an observable of three values with different types you might write the following:
 
 ```go
 package main
@@ -30,14 +29,13 @@ func main() {
 }
 ```
 
-The call above creates an observable from numbers and strings and then prints
-them.
+The call above creates an observable from numbers and strings and then prints them.
 
 ## Table of Contents
 
 <!-- MarkdownTOC -->
 
-- [Why you should use ReactiveX](#why-you-should-use-reactivex)
+- [Why you should use rx](#why-you-should-use-rx)
 - [Operators](#operators)
 	- [Creating Operators](#creating-operators)
 	- [Transforming Operators](#transforming-operators)
@@ -58,8 +56,8 @@ them.
 
 <!-- /MarkdownTOC -->
 
-## Why you should use ReactiveX
-ReactiveX observables are somewhat similar to Go channels but have much richer semantics. Observables can be hot or cold, can complete normally or with an error, use subscriptions that can be cancelled from the subscriber side. Where a normal variable is just a place where you read and write values from, an observable captures how the value of this variable changes over time. Concurrency follows naturally from the fact that an observable is an ever changing stream of values.
+## Why you should use rx
+Observables in `rx` are somewhat similar to Go channels but have much richer semantics. Observables can be hot or cold, can complete normally or with an error, use subscriptions that can be cancelled from the subscriber side. Where a normal variable is just a place where you read and write values from, an observable captures how the value of this variable changes over time. Concurrency follows naturally from the fact that an observable is an ever changing stream of values.
 
 `rx` is a library of operators that work on one or more observables. The way in which observables can be combined using operators to form new observables is the real strength of ReactiveX. Operators specify how observables representing streams of values are e.g. merged, transformed, concatenated, split, multicasted, replayed, delayed and debounced.
 
@@ -252,5 +250,4 @@ Our intellectual powers are rather geared to master static relations and our pow
 This library started life as the [Reactive eXtensions for Go](https://github.com/alecthomas/gorx) library by *Alec Thomas*. Although the library has been through the metaphorical meat grinder a few times, its DNA is still clearly present in this library and I owe Alec a debt of grattitude for the work he has made so generously available.
 
 ## License
-This library is licensed under the terms of the MIT License. See [LICENSE](../LICENSE) file in this repository for copyright notice and exact wording.
-
+This library is licensed under the terms of the MIT License. See [LICENSE](LICENSE) file for copyright notice and exact wording.
