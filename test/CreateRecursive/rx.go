@@ -2,7 +2,7 @@
 
 //go:generate jig
 
-package Make
+package CreateRecursive
 
 import (
 	"fmt"
@@ -46,44 +46,55 @@ var zeroInt int
 // function, scheduler and an subscriber.
 type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 
-//jig:name MakeIntFunc
+//jig:name Error
 
-// MakeIntFunc is the signature of a function that can be passed to MakeInt
-// to implement an ObservableInt.
-type MakeIntFunc func(Next func(int), Error func(error), Complete func())
+// Error signals an error condition.
+type Error func(error)
 
-//jig:name MakeInt
+//jig:name Complete
 
-// MakeInt provides a way of creating an ObservableInt from scratch by
-// calling observer methods programmatically. A make function conforming to the
-// MakeIntFunc signature will be called by MakeInt provining a Next, Error and
-// Complete function that can be called by the code that implements the
+// Complete signals that no more data is to be expected.
+type Complete func()
+
+//jig:name NextInt
+
+// NextInt can be called to emit the next value to the IntObserver.
+type NextInt func(int)
+
+//jig:name CreateRecursiveInt
+
+// CreateRecursiveInt provides a way of creating an ObservableInt from
+// scratch by calling observer methods programmatically.
+//
+// The create function provided to CreateRecursiveInt will be called
+// repeatedly to implement the observable. It is provided with a NextInt, Error
+// and Complete function that can be called by the code that implements the
 // Observable.
-func MakeInt(make MakeIntFunc) ObservableInt {
+func CreateRecursiveInt(create func(NextInt, Error, Complete)) ObservableInt {
 	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		done := false
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Canceled() {
 				return
 			}
-			next := func(n int) {
+			n := func(next int) {
 				if subscriber.Subscribed() {
-					observe(n, nil, false)
+					observe(next, nil, false)
 				}
 			}
-			err := func(e error) {
+			e := func(err error) {
 				done = true
 				if subscriber.Subscribed() {
-					observe(zeroInt, e, true)
+					observe(zeroInt, err, true)
 				}
 			}
-			complete := func() {
+			c := func() {
 				done = true
 				if subscriber.Subscribed() {
 					observe(zeroInt, nil, true)
 				}
 			}
-			make(next, err, complete)
+			create(n, e, c)
 			if !done && subscriber.Subscribed() {
 				self()
 			}

@@ -1,16 +1,16 @@
-package Make
+package CreateRecursive
 
 import _ "github.com/reactivego/rx"
 
-func Example_makeInt() {
+func Example_createRecursiveInt() {
 	example := func() ObservableInt {
 		done := false
-		return MakeInt(func(Next func(int), Error func(error), Complete func()) {
+		return CreateRecursiveInt(func(N NextInt, E Error, C Complete) {
 			if !done {
-				Next(1)
+				N(1)
 				done = true
 			} else {
-				Complete()
+				C()
 			}
 		})
 	}

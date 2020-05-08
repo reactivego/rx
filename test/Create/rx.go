@@ -11,6 +11,26 @@ import (
 	"github.com/reactivego/subscriber"
 )
 
+//jig:name Error
+
+// Error signals an error condition.
+type Error func(error)
+
+//jig:name Complete
+
+// Complete signals that no more data is to be expected.
+type Complete func()
+
+//jig:name Canceled
+
+// Canceled returns true when the observer has unsubscribed.
+type Canceled func() bool
+
+//jig:name NextString
+
+// NextString can be called to emit the next value to the IntObserver.
+type NextString func(string)
+
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
@@ -46,60 +66,40 @@ var zeroString string
 // function, scheduler and an subscriber.
 type ObservableString func(StringObserveFunc, Scheduler, Subscriber)
 
-//jig:name StringObserveFuncMethods
-
-// Next is called by an ObservableString to emit the next string value to the
-// observer.
-func (f StringObserveFunc) Next(next string) {
-	f(next, nil, false)
-}
-
-// Error is called by an ObservableString to report an error to the observer.
-func (f StringObserveFunc) Error(err error) {
-	f(zeroString, err, true)
-}
-
-// Complete is called by an ObservableString to signal that no more data is
-// forthcoming to the observer.
-func (f StringObserveFunc) Complete() {
-	f(zeroString, nil, true)
-}
-
-//jig:name StringObserver
-
-// StringObserver is the interface used with CreateString when implementing a custom
-// observable.
-type StringObserver interface {
-	// Next emits the next string value.
-	Next(string)
-	// Error signals an error condition.
-	Error(error)
-	// Complete signals that no more data is to be expected.
-	Complete()
-	// Subscribed returns true when the subscription is currently valid.
-	Subscribed() bool
-}
-
 //jig:name CreateString
 
-// CreateString creates an Observable from scratch by calling observer methods
-// programmatically.
-func CreateString(f func(StringObserver)) ObservableString {
+// CreateString provides a way of creating an ObservableString from
+// scratch by calling observer methods programmatically.
+//
+// The create function provided to CreateString will be called once
+// to implement the observable. It is provided with a NextString, Error,
+// Complete and Canceled function that can be called by the code that
+// implements the Observable.
+func CreateString(create func(NextString, Error, Complete, Canceled)) ObservableString {
 	observable := func(observe StringObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
-			if !subscriber.Subscribed() {
+			if subscriber.Canceled() {
 				return
 			}
-			observer := func(next string, err error, done bool) {
+			n := func(next string) {
 				if subscriber.Subscribed() {
-					observe(next, err, done)
+					observe(next, nil, false)
 				}
 			}
-			type ObserverSubscriber struct {
-				StringObserveFunc
-				Subscriber
+			e := func(err error) {
+				if subscriber.Subscribed() {
+					observe(zeroString, err, true)
+				}
 			}
-			f(&ObserverSubscriber{observer, subscriber})
+			c := func() {
+				if subscriber.Subscribed() {
+					observe(zeroString, nil, true)
+				}
+			}
+			x := func() bool {
+				return subscriber.Canceled()
+			}
+			create(n, e, c, x)
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
 	}

@@ -51,14 +51,17 @@ func NewSubjectFoo() SubjectFoo {
 			observe(nil, err, true)
 			return
 		}
-		observable := Create(func(observer Observer) {
-			receive := func(value interface{}, err error, closed bool) bool {
-				if !closed {
-					observer.Next(value)
-				} else {
-					observer.Error(err)
+		observable := Create(func(Next Next, Error Error, Complete Complete, Canceled Canceled) {
+			receive := func(next interface{}, err error, closed bool) bool {
+				switch {
+				case !closed:
+					Next(next)
+				case err != nil:
+					Error(err)
+				default:
+					Complete()
 				}
-				return observer.Subscribed()
+				return !Canceled()
 			}
 			ep.Range(receive, 0)
 		})
@@ -103,14 +106,17 @@ func NewReplaySubjectFoo(bufferCapacity int, windowDuration time.Duration) Subje
 			observe(nil, err, true)
 			return
 		}
-		observable := Create(func(observer Observer) {
-			receive := func(value interface{}, err error, closed bool) bool {
-				if !closed {
-					observer.Next(value)
-				} else {
-					observer.Error(err)
+		observable := Create(func(Next Next, Error Error, Complete Complete, Canceled Canceled) {
+			receive := func(next interface{}, err error, closed bool) bool {
+				switch {
+				case !closed:
+					Next(next)
+				case err != nil:
+					Error(err)
+				default:
+					Complete()
 				}
-				return observer.Subscribed()
+				return !Canceled()
 			}
 			ep.Range(receive, windowDuration)
 		})

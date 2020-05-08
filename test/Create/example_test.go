@@ -5,13 +5,15 @@ import (
 
 	_ "github.com/reactivego/rx/generic"
 )
-
 // Shows how to use CreateString to create an observable of strings
 func Example_createString() {
-	source := CreateString(func(observer StringObserver) {
-		observer.Next("Hello")
-		observer.Next("World!")
-		observer.Complete()
+	source := CreateString(func(N NextString, E Error, C Complete, X Canceled) {
+		if X() {
+			return
+		}
+		N("Hello")
+		N("World!")
+		C()
 	})
 
 	err := source.Println()

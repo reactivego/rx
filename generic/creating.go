@@ -2,45 +2,102 @@ package rx
 
 import "time"
 
-//jig:template Make<Foo>Func
+//jig:template Error
 
-// MakeFooFunc is the signature of a function that can be passed to MakeFoo
-// to implement an ObservableFoo.
-type MakeFooFunc func(Next func(foo), Error func(error), Complete func())
+// Error signals an error condition.
+type Error func(error)
 
-//jig:template Make<Foo>
-//jig:needs Observable<Foo>, Make<Foo>Func
+//jig:template Complete
 
-// MakeFoo provides a way of creating an ObservableFoo from scratch by
-// calling observer methods programmatically. A make function conforming to the
-// MakeFooFunc signature will be called by MakeFoo provining a Next, Error and
-// Complete function that can be called by the code that implements the
+// Complete signals that no more data is to be expected.
+type Complete func()
+
+//jig:template Canceled
+
+// Canceled returns true when the observer has unsubscribed.
+type Canceled func() bool
+
+//jig:template Next<Foo>
+
+// NextFoo can be called to emit the next value to the IntObserver.
+type NextFoo func(foo)
+
+//jig:template Create<Foo>
+//jig:needs Error, Complete, Canceled, Next<Foo>, Observable<Foo>
+
+// CreateFoo provides a way of creating an ObservableFoo from
+// scratch by calling observer methods programmatically.
+//
+// The create function provided to CreateFoo will be called once
+// to implement the observable. It is provided with a NextFoo, Error,
+// Complete and Canceled function that can be called by the code that
+// implements the Observable.
+func CreateFoo(create func(NextFoo, Error, Complete, Canceled)) ObservableFoo {
+	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		runner := scheduler.Schedule(func() {
+			if subscriber.Canceled() {
+				return
+			}
+			n := func(next foo) {
+				if subscriber.Subscribed() {
+					observe(next, nil, false)
+				}
+			}
+			e := func(err error) {
+				if subscriber.Subscribed() {
+					observe(zeroFoo, err, true)
+				}
+			}
+			c := func() {
+				if subscriber.Subscribed() {
+					observe(zeroFoo, nil, true)
+				}
+			}
+			x := func() bool {
+				return subscriber.Canceled()
+			}
+			create(n, e, c, x)
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
+}
+
+//jig:template CreateRecursive<Foo>
+//jig:needs Error, Complete, Next<Foo>, Observable<Foo>
+
+// CreateRecursiveFoo provides a way of creating an ObservableFoo from
+// scratch by calling observer methods programmatically.
+//
+// The create function provided to CreateRecursiveFoo will be called
+// repeatedly to implement the observable. It is provided with a NextFoo, Error
+// and Complete function that can be called by the code that implements the
 // Observable.
-func MakeFoo(make MakeFooFunc) ObservableFoo {
+func CreateRecursiveFoo(create func(NextFoo, Error, Complete)) ObservableFoo {
 	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		done := false
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Canceled() {
 				return
 			}
-			next := func(n foo) {
+			n := func(next foo) {
 				if subscriber.Subscribed() {
-					observe(n, nil, false)
+					observe(next, nil, false)
 				}
 			}
-			err := func(e error) {
+			e := func(err error) {
 				done = true
 				if subscriber.Subscribed() {
-					observe(zeroFoo, e, true)
+					observe(zeroFoo, err, true)
 				}
 			}
-			complete := func() {
+			c := func() {
 				done = true
 				if subscriber.Subscribed() {
 					observe(zeroFoo, nil, true)
 				}
 			}
-			make(next, err, complete)
+			create(n, e, c)
 			if !done && subscriber.Subscribed() {
 				self()
 			}
@@ -50,93 +107,49 @@ func MakeFoo(make MakeFooFunc) ObservableFoo {
 	return observable
 }
 
-//jig:template MakeTimed<Foo>Func
+//jig:template CreateFutureRecursive<Foo>
+//jig:needs Error, Complete, Next<Foo>, Observable<Foo>
 
-// MakeTimedFooFunc is the signature of a function that can be passed to
-// MakeTimedFoo to implement an ObservableFoo.
-type MakeTimedFooFunc func(Next func(foo), Error func(error), Complete func()) time.Duration
-
-//jig:template MakeTimed<Foo>
-//jig:needs Observable<Foo>, MakeTimed<Foo>Func
-
-// MakeTimedFoo provides a way of creating an ObservableFoo from scratch by
-// calling observer methods programmatically. A make function conforming to the
-// MakeFooFunc signature will be called by MakeFoo provining a Next, Error and
-// Complete function that can be called by the code that implements the
-// Observable. The timeout passed in determines the time between calling the
-// make function. The time.Duration returned by MakeTimedFooFunc determines when
-// to reschedule the next iteration.
-func MakeTimedFoo(timeout time.Duration, make MakeTimedFooFunc) ObservableFoo {
+// CreateFutureRecursiveFoo provides a way of creating an ObservableFoo from
+// scratch by calling observer methods programmatically.
+//
+// The create function provided to CreateFutureRecursiveFoo will be called
+// repeatedly to implement the observable. It is provided with a NextFoo, Error
+// and Complete function that can be called by the code that implements the
+// Observable.
+//
+// The timeout passed in determines the time before calling the create
+// function. The time.Duration returned by the create function determines how
+// long CreateFutureRecursiveFoo has to wait before calling the create function
+// again.
+func CreateFutureRecursiveFoo(timeout time.Duration, create func(NextFoo, Error, Complete) time.Duration) ObservableFoo {
 	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		done := false
 		runner := scheduler.ScheduleFutureRecursive(timeout, func(self func(time.Duration)) {
 			if subscriber.Canceled() {
 				return
 			}
-			next := func(n foo) {
+			n := func(next foo) {
 				if subscriber.Subscribed() {
-					observe(n, nil, false)
+					observe(next, nil, false)
 				}
 			}
-			error := func(e error) {
+			e := func(err error) {
 				done = true
 				if subscriber.Subscribed() {
-					observe(zeroFoo, e, true)
+					observe(zeroFoo, err, true)
 				}
 			}
-			complete := func() {
+			c := func() {
 				done = true
 				if subscriber.Subscribed() {
 					observe(zeroFoo, nil, true)
 				}
 			}
-			timeout = make(next, error, complete)
+			timeout = create(n, e, c)
 			if !done && subscriber.Subscribed() {
 				self(timeout)
 			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
-}
-
-//jig:template <Foo>Observer
-//jig:needs <Foo>ObserveFuncMethods
-
-// FooObserver is the interface used with CreateFoo when implementing a custom
-// observable.
-type FooObserver interface {
-	// Next emits the next foo value.
-	Next(foo)
-	// Error signals an error condition.
-	Error(error)
-	// Complete signals that no more data is to be expected.
-	Complete()
-	// Subscribed returns true when the subscription is currently valid.
-	Subscribed() bool
-}
-
-//jig:template Create<Foo>
-//jig:needs Observable<Foo>, <Foo>Observer
-
-// CreateFoo creates an Observable from scratch by calling observer methods
-// programmatically.
-func CreateFoo(f func(FooObserver)) ObservableFoo {
-	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		runner := scheduler.Schedule(func() {
-			if !subscriber.Subscribed() {
-				return
-			}
-			observer := func(next foo, err error, done bool) {
-				if subscriber.Subscribed() {
-					observe(next, err, done)
-				}
-			}
-			type ObserverSubscriber struct {
-				FooObserveFunc
-				Subscriber
-			}
-			f(&ObserverSubscriber{observer, subscriber})
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
 	}
@@ -164,23 +177,6 @@ func EmptyFoo() ObservableFoo {
 		runner := scheduler.Schedule(func() {
 			if subscriber.Subscribed() {
 				observe(zeroFoo, nil, true)
-			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
-}
-
-//jig:template Error<Foo>
-//jig:needs Observable<Foo>
-
-// ErrorFoo creates an Observable that emits no items and terminates with an
-// error.
-func ErrorFoo(err error) ObservableFoo {
-	observable := func(observe FooObserveFunc, scheduler Scheduler, subscriber Subscriber) {
-		runner := scheduler.Schedule(func() {
-			if subscriber.Subscribed() {
-				observe(zeroFoo, err, true)
 			}
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
