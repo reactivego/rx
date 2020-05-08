@@ -4,38 +4,14 @@
 
 [![](https://godoc.org/github.com/reactivego/rx?status.png)](http://godoc.org/github.com/reactivego/rx)
 
-Package `rx` provides reactive programming for Go. `rx` is short for [Reactive Extensions](http://reactivex.io/), an API for asynchronous programming with observables.
-
-## Reactive Extensions
-
-The main focus of Reactive Extensions are [Observables](http://reactivex.io/documentation/observable.html):
-
-- They are streams of events.
-- They assume zero to many values over time.
-- They push values.
-- They can take any amount of time to complete (or may never).
-- They are cancellable.
-- They are lazy; they don't do anything until you subscribe.
-
-The `rx` package found here uses the type `interface{}` for values of the observable. The `interface{}` type allows different types of values to be mixed and emitted by an observable. To create an observable of three values with different types you might write the following:
-
-```go
-package main
-
-import "github.com/reactivego/rx"
-
-func main() {
-	rx.From(1,"hi",2.3).Println()
-}
-```
-
-The call above creates an observable from numbers and strings and then prints them.
+Package `rx` provides [Reactive Extensions](http://reactivex.io/), an API for asynchronous programming with Observables.
 
 ## Table of Contents
 
 <!-- MarkdownTOC -->
 
-- [Why you should use rx](#why-you-should-use-rx)
+- [Regenerating this Package](#regenerating-this-package)
+- [Observables](#observables)
 - [Operators](#operators)
 	- [Creating Operators](#creating-operators)
 	- [Transforming Operators](#transforming-operators)
@@ -56,26 +32,89 @@ The call above creates an observable from numbers and strings and then prints th
 
 <!-- /MarkdownTOC -->
 
-## Why you should use rx
-Observables in `rx` are somewhat similar to Go channels but have much richer semantics. Observables can be hot or cold, can complete normally or with an error, use subscriptions that can be cancelled from the subscriber side. Where a normal variable is just a place where you read and write values from, an observable captures how the value of this variable changes over time. Concurrency follows naturally from the fact that an observable is an ever changing stream of values.
+## Regenerating this Package
 
-`rx` is a library of operators that work on one or more observables. The way in which observables can be combined using operators to form new observables is the real strength of Reactive Extensions. Operators specify how observables representing streams of values are e.g. merged, transformed, concatenated, split, multicasted, replayed, delayed and debounced.
+This package is generated from the sub-folder generic by the [jig](../generics) tool.
+You don't need to regenerate the package in order to use it. However, if you are
+interested in regenerating it, then read on.
 
-This implemenation takes cues from boh [RxJS 6](https://github.com/ReactiveX/rxjs) and [RxJava 2](https://github.com/ReactiveX/RxJava) that have been pushing the envelope in evolving operator semantics.
+The jig tool provides the parametric polymorphism capability that Go 1 is missing.
+It works by replacing place-holder types of generic functions and datatypes
+with interface{} (it can also generate statically typed code though).
+
+To regenerate, change the current working directory to the package directory
+and run the jig tool as follows:
+
+```bash
+$ go get -d github.com/reactivego/generics/cmd/jig
+$ go run github.com/reactivego/generics/cmd/jig -v
+```
+
+## Observables
+
+The main focus of `rx` is on [Observables](http://reactivex.io/documentation/observable.html).
+
+An Observable:
+
+- is a stream of events.
+- assumes zero to many values over time.
+- pushes values
+- can take any amount of time to complete (or may never)
+- is cancellable
+- is lazy (it doesn't do anything until you subscribe).
+
+This package uses `interface{}` for entry types, so an observable can emit a
+mix of differently typed entries. To create an observable that emits three
+values of different types you could write the following little program.
+
+```go
+package main
+
+import "github.com/reactivego/rx"
+
+func main() {
+	rx.From(1,"hi",2.3).Println()
+}
+```
+
+The code above creates an observable from numbers and strings and then prints them.
+
+Observables in `rx` are somewhat similar to Go channels but have much richer
+semantics:
+
+Observables can be hot or cold. A hot observable will try to emit values even
+when nobody is subscribed. As long as there are no subscribers the values of
+a hot observable are lost. The position of a mouse pointer or the current time
+are examples of hot observables. 
+
+A cold observable will only start emitting values when somebody subscribes.
+The contents of a file or a database are examples of cold observables.
+
+An observable can complete normally or with an error, it uses subscriptions
+that can be canceled from the subscriber side. Where a normal variable is
+just a place where you read and write values from, an observable captures how
+the value of this variable changes over time.
+
+Concurrency follows naturally from the fact that an observable is an ever
+changing stream of values.
 
 ## Operators 
 
-Folowing is a list of [operators](http://reactivex.io/documentation/operators.html) that have been implemented.
+The combination of Observables and a set of expressive Operators is the real strength of Reactive Extensions. 
+Operators work on one or more Observables. They are the language you use to describe the way in which observables should be combined to form new Observables. Operators specify how Observables representing streams of values are e.g. merged, transformed, concatenated, split, multicasted, replayed, delayed and debounced.
 
-Note, the operators that are used most commonly have been marked with a :star:.
+This implementation takes most of its cues from [RxJS 6](https://github.com/ReactiveX/rxjs) and [RxJava 2](https://github.com/ReactiveX/RxJava). Both libaries have been pushing the envelope in evolving operator semantics.
+
+Below is the list of implemented [operators](http://reactivex.io/documentation/operators.html). Operators with a :star: are the most commonly used ones.
 
 ### Creating Operators
 Operators that originate new Observables.
 
 - [**Create**](https://godoc.org/github.com/reactivego/rx/test/Create/)() :star: Observable
+- [**CreateRecursive**](https://godoc.org/github.com/reactivego/rx/test/CreateRecursive/)() Observable
+- [**CreateFutureRecursive**](https://godoc.org/github.com/reactivego/rx/test/CreateFutureRecursive/)() Observable
 - [**Defer**](https://godoc.org/github.com/reactivego/rx/test/Defer/)() Observable
 - [**Empty**](https://godoc.org/github.com/reactivego/rx/test/Empty/)() Observable
-- [**Error**](https://godoc.org/github.com/reactivego/rx/test/Error/)() Observable
 - [**FromChan**](https://godoc.org/github.com/reactivego/rx/test/From/)() Observable
 - FromEventSource(ch chan interface{}, opts ...options.Option) Observable
 - FromIterable(it Iterable) Observable
