@@ -17,11 +17,11 @@ type point struct{ x, y float64 }
 
 func Example_only() {
 	// Create an Observable of interface{} and stuff it with values of different types.
-	source := Create(func(observer Observer) {
-		observer.Next("Hello")                      // string
-		observer.Next(Size{1024, 768})              // Size
-		observer.Next([]point{{50, 100}, {75, 25}}) // []point
-		observer.Complete()
+	source := Create(func(N Next, E Error, C Complete, X Canceled) {
+		N("Hello")                      // string
+		N(Size{1024, 768})              // Size
+		N([]point{{50, 100}, {75, 25}}) // []point
+		C()
 	})
 
 	subscription := source.OnlyString().Subscribe(func(next string, err error, done bool) {

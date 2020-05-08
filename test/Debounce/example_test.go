@@ -17,14 +17,14 @@ func Example_debounce() {
 		110 * time.Millisecond,
 		0,
 	}
-	source := MakeTimedInt(due[0],
-		func(Next func(int), Error func(error), Complete func()) time.Duration {
+	source := CreateFutureRecursiveInt(due[0],
+		func(N NextInt, E Error, C Complete) time.Duration {
 			if i < len(due) {
-				Next(i)
+				N(i)
 				i++
 				return due[i-1]
 			} else {
-				Complete()
+				C()
 				return 0
 			}
 		})

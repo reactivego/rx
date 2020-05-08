@@ -13,6 +13,26 @@ import (
 	"github.com/reactivego/subscriber"
 )
 
+//jig:name Error
+
+// Error signals an error condition.
+type Error func(error)
+
+//jig:name Complete
+
+// Complete signals that no more data is to be expected.
+type Complete func()
+
+//jig:name Canceled
+
+// Canceled returns true when the observer has unsubscribed.
+type Canceled func() bool
+
+//jig:name NextObservableString
+
+// NextObservableString can be called to emit the next value to the IntObserver.
+type NextObservableString func(ObservableString)
+
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
@@ -48,60 +68,40 @@ var zeroObservableString ObservableString
 // function, scheduler and an subscriber.
 type ObservableObservableString func(ObservableStringObserveFunc, Scheduler, Subscriber)
 
-//jig:name ObservableStringObserveFuncMethods
-
-// Next is called by an ObservableObservableString to emit the next ObservableString value to the
-// observer.
-func (f ObservableStringObserveFunc) Next(next ObservableString) {
-	f(next, nil, false)
-}
-
-// Error is called by an ObservableObservableString to report an error to the observer.
-func (f ObservableStringObserveFunc) Error(err error) {
-	f(zeroObservableString, err, true)
-}
-
-// Complete is called by an ObservableObservableString to signal that no more data is
-// forthcoming to the observer.
-func (f ObservableStringObserveFunc) Complete() {
-	f(zeroObservableString, nil, true)
-}
-
-//jig:name ObservableStringObserver
-
-// ObservableStringObserver is the interface used with CreateObservableString when implementing a custom
-// observable.
-type ObservableStringObserver interface {
-	// Next emits the next ObservableString value.
-	Next(ObservableString)
-	// Error signals an error condition.
-	Error(error)
-	// Complete signals that no more data is to be expected.
-	Complete()
-	// Subscribed returns true when the subscription is currently valid.
-	Subscribed() bool
-}
-
 //jig:name CreateObservableString
 
-// CreateObservableString creates an Observable from scratch by calling observer methods
-// programmatically.
-func CreateObservableString(f func(ObservableStringObserver)) ObservableObservableString {
+// CreateObservableString provides a way of creating an ObservableObservableString from
+// scratch by calling observer methods programmatically.
+//
+// The create function provided to CreateObservableString will be called once
+// to implement the observable. It is provided with a NextObservableString, Error,
+// Complete and Canceled function that can be called by the code that
+// implements the Observable.
+func CreateObservableString(create func(NextObservableString, Error, Complete, Canceled)) ObservableObservableString {
 	observable := func(observe ObservableStringObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
-			if !subscriber.Subscribed() {
+			if subscriber.Canceled() {
 				return
 			}
-			observer := func(next ObservableString, err error, done bool) {
+			n := func(next ObservableString) {
 				if subscriber.Subscribed() {
-					observe(next, err, done)
+					observe(next, nil, false)
 				}
 			}
-			type ObserverSubscriber struct {
-				ObservableStringObserveFunc
-				Subscriber
+			e := func(err error) {
+				if subscriber.Subscribed() {
+					observe(zeroObservableString, err, true)
+				}
 			}
-			f(&ObserverSubscriber{observer, subscriber})
+			c := func() {
+				if subscriber.Subscribed() {
+					observe(zeroObservableString, nil, true)
+				}
+			}
+			x := func() bool {
+				return subscriber.Canceled()
+			}
+			create(n, e, c, x)
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
 	}

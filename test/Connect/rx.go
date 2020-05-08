@@ -240,14 +240,17 @@ func NewSubjectInt() SubjectInt {
 			observe(nil, err, true)
 			return
 		}
-		observable := Create(func(observer Observer) {
-			receive := func(value interface{}, err error, closed bool) bool {
-				if !closed {
-					observer.Next(value)
-				} else {
-					observer.Error(err)
+		observable := Create(func(Next Next, Error Error, Complete Complete, Canceled Canceled) {
+			receive := func(next interface{}, err error, closed bool) bool {
+				switch {
+				case !closed:
+					Next(next)
+				case err != nil:
+					Error(err)
+				default:
+					Complete()
 				}
-				return observer.Subscribed()
+				return !Canceled()
 			}
 			ep.Range(receive, 0)
 		})
@@ -324,60 +327,60 @@ var zero interface{}
 // function, scheduler and an subscriber.
 type Observable func(ObserveFunc, Scheduler, Subscriber)
 
-//jig:name ObserveFuncMethods
+//jig:name Error
 
-// Next is called by an Observable to emit the next interface{} value to the
-// observer.
-func (f ObserveFunc) Next(next interface{}) {
-	f(next, nil, false)
-}
+// Error signals an error condition.
+type Error func(error)
 
-// Error is called by an Observable to report an error to the observer.
-func (f ObserveFunc) Error(err error) {
-	f(zero, err, true)
-}
+//jig:name Complete
 
-// Complete is called by an Observable to signal that no more data is
-// forthcoming to the observer.
-func (f ObserveFunc) Complete() {
-	f(zero, nil, true)
-}
+// Complete signals that no more data is to be expected.
+type Complete func()
 
-//jig:name Observer
+//jig:name Canceled
 
-// Observer is the interface used with Create when implementing a custom
-// observable.
-type Observer interface {
-	// Next emits the next interface{} value.
-	Next(interface{})
-	// Error signals an error condition.
-	Error(error)
-	// Complete signals that no more data is to be expected.
-	Complete()
-	// Subscribed returns true when the subscription is currently valid.
-	Subscribed() bool
-}
+// Canceled returns true when the observer has unsubscribed.
+type Canceled func() bool
+
+//jig:name Next
+
+// Next can be called to emit the next value to the IntObserver.
+type Next func(interface{})
 
 //jig:name Create
 
-// Create creates an Observable from scratch by calling observer methods
-// programmatically.
-func Create(f func(Observer)) Observable {
+// Create provides a way of creating an Observable from
+// scratch by calling observer methods programmatically.
+//
+// The create function provided to Create will be called once
+// to implement the observable. It is provided with a Next, Error,
+// Complete and Canceled function that can be called by the code that
+// implements the Observable.
+func Create(create func(Next, Error, Complete, Canceled)) Observable {
 	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
-			if !subscriber.Subscribed() {
+			if subscriber.Canceled() {
 				return
 			}
-			observer := func(next interface{}, err error, done bool) {
+			n := func(next interface{}) {
 				if subscriber.Subscribed() {
-					observe(next, err, done)
+					observe(next, nil, false)
 				}
 			}
-			type ObserverSubscriber struct {
-				ObserveFunc
-				Subscriber
+			e := func(err error) {
+				if subscriber.Subscribed() {
+					observe(zero, err, true)
+				}
 			}
-			f(&ObserverSubscriber{observer, subscriber})
+			c := func() {
+				if subscriber.Subscribed() {
+					observe(zero, nil, true)
+				}
+			}
+			x := func() bool {
+				return subscriber.Canceled()
+			}
+			create(n, e, c, x)
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
 	}

@@ -77,39 +77,6 @@ func (o ObservableInt) Skip(n int) ObservableInt {
 	return o.AsObservable().Skip(n).AsObservableInt()
 }
 
-//jig:name ObserveFunc
-
-// ObserveFunc is the observer, a function that gets called whenever the
-// observable has something to report. The next argument is the item value that
-// is only valid when the done argument is false. When done is true and the err
-// argument is not nil, then the observable has terminated with an error.
-// When done is true and the err argument is nil, then the observable has
-// completed normally.
-type ObserveFunc func(next interface{}, err error, done bool)
-
-//jig:name zero
-
-var zero interface{}
-
-//jig:name Observable
-
-// Observable is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type Observable func(ObserveFunc, Scheduler, Subscriber)
-
-//jig:name ObservableIntAsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name Schedulers
 
 func TrampolineScheduler() Scheduler {
@@ -141,6 +108,39 @@ func (o ObservableInt) Println() (err error) {
 	o(observer, scheduler, subscriber)
 	subscriber.Wait()
 	return
+}
+
+//jig:name ObserveFunc
+
+// ObserveFunc is the observer, a function that gets called whenever the
+// observable has something to report. The next argument is the item value that
+// is only valid when the done argument is false. When done is true and the err
+// argument is not nil, then the observable has terminated with an error.
+// When done is true and the err argument is nil, then the observable has
+// completed normally.
+type ObserveFunc func(next interface{}, err error, done bool)
+
+//jig:name zero
+
+var zero interface{}
+
+//jig:name Observable
+
+// Observable is essentially a subscribe function taking an observe
+// function, scheduler and an subscriber.
+type Observable func(ObserveFunc, Scheduler, Subscriber)
+
+//jig:name ObservableIntAsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
 }
 
 //jig:name ObservableSkip

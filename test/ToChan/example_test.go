@@ -78,11 +78,11 @@ func Example_intChannel() {
 // ToChan will take the error and output it as the last item emitted by the
 // channel.
 func Example_inlineError() {
-	source := Create(func(observer Observer) {
+	source := Create(func(Next Next, Error Error, C Complete, X Canceled) {
 		for i := 1; i < 9; i++ {
-			observer.Next(i)
+			Next(i)
 		}
-		observer.Error(RxError("sad"))
+		Error(RxError("sad"))
 	})
 
 	for value := range source.ToChan() {

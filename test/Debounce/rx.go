@@ -12,6 +12,21 @@ import (
 	"github.com/reactivego/subscriber"
 )
 
+//jig:name Error
+
+// Error signals an error condition.
+type Error func(error)
+
+//jig:name Complete
+
+// Complete signals that no more data is to be expected.
+type Complete func()
+
+//jig:name NextInt
+
+// NextInt can be called to emit the next value to the IntObserver.
+type NextInt func(int)
+
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
@@ -47,46 +62,45 @@ var zeroInt int
 // function, scheduler and an subscriber.
 type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 
-//jig:name MakeTimedIntFunc
+//jig:name CreateFutureRecursiveInt
 
-// MakeTimedIntFunc is the signature of a function that can be passed to
-// MakeTimedInt to implement an ObservableInt.
-type MakeTimedIntFunc func(Next func(int), Error func(error), Complete func()) time.Duration
-
-//jig:name MakeTimedInt
-
-// MakeTimedInt provides a way of creating an ObservableInt from scratch by
-// calling observer methods programmatically. A make function conforming to the
-// MakeIntFunc signature will be called by MakeInt provining a Next, Error and
-// Complete function that can be called by the code that implements the
-// Observable. The timeout passed in determines the time between calling the
-// make function. The time.Duration returned by MakeTimedIntFunc determines when
-// to reschedule the next iteration.
-func MakeTimedInt(timeout time.Duration, make MakeTimedIntFunc) ObservableInt {
+// CreateFutureRecursiveInt provides a way of creating an ObservableInt from
+// scratch by calling observer methods programmatically.
+//
+// The create function provided to CreateFutureRecursiveInt will be called
+// repeatedly to implement the observable. It is provided with a NextInt, Error
+// and Complete function that can be called by the code that implements the
+// Observable.
+//
+// The timeout passed in determines the time before calling the create
+// function. The time.Duration returned by the create function determines how
+// long CreateFutureRecursiveInt has to wait before calling the create function
+// again.
+func CreateFutureRecursiveInt(timeout time.Duration, create func(NextInt, Error, Complete) time.Duration) ObservableInt {
 	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		done := false
 		runner := scheduler.ScheduleFutureRecursive(timeout, func(self func(time.Duration)) {
 			if subscriber.Canceled() {
 				return
 			}
-			next := func(n int) {
+			n := func(next int) {
 				if subscriber.Subscribed() {
-					observe(n, nil, false)
+					observe(next, nil, false)
 				}
 			}
-			error := func(e error) {
+			e := func(err error) {
 				done = true
 				if subscriber.Subscribed() {
-					observe(zeroInt, e, true)
+					observe(zeroInt, err, true)
 				}
 			}
-			complete := func() {
+			c := func() {
 				done = true
 				if subscriber.Subscribed() {
 					observe(zeroInt, nil, true)
 				}
 			}
-			timeout = make(next, error, complete)
+			timeout = create(n, e, c)
 			if !done && subscriber.Subscribed() {
 				self(timeout)
 			}

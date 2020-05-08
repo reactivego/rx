@@ -17,10 +17,10 @@ func Example_serialize() {
 	concurrently := GoroutineScheduler()
 
 	// Create badly behaved observable.
-	badboy := CreateInt(func(observer IntObserver) {
+	badboy := CreateInt(func(N NextInt, E Error, C Complete, X Canceled) {
 		hammer := func(value int) {
-			for observer.Subscribed() {
-				observer.Next(value)
+			for !X() {
+				N(value)
 			}
 		}
 		go hammer(1)

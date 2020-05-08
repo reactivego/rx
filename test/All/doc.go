@@ -14,5 +14,3 @@ Observable evaluates as false according to the predicate.
 */
 package All
 
-// Don't generate documentation into rx.go
-//off jig:no-doc

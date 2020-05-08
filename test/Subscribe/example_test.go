@@ -10,12 +10,12 @@ import (
 // method.
 func Example_basic() {
 	// Create an observable of int values
-	observable := CreateInt(func(observer IntObserver) {
-		observer.Next(456)
-		observer.Complete()
+	observable := CreateInt(func(N NextInt, E Error, C Complete, X Canceled) {
+		N(456)
+		C()
 		// Error will not be delivered by Subscribe, because when Subscribe got
 		// the Complete it immediately canceled the subscription.
-		observer.Error(RxError("error"))
+		E(RxError("error"))
 	})
 
 	// Observe function. Note that done is true for both an error as well as
@@ -53,12 +53,12 @@ func Example_basic() {
 // So don't do this in production code, use the Subscribe method.
 func Example_direct() {
 	// Create an observable of int values
-	observable := CreateInt(func(observer IntObserver) {
-		observer.Next(456)
-		observer.Complete()
+	observable := CreateInt(func(N NextInt, E Error, C Complete, X Canceled) {
+		N(456)
+		C()
 		// Error will be delivered because we are not using the Subscribe method
 		// to subscribe to the observable.
-		observer.Error(RxError("error"))
+		E(RxError("error"))
 	})
 
 	// Observe function. Note that done is true for both an error as well as

@@ -69,60 +69,60 @@ func Range(start, count int) ObservableInt {
 	return observable
 }
 
-//jig:name IntObserveFuncMethods
+//jig:name Error
 
-// Next is called by an ObservableInt to emit the next int value to the
-// observer.
-func (f IntObserveFunc) Next(next int) {
-	f(next, nil, false)
-}
+// Error signals an error condition.
+type Error func(error)
 
-// Error is called by an ObservableInt to report an error to the observer.
-func (f IntObserveFunc) Error(err error) {
-	f(zeroInt, err, true)
-}
+//jig:name Complete
 
-// Complete is called by an ObservableInt to signal that no more data is
-// forthcoming to the observer.
-func (f IntObserveFunc) Complete() {
-	f(zeroInt, nil, true)
-}
+// Complete signals that no more data is to be expected.
+type Complete func()
 
-//jig:name IntObserver
+//jig:name Canceled
 
-// IntObserver is the interface used with CreateInt when implementing a custom
-// observable.
-type IntObserver interface {
-	// Next emits the next int value.
-	Next(int)
-	// Error signals an error condition.
-	Error(error)
-	// Complete signals that no more data is to be expected.
-	Complete()
-	// Subscribed returns true when the subscription is currently valid.
-	Subscribed() bool
-}
+// Canceled returns true when the observer has unsubscribed.
+type Canceled func() bool
+
+//jig:name NextInt
+
+// NextInt can be called to emit the next value to the IntObserver.
+type NextInt func(int)
 
 //jig:name CreateInt
 
-// CreateInt creates an Observable from scratch by calling observer methods
-// programmatically.
-func CreateInt(f func(IntObserver)) ObservableInt {
+// CreateInt provides a way of creating an ObservableInt from
+// scratch by calling observer methods programmatically.
+//
+// The create function provided to CreateInt will be called once
+// to implement the observable. It is provided with a NextInt, Error,
+// Complete and Canceled function that can be called by the code that
+// implements the Observable.
+func CreateInt(create func(NextInt, Error, Complete, Canceled)) ObservableInt {
 	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
-			if !subscriber.Subscribed() {
+			if subscriber.Canceled() {
 				return
 			}
-			observer := func(next int, err error, done bool) {
+			n := func(next int) {
 				if subscriber.Subscribed() {
-					observe(next, err, done)
+					observe(next, nil, false)
 				}
 			}
-			type ObserverSubscriber struct {
-				IntObserveFunc
-				Subscriber
+			e := func(err error) {
+				if subscriber.Subscribed() {
+					observe(zeroInt, err, true)
+				}
 			}
-			f(&ObserverSubscriber{observer, subscriber})
+			c := func() {
+				if subscriber.Subscribed() {
+					observe(zeroInt, nil, true)
+				}
+			}
+			x := func() bool {
+				return subscriber.Canceled()
+			}
+			create(n, e, c, x)
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
 	}

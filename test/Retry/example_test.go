@@ -8,15 +8,15 @@ import (
 
 func Example_retry() {
 	errored := false
-	a := CreateInt(func(observer IntObserver) {
-		observer.Next(1)
-		observer.Next(2)
-		observer.Next(3)
+	a := CreateInt(func(N NextInt, E Error, C Complete, X Canceled) {
+		N(1)
+		N(2)
+		N(3)
 		if errored {
-			observer.Complete()
+			C()
 		} else {
 			// Error triggers subscribe and subscribe is scheduled on trampoline....
-			observer.Error(RxError("error"))
+			E(RxError("error"))
 			errored = true
 		}
 	}).SubscribeOn(TrampolineScheduler())
@@ -36,14 +36,14 @@ func Example_retry() {
 
 func Example_retryConcurrent() {
 	errored := false
-	a := CreateInt(func(observer IntObserver) {
-		observer.Next(1)
-		observer.Next(2)
-		observer.Next(3)
+	a := CreateInt(func(N NextInt, E Error, C Complete, X Canceled) {
+		N(1)
+		N(2)
+		N(3)
 		if errored {
-			observer.Complete()
+			C()
 		} else {
-			observer.Error(RxError("error"))
+			E(RxError("error"))
 			errored = true
 		}
 	}).SubscribeOn(GoroutineScheduler())

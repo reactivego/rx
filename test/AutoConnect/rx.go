@@ -48,60 +48,114 @@ var zeroInt int
 // function, scheduler and an subscriber.
 type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
 
-//jig:name IntObserveFuncMethods
+//jig:name DeferInt
 
-// Next is called by an ObservableInt to emit the next int value to the
-// observer.
-func (f IntObserveFunc) Next(next int) {
-	f(next, nil, false)
+// DeferInt does not create the ObservableInt until the observer subscribes,
+// and creates a fresh ObservableInt for each observer.
+func DeferInt(factory func() ObservableInt) ObservableInt {
+	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		factory()(observe, scheduler, subscriber)
+	}
+	return observable
 }
 
-// Error is called by an ObservableInt to report an error to the observer.
-func (f IntObserveFunc) Error(err error) {
-	f(zeroInt, err, true)
+//jig:name Error
+
+// Error signals an error condition.
+type Error func(error)
+
+//jig:name Complete
+
+// Complete signals that no more data is to be expected.
+type Complete func()
+
+//jig:name NextInt
+
+// NextInt can be called to emit the next value to the IntObserver.
+type NextInt func(int)
+
+//jig:name CreateRecursiveInt
+
+// CreateRecursiveInt provides a way of creating an ObservableInt from
+// scratch by calling observer methods programmatically.
+//
+// The create function provided to CreateRecursiveInt will be called
+// repeatedly to implement the observable. It is provided with a NextInt, Error
+// and Complete function that can be called by the code that implements the
+// Observable.
+func CreateRecursiveInt(create func(NextInt, Error, Complete)) ObservableInt {
+	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+		done := false
+		runner := scheduler.ScheduleRecursive(func(self func()) {
+			if subscriber.Canceled() {
+				return
+			}
+			n := func(next int) {
+				if subscriber.Subscribed() {
+					observe(next, nil, false)
+				}
+			}
+			e := func(err error) {
+				done = true
+				if subscriber.Subscribed() {
+					observe(zeroInt, err, true)
+				}
+			}
+			c := func() {
+				done = true
+				if subscriber.Subscribed() {
+					observe(zeroInt, nil, true)
+				}
+			}
+			create(n, e, c)
+			if !done && subscriber.Subscribed() {
+				self()
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
 }
 
-// Complete is called by an ObservableInt to signal that no more data is
-// forthcoming to the observer.
-func (f IntObserveFunc) Complete() {
-	f(zeroInt, nil, true)
-}
+//jig:name Canceled
 
-//jig:name IntObserver
-
-// IntObserver is the interface used with CreateInt when implementing a custom
-// observable.
-type IntObserver interface {
-	// Next emits the next int value.
-	Next(int)
-	// Error signals an error condition.
-	Error(error)
-	// Complete signals that no more data is to be expected.
-	Complete()
-	// Subscribed returns true when the subscription is currently valid.
-	Subscribed() bool
-}
+// Canceled returns true when the observer has unsubscribed.
+type Canceled func() bool
 
 //jig:name CreateInt
 
-// CreateInt creates an Observable from scratch by calling observer methods
-// programmatically.
-func CreateInt(f func(IntObserver)) ObservableInt {
+// CreateInt provides a way of creating an ObservableInt from
+// scratch by calling observer methods programmatically.
+//
+// The create function provided to CreateInt will be called once
+// to implement the observable. It is provided with a NextInt, Error,
+// Complete and Canceled function that can be called by the code that
+// implements the Observable.
+func CreateInt(create func(NextInt, Error, Complete, Canceled)) ObservableInt {
 	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
-			if !subscriber.Subscribed() {
+			if subscriber.Canceled() {
 				return
 			}
-			observer := func(next int, err error, done bool) {
+			n := func(next int) {
 				if subscriber.Subscribed() {
-					observe(next, err, done)
+					observe(next, nil, false)
 				}
 			}
-			type ObserverSubscriber struct {
-				IntObserveFunc
-				Subscriber
+			e := func(err error) {
+				if subscriber.Subscribed() {
+					observe(zeroInt, err, true)
+				}
 			}
-			f(&ObserverSubscriber{observer, subscriber})
+			c := func() {
+				if subscriber.Subscribed() {
+					observe(zeroInt, nil, true)
+				}
+			}
+			x := func() bool {
+				return subscriber.Canceled()
+			}
+			create(n, e, c, x)
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
 	}
@@ -215,6 +269,25 @@ func (o ObservableInt) Multicast(factory func() SubjectInt) ConnectableInt {
 	return ConnectableInt{ObservableInt: observable, connect: connect}
 }
 
+//jig:name IntObserveFuncMethods
+
+// Next is called by an ObservableInt to emit the next int value to the
+// observer.
+func (f IntObserveFunc) Next(next int) {
+	f(next, nil, false)
+}
+
+// Error is called by an ObservableInt to report an error to the observer.
+func (f IntObserveFunc) Error(err error) {
+	f(zeroInt, err, true)
+}
+
+// Complete is called by an ObservableInt to signal that no more data is
+// forthcoming to the observer.
+func (f IntObserveFunc) Complete() {
+	f(zeroInt, nil, true)
+}
+
 //jig:name SubjectInt
 
 // SubjectInt is a combination of an observer and observable. Subjects are
@@ -262,14 +335,17 @@ func NewReplaySubjectInt(bufferCapacity int, windowDuration time.Duration) Subje
 			observe(nil, err, true)
 			return
 		}
-		observable := Create(func(observer Observer) {
-			receive := func(value interface{}, err error, closed bool) bool {
-				if !closed {
-					observer.Next(value)
-				} else {
-					observer.Error(err)
+		observable := Create(func(Next Next, Error Error, Complete Complete, Canceled Canceled) {
+			receive := func(next interface{}, err error, closed bool) bool {
+				switch {
+				case !closed:
+					Next(next)
+				case err != nil:
+					Error(err)
+				default:
+					Complete()
 				}
-				return observer.Subscribed()
+				return !Canceled()
 			}
 			ep.Range(receive, windowDuration)
 		})
@@ -306,6 +382,27 @@ func (o ObservableInt) PublishReplay(bufferCapacity int, windowDuration time.Dur
 	return o.Multicast(factory)
 }
 
+//jig:name ConnectableIntAutoConnect
+
+// AutoConnect makes a ConnectableInt behave like an ordinary ObservableInt that
+// automatically connects when the specified number of clients subscribe to it.
+// If count is 0, then AutoConnect will immediately call connect on the
+// ConnectableInt before returning the ObservableInt part of the ConnectableInt.
+func (o ConnectableInt) AutoConnect(count int) ObservableInt {
+	if count == 0 {
+		o.connect()
+		return o.ObservableInt
+	}
+	var refcount int32
+	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+		if atomic.AddInt32(&refcount, 1) == int32(count) {
+			o.connect()
+		}
+		o.ObservableInt(observe, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name ObservableIntSubscribeOn
 
 // SubscribeOn specifies the scheduler an ObservableInt should use when it is
@@ -338,83 +435,47 @@ var zero interface{}
 // function, scheduler and an subscriber.
 type Observable func(ObserveFunc, Scheduler, Subscriber)
 
-//jig:name ObserveFuncMethods
+//jig:name Next
 
-// Next is called by an Observable to emit the next interface{} value to the
-// observer.
-func (f ObserveFunc) Next(next interface{}) {
-	f(next, nil, false)
-}
-
-// Error is called by an Observable to report an error to the observer.
-func (f ObserveFunc) Error(err error) {
-	f(zero, err, true)
-}
-
-// Complete is called by an Observable to signal that no more data is
-// forthcoming to the observer.
-func (f ObserveFunc) Complete() {
-	f(zero, nil, true)
-}
-
-//jig:name Observer
-
-// Observer is the interface used with Create when implementing a custom
-// observable.
-type Observer interface {
-	// Next emits the next interface{} value.
-	Next(interface{})
-	// Error signals an error condition.
-	Error(error)
-	// Complete signals that no more data is to be expected.
-	Complete()
-	// Subscribed returns true when the subscription is currently valid.
-	Subscribed() bool
-}
+// Next can be called to emit the next value to the IntObserver.
+type Next func(interface{})
 
 //jig:name Create
 
-// Create creates an Observable from scratch by calling observer methods
-// programmatically.
-func Create(f func(Observer)) Observable {
+// Create provides a way of creating an Observable from
+// scratch by calling observer methods programmatically.
+//
+// The create function provided to Create will be called once
+// to implement the observable. It is provided with a Next, Error,
+// Complete and Canceled function that can be called by the code that
+// implements the Observable.
+func Create(create func(Next, Error, Complete, Canceled)) Observable {
 	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
-			if !subscriber.Subscribed() {
+			if subscriber.Canceled() {
 				return
 			}
-			observer := func(next interface{}, err error, done bool) {
+			n := func(next interface{}) {
 				if subscriber.Subscribed() {
-					observe(next, err, done)
+					observe(next, nil, false)
 				}
 			}
-			type ObserverSubscriber struct {
-				ObserveFunc
-				Subscriber
+			e := func(err error) {
+				if subscriber.Subscribed() {
+					observe(zero, err, true)
+				}
 			}
-			f(&ObserverSubscriber{observer, subscriber})
+			c := func() {
+				if subscriber.Subscribed() {
+					observe(zero, nil, true)
+				}
+			}
+			x := func() bool {
+				return subscriber.Canceled()
+			}
+			create(n, e, c, x)
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
-}
-
-//jig:name ConnectableIntAutoConnect
-
-// AutoConnect makes a ConnectableInt behave like an ordinary ObservableInt that
-// automatically connects when the specified number of clients subscribe to it.
-// If count is 0, then AutoConnect will immediately call connect on the
-// ConnectableInt before returning the ObservableInt part of the ConnectableInt.
-func (o ConnectableInt) AutoConnect(count int) ObservableInt {
-	if count == 0 {
-		o.connect()
-		return o.ObservableInt
-	}
-	var refcount int32
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		if atomic.AddInt32(&refcount, 1) == int32(count) {
-			o.connect()
-		}
-		o.ObservableInt(observe, subscribeOn, subscriber)
 	}
 	return observable
 }

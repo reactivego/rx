@@ -8,12 +8,12 @@ import (
 
 func Example_basic() {
 	// Create an observable of int values
-	observable := CreateInt(func(observer IntObserver) {
-		observer.Next(456)
-		observer.Complete()
+	observable := CreateInt(func(N NextInt, E Error, C Complete, X Canceled) {
+		N(456)
+		C()
 		// Error will not be delivered by Subscribe, because when Subscribe got
 		// the Complete it immediately canceled the subscription.
-		observer.Error(RxError("error"))
+		E(RxError("error"))
 	})
 
 	// Subscribe (by default) only returns when observable has completed.

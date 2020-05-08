@@ -17,7 +17,7 @@ func Example_timeout() {
 	start := scheduler.Now()
 
 	active := true
-	source := MakeTimedInt(_0ms, func(Next func(int), Error func(error), Complete func()) time.Duration {
+	source := CreateFutureRecursiveInt(_0ms, func(Next NextInt, E Error, Complete Complete) time.Duration {
 		if active {
 			fmt.Println("Next(1) ->")
 			Next(1)

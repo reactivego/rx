@@ -8,12 +8,17 @@ import "fmt"
 // replayed without doing a subscribe to range1to9.
 func Example_autoConnect() {
 
-	range1to9 := CreateInt(func(observer IntObserver) {
+	range1to9 := DeferInt(func () ObservableInt {
 		fmt.Println("subscribed")
-		for i := 1; i < 10; i++ {
-			observer.Next(i)
-		}
-		observer.Complete()
+		i := 1
+		return CreateRecursiveInt(func(next NextInt, error Error, complete Complete) {
+			if i < 10 {
+				next(i)
+				i++
+			} else {
+				complete()
+			}
+		})
 	})
 
 	source := range1to9.PublishReplay(10, 0).AutoConnect(1)
@@ -50,12 +55,15 @@ func Example_autoConnectMulti() {
 	// call to Subscribe will lockup.
 	scheduler := GoroutineScheduler()
 
-	range1to99 := CreateInt(func(observer IntObserver) {
+	range1to99 := CreateInt(func(next NextInt, error Error, complete Complete, canceled Canceled) {
 		fmt.Println("subscribed")
 		for i := 1; i < 100; i++ {
-			observer.Next(i)
+			if canceled() {
+				return
+			}
+			next(i)
 		}
-		observer.Complete()
+		complete()
 	})
 
 	source := range1to99.PublishReplay(10, 0).AutoConnect(2).SubscribeOn(scheduler)

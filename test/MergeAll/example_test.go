@@ -8,13 +8,16 @@ import (
 )
 
 func Example_mergeAll() {
-	source := CreateObservableString(func(observer ObservableStringObserver) {
+	source := CreateObservableString(func(N NextObservableString, E Error, C Complete, X Canceled) {
 		for i := 0; i < 3; i++ {
 			time.Sleep(100 * time.Millisecond)
-			observer.Next(JustString(fmt.Sprintf("First %d", i)))
-			observer.Next(JustString(fmt.Sprintf("Second %d", i)))
+			if X() {
+				return
+			}
+			N(JustString(fmt.Sprintf("First %d", i)))
+			N(JustString(fmt.Sprintf("Second %d", i)))
 		}
-		observer.Complete()
+		C()
 	})
 
 	source.MergeAll().Println()

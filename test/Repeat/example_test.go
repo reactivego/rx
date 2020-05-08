@@ -27,11 +27,11 @@ const _1M = 1000000
 // first subscribe returns. So subscribe calls are actually not nested but
 // executed in sequence.
 func Example_trampoline() {
-	source := CreateInt(func(observer IntObserver) {
-		observer.Next(1)
-		observer.Next(2)
-		observer.Next(3)
-		observer.Complete()
+	source := CreateInt(func(N NextInt, E Error, C Complete, X Canceled) {
+		N(1)
+		N(2)
+		N(3)
+		C()
 	})
 	slice, err := source.Repeat(_1M).TakeLast(9).SubscribeOn(TrampolineScheduler()).ToSlice()
 
@@ -53,11 +53,11 @@ func Example_trampoline() {
 // scheduler because it does not create goroutines. It needs less than 70%
 // of the time the Goroutine scheduler needs.
 func Example_goroutine() {
-	source := CreateInt(func(observer IntObserver) {
-		observer.Next(1)
-		observer.Next(2)
-		observer.Next(3)
-		observer.Complete()
+	source := CreateInt(func(N NextInt, E Error, C Complete, X Canceled) {
+		N(1)
+		N(2)
+		N(3)
+		C()
 	})
 	slice, err := source.Repeat(_1M).TakeLast(9).SubscribeOn(GoroutineScheduler()).ToSlice()
 

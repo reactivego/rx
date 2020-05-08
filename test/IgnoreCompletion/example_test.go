@@ -40,11 +40,11 @@ func Example_ignoreComplete() {
 }
 
 func Example_ignoreError() {
-	source := CreateInt(func(observer IntObserver) {
+	source := CreateInt(func(N NextInt, E Error, C Complete, X Canceled) {
 		for i := 1; i < 6; i++ {
-			observer.Next(i)
+			N(i)
 		}
-		observer.Error(RxError("error"))
+		E(RxError("error"))
 	}).IgnoreCompletion()
 
 	// NOTE: subscription must run concurrently with main goroutine

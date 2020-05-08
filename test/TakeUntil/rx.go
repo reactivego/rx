@@ -310,18 +310,6 @@ func (o ObservableInt) AsObservable() Observable {
 	return observable
 }
 
-//jig:name ObservableSubscribeOn
-
-// SubscribeOn specifies the scheduler an Observable should use when it is
-// subscribed to.
-func (o Observable) SubscribeOn(subscribeOn Scheduler) Observable {
-	observable := func(observe ObserveFunc, _ Scheduler, subscriber Subscriber) {
-		subscriber.OnWait(subscribeOn.Wait)
-		o(observe, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name ErrTypecastToInt
 
 // ErrTypecastToInt is delivered to an observer if the generic value cannot be
@@ -346,6 +334,18 @@ func (o Observable) AsObservableInt() ObservableInt {
 			}
 		}
 		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableSubscribeOn
+
+// SubscribeOn specifies the scheduler an Observable should use when it is
+// subscribed to.
+func (o Observable) SubscribeOn(subscribeOn Scheduler) Observable {
+	observable := func(observe ObserveFunc, _ Scheduler, subscriber Subscriber) {
+		subscriber.OnWait(subscribeOn.Wait)
+		o(observe, subscribeOn, subscriber)
 	}
 	return observable
 }

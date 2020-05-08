@@ -11,17 +11,17 @@ func Example_mergeDelayError() {
 	const _5ms = 5 * time.Millisecond
 	const _10ms = 10 * time.Millisecond
 
-	sourceA := CreateInt(func(observer IntObserver) {
-		observer.Next(1)
-		observer.Error(RxError("error.sourceA"))
+	sourceA := CreateInt(func(N NextInt, E Error, _ Complete, _ Canceled) {
+		N(1)
+		E(RxError("error.sourceA"))
 	})
 
-	sourceB := CreateInt(func(observer IntObserver) {
+	sourceB := CreateInt(func(N NextInt, _ Error, C Complete, _ Canceled) {
 		time.Sleep(_5ms)
-		observer.Next(0)
+		N(0)
 		time.Sleep(_10ms)
-		observer.Next(2)
-		observer.Complete()
+		N(2)
+		C()
 	})
 
 	result, err := sourceA.MergeDelayError(sourceB).ToSlice()

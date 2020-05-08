@@ -7,13 +7,13 @@ import (
 )
 
 func Example_all() {
-	source := CreateInt(func(observer IntObserver) {
-		observer.Next(1)
-		observer.Next(2)
-		observer.Next(6)
-		observer.Next(2)
-		observer.Next(1)
-		observer.Complete()
+	source := CreateInt(func(N NextInt, E Error, C Complete, X Canceled) {
+		N(1)
+		N(2)
+		N(6)
+		N(2)
+		N(1)
+		C()
 	})
 
 	// Print the sequence of numbers
