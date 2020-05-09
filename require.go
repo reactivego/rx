@@ -78,10 +78,11 @@ func require() {
 		Observable Create Functions
 	*/
 
-	Create(func(Observer) {})
+	Create(func(Next, Error, Complete, Canceled) {})
+	CreateRecursive(func(Next, Error, Complete) {})
+	CreateFutureRecursive(time.Millisecond, func(Next, Error, Complete) time.Duration { return time.Millisecond })
 	Defer(func() Observable { return o })
 	Empty()
-	Error(RxError("sad"))
 	From(1, 2)
 	FromChan(make(chan interface{}))
 	Interval(time.Millisecond)
