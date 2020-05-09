@@ -11,14 +11,11 @@ import (
 	"github.com/reactivego/subscriber"
 )
 
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler = scheduler.Scheduler
-
 //jig:name Subscriber
 
-// Subscriber is an alias for the subscriber.Subscriber interface type.
+// Subscriber is an interface that can be passed in when subscribing to an
+// Observable. It allows a set of observable subscriptions to be canceled
+// from a single subscriber at the root of the subscription tree.
 type Subscriber = subscriber.Subscriber
 
 // NewSubscriber creates a new subscriber.
@@ -26,31 +23,36 @@ func NewSubscriber() Subscriber {
 	return subscriber.New()
 }
 
-//jig:name IntObserveFunc
+//jig:name Scheduler
 
-// IntObserveFunc is the observer, a function that gets called whenever the
-// observable has something to report. The next argument is the item value that
-// is only valid when the done argument is false. When done is true and the err
-// argument is not nil, then the observable has terminated with an error.
-// When done is true and the err argument is nil, then the observable has
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler = scheduler.Scheduler
+
+//jig:name IntObserver
+
+// IntObserver is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
 // completed normally.
-type IntObserveFunc func(next int, err error, done bool)
+type IntObserver func(next int, err error, done bool)
+
+//jig:name ObservableInt
+
+// ObservableInt is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type ObservableInt func(IntObserver, Scheduler, Subscriber)
 
 //jig:name zeroInt
 
 var zeroInt int
 
-//jig:name ObservableInt
-
-// ObservableInt is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
-
 //jig:name FromInt
 
 // FromInt creates an ObservableInt from multiple int values passed in.
 func FromInt(slice ...int) ObservableInt {
-	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Subscribed() {
@@ -70,31 +72,31 @@ func FromInt(slice ...int) ObservableInt {
 	return observable
 }
 
-//jig:name VectorObserveFunc
+//jig:name VectorObserver
 
-// VectorObserveFunc is the observer, a function that gets called whenever the
-// observable has something to report. The next argument is the item value that
-// is only valid when the done argument is false. When done is true and the err
-// argument is not nil, then the observable has terminated with an error.
-// When done is true and the err argument is nil, then the observable has
+// VectorObserver is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
 // completed normally.
-type VectorObserveFunc func(next []int, err error, done bool)
+type VectorObserver func(next []int, err error, done bool)
+
+//jig:name ObservableVector
+
+// ObservableVector is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type ObservableVector func(VectorObserver, Scheduler, Subscriber)
 
 //jig:name zeroVector
 
 var zeroVector []int
 
-//jig:name ObservableVector
-
-// ObservableVector is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableVector func(VectorObserveFunc, Scheduler, Subscriber)
-
 //jig:name FromVector
 
 // FromVector creates an ObservableVector from multiple []int values passed in.
 func FromVector(slice ...[]int) ObservableVector {
-	observable := func(observe VectorObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe VectorObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Subscribed() {
@@ -119,7 +121,7 @@ func FromVector(slice ...[]int) ObservableVector {
 // MapString transforms the items emitted by an ObservableInt by applying a
 // function to each item.
 func (o ObservableInt) MapString(project func(int) string) ObservableString {
-	observable := func(observe StringObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe StringObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next int, err error, done bool) {
 			var mapped string
 			if !done {
@@ -137,7 +139,7 @@ func (o ObservableInt) MapString(project func(int) string) ObservableString {
 // MapInt transforms the items emitted by an ObservableVector by applying a
 // function to each item.
 func (o ObservableVector) MapInt(project func([]int) int) ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next []int, err error, done bool) {
 			var mapped int
 			if !done {
@@ -150,25 +152,21 @@ func (o ObservableVector) MapInt(project func([]int) int) ObservableInt {
 	return observable
 }
 
-//jig:name StringObserveFunc
+//jig:name StringObserver
 
-// StringObserveFunc is the observer, a function that gets called whenever the
-// observable has something to report. The next argument is the item value that
-// is only valid when the done argument is false. When done is true and the err
-// argument is not nil, then the observable has terminated with an error.
-// When done is true and the err argument is nil, then the observable has
+// StringObserver is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
 // completed normally.
-type StringObserveFunc func(next string, err error, done bool)
-
-//jig:name zeroString
-
-var zeroString string
+type StringObserver func(next string, err error, done bool)
 
 //jig:name ObservableString
 
-// ObservableString is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableString func(StringObserveFunc, Scheduler, Subscriber)
+// ObservableString is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type ObservableString func(StringObserver, Scheduler, Subscriber)
 
 //jig:name Schedulers
 

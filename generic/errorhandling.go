@@ -6,7 +6,7 @@ package rx
 // emitting the error but by switching to the catch ObservableFoo to provide
 // items.
 func (o ObservableFoo) Catch(catch ObservableFoo) ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next foo, err error, done bool) {
 			if err != nil {
 				catch(observe, subscribeOn, subscriber)
@@ -24,8 +24,8 @@ func (o ObservableFoo) Catch(catch ObservableFoo) ObservableFoo {
 // Retry if a source ObservableFoo sends an error notification, resubscribe to
 // it in the hopes that it will complete without error.
 func (o ObservableFoo) Retry() ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		var observer FooObserveFunc
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		var observer FooObserver
 		observer = func(next foo, err error, done bool) {
 			if err != nil {
 				o(observer, subscribeOn, subscriber)

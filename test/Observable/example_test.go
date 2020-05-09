@@ -6,10 +6,9 @@ import (
 	_ "github.com/reactivego/rx"
 )
 
-// An ObserveFunc is just a callback function meant to be passed to an
-// observable.
-func Example_observeFunc() {
-	var observe ObserveFunc
+// An Observer is just a callback function meant to be passed to an Observable.
+func Example_observer() {
+	var observe Observer
 	observe = func(next interface{}, err error, done bool) {
 		switch {
 		case !done:
@@ -33,11 +32,11 @@ func Example_observeFunc() {
 	// complete
 }
 
-// An observable is just a function, that takes an observe function, a scheduler,
-// and a subscriber.
+// An Observable is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
 func Example_observable() {
 	var observable Observable
-	observable = func(observe ObserveFunc, s Scheduler, u Subscriber) {
+	observable = func(observe Observer, s Scheduler, u Subscriber) {
 		// Next
 		observe(123, nil, false)
 		// Error
@@ -46,8 +45,8 @@ func Example_observable() {
 		observe(zero, nil, true)
 	}
 
-	var observe ObserveFunc
-	observe = func(next interface{}, err error, done bool) {
+	var observer Observer
+	observer = func(next interface{}, err error, done bool) {
 		switch {
 		case !done:
 			fmt.Println(next)
@@ -58,7 +57,7 @@ func Example_observable() {
 		}
 	}
 
-	observable(observe, nil, nil)
+	observable(observer, nil, nil)
 	// Output:
 	// 123
 	// error

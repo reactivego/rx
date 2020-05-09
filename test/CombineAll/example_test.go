@@ -1,6 +1,6 @@
 package CombineAll
 
-import _ "github.com/reactivego/rx"
+import _ "github.com/reactivego/rx/generic"
 
 type Vector struct{ x, y int }
 
@@ -8,7 +8,7 @@ func Example_combineAll() {
 	a := FromInt(1, 2, 3)
 	b := FromInt(4, 5, 6)
 
-	FromObservableInt(a, b).CombineAll().MapVector(func(next IntSlice) Vector {
+	FromObservableInt(a, b).CombineAll().MapVector(func(next []int) Vector {
 		return Vector{next[0], next[1]}
 	}).Println()
 

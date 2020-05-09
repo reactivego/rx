@@ -29,14 +29,11 @@ type Canceled func() bool
 // Next can be called to emit the next value to the IntObserver.
 type Next func(interface{})
 
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler = scheduler.Scheduler
-
 //jig:name Subscriber
 
-// Subscriber is an alias for the subscriber.Subscriber interface type.
+// Subscriber is an interface that can be passed in when subscribing to an
+// Observable. It allows a set of observable subscriptions to be canceled
+// from a single subscriber at the root of the subscription tree.
 type Subscriber = subscriber.Subscriber
 
 // NewSubscriber creates a new subscriber.
@@ -44,25 +41,30 @@ func NewSubscriber() Subscriber {
 	return subscriber.New()
 }
 
-//jig:name ObserveFunc
+//jig:name Scheduler
 
-// ObserveFunc is the observer, a function that gets called whenever the
-// observable has something to report. The next argument is the item value that
-// is only valid when the done argument is false. When done is true and the err
-// argument is not nil, then the observable has terminated with an error.
-// When done is true and the err argument is nil, then the observable has
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler = scheduler.Scheduler
+
+//jig:name Observer
+
+// Observer is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
 // completed normally.
-type ObserveFunc func(next interface{}, err error, done bool)
+type Observer func(next interface{}, err error, done bool)
+
+//jig:name Observable
+
+// Observable is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type Observable func(Observer, Scheduler, Subscriber)
 
 //jig:name zero
 
 var zero interface{}
-
-//jig:name Observable
-
-// Observable is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type Observable func(ObserveFunc, Scheduler, Subscriber)
 
 //jig:name Create
 
@@ -74,7 +76,7 @@ type Observable func(ObserveFunc, Scheduler, Subscriber)
 // Complete and Canceled function that can be called by the code that
 // implements the Observable.
 func Create(create func(Next, Error, Complete, Canceled)) Observable {
-	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
 			if subscriber.Canceled() {
 				return
@@ -104,32 +106,32 @@ func Create(create func(Next, Error, Complete, Canceled)) Observable {
 	return observable
 }
 
-//jig:name StringObserveFunc
+//jig:name StringObserver
 
-// StringObserveFunc is the observer, a function that gets called whenever the
-// observable has something to report. The next argument is the item value that
-// is only valid when the done argument is false. When done is true and the err
-// argument is not nil, then the observable has terminated with an error.
-// When done is true and the err argument is nil, then the observable has
+// StringObserver is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
 // completed normally.
-type StringObserveFunc func(next string, err error, done bool)
+type StringObserver func(next string, err error, done bool)
+
+//jig:name ObservableString
+
+// ObservableString is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type ObservableString func(StringObserver, Scheduler, Subscriber)
 
 //jig:name zeroString
 
 var zeroString string
-
-//jig:name ObservableString
-
-// ObservableString is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableString func(StringObserveFunc, Scheduler, Subscriber)
 
 //jig:name ObservableOnlyString
 
 // OnlyString filters the value stream of an Observable of interface{} and outputs only the
 // string typed values.
 func (o Observable) OnlyString() ObservableString {
-	observable := func(observe StringObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe StringObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			if !done {
 				if nextString, ok := next.(string); ok {
@@ -144,32 +146,32 @@ func (o Observable) OnlyString() ObservableString {
 	return observable
 }
 
-//jig:name SizeObserveFunc
+//jig:name SizeObserver
 
-// SizeObserveFunc is the observer, a function that gets called whenever the
-// observable has something to report. The next argument is the item value that
-// is only valid when the done argument is false. When done is true and the err
-// argument is not nil, then the observable has terminated with an error.
-// When done is true and the err argument is nil, then the observable has
+// SizeObserver is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
 // completed normally.
-type SizeObserveFunc func(next Size, err error, done bool)
+type SizeObserver func(next Size, err error, done bool)
+
+//jig:name ObservableSize
+
+// ObservableSize is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type ObservableSize func(SizeObserver, Scheduler, Subscriber)
 
 //jig:name zeroSize
 
 var zeroSize Size
-
-//jig:name ObservableSize
-
-// ObservableSize is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableSize func(SizeObserveFunc, Scheduler, Subscriber)
 
 //jig:name ObservableOnlySize
 
 // OnlySize filters the value stream of an Observable of interface{} and outputs only the
 // Size typed values.
 func (o Observable) OnlySize() ObservableSize {
-	observable := func(observe SizeObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe SizeObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			if !done {
 				if nextSize, ok := next.(Size); ok {
@@ -184,32 +186,32 @@ func (o Observable) OnlySize() ObservableSize {
 	return observable
 }
 
-//jig:name PointObserveFunc
+//jig:name PointObserver
 
-// PointObserveFunc is the observer, a function that gets called whenever the
-// observable has something to report. The next argument is the item value that
-// is only valid when the done argument is false. When done is true and the err
-// argument is not nil, then the observable has terminated with an error.
-// When done is true and the err argument is nil, then the observable has
+// PointObserver is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
 // completed normally.
-type PointObserveFunc func(next []point, err error, done bool)
+type PointObserver func(next []point, err error, done bool)
+
+//jig:name ObservablePoint
+
+// ObservablePoint is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type ObservablePoint func(PointObserver, Scheduler, Subscriber)
 
 //jig:name zeroPoint
 
 var zeroPoint []point
-
-//jig:name ObservablePoint
-
-// ObservablePoint is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservablePoint func(PointObserveFunc, Scheduler, Subscriber)
 
 //jig:name ObservableOnlyPoint
 
 // OnlyPoint filters the value stream of an Observable of interface{} and outputs only the
 // []point typed values.
 func (o Observable) OnlyPoint() ObservablePoint {
-	observable := func(observe PointObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe PointObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			if !done {
 				if nextPoint, ok := next.([]point); ok {
@@ -224,6 +226,11 @@ func (o Observable) OnlyPoint() ObservablePoint {
 	return observable
 }
 
+//jig:name Subscription
+
+// Subscription is an alias for the subscriber.Subscription interface type.
+type Subscription = subscriber.Subscription
+
 //jig:name Schedulers
 
 func TrampolineScheduler() Scheduler {
@@ -234,17 +241,12 @@ func GoroutineScheduler() Scheduler {
 	return scheduler.Goroutine
 }
 
-//jig:name Subscription
-
-// Subscription is an alias for the subscriber.Subscription interface type.
-type Subscription = subscriber.Subscription
-
 //jig:name ObservableStringSubscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
 // Subscribe by default is performed on the Trampoline scheduler.
-func (o ObservableString) Subscribe(observe StringObserveFunc, subscribers ...Subscriber) Subscription {
+func (o ObservableString) Subscribe(observe StringObserver, subscribers ...Subscriber) Subscription {
 	subscribers = append(subscribers, NewSubscriber())
 	scheduler := TrampolineScheduler()
 	observer := func(next string, err error, done bool) {
@@ -265,7 +267,7 @@ func (o ObservableString) Subscribe(observe StringObserveFunc, subscribers ...Su
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
 // Subscribe by default is performed on the Trampoline scheduler.
-func (o ObservableSize) Subscribe(observe SizeObserveFunc, subscribers ...Subscriber) Subscription {
+func (o ObservableSize) Subscribe(observe SizeObserver, subscribers ...Subscriber) Subscription {
 	subscribers = append(subscribers, NewSubscriber())
 	scheduler := TrampolineScheduler()
 	observer := func(next Size, err error, done bool) {
@@ -286,7 +288,7 @@ func (o ObservableSize) Subscribe(observe SizeObserveFunc, subscribers ...Subscr
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
 // Subscribe by default is performed on the Trampoline scheduler.
-func (o ObservablePoint) Subscribe(observe PointObserveFunc, subscribers ...Subscriber) Subscription {
+func (o ObservablePoint) Subscribe(observe PointObserver, subscribers ...Subscriber) Subscription {
 	subscribers = append(subscribers, NewSubscriber())
 	scheduler := TrampolineScheduler()
 	observer := func(next []point, err error, done bool) {

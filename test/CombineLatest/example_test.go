@@ -1,6 +1,6 @@
 package CombineLatest
 
-import _ "github.com/reactivego/rx"
+import _ "github.com/reactivego/rx/generic"
 
 func Example_basic() {
 

@@ -1,11 +1,12 @@
 package rx
 
 //jig:template Observable<Foo> Average
+//jig:needs zero<Foo>
 
 // Average calculates the average of numbers emitted by an ObservableFoo and
 // emits this average.
 func (o ObservableFoo) Average() ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		var sum, count foo
 		observer := func(next foo, err error, done bool) {
 			if !done {
@@ -24,12 +25,12 @@ func (o ObservableFoo) Average() ObservableFoo {
 }
 
 //jig:template Observable<Foo> Count
-//jig:needs ObservableInt
+//jig:needs ObservableInt, zeroInt
 
 // Count counts the number of items emitted by the source ObservableFoo and
 // emits only this value.
 func (o ObservableFoo) Count() ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		var count int
 		observer := func(next foo, err error, done bool) {
 			if !done {
@@ -45,11 +46,12 @@ func (o ObservableFoo) Count() ObservableInt {
 }
 
 //jig:template Observable<Foo> Max
+//jig:needs zero<Foo>
 
 // Max determines, and emits, the maximum-valued item emitted by an
 // ObservableFoo.
 func (o ObservableFoo) Max() ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		var started bool
 		var max foo
 		observer := func(next foo, err error, done bool) {
@@ -77,11 +79,12 @@ func (o ObservableFoo) Max() ObservableFoo {
 }
 
 //jig:template Observable<Foo> Min
+//jig:needs zero<Foo>
 
 // Min determines, and emits, the minimum-valued item emitted by an
 // ObservableFoo.
 func (o ObservableFoo) Min() ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		var started bool
 		var min foo
 		observer := func(next foo, err error, done bool) {
@@ -110,13 +113,14 @@ func (o ObservableFoo) Min() ObservableFoo {
 }
 
 //jig:template Observable<Foo> Reduce<Bar>
+//jig:needs zero<Bar>
 
 // ReduceBar applies a reducer function to each item emitted by an ObservableFoo
 // and the previous reducer result. The operator accepts a seed argument that
 // is passed to the reducer for the first item emitted by the ObservableFoo.
 // ReduceBar emits only the final value.
 func (o ObservableFoo) ReduceBar(reducer func(bar, foo) bar, seed bar) ObservableBar {
-	observable := func(observe BarObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe BarObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		state := seed
 		observer := func(next foo, err error, done bool) {
 			if !done {
@@ -134,10 +138,11 @@ func (o ObservableFoo) ReduceBar(reducer func(bar, foo) bar, seed bar) Observabl
 }
 
 //jig:template Observable<Foo> Sum
+//jig:needs zero<Foo>
 
 // Sum calculates the sum of numbers emitted by an ObservableFoo and emits this sum.
 func (o ObservableFoo) Sum() ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		var sum foo
 		observer := func(next foo, err error, done bool) {
 			if !done {

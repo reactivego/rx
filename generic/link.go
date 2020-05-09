@@ -36,10 +36,10 @@ const (
 //jig:template link<Foo>
 //jig:needs RxError, LinkEnums
 
-type linkFooObserveFunc func(*linkFoo, foo, error, bool)
+type linkFooObserver func(*linkFoo, foo, error, bool)
 
 type linkFoo struct {
-	observe       linkFooObserveFunc
+	observe       linkFooObserver
 	state         int32
 	callbackState int32
 	callbackKind  int
@@ -51,7 +51,7 @@ func newInitialLinkFoo() *linkFoo {
 	return &linkFoo{state: linkCompleting, subscriber: subscriber.New()}
 }
 
-func newLinkFoo(observe linkFooObserveFunc, subscriber Subscriber) *linkFoo {
+func newLinkFoo(observe linkFooObserver, subscriber Subscriber) *linkFoo {
 	return &linkFoo{
 		observe:    observe,
 		subscriber: subscriber.Add(),

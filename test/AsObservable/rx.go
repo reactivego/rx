@@ -11,14 +11,11 @@ import (
 	"github.com/reactivego/subscriber"
 )
 
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler = scheduler.Scheduler
-
 //jig:name Subscriber
 
-// Subscriber is an alias for the subscriber.Subscriber interface type.
+// Subscriber is an interface that can be passed in when subscribing to an
+// Observable. It allows a set of observable subscriptions to be canceled
+// from a single subscriber at the root of the subscription tree.
 type Subscriber = subscriber.Subscriber
 
 // NewSubscriber creates a new subscriber.
@@ -26,31 +23,36 @@ func NewSubscriber() Subscriber {
 	return subscriber.New()
 }
 
-//jig:name ObserveFunc
+//jig:name Scheduler
 
-// ObserveFunc is the observer, a function that gets called whenever the
-// observable has something to report. The next argument is the item value that
-// is only valid when the done argument is false. When done is true and the err
-// argument is not nil, then the observable has terminated with an error.
-// When done is true and the err argument is nil, then the observable has
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler = scheduler.Scheduler
+
+//jig:name Observer
+
+// Observer is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
 // completed normally.
-type ObserveFunc func(next interface{}, err error, done bool)
+type Observer func(next interface{}, err error, done bool)
+
+//jig:name Observable
+
+// Observable is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type Observable func(Observer, Scheduler, Subscriber)
 
 //jig:name zero
 
 var zero interface{}
 
-//jig:name Observable
-
-// Observable is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type Observable func(ObserveFunc, Scheduler, Subscriber)
-
 //jig:name From
 
 // From creates an Observable from multiple interface{} values passed in.
 func From(slice ...interface{}) Observable {
-	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Subscribed() {
@@ -70,31 +72,31 @@ func From(slice ...interface{}) Observable {
 	return observable
 }
 
-//jig:name StringObserveFunc
+//jig:name StringObserver
 
-// StringObserveFunc is the observer, a function that gets called whenever the
-// observable has something to report. The next argument is the item value that
-// is only valid when the done argument is false. When done is true and the err
-// argument is not nil, then the observable has terminated with an error.
-// When done is true and the err argument is nil, then the observable has
+// StringObserver is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
 // completed normally.
-type StringObserveFunc func(next string, err error, done bool)
+type StringObserver func(next string, err error, done bool)
+
+//jig:name ObservableString
+
+// ObservableString is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type ObservableString func(StringObserver, Scheduler, Subscriber)
 
 //jig:name zeroString
 
 var zeroString string
 
-//jig:name ObservableString
-
-// ObservableString is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableString func(StringObserveFunc, Scheduler, Subscriber)
-
 //jig:name FromString
 
 // FromString creates an ObservableString from multiple string values passed in.
 func FromString(slice ...string) ObservableString {
-	observable := func(observe StringObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe StringObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Subscribed() {
@@ -114,25 +116,21 @@ func FromString(slice ...string) ObservableString {
 	return observable
 }
 
-//jig:name Float64ObserveFunc
+//jig:name Float64Observer
 
-// Float64ObserveFunc is the observer, a function that gets called whenever the
-// observable has something to report. The next argument is the item value that
-// is only valid when the done argument is false. When done is true and the err
-// argument is not nil, then the observable has terminated with an error.
-// When done is true and the err argument is nil, then the observable has
+// Float64Observer is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
 // completed normally.
-type Float64ObserveFunc func(next float64, err error, done bool)
-
-//jig:name zeroFloat64
-
-var zeroFloat64 float64
+type Float64Observer func(next float64, err error, done bool)
 
 //jig:name ObservableFloat64
 
-// ObservableFloat64 is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableFloat64 func(Float64ObserveFunc, Scheduler, Subscriber)
+// ObservableFloat64 is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type ObservableFloat64 func(Float64Observer, Scheduler, Subscriber)
 
 //jig:name RxError
 
@@ -146,12 +144,16 @@ func (e RxError) Error() string	{ return string(e) }
 // typecast to float64.
 const ErrTypecastToFloat64 = RxError("typecast to float64 failed")
 
+//jig:name zeroFloat64
+
+var zeroFloat64 float64
+
 //jig:name ObservableAsObservableFloat64
 
 // AsFloat64 turns an Observable of interface{} into an ObservableFloat64. If during
 // observing a typecast fails, the error ErrTypecastToFloat64 will be emitted.
 func (o Observable) AsObservableFloat64() ObservableFloat64 {
-	observable := func(observe Float64ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Float64Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			if !done {
 				if nextFloat64, ok := next.(float64); ok {
@@ -172,7 +174,7 @@ func (o Observable) AsObservableFloat64() ObservableFloat64 {
 
 // AsObservable turns a typed ObservableString into an Observable of interface{}.
 func (o ObservableString) AsObservable() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next string, err error, done bool) {
 			observe(interface{}(next), err, done)
 		}

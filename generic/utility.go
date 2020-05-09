@@ -10,7 +10,7 @@ import (
 
 // Do calls a function for each next value passing through the observable.
 func (o ObservableFoo) Do(f func(next foo)) ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next foo, err error, done bool) {
 			if !done {
 				f(next)
@@ -26,7 +26,7 @@ func (o ObservableFoo) Do(f func(next foo)) ObservableFoo {
 
 // DoOnError calls a function for any error on the stream.
 func (o ObservableFoo) DoOnError(f func(err error)) ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next foo, err error, done bool) {
 			if err != nil {
 				f(err)
@@ -42,7 +42,7 @@ func (o ObservableFoo) DoOnError(f func(err error)) ObservableFoo {
 
 // DoOnComplete calls a function when the stream completes.
 func (o ObservableFoo) DoOnComplete(f func()) ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next foo, err error, done bool) {
 			if err == nil && done {
 				f()
@@ -58,7 +58,7 @@ func (o ObservableFoo) DoOnComplete(f func()) ObservableFoo {
 
 // Delay shifts the emission from an Observable forward in time by a particular amount of time.
 func (o ObservableFoo) Delay(duration time.Duration) ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		firstTime := true
 		observer := func(next foo, err error, done bool) {
 			if firstTime {
@@ -77,7 +77,7 @@ func (o ObservableFoo) Delay(duration time.Duration) ObservableFoo {
 // Finally applies a function for any error or completion on the stream.
 // This doesn't expose whether this was an error or a completion.
 func (o ObservableFoo) Finally(f func()) ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next foo, err error, done bool) {
 			if done {
 				f()
@@ -94,7 +94,7 @@ func (o ObservableFoo) Finally(f func()) ObservableFoo {
 // Passthrough just passes through all output from the ObservableFoo.
 func (o ObservableFoo) Passthrough() ObservableFoo {
 	// Operator scope
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		// Subscribe scope
 		observer := func(next foo, err error, done bool) {
 			// Observe scope
@@ -110,7 +110,7 @@ func (o ObservableFoo) Passthrough() ObservableFoo {
 // Serialize forces an ObservableFoo to make serialized calls and to be
 // well-behaved.
 func (o ObservableFoo) Serialize() ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		var observer struct {
 			sync.Mutex
 			done bool
@@ -129,7 +129,7 @@ func (o ObservableFoo) Serialize() ObservableFoo {
 }
 
 //jig:template Observable Timeout
-//jig:needs RxError, Observable Serialize
+//jig:needs RxError, Observable Serialize, zero
 
 // ErrTimeout is delivered to an observer if the stream times out.
 const ErrTimeout = RxError("timeout")
@@ -138,7 +138,7 @@ const ErrTimeout = RxError("timeout")
 // particular period of time elapses without any emitted items.
 // Timeout schedules tasks on the scheduler passed to this 
 func (o Observable) Timeout(timeout time.Duration) Observable {
-	observable := Observable(func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := Observable(func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		if subscriber.Canceled() {
 			return
 		}
@@ -209,7 +209,7 @@ const ErrObservableContractViolationErrorAfterTermination = RxError("observable 
 const ErrObservableContractViolationCompleteAfterTermination = RxError("observable contract violation: complete after termination")
 
 //jig:template Observable<Foo> Validated
-//jig:needs ErrObservableContractViolation
+//jig:needs ErrObservableContractViolation, zero<Foo>
 
 // Validated will check for violations of the observable contract. More specific
 // it will detect concurrent notifications from the observable and it will
@@ -219,7 +219,7 @@ const ErrObservableContractViolationCompleteAfterTermination = RxError("observab
 // A violation will always be reported via the onViolation callback. If nil is
 // passed as the callback, the operation will use panic to report the violation.
 func (o ObservableFoo) Validated(onViolation func(err error)) ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		const (
 			operational int32 = iota
 			terminated

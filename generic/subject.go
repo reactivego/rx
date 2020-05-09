@@ -6,17 +6,18 @@ import (
 	"github.com/reactivego/multicast"
 )
 
+
 //jig:template Subject<Foo>
-//jig:embeds <Foo>ObserveFuncMethods, Observable<Foo>
+//jig:embeds Observable<Foo>, <Foo>Observer, zero<Foo>
 
 // SubjectFoo is a combination of an observer and observable. Subjects are
 // special because they are the only reactive constructs that support
 // multicasting. The items sent to it through its observer side are
 // multicasted to multiple clients subscribed to its observable side.
 //
-// A SubjectFoo embeds ObservableFoo and FooObserveFunc. This exposes the
+// A SubjectFoo embeds ObservableFoo and FooObserver. This exposes the
 // methods and fields of both types on SubjectFoo. Use the ObservableFoo
-// methods to subscribe to it. Use the FooObserveFunc Next, Error and Complete
+// methods to subscribe to it. Use the FooObserver Next, Error and Complete
 // methods to feed data to it.
 //
 // After a subject has been terminated by calling either Error or Complete,
@@ -27,7 +28,24 @@ import (
 // functions for more info.
 type SubjectFoo struct {
 	ObservableFoo
-	FooObserveFunc
+	FooObserver
+}
+
+// Next is called by an ObservableFoo to emit the next foo value to the
+// Observer.
+func (f FooObserver) Next(next foo) {
+	f(next, nil, false)
+}
+
+// Error is called by an ObservableFoo to report an error to the Observer.
+func (f FooObserver) Error(err error) {
+	f(zeroFoo, err, true)
+}
+
+// Complete is called by an ObservableFoo to signal that no more data is
+// forthcoming to the Observer.
+func (f FooObserver) Complete() {
+	f(zeroFoo, nil, true)
 }
 
 //jig:template NewSubject<Foo>
@@ -45,7 +63,7 @@ type SubjectFoo struct {
 func NewSubjectFoo() SubjectFoo {
 	ch := multicast.NewChan(1, 16 /*max endpoints*/)
 
-	observable := Observable(func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := Observable(func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		ep, err := ch.NewEndpoint(0)
 		if err != nil {
 			observe(nil, err, true)
@@ -100,7 +118,7 @@ func NewReplaySubjectFoo(bufferCapacity int, windowDuration time.Duration) Subje
 	}
 	ch := multicast.NewChan(bufferCapacity, 16 /*max endpoints*/)
 
-	observable := Observable(func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := Observable(func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		ep, err := ch.NewEndpoint(multicast.ReplayAll)
 		if err != nil {
 			observe(nil, err, true)

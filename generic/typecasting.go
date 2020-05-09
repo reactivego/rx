@@ -6,7 +6,7 @@ package rx
 
 // AsObservableBar turns a typed ObservableFoo into an Observable of bar.
 func (o ObservableFoo) AsObservableBar() ObservableBar {
-	observable := func(observe BarObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe BarObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next foo, err error, done bool) {
 			observe(bar(next), err, done)
 		}
@@ -23,13 +23,13 @@ func (o ObservableFoo) AsObservableBar() ObservableBar {
 const ErrTypecastToFoo = RxError("typecast to foo failed")
 
 //jig:template Observable AsObservable<Foo>
-//jig:needs Observable<Foo>, ErrTypecastTo<Foo>
+//jig:needs Observable<Foo>, ErrTypecastTo<Foo>, zero<Foo>
 //jig:required-vars Foo
 
 // AsFoo turns an Observable of interface{} into an ObservableFoo. If during
 // observing a typecast fails, the error ErrTypecastToFoo will be emitted.
 func (o Observable) AsObservableFoo() ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			if !done {
 				if nextFoo, ok := next.(foo); ok {
@@ -47,13 +47,13 @@ func (o Observable) AsObservableFoo() ObservableFoo {
 }
 
 //jig:template Observable Only<Foo>
-//jig:needs Observable<Foo>
+//jig:needs Observable<Foo>, zero<Foo>
 //jig:required-vars Foo
 
 // OnlyFoo filters the value stream of an Observable of interface{} and outputs only the
 // foo typed values.
 func (o Observable) OnlyFoo() ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			if !done {
 				if nextFoo, ok := next.(foo); ok {

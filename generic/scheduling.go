@@ -24,7 +24,7 @@ func GoroutineScheduler() Scheduler  {
 
 // ObserveOn specifies a schedule function to use for delivering values to the observer.
 func (o ObservableFoo) ObserveOn(schedule func(task func())) ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next foo, err error, done bool) {
 			task := func() {
 				observe(next, err, done)
@@ -41,7 +41,7 @@ func (o ObservableFoo) ObserveOn(schedule func(task func())) ObservableFoo {
 // SubscribeOn specifies the scheduler an ObservableFoo should use when it is
 // subscribed to.
 func (o ObservableFoo) SubscribeOn(subscribeOn Scheduler) ObservableFoo {
-	observable := func(observe FooObserveFunc, _ Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, _ Scheduler, subscriber Subscriber) {
 		subscriber.OnWait(subscribeOn.Wait)
 		o(observe, subscribeOn, subscriber)
 	}

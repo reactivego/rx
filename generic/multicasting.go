@@ -47,7 +47,7 @@ func (o ObservableFoo) Multicast(factory func() SubjectFoo) ConnectableFoo {
 		atomic.Value
 	}
 	subjectValue.Store(factory())
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		if s, ok := subjectValue.Load().(SubjectFoo); ok {
 			s.ObservableFoo(observe, subscribeOn, subscriber)
 		}
@@ -55,7 +55,7 @@ func (o ObservableFoo) Multicast(factory func() SubjectFoo) ConnectableFoo {
 	observer := func(next foo, err error, done bool) {
 		if atomic.CompareAndSwapInt32(&subjectValue.state, active, notifying) {
 			if s, ok := subjectValue.Load().(SubjectFoo); ok {
-				s.FooObserveFunc(next, err, done)
+				s.FooObserver(next, err, done)
 			}
 			if !done {
 				atomic.CompareAndSwapInt32(&subjectValue.state, notifying, active)
@@ -138,7 +138,7 @@ func (o ConnectableFoo) RefCount() ObservableFoo {
 		refcount   int32
 		connection Subscription
 	)
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		if atomic.AddInt32(&refcount, 1) == 1 {
 			connection = o.connect()
 		}
@@ -165,7 +165,7 @@ func (o ConnectableFoo) AutoConnect(count int) ObservableFoo {
 		return o.ObservableFoo
 	}
 	var refcount int32
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		if atomic.AddInt32(&refcount, 1) == int32(count) {
 			o.connect()
 		}

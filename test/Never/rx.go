@@ -12,14 +12,11 @@ import (
 	"github.com/reactivego/subscriber"
 )
 
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler = scheduler.Scheduler
-
 //jig:name Subscriber
 
-// Subscriber is an alias for the subscriber.Subscriber interface type.
+// Subscriber is an interface that can be passed in when subscribing to an
+// Observable. It allows a set of observable subscriptions to be canceled
+// from a single subscriber at the root of the subscription tree.
 type Subscriber = subscriber.Subscriber
 
 // NewSubscriber creates a new subscriber.
@@ -27,31 +24,32 @@ func NewSubscriber() Subscriber {
 	return subscriber.New()
 }
 
-//jig:name ObserveFunc
+//jig:name Scheduler
 
-// ObserveFunc is the observer, a function that gets called whenever the
-// observable has something to report. The next argument is the item value that
-// is only valid when the done argument is false. When done is true and the err
-// argument is not nil, then the observable has terminated with an error.
-// When done is true and the err argument is nil, then the observable has
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler = scheduler.Scheduler
+
+//jig:name Observer
+
+// Observer is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
 // completed normally.
-type ObserveFunc func(next interface{}, err error, done bool)
-
-//jig:name zero
-
-var zero interface{}
+type Observer func(next interface{}, err error, done bool)
 
 //jig:name Observable
 
-// Observable is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type Observable func(ObserveFunc, Scheduler, Subscriber)
+// Observable is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type Observable func(Observer, Scheduler, Subscriber)
 
 //jig:name Never
 
 // Never creates an Observable that emits no items and does't terminate.
 func Never() Observable {
-	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 	}
 	return observable
 }
@@ -67,7 +65,7 @@ func (e RxError) Error() string	{ return string(e) }
 // Serialize forces an Observable to make serialized calls and to be
 // well-behaved.
 func (o Observable) Serialize() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		var observer struct {
 			sync.Mutex
 			done	bool
@@ -85,6 +83,10 @@ func (o Observable) Serialize() Observable {
 	return observable
 }
 
+//jig:name zero
+
+var zero interface{}
+
 //jig:name ObservableTimeout
 
 // ErrTimeout is delivered to an observer if the stream times out.
@@ -94,7 +96,7 @@ const ErrTimeout = RxError("timeout")
 // particular period of time elapses without any emitted items.
 // Timeout schedules tasks on the scheduler passed to this
 func (o Observable) Timeout(timeout time.Duration) Observable {
-	observable := Observable(func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := Observable(func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		if subscriber.Canceled() {
 			return
 		}
@@ -146,12 +148,17 @@ func (o Observable) Timeout(timeout time.Duration) Observable {
 // SubscribeOn specifies the scheduler an Observable should use when it is
 // subscribed to.
 func (o Observable) SubscribeOn(subscribeOn Scheduler) Observable {
-	observable := func(observe ObserveFunc, _ Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, _ Scheduler, subscriber Subscriber) {
 		subscriber.OnWait(subscribeOn.Wait)
 		o(observe, subscribeOn, subscriber)
 	}
 	return observable
 }
+
+//jig:name Subscription
+
+// Subscription is an alias for the subscriber.Subscription interface type.
+type Subscription = subscriber.Subscription
 
 //jig:name Schedulers
 
@@ -163,17 +170,12 @@ func GoroutineScheduler() Scheduler {
 	return scheduler.Goroutine
 }
 
-//jig:name Subscription
-
-// Subscription is an alias for the subscriber.Subscription interface type.
-type Subscription = subscriber.Subscription
-
 //jig:name ObservableSubscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
 // Subscribe by default is performed on the Trampoline scheduler.
-func (o Observable) Subscribe(observe ObserveFunc, subscribers ...Subscriber) Subscription {
+func (o Observable) Subscribe(observe Observer, subscribers ...Subscriber) Subscription {
 	subscribers = append(subscribers, NewSubscriber())
 	scheduler := TrampolineScheduler()
 	observer := func(next interface{}, err error, done bool) {

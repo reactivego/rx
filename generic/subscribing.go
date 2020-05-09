@@ -9,7 +9,9 @@ import (
 
 //jig:template Subscriber
 
-// Subscriber is an alias for the subscriber.Subscriber interface type.
+// Subscriber is an interface that can be passed in when subscribing to an
+// Observable. It allows a set of observable subscriptions to be canceled
+// from a single subscriber at the root of the subscription tree.
 type Subscriber = subscriber.Subscriber
 
 // NewSubscriber creates a new subscriber.
@@ -23,7 +25,7 @@ func NewSubscriber() Subscriber {
 type Subscription = subscriber.Subscription
 
 //jig:template Observable<Foo> Println
-//jig:needs Schedulers, Subscriber
+//jig:needs Subscriber, Schedulers
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
@@ -47,7 +49,7 @@ func (o ObservableFoo) Println() (err error) {
 }
 
 //jig:template Observable<Foo> Wait
-//jig:needs Schedulers, Subscriber
+//jig:needs Subscriber, Schedulers
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
@@ -68,7 +70,7 @@ func (o ObservableFoo) Wait() (err error) {
 }
 
 //jig:template Observable<Foo> ToSlice
-//jig:needs Schedulers, Subscriber
+//jig:needs Subscriber, Schedulers
 
 // ToSlice collects all values from the ObservableFoo into an slice. The
 // complete slice and any error are returned.
@@ -90,7 +92,7 @@ func (o ObservableFoo) ToSlice() (slice []foo, err error) {
 }
 
 //jig:template Observable<Foo> ToSingle
-//jig:needs Schedulers, Subscriber
+//jig:needs Subscriber, Schedulers
 
 // ToSingle blocks until the ObservableFoo emits exactly one value or an error.
 // The value and any error are returned.
@@ -113,7 +115,7 @@ func (o ObservableFoo) ToSingle() (entry foo, err error) {
 }
 
 //jig:template Observable ToChan
-//jig:needs Schedulers, Subscriber
+//jig:needs Subscriber, Schedulers
 
 // ToChan returns a channel that emits interface{} values. If the source
 // observable does not emit values but emits an error or complete, then the
@@ -176,7 +178,7 @@ func (o Observable) ToChan(subscribers ...Subscriber) <-chan interface{} {
 }
 
 //jig:template Observable<Foo> ToChan
-//jig:needs Schedulers, Subscriber
+//jig:needs Subscriber, Schedulers
 //jig:required-vars Foo
 
 // ToChan returns a channel that emits foo values. If the source observable does
@@ -235,12 +237,12 @@ func (o ObservableFoo) ToChan(subscribers ...Subscriber) <-chan foo {
 }
 
 //jig:template Observable<Foo> Subscribe
-//jig:needs Schedulers, Subscriber, Subscription
+//jig:needs Subscription, Subscriber, Schedulers, zero<Foo>
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
 // Subscribe by default is performed on the Trampoline scheduler.
-func (o ObservableFoo) Subscribe(observe FooObserveFunc, subscribers ...Subscriber) Subscription {
+func (o ObservableFoo) Subscribe(observe FooObserver, subscribers ...Subscriber) Subscription {
 	subscribers = append(subscribers, NewSubscriber())
 	scheduler := TrampolineScheduler()
 	observer := func(next foo, err error, done bool) {

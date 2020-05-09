@@ -42,7 +42,7 @@ found 16 templates in package "multicast" (github.com/reactivego/multicast/gener
 generating "FromString"
   Scheduler
   Subscriber
-  StringObserveFunc
+  StringObserver
   zeroString
   ObservableString
   FromString

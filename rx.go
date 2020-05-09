@@ -14,14 +14,11 @@ import (
 	"github.com/reactivego/subscriber"
 )
 
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler = scheduler.Scheduler
-
 //jig:name Subscriber
 
-// Subscriber is an alias for the subscriber.Subscriber interface type.
+// Subscriber is an interface that can be passed in when subscribing to an
+// Observable. It allows a set of observable subscriptions to be canceled
+// from a single subscriber at the root of the subscription tree.
 type Subscriber = subscriber.Subscriber
 
 // NewSubscriber creates a new subscriber.
@@ -29,85 +26,82 @@ func NewSubscriber() Subscriber {
 	return subscriber.New()
 }
 
-//jig:name ObserveFunc
+//jig:name Scheduler
 
-// ObserveFunc is the observer, a function that gets called whenever the
-// observable has something to report. The next argument is the item value that
-// is only valid when the done argument is false. When done is true and the err
-// argument is not nil, then the observable has terminated with an error.
-// When done is true and the err argument is nil, then the observable has
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler = scheduler.Scheduler
+
+//jig:name Observer
+
+// Observer is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
 // completed normally.
-type ObserveFunc func(next interface{}, err error, done bool)
+type Observer func(next interface{}, err error, done bool)
+
+//jig:name Observable
+
+// Observable is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type Observable func(Observer, Scheduler, Subscriber)
+
+//jig:name BoolObserver
+
+// BoolObserver is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
+// completed normally.
+type BoolObserver func(next bool, err error, done bool)
+
+//jig:name ObservableBool
+
+// ObservableBool is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type ObservableBool func(BoolObserver, Scheduler, Subscriber)
+
+//jig:name IntObserver
+
+// IntObserver is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
+// completed normally.
+type IntObserver func(next int, err error, done bool)
+
+//jig:name ObservableInt
+
+// ObservableInt is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type ObservableInt func(IntObserver, Scheduler, Subscriber)
+
+//jig:name ObservableObserver
+
+// ObservableObserver is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
+// completed normally.
+type ObservableObserver func(next Observable, err error, done bool)
+
+//jig:name ObservableObservable
+
+// ObservableObservable is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type ObservableObservable func(ObservableObserver, Scheduler, Subscriber)
 
 //jig:name zero
 
 var zero interface{}
 
-//jig:name Observable
-
-// Observable is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type Observable func(ObserveFunc, Scheduler, Subscriber)
-
-//jig:name BoolObserveFunc
-
-// BoolObserveFunc is the observer, a function that gets called whenever the
-// observable has something to report. The next argument is the item value that
-// is only valid when the done argument is false. When done is true and the err
-// argument is not nil, then the observable has terminated with an error.
-// When done is true and the err argument is nil, then the observable has
-// completed normally.
-type BoolObserveFunc func(next bool, err error, done bool)
-
-//jig:name zeroBool
-
-var zeroBool bool
-
-//jig:name ObservableBool
-
-// ObservableBool is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableBool func(BoolObserveFunc, Scheduler, Subscriber)
-
-//jig:name IntObserveFunc
-
-// IntObserveFunc is the observer, a function that gets called whenever the
-// observable has something to report. The next argument is the item value that
-// is only valid when the done argument is false. When done is true and the err
-// argument is not nil, then the observable has terminated with an error.
-// When done is true and the err argument is nil, then the observable has
-// completed normally.
-type IntObserveFunc func(next int, err error, done bool)
-
-//jig:name zeroInt
-
-var zeroInt int
-
-//jig:name ObservableInt
-
-// ObservableInt is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableInt func(IntObserveFunc, Scheduler, Subscriber)
-
-//jig:name ObservableObserveFunc
-
-// ObservableObserveFunc is the observer, a function that gets called whenever the
-// observable has something to report. The next argument is the item value that
-// is only valid when the done argument is false. When done is true and the err
-// argument is not nil, then the observable has terminated with an error.
-// When done is true and the err argument is nil, then the observable has
-// completed normally.
-type ObservableObserveFunc func(next Observable, err error, done bool)
-
 //jig:name zeroObservable
 
 var zeroObservable Observable
-
-//jig:name ObservableObservable
-
-// ObservableObservable is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableObservable func(ObservableObserveFunc, Scheduler, Subscriber)
 
 //jig:name Error
 
@@ -139,7 +133,7 @@ type Next func(interface{})
 // Complete and Canceled function that can be called by the code that
 // implements the Observable.
 func Create(create func(Next, Error, Complete, Canceled)) Observable {
-	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
 			if subscriber.Canceled() {
 				return
@@ -179,7 +173,7 @@ func Create(create func(Next, Error, Complete, Canceled)) Observable {
 // and Complete function that can be called by the code that implements the
 // Observable.
 func CreateRecursive(create func(Next, Error, Complete)) Observable {
-	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		done := false
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Canceled() {
@@ -227,7 +221,7 @@ func CreateRecursive(create func(Next, Error, Complete)) Observable {
 // long CreateFutureRecursive has to wait before calling the create function
 // again.
 func CreateFutureRecursive(timeout time.Duration, create func(Next, Error, Complete) time.Duration) Observable {
-	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		done := false
 		runner := scheduler.ScheduleFutureRecursive(timeout, func(self func(time.Duration)) {
 			if subscriber.Canceled() {
@@ -265,7 +259,7 @@ func CreateFutureRecursive(timeout time.Duration, create func(Next, Error, Compl
 // Defer does not create the Observable until the observer subscribes,
 // and creates a fresh Observable for each observer.
 func Defer(factory func() Observable) Observable {
-	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		factory()(observe, scheduler, subscriber)
 	}
 	return observable
@@ -275,7 +269,7 @@ func Defer(factory func() Observable) Observable {
 
 // Empty creates an Observable that emits no items but terminates normally.
 func Empty() Observable {
-	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
 			if subscriber.Subscribed() {
 				observe(zero, nil, true)
@@ -290,7 +284,7 @@ func Empty() Observable {
 
 // From creates an Observable from multiple interface{} values passed in.
 func From(slice ...interface{}) Observable {
-	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Subscribed() {
@@ -319,7 +313,7 @@ func From(slice ...interface{}) Observable {
 // an error into the channel, it should close the channel immediately to
 // indicate termination with error.
 func FromChan(ch <-chan interface{}) Observable {
-	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Canceled() {
 				return
@@ -353,7 +347,7 @@ func FromChan(ch <-chan interface{}) Observable {
 // by a particular time interval. First integer is emitted after the first time
 // interval expires.
 func Interval(interval time.Duration) ObservableInt {
-	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleFutureRecursive(interval, func(self func(time.Duration)) {
 			if subscriber.Canceled() {
@@ -375,7 +369,7 @@ func Interval(interval time.Duration) ObservableInt {
 
 // Just creates an Observable that emits a particular item.
 func Just(element interface{}) Observable {
-	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		done := false
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Subscribed() {
@@ -402,10 +396,10 @@ func (o Observable) Concat(other ...Observable) Observable {
 	if len(other) == 0 {
 		return o
 	}
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		var (
 			observables	= append([]Observable{}, other...)
-			observer	ObserveFunc
+			observer	Observer
 		)
 		observer = func(next interface{}, err error, done bool) {
 			if !done || err != nil {
@@ -443,7 +437,7 @@ func (o Observable) Merge(other ...Observable) Observable {
 	if len(other) == 0 {
 		return o
 	}
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		var observers struct {
 			sync.Mutex
 			done	bool
@@ -497,17 +491,21 @@ func Merge(observables ...Observable) Observable {
 
 // Never creates an Observable that emits no items and does't terminate.
 func Never() Observable {
-	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 	}
 	return observable
 }
+
+//jig:name zeroInt
+
+var zeroInt int
 
 //jig:name Range
 
 // Range creates an ObservableInt that emits a range of sequential integers.
 func Range(start, count int) ObservableInt {
 	end := start + count
-	observable := func(observe IntObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := start
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Subscribed() {
@@ -532,7 +530,7 @@ func Range(start, count int) ObservableInt {
 // Repeat creates an Observable that emits a particular item or sequence
 // of items repeatedly.
 func Repeat(value interface{}, count int) Observable {
-	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Subscribed() {
@@ -559,7 +557,7 @@ func Repeat(value interface{}, count int) Observable {
 // If the error is non-nil the returned Observable will be an Observable that
 // emits and error, otherwise it will be a single-value Observable of the value.
 func Start(f func() (interface{}, error)) Observable {
-	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		done := false
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Subscribed() {
@@ -588,7 +586,7 @@ func Start(f func() (interface{}, error)) Observable {
 // Throw creates an Observable that emits no items and terminates with an
 // error.
 func Throw(err error) Observable {
-	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
 			if subscriber.Subscribed() {
 				observe(zero, err, true)
@@ -605,6 +603,10 @@ type RxError string
 
 func (e RxError) Error() string	{ return string(e) }
 
+//jig:name zeroBool
+
+var zeroBool bool
+
 //jig:name ObservableAll
 
 // All determines whether all items emitted by an Observable meet some
@@ -618,7 +620,7 @@ func (e RxError) Error() string	{ return string(e) }
 // true according to this predicate; false if any item emitted by the source
 // Observable evaluates as false according to this predicate.
 func (o Observable) All(predicate func(next interface{}) bool) ObservableBool {
-	observable := func(observe BoolObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe BoolObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			switch {
 			case !done:
@@ -649,7 +651,7 @@ const ErrTypecastToBool = RxError("typecast to bool failed")
 // AsBool turns an Observable of interface{} into an ObservableBool. If during
 // observing a typecast fails, the error ErrTypecastToBool will be emitted.
 func (o Observable) AsObservableBool() ObservableBool {
-	observable := func(observe BoolObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe BoolObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			if !done {
 				if nextBool, ok := next.(bool); ok {
@@ -677,7 +679,7 @@ const ErrTypecastToInt = RxError("typecast to int failed")
 // AsInt turns an Observable of interface{} into an ObservableInt. If during
 // observing a typecast fails, the error ErrTypecastToInt will be emitted.
 func (o Observable) AsObservableInt() ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			if !done {
 				if nextInt, ok := next.(int); ok {
@@ -698,7 +700,7 @@ func (o Observable) AsObservableInt() ObservableInt {
 
 // AsObservable turns a typed ObservableBool into an Observable of interface{}.
 func (o ObservableBool) AsObservable() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next bool, err error, done bool) {
 			observe(interface{}(next), err, done)
 		}
@@ -711,7 +713,7 @@ func (o ObservableBool) AsObservable() Observable {
 
 // AsObservable turns a typed ObservableInt into an Observable of interface{}.
 func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next int, err error, done bool) {
 			observe(interface{}(next), err, done)
 		}
@@ -725,7 +727,7 @@ func (o ObservableInt) AsObservable() Observable {
 // Average calculates the average of numbers emitted by an ObservableInt and
 // emits this average.
 func (o ObservableInt) Average() ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		var sum, count int
 		observer := func(next int, err error, done bool) {
 			if !done {
@@ -749,7 +751,7 @@ func (o ObservableInt) Average() ObservableInt {
 // emitting the error but by switching to the catch Observable to provide
 // items.
 func (o Observable) Catch(catch Observable) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			if err != nil {
 				catch(observe, subscribeOn, subscriber)
@@ -762,16 +764,16 @@ func (o Observable) Catch(catch Observable) Observable {
 	return observable
 }
 
-//jig:name Slice
+//jig:name _s
 
-type Slice []interface{}
+type _s = []interface{}
 
 //jig:name ObservableObservableCombineAll
 
 // CombineAll flattens an ObservableObservable by applying combineLatest
 // when the ObservableObservable completes.
-func (o ObservableObservable) CombineAll() ObservableSlice {
-	observable := func(observe SliceObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+func (o ObservableObservable) CombineAll() Observable_s {
+	observable := func(observe _sObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observables := []Observable(nil)
 		var observers struct {
 			sync.Mutex
@@ -779,7 +781,7 @@ func (o ObservableObservable) CombineAll() ObservableSlice {
 			initialized	int
 			active		int
 		}
-		makeObserver := func(index int) ObserveFunc {
+		makeObserver := func(index int) Observer {
 			observer := func(next interface{}, err error, done bool) {
 				observers.Lock()
 				defer observers.Unlock()
@@ -795,10 +797,10 @@ func (o ObservableObservable) CombineAll() ObservableSlice {
 						}
 					case err != nil:
 						observers.active = 0
-						observe(zeroSlice, err, true)
+						observe(zero_s, err, true)
 					default:
 						if observers.active--; observers.active == 0 {
-							observe(zeroSlice, nil, true)
+							observe(zero_s, nil, true)
 						}
 					}
 				}
@@ -811,7 +813,7 @@ func (o ObservableObservable) CombineAll() ObservableSlice {
 			case !done:
 				observables = append(observables, next)
 			case err != nil:
-				observe(zeroSlice, err, true)
+				observe(zero_s, err, true)
 			default:
 				subscribeOn.Schedule(func() {
 					if !subscriber.Canceled() {
@@ -837,11 +839,11 @@ func (o ObservableObservable) CombineAll() ObservableSlice {
 
 // ConcatAll flattens a higher order observable by concattenating the observables it emits.
 func (o ObservableObservable) ConcatAll() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		var (
 			mutex		sync.Mutex
 			observables	[]Observable
-			observer	ObserveFunc
+			observer	Observer
 		)
 		observer = func(next interface{}, err error, done bool) {
 			mutex.Lock()
@@ -879,7 +881,7 @@ func (o ObservableObservable) ConcatAll() Observable {
 // Count counts the number of items emitted by the source Observable and
 // emits only this value.
 func (o Observable) Count() ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		var count int
 		observer := func(next interface{}, err error, done bool) {
 			if !done {
@@ -899,7 +901,7 @@ func (o Observable) Count() ObservableInt {
 // Debounce only emits the last item of a burst from an Observable if a
 // particular timespan has passed without it emitting another item.
 func (o Observable) Debounce(duration time.Duration) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		valuech := make(chan interface{})
 		donech := make(chan error)
 		debouncer := func() {
@@ -947,7 +949,7 @@ func (o Observable) Debounce(duration time.Duration) Observable {
 
 // Delay shifts the emission from an Observable forward in time by a particular amount of time.
 func (o Observable) Delay(duration time.Duration) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		firstTime := true
 		observer := func(next interface{}, err error, done bool) {
 			if firstTime {
@@ -965,7 +967,7 @@ func (o Observable) Delay(duration time.Duration) Observable {
 
 // Distinct suppress duplicate items emitted by an Observable
 func (o Observable) Distinct() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		seen := map[interface{}]struct{}{}
 		observer := func(next interface{}, err error, done bool) {
 			if !done {
@@ -985,7 +987,7 @@ func (o Observable) Distinct() Observable {
 
 // Do calls a function for each next value passing through the observable.
 func (o Observable) Do(f func(next interface{})) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			if !done {
 				f(next)
@@ -1001,7 +1003,7 @@ func (o Observable) Do(f func(next interface{})) Observable {
 
 // DoOnComplete calls a function when the stream completes.
 func (o Observable) DoOnComplete(f func()) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			if err == nil && done {
 				f()
@@ -1017,7 +1019,7 @@ func (o Observable) DoOnComplete(f func()) Observable {
 
 // DoOnError calls a function for any error on the stream.
 func (o Observable) DoOnError(f func(err error)) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			if err != nil {
 				f(err)
@@ -1033,7 +1035,7 @@ func (o Observable) DoOnError(f func(err error)) Observable {
 
 // ElementAt emit only item n emitted by an Observable
 func (o Observable) ElementAt(n int) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		i := 0
 		observer := func(next interface{}, err error, done bool) {
 			if done || i == n {
@@ -1050,7 +1052,7 @@ func (o Observable) ElementAt(n int) Observable {
 
 // Filter emits only those items from an Observable that pass a predicate test.
 func (o Observable) Filter(predicate func(next interface{}) bool) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			if done || predicate(next) {
 				observe(next, err, done)
@@ -1066,7 +1068,7 @@ func (o Observable) Filter(predicate func(next interface{}) bool) Observable {
 // Finally applies a function for any error or completion on the stream.
 // This doesn't expose whether this was an error or a completion.
 func (o Observable) Finally(f func()) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			if done {
 				f()
@@ -1082,7 +1084,7 @@ func (o Observable) Finally(f func()) Observable {
 
 // First emits only the first item, or the first item that meets a condition, from an Observable.
 func (o Observable) First() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		start := true
 		observer := func(next interface{}, err error, done bool) {
 			if done || start {
@@ -1099,7 +1101,7 @@ func (o Observable) First() Observable {
 
 // IgnoreCompletion only emits items and never completes, neither with Error nor with Complete.
 func (o Observable) IgnoreCompletion() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			if !done {
 				observe(next, err, done)
@@ -1114,7 +1116,7 @@ func (o Observable) IgnoreCompletion() Observable {
 
 // IgnoreElements does not emit any items from an Observable but mirrors its termination notification.
 func (o Observable) IgnoreElements() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			if done {
 				observe(next, err, done)
@@ -1129,7 +1131,7 @@ func (o Observable) IgnoreElements() Observable {
 
 // Last emits only the last item emitted by an Observable.
 func (o Observable) Last() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		have := false
 		var last interface{}
 		observer := func(next interface{}, err error, done bool) {
@@ -1153,7 +1155,7 @@ func (o Observable) Last() Observable {
 // Map transforms the items emitted by an Observable by applying a
 // function to each item.
 func (o Observable) Map(project func(interface{}) interface{}) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			var mapped interface{}
 			if !done {
@@ -1171,7 +1173,7 @@ func (o Observable) Map(project func(interface{}) interface{}) Observable {
 // MapObservable transforms the items emitted by an ObservableInt by applying a
 // function to each item.
 func (o ObservableInt) MapObservable(project func(int) Observable) ObservableObservable {
-	observable := func(observe ObservableObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe ObservableObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next int, err error, done bool) {
 			var mapped Observable
 			if !done {
@@ -1189,7 +1191,7 @@ func (o ObservableInt) MapObservable(project func(int) Observable) ObservableObs
 // Max determines, and emits, the maximum-valued item emitted by an
 // ObservableInt.
 func (o ObservableInt) Max() ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		var started bool
 		var max int
 		observer := func(next int, err error, done bool) {
@@ -1220,7 +1222,7 @@ func (o ObservableInt) Max() ObservableInt {
 
 // MergeAll flattens a higher order observable by merging the observables it emits.
 func (o ObservableObservable) MergeAll() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		var observers struct {
 			sync.Mutex
 			done	bool
@@ -1269,7 +1271,7 @@ func (o Observable) MergeDelayError(other ...Observable) Observable {
 	if len(other) == 0 {
 		return o
 	}
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		var observers struct {
 			sync.Mutex
 			len	int
@@ -1319,7 +1321,7 @@ func (o Observable) MergeMap(project func(interface{}) Observable) Observable {
 // Min determines, and emits, the minimum-valued item emitted by an
 // ObservableInt.
 func (o ObservableInt) Min() ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		var started bool
 		var min int
 		observer := func(next int, err error, done bool) {
@@ -1351,7 +1353,7 @@ func (o ObservableInt) Min() ObservableInt {
 
 // ObserveOn specifies a schedule function to use for delivering values to the observer.
 func (o Observable) ObserveOn(schedule func(task func())) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			task := func() {
 				observe(next, err, done)
@@ -1368,7 +1370,7 @@ func (o Observable) ObserveOn(schedule func(task func())) Observable {
 // OnlyBool filters the value stream of an Observable of interface{} and outputs only the
 // bool typed values.
 func (o Observable) OnlyBool() ObservableBool {
-	observable := func(observe BoolObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe BoolObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			if !done {
 				if nextBool, ok := next.(bool); ok {
@@ -1388,7 +1390,7 @@ func (o Observable) OnlyBool() ObservableBool {
 // OnlyInt filters the value stream of an Observable of interface{} and outputs only the
 // int typed values.
 func (o Observable) OnlyInt() ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			if !done {
 				if nextInt, ok := next.(int); ok {
@@ -1410,7 +1412,7 @@ func (o Observable) OnlyInt() ObservableInt {
 // is passed to the reducer for the first item emitted by the Observable.
 // Reduce emits only the final value.
 func (o Observable) Reduce(reducer func(interface{}, interface{}) interface{}, seed interface{}) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		state := seed
 		observer := func(next interface{}, err error, done bool) {
 			if !done {
@@ -1434,9 +1436,9 @@ func (o Observable) Repeat(count int) Observable {
 	if count == 0 {
 		return Empty()
 	}
-	observable := func(observe ObserveFunc, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		var repeated int
-		var observer ObserveFunc
+		var observer Observer
 		observer = func(next interface{}, err error, done bool) {
 			if !done || err != nil {
 				observe(next, err, done)
@@ -1459,8 +1461,8 @@ func (o Observable) Repeat(count int) Observable {
 // Retry if a source Observable sends an error notification, resubscribe to
 // it in the hopes that it will complete without error.
 func (o Observable) Retry() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
-		var observer ObserveFunc
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		var observer Observer
 		observer = func(next interface{}, err error, done bool) {
 			if err != nil {
 				o(observer, subscribeOn, subscriber)
@@ -1477,7 +1479,7 @@ func (o Observable) Retry() Observable {
 
 // Sample emits the most recent item emitted by an Observable within periodic time intervals.
 func (o Observable) Sample(window time.Duration) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		var unsubscribe = make(chan struct{})
 		var last struct {
 			sync.Mutex
@@ -1533,7 +1535,7 @@ func (o Observable) Sample(window time.Duration) Observable {
 // seed argument that is passed to the accumulator for the first item emitted
 // by the Observable. Scan emits every value, both intermediate and final.
 func (o Observable) Scan(accumulator func(interface{}, interface{}) interface{}, seed interface{}) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		state := seed
 		observer := func(next interface{}, err error, done bool) {
 			if !done {
@@ -1554,7 +1556,7 @@ func (o Observable) Scan(accumulator func(interface{}, interface{}) interface{},
 // completes. If the observable sends no data before completing or sends more
 // than 1 item before completing, this is reported as an error to the observer.
 func (o Observable) Single() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		var (
 			count	int
 			latest	interface{}
@@ -1591,7 +1593,7 @@ func (o Observable) Single() Observable {
 
 // Skip suppresses the first n items emitted by an Observable.
 func (o Observable) Skip(n int) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		i := 0
 		observer := func(next interface{}, err error, done bool) {
 			if done || i >= n {
@@ -1608,7 +1610,7 @@ func (o Observable) Skip(n int) Observable {
 
 // SkipLast suppresses the last n items emitted by an Observable.
 func (o Observable) SkipLast(n int) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		read := 0
 		write := 0
 		n++
@@ -1635,7 +1637,7 @@ func (o Observable) SkipLast(n int) Observable {
 // SubscribeOn specifies the scheduler an Observable should use when it is
 // subscribed to.
 func (o Observable) SubscribeOn(subscribeOn Scheduler) Observable {
-	observable := func(observe ObserveFunc, _ Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, _ Scheduler, subscriber Subscriber) {
 		subscriber.OnWait(subscribeOn.Wait)
 		o(observe, subscribeOn, subscriber)
 	}
@@ -1646,7 +1648,7 @@ func (o Observable) SubscribeOn(subscribeOn Scheduler) Observable {
 
 // Sum calculates the sum of numbers emitted by an ObservableInt and emits this sum.
 func (o ObservableInt) Sum() ObservableInt {
-	observable := func(observe IntObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		var sum int
 		observer := func(next int, err error, done bool) {
 			if !done {
@@ -1690,10 +1692,10 @@ const (
 
 //jig:name link
 
-type linkObserveFunc func(*link, interface{}, error, bool)
+type linkObserver func(*link, interface{}, error, bool)
 
 type link struct {
-	observe		linkObserveFunc
+	observe		linkObserver
 	state		int32
 	callbackState	int32
 	callbackKind	int
@@ -1705,7 +1707,7 @@ func newInitialLink() *link {
 	return &link{state: linkCompleting, subscriber: subscriber.New()}
 }
 
-func newLink(observe linkObserveFunc, subscriber Subscriber) *link {
+func newLink(observe linkObserver, subscriber Subscriber) *link {
 	return &link{
 		observe:	observe,
 		subscriber:	subscriber.Add(),
@@ -1802,7 +1804,7 @@ func (o *link) OnComplete(callback func()) error {
 // SwitchAll converts an Observable that emits Observables into a single Observable
 // that emits the items emitted by the most-recently-emitted of those Observables.
 func (o ObservableObservable) SwitchAll() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(link *link, next interface{}, err error, done bool) {
 			if !done || err != nil {
 				observe(next, err, done)
@@ -1859,7 +1861,7 @@ func (o Observable) SwitchMap(project func(interface{}) Observable) Observable {
 
 // Take emits only the first n items emitted by an Observable.
 func (o Observable) Take(n int) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		taken := 0
 		observer := func(next interface{}, err error, done bool) {
 			if taken < n {
@@ -1888,7 +1890,7 @@ func (o ObservableInt) Take(n int) ObservableInt {
 
 // TakeLast emits only the last n items emitted by an Observable.
 func (o Observable) TakeLast(n int) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		read := 0
 		write := 0
 		n++
@@ -1917,7 +1919,7 @@ func (o Observable) TakeLast(n int) Observable {
 
 // TakeUntil emits items emitted by an Observable until another Observable emits an item.
 func (o Observable) TakeUntil(other Observable) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		var watcherNext int32
 		watcherSubscriber := subscriber.Add()
 		watcher := func(next interface{}, err error, done bool) {
@@ -1948,7 +1950,7 @@ func (o Observable) TakeUntil(other Observable) Observable {
 // becomes false, at which point TakeWhile stops mirroring the source Observable and terminates
 // its own Observable.
 func (o Observable) TakeWhile(condition func(next interface{}) bool) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			if done || condition(next) {
 				observe(next, err, done)
@@ -1966,7 +1968,7 @@ func (o Observable) TakeWhile(condition func(next interface{}) bool) Observable 
 // Serialize forces an Observable to make serialized calls and to be
 // well-behaved.
 func (o Observable) Serialize() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		var observer struct {
 			sync.Mutex
 			done	bool
@@ -1993,7 +1995,7 @@ const ErrTimeout = RxError("timeout")
 // particular period of time elapses without any emitted items.
 // Timeout schedules tasks on the scheduler passed to this
 func (o Observable) Timeout(timeout time.Duration) Observable {
-	observable := Observable(func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := Observable(func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		if subscriber.Canceled() {
 			return
 		}
@@ -2129,7 +2131,7 @@ type Subscription = subscriber.Subscription
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
 // Subscribe by default is performed on the Trampoline scheduler.
-func (o Observable) Subscribe(observe ObserveFunc, subscribers ...Subscriber) Subscription {
+func (o Observable) Subscribe(observe Observer, subscribers ...Subscriber) Subscription {
 	subscribers = append(subscribers, NewSubscriber())
 	scheduler := TrampolineScheduler()
 	observer := func(next interface{}, err error, done bool) {
@@ -2150,7 +2152,7 @@ func (o Observable) Subscribe(observe ObserveFunc, subscribers ...Subscriber) Su
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
 // Subscribe by default is performed on the Trampoline scheduler.
-func (o ObservableBool) Subscribe(observe BoolObserveFunc, subscribers ...Subscriber) Subscription {
+func (o ObservableBool) Subscribe(observe BoolObserver, subscribers ...Subscriber) Subscription {
 	subscribers = append(subscribers, NewSubscriber())
 	scheduler := TrampolineScheduler()
 	observer := func(next bool, err error, done bool) {
@@ -2171,7 +2173,7 @@ func (o ObservableBool) Subscribe(observe BoolObserveFunc, subscribers ...Subscr
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
 // Subscribe by default is performed on the Trampoline scheduler.
-func (o ObservableInt) Subscribe(observe IntObserveFunc, subscribers ...Subscriber) Subscription {
+func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber) Subscription {
 	subscribers = append(subscribers, NewSubscriber())
 	scheduler := TrampolineScheduler()
 	observer := func(next int, err error, done bool) {
@@ -2552,32 +2554,32 @@ func (o ObservableInt) Wait() (err error) {
 	return
 }
 
-//jig:name SliceObserveFunc
+//jig:name _sObserver
 
-// SliceObserveFunc is the observer, a function that gets called whenever the
-// observable has something to report. The next argument is the item value that
-// is only valid when the done argument is false. When done is true and the err
-// argument is not nil, then the observable has terminated with an error.
-// When done is true and the err argument is nil, then the observable has
+// _sObserver is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
 // completed normally.
-type SliceObserveFunc func(next Slice, err error, done bool)
+type _sObserver func(next _s, err error, done bool)
 
-//jig:name zeroSlice
+//jig:name Observable_s
 
-var zeroSlice Slice
+// Observable_s is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type Observable_s func(_sObserver, Scheduler, Subscriber)
 
-//jig:name ObservableSlice
+//jig:name zero_s
 
-// ObservableSlice is essentially a subscribe function taking an observe
-// function, scheduler and an subscriber.
-type ObservableSlice func(SliceObserveFunc, Scheduler, Subscriber)
+var zero_s _s
 
 //jig:name ObservableMapObservable
 
 // MapObservable transforms the items emitted by an Observable by applying a
 // function to each item.
 func (o Observable) MapObservable(project func(interface{}) Observable) ObservableObservable {
-	observable := func(observe ObservableObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe ObservableObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			var mapped Observable
 			if !done {

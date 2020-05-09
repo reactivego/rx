@@ -71,7 +71,7 @@ func Example_publishRefCount() {
 	s := FromChanInt(ch).Publish().RefCount().SubscribeOn(scheduler)
 	a := []int{}
 	b := []int{}
-	appendToSlice := func(slice *[]int) IntObserveFunc {
+	appendToSlice := func(slice *[]int) IntObserver {
 		return func(next int, err error, done bool) {
 			if !done {
 				*slice = append(*slice, next)

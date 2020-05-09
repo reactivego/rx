@@ -5,26 +5,17 @@ import (
 	"sync/atomic"
 )
 
-//jig:template <Foo>Slice
+//jig:template _<Foo>s
 
-type FooSlice []foo
-
-//jig:template CombineLatest<Foo>
-//jig:needs ObservableObservable<Foo> CombineAll
-
-// Combines multiple Observables to create an Observable whose values are
-// calculated from the latest values of each of its input Observables.
-func CombineLatestFoo(observables ...ObservableFoo) ObservableFooSlice {
-	return FromObservableFoo(observables...).CombineAll()
-}
+type _Foos = []foo
 
 //jig:template ObservableObservable<Foo> CombineAll
-//jig:needs <Foo>Slice, zero<Foo>
+//jig:needs _<Foo>s, zero<Foo>
 
 // CombineAll flattens an ObservableObservableFoo by applying combineLatest
 // when the ObservableObservableFoo completes.
-func (o ObservableObservableFoo) CombineAll() ObservableFooSlice {
-	observable := func(observe FooSliceObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+func (o ObservableObservableFoo) CombineAll() Observable_Foos {
+	observable := func(observe _FoosObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observables := []ObservableFoo(nil)
 		var observers struct {
 			sync.Mutex
@@ -32,7 +23,7 @@ func (o ObservableObservableFoo) CombineAll() ObservableFooSlice {
 			initialized int
 			active int
 		}
-		makeObserver := func(index int) FooObserveFunc {
+		makeObserver := func(index int) FooObserver {
 			observer := func(next foo, err error, done bool) {
 				observers.Lock()
 				defer observers.Unlock()
@@ -48,10 +39,10 @@ func (o ObservableObservableFoo) CombineAll() ObservableFooSlice {
 						}
 					case err != nil:
 						observers.active = 0
-						observe(zeroFooSlice, err, true)
+						observe(zero_Foos, err, true)
 					default:
 						if observers.active--; observers.active == 0 {
-							observe(zeroFooSlice, nil, true)
+							observe(zero_Foos, nil, true)
 						}
 					}
 				}
@@ -64,7 +55,7 @@ func (o ObservableObservableFoo) CombineAll() ObservableFooSlice {
 			case !done:
 				observables = append(observables, next)
 			case err != nil:
-				observe(zeroFooSlice, err, true)
+				observe(zero_Foos, err, true)
 			default:
 				subscribeOn.Schedule(func() {
 					if !subscriber.Canceled() {
@@ -86,6 +77,15 @@ func (o ObservableObservableFoo) CombineAll() ObservableFooSlice {
 	return observable
 }
 
+//jig:template CombineLatest<Foo>
+//jig:needs ObservableObservable<Foo> CombineAll
+
+// Combines multiple Observables to create an Observable whose values are
+// calculated from the latest values of each of its input Observables.
+func CombineLatestFoo(observables ...ObservableFoo) Observable_Foos {
+	return FromObservableFoo(observables...).CombineAll()
+}
+
 //jig:template Concat<Foo>
 //jig:needs Observable<Foo> Concat
 
@@ -98,16 +98,17 @@ func ConcatFoo(observables ...ObservableFoo) ObservableFoo {
 }
 
 //jig:template Observable<Foo> Concat
+//jig:needs zero<Foo>
 
 // Concat emits the emissions from two or more ObservableFoos without interleaving them.
 func (o ObservableFoo) Concat(other ...ObservableFoo) ObservableFoo {
 	if len(other) == 0 {
 		return o
 	}
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		var (
 			observables = append([]ObservableFoo{}, other...)
-			observer    FooObserveFunc
+			observer    FooObserver
 		)
 		observer = func(next foo, err error, done bool) {
 			if !done || err != nil {
@@ -128,14 +129,15 @@ func (o ObservableFoo) Concat(other ...ObservableFoo) ObservableFoo {
 }
 
 //jig:template ObservableObservable<Foo> ConcatAll
+//jig:needs zero<Foo>
 
 // ConcatAll flattens a higher order observable by concattenating the observables it emits.
 func (o ObservableObservableFoo) ConcatAll() ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		var (
 			mutex       sync.Mutex
 			observables []ObservableFoo
-			observer    FooObserveFunc
+			observer    FooObserver
 		)
 		observer = func(next foo, err error, done bool) {
 			mutex.Lock()
@@ -181,6 +183,7 @@ func MergeFoo(observables ...ObservableFoo) ObservableFoo {
 }
 
 //jig:template Observable<Foo> Merge
+//jig:needs zero<Foo>
 
 // Merge combines multiple Observables into one by merging their emissions.
 // An error from any of the observables will terminate the merged observables.
@@ -188,7 +191,7 @@ func (o ObservableFoo) Merge(other ...ObservableFoo) ObservableFoo {
 	if len(other) == 0 {
 		return o
 	}
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		var observers struct {
 			sync.Mutex
 			done bool
@@ -228,10 +231,11 @@ func (o ObservableFoo) Merge(other ...ObservableFoo) ObservableFoo {
 }
 
 //jig:template ObservableObservable<Foo> MergeAll
+//jig:meeds zero<Foo>
 
 // MergeAll flattens a higher order observable by merging the observables it emits.
 func (o ObservableObservableFoo) MergeAll() ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		var observers struct {
 			sync.Mutex
 			done bool
@@ -285,6 +289,7 @@ func MergeDelayErrorFoo(observables ...ObservableFoo) ObservableFoo {
 }
 
 //jig:template Observable<Foo> MergeDelayError
+//jig:needs zero<Foo>
 
 // MergeDelayError combines multiple Observables into one by merging their emissions.
 // Any error will be deferred until all observables terminate.
@@ -292,7 +297,7 @@ func (o ObservableFoo) MergeDelayError(other ...ObservableFoo) ObservableFoo {
 	if len(other) == 0 {
 		return o
 	}
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		var observers struct {
 			sync.Mutex
 			len int
@@ -329,12 +334,12 @@ func (o ObservableFoo) MergeDelayError(other ...ObservableFoo) ObservableFoo {
 }
 
 //jig:template ObservableObservable<Foo> SwitchAll
-//jig:needs link<Foo>
+//jig:needs link<Foo>, zero<Foo>
 
 // SwitchAll converts an Observable that emits Observables into a single Observable
 // that emits the items emitted by the most-recently-emitted of those Observables.
 func (o ObservableObservableFoo) SwitchAll() ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(link *linkFoo, next foo, err error, done bool) {
 			if !done || err != nil {
 				observe(next, err, done)

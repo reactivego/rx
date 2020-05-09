@@ -10,7 +10,7 @@ import (
 // Debounce only emits the last item of a burst from an Observable if a
 // particular timespan has passed without it emitting another item.
 func (o Observable) Debounce(duration time.Duration) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		valuech := make(chan interface{})
 		donech := make(chan error)
 		debouncer := func() {
@@ -67,7 +67,7 @@ func (o ObservableFoo) Debounce(duration time.Duration) ObservableFoo {
 
 // Distinct suppress duplicate items emitted by an Observable
 func (o Observable) Distinct() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		seen := map[interface{}]struct{}{}
 		observer := func(next interface{}, err error, done bool) {
 			if !done {
@@ -95,7 +95,7 @@ func (o ObservableFoo) Distinct() ObservableFoo {
 
 // ElementAt emit only item n emitted by an Observable
 func (o Observable) ElementAt(n int) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		i := 0
 		observer := func(next interface{}, err error, done bool) {
 			if done || i == n {
@@ -120,7 +120,7 @@ func (o ObservableFoo) ElementAt(n int) ObservableFoo {
 
 // Filter emits only those items from an ObservableFoo that pass a predicate test.
 func (o ObservableFoo) Filter(predicate func(next foo) bool) ObservableFoo {
-	observable := func(observe FooObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next foo, err error, done bool) {
 			if done || predicate(next) {
 				observe(next, err, done)
@@ -135,7 +135,7 @@ func (o ObservableFoo) Filter(predicate func(next foo) bool) ObservableFoo {
 
 // First emits only the first item, or the first item that meets a condition, from an Observable.
 func (o Observable) First() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		start := true
 		observer := func(next interface{}, err error, done bool) {
 			if done || start {
@@ -160,7 +160,7 @@ func (o ObservableFoo) First() ObservableFoo {
 
 // IgnoreElements does not emit any items from an Observable but mirrors its termination notification.
 func (o Observable) IgnoreElements() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			if done {
 				observe(next, err, done)
@@ -183,7 +183,7 @@ func (o ObservableFoo) IgnoreElements() ObservableFoo {
 
 // IgnoreCompletion only emits items and never completes, neither with Error nor with Complete.
 func (o Observable) IgnoreCompletion() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			if !done {
 				observe(next, err, done)
@@ -206,7 +206,7 @@ func (o ObservableFoo) IgnoreCompletion() ObservableFoo {
 
 // Last emits only the last item emitted by an Observable.
 func (o Observable) Last() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		have := false
 		var last interface{}
 		observer := func(next interface{}, err error, done bool) {
@@ -239,7 +239,7 @@ func (o ObservableFoo) Last() ObservableFoo {
 
 // Sample emits the most recent item emitted by an Observable within periodic time intervals.
 func (o Observable) Sample(window time.Duration) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		var unsubscribe = make(chan struct{})
 		var last struct {
 			sync.Mutex
@@ -304,7 +304,7 @@ func (o ObservableFoo) Sample(window time.Duration) ObservableFoo {
 // completes. If the observable sends no data before completing or sends more
 // than 1 item before completing, this is reported as an error to the observer.
 func (o Observable) Single() Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		var (
 			count  int
 			latest interface{}
@@ -350,7 +350,7 @@ func (o ObservableFoo) Single() ObservableFoo {
 
 // Skip suppresses the first n items emitted by an Observable.
 func (o Observable) Skip(n int) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		i := 0
 		observer := func(next interface{}, err error, done bool) {
 			if done || i >= n {
@@ -374,7 +374,7 @@ func (o ObservableFoo) Skip(n int) ObservableFoo {
 
 // SkipLast suppresses the last n items emitted by an Observable.
 func (o Observable) SkipLast(n int) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		read := 0
 		write := 0
 		n++
@@ -408,7 +408,7 @@ func (o ObservableFoo) SkipLast(n int) ObservableFoo {
 
 // Take emits only the first n items emitted by an Observable.
 func (o Observable) Take(n int) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		taken := 0
 		observer := func(next interface{}, err error, done bool) {
 			if taken < n {
@@ -438,7 +438,7 @@ func (o ObservableFoo) Take(n int) ObservableFoo {
 
 // TakeLast emits only the last n items emitted by an Observable.
 func (o Observable) TakeLast(n int) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		read := 0
 		write := 0
 		n++

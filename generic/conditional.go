@@ -3,7 +3,7 @@ package rx
 import "sync/atomic"
 
 //jig:template Observable All
-//jig:needs ObservableBool
+//jig:needs ObservableBool, zeroBool
 
 // All determines whether all items emitted by an Observable meet some
 // criteria.
@@ -16,7 +16,7 @@ import "sync/atomic"
 // true according to this predicate; false if any item emitted by the source
 // Observable evaluates as false according to this predicate.
 func (o Observable) All(predicate func(next interface{}) bool) ObservableBool {
-	observable := func(observe BoolObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe BoolObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			switch {
 			case !done:
@@ -56,6 +56,7 @@ func (o ObservableFoo) All(predicate func(next foo) bool) ObservableBool {
 }
 
 //jig:template Observable TakeWhile
+//jig:needs zero
 
 // TakeWhile mirrors items emitted by an Observable until a specified condition becomes false.
 //
@@ -63,7 +64,7 @@ func (o ObservableFoo) All(predicate func(next foo) bool) ObservableBool {
 // becomes false, at which point TakeWhile stops mirroring the source Observable and terminates
 // its own Observable.
 func (o Observable) TakeWhile(condition func(next interface{}) bool) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			if done || condition(next) {
 				observe(next, err, done)
@@ -92,10 +93,11 @@ func (o ObservableFoo) TakeWhile(condition func(next foo) bool) ObservableFoo {
 }
 
 //jig:template Observable TakeUntil
+//jig:needs zero
 
 // TakeUntil emits items emitted by an Observable until another Observable emits an item.
 func (o Observable) TakeUntil(other Observable) Observable {
-	observable := func(observe ObserveFunc, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		var watcherNext int32
 		watcherSubscriber := subscriber.Add()
 		watcher := func (next interface{}, err error, done bool) {
