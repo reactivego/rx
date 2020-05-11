@@ -15,8 +15,8 @@ datatypes with interface{} (it can also generate statically typed code though).
 To regenerate, change the current working directory to the package directory
 and run the jig tool as follows:
 
-	$ go get -d github.com/reactivego/generics/cmd/jig
-	$ go run github.com/reactivego/generics/cmd/jig -v
+	$ go get -d github.com/reactivego/jig
+	$ go run github.com/reactivego/jig -v
 
 Observables
 

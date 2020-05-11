@@ -34,7 +34,7 @@ Package `rx` provides [Reactive Extensions](http://reactivex.io/), an API for as
 
 ## Regenerating this Package
 
-This package is generated from the sub-folder generic by the [jig](http://github.com/reactivego/generics) tool.
+This package is generated from the sub-folder generic by the [jig](http://github.com/reactivego/jig) tool.
 You don't need to regenerate the package in order to use it. However, if you are
 interested in regenerating it, then read on.
 
@@ -46,8 +46,8 @@ To regenerate, change the current working directory to the package directory
 and run the jig tool as follows:
 
 ```bash
-$ go get -d github.com/reactivego/generics/cmd/jig
-$ go run github.com/reactivego/generics/cmd/jig -v
+$ go get -d github.com/reactivego/jig
+$ go run github.com/reactivego/jig -v
 ```
 
 ## Observables
