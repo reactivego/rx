@@ -24,7 +24,9 @@ Then you use the code as follows:
 You'll need to generate the observables and operators by running the jig tool.
 For details about the jig tool see https://github.com/reactivego/jig 
 
-For more information about the available generics see https://godoc.org/github.com/reactivego/rx/generic 
+For more information about the available generic functions and operators
+see the list of operators below. Every implemented operator has a link
+to an example where it is showed being used in a statically typed context.
 
 Observables
 

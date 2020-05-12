@@ -30,10 +30,11 @@ You can now build and run the generated code:
 
 	go run *.go
 
-For more info see https://github.com/reactivego/rx/tree/master/generic.
-
-For an overview of all implemented operators, see
+For more information about the available generic functions and operators
+see either:
 https://github.com/reactivego/rx#operators
+or
+https://godoc.org/github.com/reactivego/rx
 */
 package rx
 

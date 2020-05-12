@@ -179,7 +179,7 @@ Operators that work with multiple source observables to create a single observab
 | Race          | RaceWith          | RaceMap          | RaceMapTo          | RaceAll          |
 | [**CombineLatest**](https://godoc.org/github.com/reactivego/rx/test/CombineLatest/) | [**CombineLatestWith**](https://godoc.org/github.com/reactivego/rx/test/CombineLatestWith/) | [**CombineLatestMap**](https://godoc.org/github.com/reactivego/rx/test/CombineLatestMap/) | [**CombineLatestMapTo**](https://godoc.org/github.com/reactivego/rx/test/CombineLatestMapTo/) | [**CombineLatestAll**](https://godoc.org/github.com/reactivego/rx/test/CombineLatestAll/) |
 | Zip           | ZipWith           | ZipMap           | ZipMapTo           | ZipAll           |
-| ?             | WithLatestFrom    | ?                | ?                  | ?                |
+| ?             | WithLatestFrom :star:| ?                | ?                  | ?                |
 | ForkJoin      | ?                 | ?                | ?                  | ?                |
 
 **Concat**, **Switch** and **Exhaust** are all operators that flatten the emissions of multiple observables into a single stream by subscribing to every observable *stricly in sequence*. Observables may be added while the flattening is already going on.
@@ -187,51 +187,6 @@ Operators that work with multiple source observables to create a single observab
 **Merge**, **MergeDelayError** and **Race** are operators that flatten the emissions of multiple observables into a single stream by subscribing to all observables *concurrently*. Here also, observables may be added while the flattening is already going on.
 
 **CombineLatest**, **Zip**, **WithLatestFrom** and **ForkJoin** are operators that flatten the emissions of multiple observables into a single observable that emits slices of values. Differently from the previous two sets of operators, these operators only start emitting once the list of observables to flatten is complete. 
-
-#### Concat
-
-- [**Concat**](https://godoc.org/github.com/reactivego/rx/test/Concat/)() :star: Observable
-- (Observable) [**ConcatWith**](https://godoc.org/github.com/reactivego/rx/test/ConcatWith/)() :star: Observable
-- (Observable) [**ConcatMap**](https://godoc.org/github.com/reactivego/rx/test/ConcatMap/)() Observable
-- (Observable) [**ConcatMapTo**](https://godoc.org/github.com/reactivego/rx/test/ConcatMapTo/)() Observable
-- (Observable<sup>2</sup>) [**ConcatAll**](https://godoc.org/github.com/reactivego/rx/test/ConcatAll/)() Observable
-
-#### Switch
-
-- (Observable) [**SwitchMap**](https://godoc.org/github.com/reactivego/rx/test/SwitchMap/)() :star: Observable
-- (Observable<sup>2</sup>) [**SwitchAll**](https://godoc.org/github.com/reactivego/rx/test/SwitchAll/)() Observable
-
-#### Merge
-
-- [**Merge**](https://godoc.org/github.com/reactivego/rx/test/Merge/)() :star: Observable
-- (Observable) [**MergeWith**](https://godoc.org/github.com/reactivego/rx/test/MergeWith/)() :star: Observable
-- (Observable) [**MergeMap**](https://godoc.org/github.com/reactivego/rx/test/MergeMap/)() :star: Observable
-- (Observable<sup>2</sup>) [**MergeAll**](https://godoc.org/github.com/reactivego/rx/test/MergeAll/)() Observable
-
-#### MergeDelayError
-
-- [**MergeDelayError**](https://godoc.org/github.com/reactivego/rx/test/MergeDelayError/)() Observable
-- (Observable) [**MergeDelayErrorWith**](https://godoc.org/github.com/reactivego/rx/test/MergeDelayErrorWith/)() Observable
-
-#### CombineLatest
-
-- [**CombineLatest**](https://godoc.org/github.com/reactivego/rx/test/CombineLatest/)() Observable
-- (Observable) [**CombineLatestWith**](https://godoc.org/github.com/reactivego/rx/test/CombineLatestWith/)() Observable
-- (Observable) [**CombineLatestMap**](https://godoc.org/github.com/reactivego/rx/test/CombineLatestMap/)() Observable
-- (Observable) [**CombineLatestMapTo**](https://godoc.org/github.com/reactivego/rx/test/CombineLatestMapTo/)() Observable
-- (Observable<sup>2</sup>) [**CombineLatestAll**](https://godoc.org/github.com/reactivego/rx/test/CombineLatestAll/)() Observable
-
-#### Zip
-
-- ZipFromObservable(publisher Observable, zipper Function2) Observable
-
-#### WithLatestFrom
-
-- WithLatestFrom :star:
-
-#### ForkJoin
-
-- ForkJoin
 
 ### Error Handling Operators
 Operators that help to recover from error notifications from an Observable.
