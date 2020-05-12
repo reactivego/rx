@@ -11,22 +11,17 @@ import (
 	"github.com/reactivego/subscriber"
 )
 
+//jig:name Scheduler
+
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler = scheduler.Scheduler
+
 //jig:name Subscriber
 
 // Subscriber is an interface that can be passed in when subscribing to an
 // Observable. It allows a set of observable subscriptions to be canceled
 // from a single subscriber at the root of the subscription tree.
 type Subscriber = subscriber.Subscriber
-
-// NewSubscriber creates a new subscriber.
-func NewSubscriber() Subscriber {
-	return subscriber.New()
-}
-
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler = scheduler.Scheduler
 
 //jig:name Observer
 
@@ -44,14 +39,11 @@ type Observer func(next interface{}, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type Observable func(Observer, Scheduler, Subscriber)
 
-//jig:name zero
-
-var zero interface{}
-
 //jig:name From
 
 // From creates an Observable from multiple interface{} values passed in.
 func From(slice ...interface{}) Observable {
+	var zero interface{}
 	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -72,6 +64,13 @@ func From(slice ...interface{}) Observable {
 	return observable
 }
 
+//jig:name NewSubscriber
+
+// NewSubscriber creates a new subscriber.
+func NewSubscriber() Subscriber {
+	return subscriber.New()
+}
+
 //jig:name IntObserver
 
 // IntObserver is a function that gets called whenever the Observable has
@@ -87,10 +86,6 @@ type IntObserver func(next int, err error, done bool)
 // ObservableInt is a function taking an Observer, Scheduler and Subscriber.
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableInt func(IntObserver, Scheduler, Subscriber)
-
-//jig:name zeroInt
-
-var zeroInt int
 
 //jig:name Range
 
@@ -108,7 +103,7 @@ func Range(start, count int) ObservableInt {
 						self()
 					}
 				} else {
-					observe(zeroInt, nil, true)
+					observe(0, nil, true)
 				}
 			}
 		})
@@ -147,6 +142,7 @@ type Next func(interface{})
 // Complete and Canceled function that can be called by the code that
 // implements the Observable.
 func Create(create func(Next, Error, Complete, Canceled)) Observable {
+	var zero interface{}
 	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
 			if subscriber.Canceled() {
@@ -183,16 +179,6 @@ type RxError string
 
 func (e RxError) Error() string	{ return string(e) }
 
-//jig:name Schedulers
-
-func TrampolineScheduler() Scheduler {
-	return scheduler.Trampoline
-}
-
-func GoroutineScheduler() Scheduler {
-	return scheduler.Goroutine
-}
-
 //jig:name ObservableToChan
 
 // ToChan returns a channel that emits interface{} values. If the source
@@ -205,8 +191,8 @@ func GoroutineScheduler() Scheduler {
 // by the calling code directly. To cancel ToChan you will need to supply a
 // subscriber that you hold on to.
 func (o Observable) ToChan(subscribers ...Subscriber) <-chan interface{} {
-	scheduler := GoroutineScheduler()
-	subscribers = append(subscribers, NewSubscriber())
+	scheduler := scheduler.Goroutine
+	subscribers = append(subscribers, subscriber.New())
 	donech := make(chan struct{})
 	nextch := make(chan interface{})
 	const (
@@ -266,8 +252,8 @@ func (o Observable) ToChan(subscribers ...Subscriber) <-chan interface{} {
 // by the calling code directly. To cancel ToChan you will need to supply a
 // subscriber that you hold on to.
 func (o ObservableInt) ToChan(subscribers ...Subscriber) <-chan int {
-	scheduler := GoroutineScheduler()
-	subscribers = append(subscribers, NewSubscriber())
+	scheduler := scheduler.Goroutine
+	subscribers = append(subscribers, subscriber.New())
 	donech := make(chan struct{})
 	nextch := make(chan int)
 	const (

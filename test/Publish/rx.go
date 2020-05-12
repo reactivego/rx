@@ -12,22 +12,17 @@ import (
 	"github.com/reactivego/subscriber"
 )
 
+//jig:name Scheduler
+
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler = scheduler.Scheduler
+
 //jig:name Subscriber
 
 // Subscriber is an interface that can be passed in when subscribing to an
 // Observable. It allows a set of observable subscriptions to be canceled
 // from a single subscriber at the root of the subscription tree.
 type Subscriber = subscriber.Subscriber
-
-// NewSubscriber creates a new subscriber.
-func NewSubscriber() Subscriber {
-	return subscriber.New()
-}
-
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler = scheduler.Scheduler
 
 //jig:name IntObserver
 
@@ -45,14 +40,11 @@ type IntObserver func(next int, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableInt func(IntObserver, Scheduler, Subscriber)
 
-//jig:name zeroInt
-
-var zeroInt int
-
 //jig:name FromInt
 
 // FromInt creates an ObservableInt from multiple int values passed in.
 func FromInt(slice ...int) ObservableInt {
+	var zeroInt int
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -73,13 +65,20 @@ func FromInt(slice ...int) ObservableInt {
 	return observable
 }
 
+//jig:name GoroutineScheduler
+
+func GoroutineScheduler() Scheduler {
+	return scheduler.Goroutine
+}
+
 //jig:name FromChanInt
 
 // FromChanInt creates an ObservableInt from a Go channel of int values.
 // It's not possible for the code feeding into the channel to send an error.
-// The feeding code can send zero or more int items and then closing the
+// The feeding code can send nil or more int items and then closing the
 // channel will be seen as completion.
 func FromChanInt(ch <-chan int) ObservableInt {
+	var zeroInt int
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Canceled() {
@@ -108,28 +107,19 @@ func FromChanInt(ch <-chan int) ObservableInt {
 // Subscription is an alias for the subscriber.Subscription interface type.
 type Subscription = subscriber.Subscription
 
-//jig:name Schedulers
-
-func TrampolineScheduler() Scheduler {
-	return scheduler.Trampoline
-}
-
-func GoroutineScheduler() Scheduler {
-	return scheduler.Goroutine
-}
-
 //jig:name ObservableIntSubscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
 // Subscribe by default is performed on the Trampoline scheduler.
 func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber) Subscription {
-	subscribers = append(subscribers, NewSubscriber())
-	scheduler := TrampolineScheduler()
+	subscribers = append(subscribers, subscriber.New())
+	scheduler := scheduler.Trampoline
 	observer := func(next int, err error, done bool) {
 		if !done {
 			observe(next, err, done)
 		} else {
+			var zeroInt int
 			observe(zeroInt, err, true)
 			subscribers[0].Unsubscribe()
 		}
@@ -241,12 +231,14 @@ func (f IntObserver) Next(next int) {
 
 // Error is called by an ObservableInt to report an error to the Observer.
 func (f IntObserver) Error(err error) {
+	var zeroInt int
 	f(zeroInt, err, true)
 }
 
 // Complete is called by an ObservableInt to signal that no more data is
 // forthcoming to the Observer.
 func (f IntObserver) Complete() {
+	var zeroInt int
 	f(zeroInt, nil, true)
 }
 
@@ -398,10 +390,6 @@ type Canceled func() bool
 // Next can be called to emit the next value to the IntObserver.
 type Next func(interface{})
 
-//jig:name zero
-
-var zero interface{}
-
 //jig:name Create
 
 // Create provides a way of creating an Observable from
@@ -412,6 +400,7 @@ var zero interface{}
 // Complete and Canceled function that can be called by the code that
 // implements the Observable.
 func Create(create func(Next, Error, Complete, Canceled)) Observable {
+	var zero interface{}
 	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
 			if subscriber.Canceled() {
@@ -501,9 +490,11 @@ func (o Observable) AsObservableInt() ObservableInt {
 				if nextInt, ok := next.(int); ok {
 					observe(nextInt, err, done)
 				} else {
+					var zeroInt int
 					observe(zeroInt, ErrTypecastToInt, true)
 				}
 			} else {
+				var zeroInt int
 				observe(zeroInt, err, true)
 			}
 		}
@@ -544,22 +535,19 @@ type BoolObserver func(next bool, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableBool func(BoolObserver, Scheduler, Subscriber)
 
-//jig:name zeroString
-
-var zeroString string
-
 //jig:name ObservableStringSubscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
 // Subscribe by default is performed on the Trampoline scheduler.
 func (o ObservableString) Subscribe(observe StringObserver, subscribers ...Subscriber) Subscription {
-	subscribers = append(subscribers, NewSubscriber())
-	scheduler := TrampolineScheduler()
+	subscribers = append(subscribers, subscriber.New())
+	scheduler := scheduler.Trampoline
 	observer := func(next string, err error, done bool) {
 		if !done {
 			observe(next, err, done)
 		} else {
+			var zeroString string
 			observe(zeroString, err, true)
 			subscribers[0].Unsubscribe()
 		}
@@ -569,22 +557,19 @@ func (o ObservableString) Subscribe(observe StringObserver, subscribers ...Subsc
 	return subscribers[0]
 }
 
-//jig:name zeroBool
-
-var zeroBool bool
-
 //jig:name ObservableBoolSubscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
 // Subscribe by default is performed on the Trampoline scheduler.
 func (o ObservableBool) Subscribe(observe BoolObserver, subscribers ...Subscriber) Subscription {
-	subscribers = append(subscribers, NewSubscriber())
-	scheduler := TrampolineScheduler()
+	subscribers = append(subscribers, subscriber.New())
+	scheduler := scheduler.Trampoline
 	observer := func(next bool, err error, done bool) {
 		if !done {
 			observe(next, err, done)
 		} else {
+			var zeroBool bool
 			observe(zeroBool, err, true)
 			subscribers[0].Unsubscribe()
 		}

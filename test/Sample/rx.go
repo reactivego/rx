@@ -13,22 +13,17 @@ import (
 	"github.com/reactivego/subscriber"
 )
 
+//jig:name Scheduler
+
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler = scheduler.Scheduler
+
 //jig:name Subscriber
 
 // Subscriber is an interface that can be passed in when subscribing to an
 // Observable. It allows a set of observable subscriptions to be canceled
 // from a single subscriber at the root of the subscription tree.
 type Subscriber = subscriber.Subscriber
-
-// NewSubscriber creates a new subscriber.
-func NewSubscriber() Subscriber {
-	return subscriber.New()
-}
-
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler = scheduler.Scheduler
 
 //jig:name IntObserver
 
@@ -189,16 +184,6 @@ func (o ObservableInt) AsObservable() Observable {
 	return observable
 }
 
-//jig:name Schedulers
-
-func TrampolineScheduler() Scheduler {
-	return scheduler.Trampoline
-}
-
-func GoroutineScheduler() Scheduler {
-	return scheduler.Goroutine
-}
-
 //jig:name ObservableIntPrintln
 
 // Println subscribes to the Observable and prints every item to os.Stdout
@@ -206,8 +191,8 @@ func GoroutineScheduler() Scheduler {
 // when the Observable completed normally.
 // Println is performed on the Trampoline scheduler.
 func (o ObservableInt) Println() (err error) {
-	subscriber := NewSubscriber()
-	scheduler := TrampolineScheduler()
+	subscriber := subscriber.New()
+	scheduler := scheduler.Trampoline
 	observer := func(next int, e error, done bool) {
 		if !done {
 			fmt.Println(next)
@@ -234,10 +219,6 @@ func (e RxError) Error() string	{ return string(e) }
 // typecast to int.
 const ErrTypecastToInt = RxError("typecast to int failed")
 
-//jig:name zeroInt
-
-var zeroInt int
-
 //jig:name ObservableAsObservableInt
 
 // AsInt turns an Observable of interface{} into an ObservableInt. If during
@@ -249,9 +230,11 @@ func (o Observable) AsObservableInt() ObservableInt {
 				if nextInt, ok := next.(int); ok {
 					observe(nextInt, err, done)
 				} else {
+					var zeroInt int
 					observe(zeroInt, ErrTypecastToInt, true)
 				}
 			} else {
+				var zeroInt int
 				observe(zeroInt, err, true)
 			}
 		}

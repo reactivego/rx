@@ -31,22 +31,17 @@ type Canceled func() bool
 // NextString can be called to emit the next value to the IntObserver.
 type NextString func(string)
 
+//jig:name Scheduler
+
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler = scheduler.Scheduler
+
 //jig:name Subscriber
 
 // Subscriber is an interface that can be passed in when subscribing to an
 // Observable. It allows a set of observable subscriptions to be canceled
 // from a single subscriber at the root of the subscription tree.
 type Subscriber = subscriber.Subscriber
-
-// NewSubscriber creates a new subscriber.
-func NewSubscriber() Subscriber {
-	return subscriber.New()
-}
-
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler = scheduler.Scheduler
 
 //jig:name StringObserver
 
@@ -64,10 +59,6 @@ type StringObserver func(next string, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableString func(StringObserver, Scheduler, Subscriber)
 
-//jig:name zeroString
-
-var zeroString string
-
 //jig:name CreateString
 
 // CreateString provides a way of creating an ObservableString from
@@ -78,6 +69,7 @@ var zeroString string
 // Complete and Canceled function that can be called by the code that
 // implements the Observable.
 func CreateString(create func(NextString, Error, Complete, Canceled)) ObservableString {
+	var zeroString string
 	observable := func(observe StringObserver, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
 			if subscriber.Canceled() {
@@ -108,16 +100,6 @@ func CreateString(create func(NextString, Error, Complete, Canceled)) Observable
 	return observable
 }
 
-//jig:name Schedulers
-
-func TrampolineScheduler() Scheduler {
-	return scheduler.Trampoline
-}
-
-func GoroutineScheduler() Scheduler {
-	return scheduler.Goroutine
-}
-
 //jig:name ObservableStringPrintln
 
 // Println subscribes to the Observable and prints every item to os.Stdout
@@ -125,8 +107,8 @@ func GoroutineScheduler() Scheduler {
 // when the Observable completed normally.
 // Println is performed on the Trampoline scheduler.
 func (o ObservableString) Println() (err error) {
-	subscriber := NewSubscriber()
-	scheduler := TrampolineScheduler()
+	subscriber := subscriber.New()
+	scheduler := scheduler.Trampoline
 	observer := func(next string, e error, done bool) {
 		if !done {
 			fmt.Println(next)

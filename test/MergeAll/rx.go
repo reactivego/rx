@@ -33,22 +33,17 @@ type Canceled func() bool
 // NextObservableString can be called to emit the next value to the IntObserver.
 type NextObservableString func(ObservableString)
 
+//jig:name Scheduler
+
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler = scheduler.Scheduler
+
 //jig:name Subscriber
 
 // Subscriber is an interface that can be passed in when subscribing to an
 // Observable. It allows a set of observable subscriptions to be canceled
 // from a single subscriber at the root of the subscription tree.
 type Subscriber = subscriber.Subscriber
-
-// NewSubscriber creates a new subscriber.
-func NewSubscriber() Subscriber {
-	return subscriber.New()
-}
-
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler = scheduler.Scheduler
 
 //jig:name ObservableStringObserver
 
@@ -66,10 +61,6 @@ type ObservableStringObserver func(next ObservableString, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableObservableString func(ObservableStringObserver, Scheduler, Subscriber)
 
-//jig:name zeroObservableString
-
-var zeroObservableString ObservableString
-
 //jig:name CreateObservableString
 
 // CreateObservableString provides a way of creating an ObservableObservableString from
@@ -80,6 +71,7 @@ var zeroObservableString ObservableString
 // Complete and Canceled function that can be called by the code that
 // implements the Observable.
 func CreateObservableString(create func(NextObservableString, Error, Complete, Canceled)) ObservableObservableString {
+	var zeroObservableString ObservableString
 	observable := func(observe ObservableStringObserver, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
 			if subscriber.Canceled() {
@@ -126,27 +118,18 @@ type StringObserver func(next string, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableString func(StringObserver, Scheduler, Subscriber)
 
-//jig:name zeroString
-
-var zeroString string
-
 //jig:name JustString
 
 // JustString creates an ObservableString that emits a particular item.
 func JustString(element string) ObservableString {
+	var zeroString string
 	observable := func(observe StringObserver, scheduler Scheduler, subscriber Subscriber) {
-		done := false
-		runner := scheduler.ScheduleRecursive(func(self func()) {
+		runner := scheduler.Schedule(func() {
 			if subscriber.Subscribed() {
-				if !done {
-					observe(element, nil, false)
-					if subscriber.Subscribed() {
-						done = true
-						self()
-					}
-				} else {
-					observe(zeroString, nil, true)
-				}
+				observe(element, nil, false)
+			}
+			if subscriber.Subscribed() {
+				observe(zeroString, nil, true)
 			}
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
@@ -173,9 +156,11 @@ func (o ObservableObservableString) MergeAll() ObservableString {
 					observe(next, nil, false)
 				case err != nil:
 					observers.done = true
+					var zeroString string
 					observe(zeroString, err, true)
 				default:
 					if atomic.AddInt32(&observers.len, -1) == 0 {
+						var zeroString string
 						observe(zeroString, nil, true)
 					}
 				}
@@ -186,6 +171,7 @@ func (o ObservableObservableString) MergeAll() ObservableString {
 				atomic.AddInt32(&observers.len, 1)
 				next(observer, subscribeOn, subscriber)
 			} else {
+				var zeroString string
 				observer(zeroString, err, true)
 			}
 		}
@@ -199,16 +185,6 @@ func (o ObservableObservableString) MergeAll() ObservableString {
 	return observable
 }
 
-//jig:name Schedulers
-
-func TrampolineScheduler() Scheduler {
-	return scheduler.Trampoline
-}
-
-func GoroutineScheduler() Scheduler {
-	return scheduler.Goroutine
-}
-
 //jig:name ObservableStringPrintln
 
 // Println subscribes to the Observable and prints every item to os.Stdout
@@ -216,8 +192,8 @@ func GoroutineScheduler() Scheduler {
 // when the Observable completed normally.
 // Println is performed on the Trampoline scheduler.
 func (o ObservableString) Println() (err error) {
-	subscriber := NewSubscriber()
-	scheduler := TrampolineScheduler()
+	subscriber := subscriber.New()
+	scheduler := scheduler.Trampoline
 	observer := func(next string, e error, done bool) {
 		if !done {
 			fmt.Println(next)

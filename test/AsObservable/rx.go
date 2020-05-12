@@ -11,22 +11,17 @@ import (
 	"github.com/reactivego/subscriber"
 )
 
+//jig:name Scheduler
+
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler = scheduler.Scheduler
+
 //jig:name Subscriber
 
 // Subscriber is an interface that can be passed in when subscribing to an
 // Observable. It allows a set of observable subscriptions to be canceled
 // from a single subscriber at the root of the subscription tree.
 type Subscriber = subscriber.Subscriber
-
-// NewSubscriber creates a new subscriber.
-func NewSubscriber() Subscriber {
-	return subscriber.New()
-}
-
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler = scheduler.Scheduler
 
 //jig:name Observer
 
@@ -44,14 +39,11 @@ type Observer func(next interface{}, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type Observable func(Observer, Scheduler, Subscriber)
 
-//jig:name zero
-
-var zero interface{}
-
 //jig:name From
 
 // From creates an Observable from multiple interface{} values passed in.
 func From(slice ...interface{}) Observable {
+	var zero interface{}
 	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -88,14 +80,11 @@ type StringObserver func(next string, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableString func(StringObserver, Scheduler, Subscriber)
 
-//jig:name zeroString
-
-var zeroString string
-
 //jig:name FromString
 
 // FromString creates an ObservableString from multiple string values passed in.
 func FromString(slice ...string) ObservableString {
+	var zeroString string
 	observable := func(observe StringObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -144,10 +133,6 @@ func (e RxError) Error() string	{ return string(e) }
 // typecast to float64.
 const ErrTypecastToFloat64 = RxError("typecast to float64 failed")
 
-//jig:name zeroFloat64
-
-var zeroFloat64 float64
-
 //jig:name ObservableAsObservableFloat64
 
 // AsFloat64 turns an Observable of interface{} into an ObservableFloat64. If during
@@ -159,9 +144,11 @@ func (o Observable) AsObservableFloat64() ObservableFloat64 {
 				if nextFloat64, ok := next.(float64); ok {
 					observe(nextFloat64, err, done)
 				} else {
+					var zeroFloat64 float64
 					observe(zeroFloat64, ErrTypecastToFloat64, true)
 				}
 			} else {
+				var zeroFloat64 float64
 				observe(zeroFloat64, err, true)
 			}
 		}
@@ -183,16 +170,6 @@ func (o ObservableString) AsObservable() Observable {
 	return observable
 }
 
-//jig:name Schedulers
-
-func TrampolineScheduler() Scheduler {
-	return scheduler.Trampoline
-}
-
-func GoroutineScheduler() Scheduler {
-	return scheduler.Goroutine
-}
-
 //jig:name ObservableFloat64Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
@@ -200,8 +177,8 @@ func GoroutineScheduler() Scheduler {
 // when the Observable completed normally.
 // Println is performed on the Trampoline scheduler.
 func (o ObservableFloat64) Println() (err error) {
-	subscriber := NewSubscriber()
-	scheduler := TrampolineScheduler()
+	subscriber := subscriber.New()
+	scheduler := scheduler.Trampoline
 	observer := func(next float64, e error, done bool) {
 		if !done {
 			fmt.Println(next)
@@ -222,8 +199,8 @@ func (o ObservableFloat64) Println() (err error) {
 // Returns either the error or nil when the Observable completed normally.
 // Subscribing is performed on the Trampoline scheduler.
 func (o ObservableFloat64) Wait() (err error) {
-	subscriber := NewSubscriber()
-	scheduler := TrampolineScheduler()
+	subscriber := subscriber.New()
+	scheduler := scheduler.Trampoline
 	observer := func(next float64, e error, done bool) {
 		if done {
 			err = e
@@ -243,8 +220,8 @@ func (o ObservableFloat64) Wait() (err error) {
 // when the Observable completed normally.
 // Println is performed on the Trampoline scheduler.
 func (o Observable) Println() (err error) {
-	subscriber := NewSubscriber()
-	scheduler := TrampolineScheduler()
+	subscriber := subscriber.New()
+	scheduler := scheduler.Trampoline
 	observer := func(next interface{}, e error, done bool) {
 		if !done {
 			fmt.Println(next)

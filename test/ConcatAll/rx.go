@@ -13,22 +13,17 @@ import (
 	"github.com/reactivego/subscriber"
 )
 
+//jig:name Scheduler
+
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler = scheduler.Scheduler
+
 //jig:name Subscriber
 
 // Subscriber is an interface that can be passed in when subscribing to an
 // Observable. It allows a set of observable subscriptions to be canceled
 // from a single subscriber at the root of the subscription tree.
 type Subscriber = subscriber.Subscriber
-
-// NewSubscriber creates a new subscriber.
-func NewSubscriber() Subscriber {
-	return subscriber.New()
-}
-
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler = scheduler.Scheduler
 
 //jig:name IntObserver
 
@@ -70,10 +65,6 @@ func Interval(interval time.Duration) ObservableInt {
 	return observable
 }
 
-//jig:name zeroInt
-
-var zeroInt int
-
 //jig:name Range
 
 // Range creates an ObservableInt that emits a range of sequential integers.
@@ -90,7 +81,7 @@ func Range(start, count int) ObservableInt {
 						self()
 					}
 				} else {
-					observe(zeroInt, nil, true)
+					observe(0, nil, true)
 				}
 			}
 		})
@@ -144,6 +135,19 @@ type Observer func(next interface{}, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type Observable func(Observer, Scheduler, Subscriber)
 
+//jig:name ObservableIntAsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name ObservableIntMapObservableInt
 
 // MapObservableInt transforms the items emitted by an ObservableInt by applying a
@@ -156,19 +160,6 @@ func (o ObservableInt) MapObservableInt(project func(int) ObservableInt) Observa
 				mapped = project(next)
 			}
 			observe(mapped, err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableIntAsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
 		}
 		o(observer, subscribeOn, subscriber)
 	}
@@ -214,9 +205,11 @@ func (o Observable) AsObservableInt() ObservableInt {
 				if nextInt, ok := next.(int); ok {
 					observe(nextInt, err, done)
 				} else {
+					var zeroInt int
 					observe(zeroInt, ErrTypecastToInt, true)
 				}
 			} else {
+				var zeroInt int
 				observe(zeroInt, err, true)
 			}
 		}
@@ -229,6 +222,7 @@ func (o Observable) AsObservableInt() ObservableInt {
 
 // ConcatAll flattens a higher order observable by concattenating the observables it emits.
 func (o ObservableObservableInt) ConcatAll() ObservableInt {
+	var zeroInt int
 	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		var (
 			mutex		sync.Mutex
@@ -266,16 +260,6 @@ func (o ObservableObservableInt) ConcatAll() ObservableInt {
 	return observable
 }
 
-//jig:name Schedulers
-
-func TrampolineScheduler() Scheduler {
-	return scheduler.Trampoline
-}
-
-func GoroutineScheduler() Scheduler {
-	return scheduler.Goroutine
-}
-
 //jig:name ObservableIntPrintln
 
 // Println subscribes to the Observable and prints every item to os.Stdout
@@ -283,8 +267,8 @@ func GoroutineScheduler() Scheduler {
 // when the Observable completed normally.
 // Println is performed on the Trampoline scheduler.
 func (o ObservableInt) Println() (err error) {
-	subscriber := NewSubscriber()
-	scheduler := TrampolineScheduler()
+	subscriber := subscriber.New()
+	scheduler := scheduler.Trampoline
 	observer := func(next int, e error, done bool) {
 		if !done {
 			fmt.Println(next)

@@ -13,6 +13,17 @@ import (
 	"github.com/reactivego/subscriber"
 )
 
+//jig:name Scheduler
+
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler = scheduler.Scheduler
+
+//jig:name TrampolineScheduler
+
+func TrampolineScheduler() Scheduler {
+	return scheduler.Trampoline
+}
+
 //jig:name Error
 
 // Error signals an error condition.
@@ -35,16 +46,6 @@ type NextInt func(int)
 // from a single subscriber at the root of the subscription tree.
 type Subscriber = subscriber.Subscriber
 
-// NewSubscriber creates a new subscriber.
-func NewSubscriber() Subscriber {
-	return subscriber.New()
-}
-
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler = scheduler.Scheduler
-
 //jig:name IntObserver
 
 // IntObserver is a function that gets called whenever the Observable has
@@ -61,10 +62,6 @@ type IntObserver func(next int, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableInt func(IntObserver, Scheduler, Subscriber)
 
-//jig:name zeroInt
-
-var zeroInt int
-
 //jig:name CreateFutureRecursiveInt
 
 // CreateFutureRecursiveInt provides a way of creating an ObservableInt from
@@ -80,6 +77,7 @@ var zeroInt int
 // long CreateFutureRecursiveInt has to wait before calling the create function
 // again.
 func CreateFutureRecursiveInt(timeout time.Duration, create func(NextInt, Error, Complete) time.Duration) ObservableInt {
+	var zeroInt int
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		done := false
 		runner := scheduler.ScheduleFutureRecursive(timeout, func(self func(time.Duration)) {
@@ -142,10 +140,6 @@ func (o Observable) Serialize() Observable {
 	return observable
 }
 
-//jig:name zero
-
-var zero interface{}
-
 //jig:name ObservableTimeout
 
 // ErrTimeout is delivered to an observer if the stream times out.
@@ -178,7 +172,7 @@ func (o Observable) Timeout(timeout time.Duration) Observable {
 				return
 			}
 			last.done = true
-			observe(zero, ErrTimeout, true)
+			observe(nil, ErrTimeout, true)
 		}
 		runner := subscribeOn.ScheduleFutureRecursive(timeout, timer)
 		subscriber.OnUnsubscribe(runner.Cancel)
@@ -257,39 +251,6 @@ func (o ObservableInt) AsObservable() Observable {
 	return observable
 }
 
-//jig:name Schedulers
-
-func TrampolineScheduler() Scheduler {
-	return scheduler.Trampoline
-}
-
-func GoroutineScheduler() Scheduler {
-	return scheduler.Goroutine
-}
-
-//jig:name ObservableIntPrintln
-
-// Println subscribes to the Observable and prints every item to os.Stdout
-// while it waits for completion or error. Returns either the error or nil
-// when the Observable completed normally.
-// Println is performed on the Trampoline scheduler.
-func (o ObservableInt) Println() (err error) {
-	subscriber := NewSubscriber()
-	scheduler := TrampolineScheduler()
-	observer := func(next int, e error, done bool) {
-		if !done {
-			fmt.Println(next)
-		} else {
-			err = e
-			subscriber.Unsubscribe()
-		}
-	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
-}
-
 //jig:name ErrTypecastToInt
 
 // ErrTypecastToInt is delivered to an observer if the generic value cannot be
@@ -307,13 +268,38 @@ func (o Observable) AsObservableInt() ObservableInt {
 				if nextInt, ok := next.(int); ok {
 					observe(nextInt, err, done)
 				} else {
+					var zeroInt int
 					observe(zeroInt, ErrTypecastToInt, true)
 				}
 			} else {
+				var zeroInt int
 				observe(zeroInt, err, true)
 			}
 		}
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
+}
+
+//jig:name ObservableIntPrintln
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println is performed on the Trampoline scheduler.
+func (o ObservableInt) Println() (err error) {
+	subscriber := subscriber.New()
+	scheduler := scheduler.Trampoline
+	observer := func(next int, e error, done bool) {
+		if !done {
+			fmt.Println(next)
+		} else {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
 }

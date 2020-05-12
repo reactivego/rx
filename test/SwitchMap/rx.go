@@ -14,22 +14,17 @@ import (
 	"github.com/reactivego/subscriber"
 )
 
+//jig:name Scheduler
+
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler = scheduler.Scheduler
+
 //jig:name Subscriber
 
 // Subscriber is an interface that can be passed in when subscribing to an
 // Observable. It allows a set of observable subscriptions to be canceled
 // from a single subscriber at the root of the subscription tree.
 type Subscriber = subscriber.Subscriber
-
-// NewSubscriber creates a new subscriber.
-func NewSubscriber() Subscriber {
-	return subscriber.New()
-}
-
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler = scheduler.Scheduler
 
 //jig:name Observer
 
@@ -72,14 +67,11 @@ type StringObserver func(next string, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableString func(StringObserver, Scheduler, Subscriber)
 
-//jig:name zero
-
-var zero interface{}
-
 //jig:name From
 
 // From creates an Observable from multiple interface{} values passed in.
 func From(slice ...interface{}) Observable {
+	var zero interface{}
 	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -140,14 +132,11 @@ func Interval(interval time.Duration) ObservableInt {
 	return observable
 }
 
-//jig:name zeroString
-
-var zeroString string
-
 //jig:name EmptyString
 
 // EmptyString creates an Observable that emits no items but terminates normally.
 func EmptyString() ObservableString {
+	var zeroString string
 	observable := func(observe StringObserver, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
 			if subscriber.Subscribed() {
@@ -220,7 +209,7 @@ func (o Observable) Timeout(timeout time.Duration) Observable {
 				return
 			}
 			last.done = true
-			observe(zero, ErrTimeout, true)
+			observe(nil, ErrTimeout, true)
 		}
 		runner := subscribeOn.ScheduleFutureRecursive(timeout, timer)
 		subscriber.OnUnsubscribe(runner.Cancel)
@@ -261,9 +250,11 @@ func (o Observable) AsObservableString() ObservableString {
 				if nextString, ok := next.(string); ok {
 					observe(nextString, err, done)
 				} else {
+					var zeroString string
 					observe(zeroString, ErrTypecastToString, true)
 				}
 			} else {
+				var zeroString string
 				observe(zeroString, err, true)
 			}
 		}
@@ -344,48 +335,11 @@ func (o ObservableInt) AsObservable() Observable {
 	return observable
 }
 
-//jig:name Schedulers
-
-func TrampolineScheduler() Scheduler {
-	return scheduler.Trampoline
-}
-
-func GoroutineScheduler() Scheduler {
-	return scheduler.Goroutine
-}
-
-//jig:name ObservableStringPrintln
-
-// Println subscribes to the Observable and prints every item to os.Stdout
-// while it waits for completion or error. Returns either the error or nil
-// when the Observable completed normally.
-// Println is performed on the Trampoline scheduler.
-func (o ObservableString) Println() (err error) {
-	subscriber := NewSubscriber()
-	scheduler := TrampolineScheduler()
-	observer := func(next string, e error, done bool) {
-		if !done {
-			fmt.Println(next)
-		} else {
-			err = e
-			subscriber.Unsubscribe()
-		}
-	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
-}
-
 //jig:name ErrTypecastToInt
 
 // ErrTypecastToInt is delivered to an observer if the generic value cannot be
 // typecast to int.
 const ErrTypecastToInt = RxError("typecast to int failed")
-
-//jig:name zeroInt
-
-var zeroInt int
 
 //jig:name ObservableAsObservableInt
 
@@ -398,9 +352,11 @@ func (o Observable) AsObservableInt() ObservableInt {
 				if nextInt, ok := next.(int); ok {
 					observe(nextInt, err, done)
 				} else {
+					var zeroInt int
 					observe(zeroInt, ErrTypecastToInt, true)
 				}
 			} else {
+				var zeroInt int
 				observe(zeroInt, err, true)
 			}
 		}
@@ -425,6 +381,29 @@ func (o ObservableInt) MapObservableString(project func(int) ObservableString) O
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
+}
+
+//jig:name ObservableStringPrintln
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println is performed on the Trampoline scheduler.
+func (o ObservableString) Println() (err error) {
+	subscriber := subscriber.New()
+	scheduler := scheduler.Trampoline
+	observer := func(next string, e error, done bool) {
+		if !done {
+			fmt.Println(next)
+		} else {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
 }
 
 //jig:name ObservableStringObserver
@@ -611,11 +590,13 @@ func (o ObservableObservableString) SwitchAll() ObservableString {
 				})
 			case err != nil:
 				currentLink.Cancel(func() {
+					var zeroString string
 					observe(zeroString, err, true)
 				})
 				switcherSubscriber.Unsubscribe()
 			default:
 				currentLink.OnComplete(func() {
+					var zeroString string
 					observe(zeroString, nil, true)
 				})
 				switcherSubscriber.Unsubscribe()

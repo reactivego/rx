@@ -71,8 +71,13 @@ type Slice = []interface{}
 
 //jig:name ObservableObservableCombineLatestAll
 
-// CombineLatestAll flattens an ObservableObservable by applying combineLatest
-// when the ObservableObservable completes.
+// CombineLatestAll flattens a higher order observable
+// (e.g. ObservableObservable) by subscribing to
+// all emitted observables (ie. Observable entries) until the source
+// completes. It will then wait for all of the subscribed Observables
+// to emit before emitting the first slice. Whenever any of the subscribed
+// observables emits, a new slice will be emitted containing all the latest
+// value.
 func (o ObservableObservable) CombineLatestAll() ObservableSlice {
 	var zero interface{}
 	var zeroSlice []interface{}
@@ -140,8 +145,11 @@ func (o ObservableObservable) CombineLatestAll() ObservableSlice {
 
 //jig:name ObservableCombineLatestWith
 
-// Combines multiple Observables to create an Observable whose values are
-// calculated from the latest values of each of its input Observables.
+// CombineLatestWith will subscribe to its Observable and all other
+// Observables passed in. It will then wait for all of the ObservableBars
+// to emit before emitting the first slice. Whenever any of the subscribed
+// observables emits, a new slice will be emitted containing all the latest
+// value.
 func (o Observable) CombineLatestWith(observables ...Observable) ObservableSlice {
 	return FromObservable(append([]Observable{o}, observables...)...).CombineLatestAll()
 }

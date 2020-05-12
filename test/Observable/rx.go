@@ -19,15 +19,16 @@ import (
 // completed normally.
 type Observer func(next interface{}, err error, done bool)
 
-//jig:name zero
-
-var zero interface{}
-
 //jig:name RxError
 
 type RxError string
 
 func (e RxError) Error() string	{ return string(e) }
+
+//jig:name Scheduler
+
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler = scheduler.Scheduler
 
 //jig:name Subscriber
 
@@ -35,16 +36,6 @@ func (e RxError) Error() string	{ return string(e) }
 // Observable. It allows a set of observable subscriptions to be canceled
 // from a single subscriber at the root of the subscription tree.
 type Subscriber = subscriber.Subscriber
-
-// NewSubscriber creates a new subscriber.
-func NewSubscriber() Subscriber {
-	return subscriber.New()
-}
-
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler = scheduler.Scheduler
 
 //jig:name Observable
 

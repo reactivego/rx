@@ -17,22 +17,17 @@ type RxError string
 
 func (e RxError) Error() string	{ return string(e) }
 
+//jig:name Scheduler
+
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler = scheduler.Scheduler
+
 //jig:name Subscriber
 
 // Subscriber is an interface that can be passed in when subscribing to an
 // Observable. It allows a set of observable subscriptions to be canceled
 // from a single subscriber at the root of the subscription tree.
 type Subscriber = subscriber.Subscriber
-
-// NewSubscriber creates a new subscriber.
-func NewSubscriber() Subscriber {
-	return subscriber.New()
-}
-
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler = scheduler.Scheduler
 
 //jig:name Observer
 
@@ -50,15 +45,11 @@ type Observer func(next interface{}, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type Observable func(Observer, Scheduler, Subscriber)
 
-//jig:name zero
-
-var zero interface{}
-
 //jig:name FromChan
 
 // FromChan creates an Observable from a Go channel of interface{}
 // values. This allows the code feeding into the channel to send either an error
-// or the next value. The feeding code can send zero or more items and then
+// or the next value. The feeding code can send nil or more items and then
 // closing the channel will be seen as completion. When the feeding code sends
 // an error into the channel, it should close the channel immediately to
 // indicate termination with error.
@@ -80,10 +71,10 @@ func FromChan(ch <-chan interface{}) Observable {
 						self()
 					}
 				} else {
-					observe(zero, err, true)
+					observe(nil, err, true)
 				}
 			} else {
-				observe(zero, nil, true)
+				observe(nil, nil, true)
 			}
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
@@ -107,17 +98,14 @@ type IntObserver func(next int, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableInt func(IntObserver, Scheduler, Subscriber)
 
-//jig:name zeroInt
-
-var zeroInt int
-
 //jig:name FromChanInt
 
 // FromChanInt creates an ObservableInt from a Go channel of int values.
 // It's not possible for the code feeding into the channel to send an error.
-// The feeding code can send zero or more int items and then closing the
+// The feeding code can send nil or more int items and then closing the
 // channel will be seen as completion.
 func FromChanInt(ch <-chan int) ObservableInt {
+	var zeroInt int
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Canceled() {
@@ -158,25 +146,17 @@ func (o Observable) AsObservableInt() ObservableInt {
 				if nextInt, ok := next.(int); ok {
 					observe(nextInt, err, done)
 				} else {
+					var zeroInt int
 					observe(zeroInt, ErrTypecastToInt, true)
 				}
 			} else {
+				var zeroInt int
 				observe(zeroInt, err, true)
 			}
 		}
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
-}
-
-//jig:name Schedulers
-
-func TrampolineScheduler() Scheduler {
-	return scheduler.Trampoline
-}
-
-func GoroutineScheduler() Scheduler {
-	return scheduler.Goroutine
 }
 
 //jig:name ObservableIntPrintln
@@ -186,8 +166,8 @@ func GoroutineScheduler() Scheduler {
 // when the Observable completed normally.
 // Println is performed on the Trampoline scheduler.
 func (o ObservableInt) Println() (err error) {
-	subscriber := NewSubscriber()
-	scheduler := TrampolineScheduler()
+	subscriber := subscriber.New()
+	scheduler := scheduler.Trampoline
 	observer := func(next int, e error, done bool) {
 		if !done {
 			fmt.Println(next)

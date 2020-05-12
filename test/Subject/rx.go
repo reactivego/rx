@@ -10,22 +10,17 @@ import (
 	"github.com/reactivego/subscriber"
 )
 
+//jig:name Scheduler
+
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler = scheduler.Scheduler
+
 //jig:name Subscriber
 
 // Subscriber is an interface that can be passed in when subscribing to an
 // Observable. It allows a set of observable subscriptions to be canceled
 // from a single subscriber at the root of the subscription tree.
 type Subscriber = subscriber.Subscriber
-
-// NewSubscriber creates a new subscriber.
-func NewSubscriber() Subscriber {
-	return subscriber.New()
-}
-
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler = scheduler.Scheduler
 
 //jig:name IntObserver
 
@@ -42,10 +37,6 @@ type IntObserver func(next int, err error, done bool)
 // ObservableInt is a function taking an Observer, Scheduler and Subscriber.
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableInt func(IntObserver, Scheduler, Subscriber)
-
-//jig:name zeroInt
-
-var zeroInt int
 
 //jig:name SubjectInt
 
@@ -78,12 +69,14 @@ func (f IntObserver) Next(next int) {
 
 // Error is called by an ObservableInt to report an error to the Observer.
 func (f IntObserver) Error(err error) {
+	var zeroInt int
 	f(zeroInt, err, true)
 }
 
 // Complete is called by an ObservableInt to signal that no more data is
 // forthcoming to the Observer.
 func (f IntObserver) Complete() {
+	var zeroInt int
 	f(zeroInt, nil, true)
 }
 
@@ -137,6 +130,12 @@ func NewSubjectInt() SubjectInt {
 	return SubjectInt{observable.AsObservableInt(), observer}
 }
 
+//jig:name GoroutineScheduler
+
+func GoroutineScheduler() Scheduler {
+	return scheduler.Goroutine
+}
+
 //jig:name RxError
 
 type RxError string
@@ -160,24 +159,14 @@ func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
 	return observable
 }
 
-//jig:name Schedulers
-
-func TrampolineScheduler() Scheduler {
-	return scheduler.Trampoline
-}
-
-func GoroutineScheduler() Scheduler {
-	return scheduler.Goroutine
-}
-
 //jig:name ObservableIntWait
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
 // Subscribing is performed on the Trampoline scheduler.
 func (o ObservableInt) Wait() (err error) {
-	subscriber := NewSubscriber()
-	scheduler := TrampolineScheduler()
+	subscriber := subscriber.New()
+	scheduler := scheduler.Trampoline
 	observer := func(next int, e error, done bool) {
 		if done {
 			err = e
@@ -226,10 +215,6 @@ type Canceled func() bool
 // Next can be called to emit the next value to the IntObserver.
 type Next func(interface{})
 
-//jig:name zero
-
-var zero interface{}
-
 //jig:name Create
 
 // Create provides a way of creating an Observable from
@@ -240,6 +225,7 @@ var zero interface{}
 // Complete and Canceled function that can be called by the code that
 // implements the Observable.
 func Create(create func(Next, Error, Complete, Canceled)) Observable {
+	var zero interface{}
 	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
 			if subscriber.Canceled() {
@@ -276,12 +262,13 @@ func Create(create func(Next, Error, Complete, Canceled)) Observable {
 // This method returns a Subscription.
 // Subscribe by default is performed on the Trampoline scheduler.
 func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber) Subscription {
-	subscribers = append(subscribers, NewSubscriber())
-	scheduler := TrampolineScheduler()
+	subscribers = append(subscribers, subscriber.New())
+	scheduler := scheduler.Trampoline
 	observer := func(next int, err error, done bool) {
 		if !done {
 			observe(next, err, done)
 		} else {
+			var zeroInt int
 			observe(zeroInt, err, true)
 			subscribers[0].Unsubscribe()
 		}
@@ -308,9 +295,11 @@ func (o Observable) AsObservableInt() ObservableInt {
 				if nextInt, ok := next.(int); ok {
 					observe(nextInt, err, done)
 				} else {
+					var zeroInt int
 					observe(zeroInt, ErrTypecastToInt, true)
 				}
 			} else {
+				var zeroInt int
 				observe(zeroInt, err, true)
 			}
 		}

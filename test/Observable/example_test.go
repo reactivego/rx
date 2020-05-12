@@ -23,9 +23,9 @@ func Example_observer() {
 	// Next
 	observe(123, nil, false)
 	// Error
-	observe(zero, RxError("error"), true)
+	observe(nil, RxError("error"), true)
 	// Complete
-	observe(zero, nil, true)
+	observe(nil, nil, true)
 	// Output:
 	// 123
 	// error
@@ -40,9 +40,9 @@ func Example_observable() {
 		// Next
 		observe(123, nil, false)
 		// Error
-		observe(zero, RxError("error"), true)
+		observe(nil, RxError("error"), true)
 		// Complete
-		observe(zero, nil, true)
+		observe(nil, nil, true)
 	}
 
 	var observer Observer
