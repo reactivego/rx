@@ -2,21 +2,29 @@
 Package rx provides Go with Reactive Extensions, an API for asynchronous
 programming with Observables.
 
-Regenerating this Package
+Ways of using this library
 
-This package is generated from the sub-folder generic by the jig tool.
-You don't need to regenerate the package in order to use it. However, if you
-are interested in regenerating it, then read on.
+You can use this package directly as follows:
 
-The jig tool provides the parametric polymorphism capability that Go 1 is
-missing. It works by replacing place-holder types of generic functions and
-datatypes with interface{} (it can also generate statically typed code though).
+	import "github.com/reactivego/rx"
 
-To regenerate, change the current working directory to the package directory
-and run the jig tool as follows:
+Then you just use the code directly from the library:
 
-	$ go get -d github.com/reactivego/jig
-	$ go run github.com/reactivego/jig -v
+	rx.From(1,2,"hello").Println()	
+
+Alternatively you can use the library as a generics library and use
+a tool to generate statically typed  observables and operators:
+
+	import _ "github.com/reactivego/rx/generic"
+
+Then you use the code as follows:
+	
+	FromInt(1,2).Println()
+
+You'll need to generate the observables and operators by running the jig tool.
+For details about the jig tool see https://github.com/reactivego/jig 
+
+For more information about the available generics see https://godoc.org/github.com/reactivego/rx/generic 
 
 Observables
 
@@ -92,7 +100,6 @@ Operators that originate new Observables.
 	Never            https://godoc.org/github.com/reactivego/rx/test/Never/
 	Of               https://godoc.org/github.com/reactivego/rx/test/Of/
 	Range            https://godoc.org/github.com/reactivego/rx/test/Range/
-	Repeat           https://godoc.org/github.com/reactivego/rx/test/Repeat/
 	Start            https://godoc.org/github.com/reactivego/rx/test/Start/
 	Throw            https://godoc.org/github.com/reactivego/rx/test/Throw/
 
@@ -124,10 +131,11 @@ Operators that selectively emit items from a source Observable.
 	TakeUntil        https://godoc.org/github.com/reactivego/rx/test/TakeUntil/ 
 	TakeWhile        https://godoc.org/github.com/reactivego/rx/test/TakeWhile/ 
 
-Sequencing Operators
+Combining Operators
 
-Operators that work with multiple source Observables to create a single Observable.
-This Observable then flattens the emissions into a single stream.
+Below are the operators that flatten the emissions of multiple observables into
+a single stream by subscribing to every observable stricly in sequence.
+Observables may be added while the flattening is already going on.
 
 	Concat           https://godoc.org/github.com/reactivego/rx/test/Concat/ 
 	ConcatWith       https://godoc.org/github.com/reactivego/rx/test/ConcatWith/
@@ -136,6 +144,11 @@ This Observable then flattens the emissions into a single stream.
 	ConcatAll        https://godoc.org/github.com/reactivego/rx/test/ConcatAll/
 	SwitchMap        https://godoc.org/github.com/reactivego/rx/test/SwitchMap/
 	SwitchAll        https://godoc.org/github.com/reactivego/rx/test/SwitchAll/
+
+Below are operators that flatten the emissions of multiple observables into a
+single stream by subscribing to all observables concurrently. Here also,
+observables may be added while the flattening is already going on.
+
 	Merge            https://godoc.org/github.com/reactivego/rx/test/Merge/
 	MergeWith        https://godoc.org/github.com/reactivego/rx/test/MergeWith/
 	MergeMap         https://godoc.org/github.com/reactivego/rx/test/MergeMap/
@@ -143,10 +156,9 @@ This Observable then flattens the emissions into a single stream.
 	MergeDelayError  https://godoc.org/github.com/reactivego/rx/test/MergeDelayError/
 	MergeDelayErrorWith https://godoc.org/github.com/reactivego/rx/test/MergeDelayErrorWith/
 
-Combining Operators
-
-Operators that work with multiple source Observables to create a single Observable.
-This Observable emits the emissions of the source Observables as slices.
+Below are operators that flatten the emissions of multiple observables into a single observable
+that emits slices of values. Differently from the previous two sets of operators,
+these operators only start emitting once the list of observables to flatten is complete. 
 
 	CombineLatest      https://godoc.org/github.com/reactivego/rx/test/CombineLatest/
 	CombineLatestWith  https://godoc.org/github.com/reactivego/rx/test/CombineLatestWith/
@@ -167,10 +179,11 @@ A toolbox of useful Operators for working with Observables.
 
 	Delay            https://godoc.org/github.com/reactivego/rx/test/Delay/
 	Do               https://godoc.org/github.com/reactivego/rx/test/Do/ 
-	DoOnError        https://godoc.org/github.com/reactivego/rx/test/Do/
-	DoOnComplete     https://godoc.org/github.com/reactivego/rx/test/Do/
-	Finally          https://godoc.org/github.com/reactivego/rx/test/Do/
+	DoOnError        https://godoc.org/github.com/reactivego/rx/test/DoOnError/
+	DoOnComplete     https://godoc.org/github.com/reactivego/rx/test/DoOnComplete/
+	Finally          https://godoc.org/github.com/reactivego/rx/test/Finally/
 	Passthrough      https://godoc.org/github.com/reactivego/rx/test/Passthrough/
+	Repeat           https://godoc.org/github.com/reactivego/rx/test/Repeat/
 	Serialize        https://godoc.org/github.com/reactivego/rx/test/Serialize/
 	Timeout          https://godoc.org/github.com/reactivego/rx/test/Timeout/
 
@@ -180,7 +193,7 @@ Operators that evaluate one or more Observables or items emitted by Observables.
 
 	All              https://godoc.org/github.com/reactivego/rx/test/All/ ObservableBool
 
-Mathematical and Aggregate Operators
+Aggregate Operators
 
 Operators that operate on the entire sequence of items emitted by an Observable.
 
@@ -246,6 +259,22 @@ Connect is called internally by RefCount and AutoConnect.
 
 	RefCount         https://godoc.org/github.com/reactivego/rx/test/RefCount
 	AutoConnect      https://godoc.org/github.com/reactivego/rx/test/AutoConnect
+
+Regenerating this Package
+
+This package is generated from the sub-folder generic by the jig tool.
+You don't need to regenerate the package in order to use it. However, if you
+are interested in regenerating it, then read on.
+
+The jig tool provides the parametric polymorphism capability that Go 1 is
+missing. It works by replacing place-holder types of generic functions and
+datatypes with interface{} (it can also generate statically typed code though).
+
+To regenerate, change the current working directory to the package directory
+and run the jig tool as follows:
+
+	$ go get -d github.com/reactivego/jig
+	$ go run github.com/reactivego/jig -v
 
 License
 
