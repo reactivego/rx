@@ -7,9 +7,9 @@ import (
 )
 
 func Example_basic() {
-	source := RepeatInt(5, 3)
+	source := JustInt(5)
 
-	slice, err := source.ToSlice()
+	slice, err := source.Repeat(3).ToSlice()
 
 	fmt.Println(slice)
 	fmt.Println(err)

@@ -33,7 +33,6 @@ func require() {
 	Just(1)
 	Never()
 	Range(1, 2)
-	Repeat(nil, 1)
 	Start(func() (interface{}, error) { return o, nil })
 	Throw(RxError("sad"))
 

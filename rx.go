@@ -429,32 +429,6 @@ func Range(start, count int) ObservableInt {
 	return observable
 }
 
-//jig:name Repeat
-
-// Repeat creates an Observable that emits a particular item or sequence
-// of items repeatedly.
-func Repeat(value interface{}, count int) Observable {
-	var zero interface{}
-	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
-		i := 0
-		runner := scheduler.ScheduleRecursive(func(self func()) {
-			if subscriber.Subscribed() {
-				if i < count {
-					observe(value, nil, false)
-					if subscriber.Subscribed() {
-						i++
-						self()
-					}
-				} else {
-					observe(zero, nil, true)
-				}
-			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
-}
-
 //jig:name Start
 
 // Start creates an Observable that emits the return value of a function.
@@ -598,37 +572,6 @@ func CombineLatest(observables ...Observable) ObservableSlice {
 	return FromObservable(observables...).CombineLatestAll()
 }
 
-//jig:name ObservableConcat
-
-// Concat emits the emissions from two or more Observables without interleaving them.
-func (o Observable) Concat(other ...Observable) Observable {
-	var zero interface{}
-	if len(other) == 0 {
-		return o
-	}
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		var (
-			observables	= append([]Observable{}, other...)
-			observer	Observer
-		)
-		observer = func(next interface{}, err error, done bool) {
-			if !done || err != nil {
-				observe(next, err, done)
-			} else {
-				if len(observables) == 0 {
-					observe(zero, nil, true)
-				} else {
-					o := observables[0]
-					observables = observables[1:]
-					o(observer, subscribeOn, subscriber)
-				}
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name Concat
 
 // Concat emits the emissions from two or more Observables without interleaving them.
@@ -636,7 +579,7 @@ func Concat(observables ...Observable) Observable {
 	if len(observables) == 0 {
 		return Empty()
 	}
-	return observables[0].Concat(observables[1:]...)
+	return observables[0].ConcatWith(observables[1:]...)
 }
 
 //jig:name ObservableMerge
@@ -778,8 +721,8 @@ type ObservableSlice func(SliceObserver, Scheduler, Subscriber)
 // to emit before emitting the first slice. Whenever any of the subscribed
 // observables emits, a new slice will be emitted containing all the latest
 // value.
-func (o Observable) CombineLatestWith(observables ...Observable) ObservableSlice {
-	return FromObservable(append([]Observable{o}, observables...)...).CombineLatestAll()
+func (o Observable) CombineLatestWith(other ...Observable) ObservableSlice {
+	return FromObservable(append([]Observable{o}, other...)...).CombineLatestAll()
 }
 
 //jig:name ObservableCombineLatestMap
@@ -804,6 +747,37 @@ func (o Observable) CombineLatestMap(project func(interface{}) Observable) Obser
 func (o Observable) CombineLatestMapTo(inner Observable) ObservableSlice {
 	project := func(interface{}) Observable { return inner }
 	return o.MapObservable(project).CombineLatestAll()
+}
+
+//jig:name ObservableConcatWith
+
+// ConcatWith emits the emissions from two or more Observables without interleaving them.
+func (o Observable) ConcatWith(other ...Observable) Observable {
+	var zero interface{}
+	if len(other) == 0 {
+		return o
+	}
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		var (
+			observables	= append([]Observable{}, other...)
+			observer	Observer
+		)
+		observer = func(next interface{}, err error, done bool) {
+			if !done || err != nil {
+				observe(next, err, done)
+			} else {
+				if len(observables) == 0 {
+					observe(zero, nil, true)
+				} else {
+					o := observables[0]
+					observables = observables[1:]
+					o(observer, subscribeOn, subscriber)
+				}
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
 }
 
 //jig:name ObservableObservableConcatAll

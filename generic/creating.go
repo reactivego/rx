@@ -392,68 +392,6 @@ func Range(start, count int) ObservableInt {
 	return observable
 }
 
-//jig:template Observable Repeat
-
-// Repeat creates an Observable that emits a sequence of items repeatedly.
-func (o Observable) Repeat(count int) Observable {
-	if count == 0 {
-		return Empty()
-	}
-	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
-		var repeated int
-		var observer Observer
-		observer = func(next interface{}, err error, done bool) {
-			if !done || err != nil {
-				observe(next, err, done)
-			} else {
-				repeated++
-				if repeated < count {
-					o(observer, scheduler, subscriber)
-				} else {
-					observe(nil, nil, true)
-				}
-			}
-		}
-		o(observer, scheduler, subscriber)
-	}
-	return observable
-}
-
-//jig:template Observable<Foo> Repeat
-//jig:needs Observable Repeat
-
-// Repeat creates an ObservableFoo that emits a sequence of items repeatedly.
-func (o ObservableFoo) Repeat(count int) ObservableFoo {
-	return o.AsObservable().Repeat(count).AsObservableFoo()
-}
-
-//jig:template Repeat<Foo>
-//jig:needs Observable<Foo>
-
-// RepeatFoo creates an ObservableFoo that emits a particular item or sequence
-// of items repeatedly.
-func RepeatFoo(value foo, count int) ObservableFoo {
-	var zeroFoo foo
-	observable := func(observe FooObserver, scheduler Scheduler, subscriber Subscriber) {
-		i := 0
-		runner := scheduler.ScheduleRecursive(func(self func()) {
-			if subscriber.Subscribed() {
-				if i < count {
-					observe(value, nil, false)
-					if subscriber.Subscribed() {
-						i++
-						self()
-					}
-				} else {
-					observe(zeroFoo, nil, true)
-				}
-			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
-}
-
 //jig:template Start<Foo>
 //jig:needs Observable<Foo>
 

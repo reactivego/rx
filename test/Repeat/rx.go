@@ -37,25 +37,18 @@ type IntObserver func(next int, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableInt func(IntObserver, Scheduler, Subscriber)
 
-//jig:name RepeatInt
+//jig:name JustInt
 
-// RepeatInt creates an ObservableInt that emits a particular item or sequence
-// of items repeatedly.
-func RepeatInt(value int, count int) ObservableInt {
+// JustInt creates an ObservableInt that emits a particular item.
+func JustInt(element int) ObservableInt {
 	var zeroInt int
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
-		i := 0
-		runner := scheduler.ScheduleRecursive(func(self func()) {
+		runner := scheduler.Schedule(func() {
 			if subscriber.Subscribed() {
-				if i < count {
-					observe(value, nil, false)
-					if subscriber.Subscribed() {
-						i++
-						self()
-					}
-				} else {
-					observe(zeroInt, nil, true)
-				}
+				observe(element, nil, false)
+			}
+			if subscriber.Subscribed() {
+				observe(zeroInt, nil, true)
 			}
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
@@ -136,27 +129,6 @@ func GoroutineScheduler() Scheduler {
 	return scheduler.Goroutine
 }
 
-//jig:name ObservableIntToSlice
-
-// ToSlice collects all values from the ObservableInt into an slice. The
-// complete slice and any error are returned.
-func (o ObservableInt) ToSlice() (slice []int, err error) {
-	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
-	observer := func(next int, e error, done bool) {
-		if !done {
-			slice = append(slice, next)
-		} else {
-			err = e
-			subscriber.Unsubscribe()
-		}
-	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
-}
-
 //jig:name ObservableRepeat
 
 // Repeat creates an Observable that emits a sequence of items repeatedly.
@@ -206,6 +178,27 @@ type Observer func(next interface{}, err error, done bool)
 // Observable is a function taking an Observer, Scheduler and Subscriber.
 // Calling it will subscribe the Observer to events from the Observable.
 type Observable func(Observer, Scheduler, Subscriber)
+
+//jig:name ObservableIntToSlice
+
+// ToSlice collects all values from the ObservableInt into an slice. The
+// complete slice and any error are returned.
+func (o ObservableInt) ToSlice() (slice []int, err error) {
+	subscriber := subscriber.New()
+	scheduler := scheduler.Trampoline
+	observer := func(next int, e error, done bool) {
+		if !done {
+			slice = append(slice, next)
+		} else {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
+}
 
 //jig:name ObservableTakeLast
 

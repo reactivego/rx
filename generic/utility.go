@@ -105,6 +105,41 @@ func (o ObservableFoo) Passthrough() ObservableFoo {
 	return observable
 }
 
+//jig:template Observable Repeat
+
+// Repeat creates an Observable that emits a sequence of items repeatedly.
+func (o Observable) Repeat(count int) Observable {
+	if count == 0 {
+		return Empty()
+	}
+	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
+		var repeated int
+		var observer Observer
+		observer = func(next interface{}, err error, done bool) {
+			if !done || err != nil {
+				observe(next, err, done)
+			} else {
+				repeated++
+				if repeated < count {
+					o(observer, scheduler, subscriber)
+				} else {
+					observe(nil, nil, true)
+				}
+			}
+		}
+		o(observer, scheduler, subscriber)
+	}
+	return observable
+}
+
+//jig:template Observable<Foo> Repeat
+//jig:needs Observable Repeat
+
+// Repeat creates an ObservableFoo that emits a sequence of items repeatedly.
+func (o ObservableFoo) Repeat(count int) ObservableFoo {
+	return o.AsObservable().Repeat(count).AsObservableFoo()
+}
+
 //jig:template Observable<Foo> Serialize
 
 // Serialize forces an ObservableFoo to make serialized calls and to be
