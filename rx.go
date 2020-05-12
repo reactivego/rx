@@ -582,55 +582,6 @@ func Concat(observables ...Observable) Observable {
 	return observables[0].ConcatWith(observables[1:]...)
 }
 
-//jig:name ObservableMerge
-
-// Merge combines multiple Observables into one by merging their emissions.
-// An error from any of the observables will terminate the merged observables.
-func (o Observable) Merge(other ...Observable) Observable {
-	if len(other) == 0 {
-		return o
-	}
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		var observers struct {
-			sync.Mutex
-			done	bool
-			len	int
-		}
-		observer := func(next interface{}, err error, done bool) {
-			observers.Lock()
-			defer observers.Unlock()
-			if !observers.done {
-				switch {
-				case !done:
-					observe(next, nil, false)
-				case err != nil:
-					observers.done = true
-					var zero interface{}
-					observe(zero, err, true)
-				default:
-					if observers.len--; observers.len == 0 {
-						var zero interface{}
-						observe(zero, nil, true)
-					}
-				}
-			}
-		}
-		subscribeOn.Schedule(func() {
-			if !subscriber.Canceled() {
-				observers.len = 1 + len(other)
-				o(observer, subscribeOn, subscriber)
-				for _, o := range other {
-					if subscriber.Canceled() {
-						return
-					}
-					o(observer, subscribeOn, subscriber)
-				}
-			}
-		})
-	}
-	return observable
-}
-
 //jig:name Merge
 
 // Merge combines multiple Observables into one by merging their emissions.
@@ -639,7 +590,7 @@ func Merge(observables ...Observable) Observable {
 	if len(observables) == 0 {
 		return Empty()
 	}
-	return observables[0].Merge(observables[1:]...)
+	return observables[0].MergeWith(observables[1:]...)
 }
 
 //jig:name ObservableMergeDelayError
@@ -1014,6 +965,55 @@ func (o ObservableObservable) SwitchAll() Observable {
 			}
 		}
 		o(switcher, subscribeOn, switcherSubscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableMergeWith
+
+// MergeWith combines multiple Observables into one by merging their emissions.
+// An error from any of the observables will terminate the merged observables.
+func (o Observable) MergeWith(other ...Observable) Observable {
+	if len(other) == 0 {
+		return o
+	}
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		var observers struct {
+			sync.Mutex
+			done	bool
+			len	int
+		}
+		observer := func(next interface{}, err error, done bool) {
+			observers.Lock()
+			defer observers.Unlock()
+			if !observers.done {
+				switch {
+				case !done:
+					observe(next, nil, false)
+				case err != nil:
+					observers.done = true
+					var zero interface{}
+					observe(zero, err, true)
+				default:
+					if observers.len--; observers.len == 0 {
+						var zero interface{}
+						observe(zero, nil, true)
+					}
+				}
+			}
+		}
+		subscribeOn.Schedule(func() {
+			if !subscriber.Canceled() {
+				observers.len = 1 + len(other)
+				o(observer, subscribeOn, subscriber)
+				for _, o := range other {
+					if subscriber.Canceled() {
+						return
+					}
+					o(observer, subscribeOn, subscriber)
+				}
+			}
+		})
 	}
 	return observable
 }

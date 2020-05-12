@@ -14,14 +14,14 @@ func MergeFoo(observables ...ObservableFoo) ObservableFoo {
 	if len(observables) == 0 {
 		return EmptyFoo()
 	}
-	return observables[0].Merge(observables[1:]...)
+	return observables[0].MergeWith(observables[1:]...)
 }
 
-//jig:template Observable<Foo> Merge
+//jig:template Observable<Foo> MergeWith
 
-// Merge combines multiple Observables into one by merging their emissions.
+// MergeWith combines multiple Observables into one by merging their emissions.
 // An error from any of the observables will terminate the merged observables.
-func (o ObservableFoo) Merge(other ...ObservableFoo) ObservableFoo {
+func (o ObservableFoo) MergeWith(other ...ObservableFoo) ObservableFoo {
 	if len(other) == 0 {
 		return o
 	}

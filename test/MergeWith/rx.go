@@ -2,7 +2,7 @@
 
 //go:generate jig
 
-package Merge
+package MergeWith
 
 import (
 	"fmt"
@@ -65,11 +65,30 @@ func FromInt(slice ...int) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntMerge
+//jig:name JustInt
 
-// Merge combines multiple Observables into one by merging their emissions.
+// JustInt creates an ObservableInt that emits a particular item.
+func JustInt(element int) ObservableInt {
+	var zeroInt int
+	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
+		runner := scheduler.Schedule(func() {
+			if subscriber.Subscribed() {
+				observe(element, nil, false)
+			}
+			if subscriber.Subscribed() {
+				observe(zeroInt, nil, true)
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
+}
+
+//jig:name ObservableIntMergeWith
+
+// MergeWith combines multiple Observables into one by merging their emissions.
 // An error from any of the observables will terminate the merged observables.
-func (o ObservableInt) Merge(other ...ObservableInt) ObservableInt {
+func (o ObservableInt) MergeWith(other ...ObservableInt) ObservableInt {
 	if len(other) == 0 {
 		return o
 	}
@@ -114,17 +133,6 @@ func (o ObservableInt) Merge(other ...ObservableInt) ObservableInt {
 	return observable
 }
 
-//jig:name MergeInt
-
-// MergeInt combines multiple Observables into one by merging their emissions.
-// An error from any of the observables will terminate the merged observables.
-func MergeInt(observables ...ObservableInt) ObservableInt {
-	if len(observables) == 0 {
-		return EmptyInt()
-	}
-	return observables[0].Merge(observables[1:]...)
-}
-
 //jig:name ObservableIntPrintln
 
 // Println subscribes to the Observable and prints every item to os.Stdout
@@ -148,18 +156,18 @@ func (o ObservableInt) Println() (err error) {
 	return
 }
 
-//jig:name EmptyInt
+//jig:name ObservableIntDoOnComplete
 
-// EmptyInt creates an Observable that emits no items but terminates normally.
-func EmptyInt() ObservableInt {
-	var zeroInt int
-	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
-		runner := scheduler.Schedule(func() {
-			if subscriber.Subscribed() {
-				observe(zeroInt, nil, true)
+// DoOnComplete calls a function when the stream completes.
+func (o ObservableInt) DoOnComplete(f func()) ObservableInt {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			if err == nil && done {
+				f()
 			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
+			observe(next, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
 	}
 	return observable
 }

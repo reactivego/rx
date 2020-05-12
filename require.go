@@ -64,7 +64,7 @@ func require() {
 	// ExhaustAll
 
 	Merge(o)
-	o.Merge() // With
+	o.MergeWith()
 	o.MergeMap(func(interface{}) Observable { return o })
 	// o.MergeMapTo(o)
 	oo.MergeAll()
