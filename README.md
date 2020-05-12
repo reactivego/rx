@@ -54,8 +54,6 @@ Then you use the code as follows:
 
 You'll need to generate the observables and operators by running the [jig tool](https://github.com/reactivego/jig).
 
-For more information about the available generics see [![](https://godoc.org/github.com/reactivego/rx?status.png)](http://godoc.org/github.com/reactivego/rx/generic).
-
 ## Observables
 
 The main focus of `rx` is on [Observables](http://reactivex.io/documentation/observable.html).
