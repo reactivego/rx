@@ -23,8 +23,8 @@ func CombineLatestFoo(observables ...ObservableFoo) ObservableFooSlice {
 // to emit before emitting the first slice. Whenever any of the subscribed
 // observables emits, a new slice will be emitted containing all the latest
 // value.
-func (o ObservableFoo) CombineLatestWith(observables ...ObservableFoo) ObservableFooSlice {
-	return FromObservableFoo(append([]ObservableFoo{o}, observables...)...).CombineLatestAll()
+func (o ObservableFoo) CombineLatestWith(other ...ObservableFoo) ObservableFooSlice {
+	return FromObservableFoo(append([]ObservableFoo{o}, other...)...).CombineLatestAll()
 }
 
 //jig:template Observable<Foo> CombineLatestMap<Bar>
