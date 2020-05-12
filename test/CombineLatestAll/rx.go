@@ -2,7 +2,7 @@
 
 //go:generate jig
 
-package CombineAll
+package CombineLatestAll
 
 import (
 	"fmt"
@@ -12,22 +12,17 @@ import (
 	"github.com/reactivego/subscriber"
 )
 
+//jig:name Scheduler
+
+// Scheduler is used to schedule tasks to support subscribing and observing.
+type Scheduler = scheduler.Scheduler
+
 //jig:name Subscriber
 
 // Subscriber is an interface that can be passed in when subscribing to an
 // Observable. It allows a set of observable subscriptions to be canceled
 // from a single subscriber at the root of the subscription tree.
 type Subscriber = subscriber.Subscriber
-
-// NewSubscriber creates a new subscriber.
-func NewSubscriber() Subscriber {
-	return subscriber.New()
-}
-
-//jig:name Scheduler
-
-// Scheduler is used to schedule tasks to support subscribing and observing.
-type Scheduler = scheduler.Scheduler
 
 //jig:name IntObserver
 
@@ -45,14 +40,11 @@ type IntObserver func(next int, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableInt func(IntObserver, Scheduler, Subscriber)
 
-//jig:name zeroInt
-
-var zeroInt int
-
 //jig:name FromInt
 
 // FromInt creates an ObservableInt from multiple int values passed in.
 func FromInt(slice ...int) ObservableInt {
+	var zeroInt int
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -89,14 +81,11 @@ type ObservableIntObserver func(next ObservableInt, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableObservableInt func(ObservableIntObserver, Scheduler, Subscriber)
 
-//jig:name zeroObservableInt
-
-var zeroObservableInt ObservableInt
-
 //jig:name FromObservableInt
 
 // FromObservableInt creates an ObservableObservableInt from multiple ObservableInt values passed in.
 func FromObservableInt(slice ...ObservableInt) ObservableObservableInt {
+	var zeroObservableInt ObservableInt
 	observable := func(observe ObservableIntObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -117,16 +106,23 @@ func FromObservableInt(slice ...ObservableInt) ObservableObservableInt {
 	return observable
 }
 
-//jig:name _Ints
+//jig:name IntSlice
 
-type _Ints = []int
+type IntSlice = []int
 
-//jig:name ObservableObservableIntCombineAll
+//jig:name ObservableObservableIntCombineLatestAll
 
-// CombineAll flattens an ObservableObservableInt by applying combineLatest
-// when the ObservableObservableInt completes.
-func (o ObservableObservableInt) CombineAll() Observable_Ints {
-	observable := func(observe _IntsObserver, subscribeOn Scheduler, subscriber Subscriber) {
+// CombineLatestAll flattens a higher order observable
+// (e.g. ObservableObservableInt) by subscribing to
+// all emitted observables (ie. ObservableInt entries) until the source
+// completes. It will then wait for all of the subscribed ObservableInts
+// to emit before emitting the first slice. Whenever any of the subscribed
+// observables emits, a new slice will be emitted containing all the latest
+// value.
+func (o ObservableObservableInt) CombineLatestAll() ObservableIntSlice {
+	var zeroInt int
+	var zeroIntSlice []int
+	observable := func(observe IntSliceObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observables := []ObservableInt(nil)
 		var observers struct {
 			sync.Mutex
@@ -150,10 +146,10 @@ func (o ObservableObservableInt) CombineAll() Observable_Ints {
 						}
 					case err != nil:
 						observers.active = 0
-						observe(zero_Ints, err, true)
+						observe(zeroIntSlice, err, true)
 					default:
 						if observers.active--; observers.active == 0 {
-							observe(zero_Ints, nil, true)
+							observe(zeroIntSlice, nil, true)
 						}
 					}
 				}
@@ -166,7 +162,7 @@ func (o ObservableObservableInt) CombineAll() Observable_Ints {
 			case !done:
 				observables = append(observables, next)
 			case err != nil:
-				observe(zero_Ints, err, true)
+				observe(zeroIntSlice, err, true)
 			default:
 				subscribeOn.Schedule(func() {
 					if !subscriber.Canceled() {
@@ -188,33 +184,29 @@ func (o ObservableObservableInt) CombineAll() Observable_Ints {
 	return observable
 }
 
-//jig:name _IntsObserver
+//jig:name IntSliceObserver
 
-// _IntsObserver is a function that gets called whenever the Observable has
+// IntSliceObserver is a function that gets called whenever the Observable has
 // something to report. The next argument is the item value that is only
 // valid when the done argument is false. When done is true and the err
 // argument is not nil, then the Observable has terminated with an error.
 // When done is true and the err argument is nil, then the Observable has
 // completed normally.
-type _IntsObserver func(next _Ints, err error, done bool)
+type IntSliceObserver func(next IntSlice, err error, done bool)
 
-//jig:name Observable_Ints
+//jig:name ObservableIntSlice
 
-// Observable_Ints is a function taking an Observer, Scheduler and Subscriber.
+// ObservableIntSlice is a function taking an Observer, Scheduler and Subscriber.
 // Calling it will subscribe the Observer to events from the Observable.
-type Observable_Ints func(_IntsObserver, Scheduler, Subscriber)
+type ObservableIntSlice func(IntSliceObserver, Scheduler, Subscriber)
 
-//jig:name zero_Ints
+//jig:name ObservableIntSliceMapVector
 
-var zero_Ints _Ints
-
-//jig:name Observable_IntsMapVector
-
-// MapVector transforms the items emitted by an Observable_Ints by applying a
+// MapVector transforms the items emitted by an ObservableIntSlice by applying a
 // function to each item.
-func (o Observable_Ints) MapVector(project func(_Ints) Vector) ObservableVector {
+func (o ObservableIntSlice) MapVector(project func(IntSlice) Vector) ObservableVector {
 	observable := func(observe VectorObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next _Ints, err error, done bool) {
+		observer := func(next IntSlice, err error, done bool) {
 			var mapped Vector
 			if !done {
 				mapped = project(next)
@@ -242,16 +234,6 @@ type VectorObserver func(next Vector, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableVector func(VectorObserver, Scheduler, Subscriber)
 
-//jig:name Schedulers
-
-func TrampolineScheduler() Scheduler {
-	return scheduler.Trampoline
-}
-
-func GoroutineScheduler() Scheduler {
-	return scheduler.Goroutine
-}
-
 //jig:name ObservableVectorPrintln
 
 // Println subscribes to the Observable and prints every item to os.Stdout
@@ -259,8 +241,8 @@ func GoroutineScheduler() Scheduler {
 // when the Observable completed normally.
 // Println is performed on the Trampoline scheduler.
 func (o ObservableVector) Println() (err error) {
-	subscriber := NewSubscriber()
-	scheduler := TrampolineScheduler()
+	subscriber := subscriber.New()
+	scheduler := scheduler.Trampoline
 	observer := func(next Vector, e error, done bool) {
 		if !done {
 			fmt.Println(next)

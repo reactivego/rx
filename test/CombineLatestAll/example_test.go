@@ -1,4 +1,4 @@
-package CombineAll
+package CombineLatestAll
 
 import _ "github.com/reactivego/rx/generic"
 
@@ -8,7 +8,7 @@ func Example_combineAll() {
 	a := FromInt(1, 2, 3)
 	b := FromInt(4, 5, 6)
 
-	FromObservableInt(a, b).CombineAll().MapVector(func(next []int) Vector {
+	FromObservableInt(a, b).CombineLatestAll().MapVector(func(next []int) Vector {
 		return Vector{next[0], next[1]}
 	}).Println()
 
