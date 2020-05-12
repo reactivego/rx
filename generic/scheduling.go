@@ -9,12 +9,15 @@ import (
 // Scheduler is used to schedule tasks to support subscribing and observing.
 type Scheduler = scheduler.Scheduler
 
-//jig:template Schedulers
+//jig:template TrampolineScheduler
 //jig:needs Scheduler
 
 func TrampolineScheduler() Scheduler {
 	return scheduler.Trampoline
 }
+
+//jig:template GoroutineScheduler
+//jig:needs Scheduler
 
 func GoroutineScheduler() Scheduler  {
 	return scheduler.Goroutine

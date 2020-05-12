@@ -1,6 +1,7 @@
 package rx
 
 import (
+	"sync"
 	"sync/atomic"
 
 	"github.com/reactivego/subscriber"
@@ -141,4 +142,54 @@ func (o *linkFoo) OnComplete(callback func()) error {
 		o.callback()
 	}
 	return nil
+}
+
+//jig:template ObservableObservable<Foo> SwitchAll
+//jig:needs link<Foo>
+
+// SwitchAll converts an Observable that emits Observables into a single Observable
+// that emits the items emitted by the most-recently-emitted of those Observables.
+func (o ObservableObservableFoo) SwitchAll() ObservableFoo {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(link *linkFoo, next foo, err error, done bool) {
+			if !done || err != nil {
+				observe(next, err, done)
+			} else {
+				link.subscriber.Unsubscribe() // We filter complete. Therefore, we need to perform Unsubscribe.
+			}
+		}
+		currentLink := newInitialLinkFoo()
+		var switcherMutex sync.Mutex
+		switcherSubscriber := subscriber.Add()
+		switcher := func(next ObservableFoo, err error, done bool) {
+			switch {
+			case !done:
+				previousLink := currentLink
+				func() {
+					switcherMutex.Lock()
+					defer switcherMutex.Unlock()
+					currentLink = newLinkFoo(observer, subscriber)
+				}()
+				previousLink.Cancel(func() {
+					switcherMutex.Lock()
+					defer switcherMutex.Unlock()
+					currentLink.SubscribeTo(next, subscribeOn)
+				})
+			case err != nil:
+				currentLink.Cancel(func() {
+					var zeroFoo foo
+					observe(zeroFoo, err, true)
+				})
+				switcherSubscriber.Unsubscribe()
+			default:
+				currentLink.OnComplete(func() {
+					var zeroFoo foo
+					observe(zeroFoo, nil, true)
+				})
+				switcherSubscriber.Unsubscribe()
+			}
+		}
+		o(switcher, subscribeOn, switcherSubscriber)
+	}
+	return observable
 }

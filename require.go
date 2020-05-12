@@ -5,6 +5,10 @@ package rx
 import "time"
 
 func require() {
+	_ = NewSubscriber()
+	_ = GoroutineScheduler()
+	t := TrampolineScheduler()
+
 	/*
 		Observable Types
 	*/
@@ -13,66 +17,6 @@ func require() {
 	var b ObservableBool
 	var i ObservableInt
 	var oo ObservableObservable
-
-	/*
-		Observable Operator Methods
-	*/
-
-	o.All(func(next interface{}) bool { return true })
-	o.AsObservableBool()
-	o.AsObservableInt()
-	b.AsObservable()
-	i.AsObservable()
-	i.Average()
-	o.Catch(o)
-	oo.CombineAll()
-	o.Concat()
-	oo.ConcatAll()
-	o.Count()
-	o.Debounce(time.Millisecond)
-	o.Delay(time.Millisecond)
-	o.Distinct()
-	o.Do(func(interface{}) {})
-	o.DoOnComplete(func() {})
-	o.DoOnError(func(error) {})
-	o.ElementAt(0)
-	o.Filter(func(interface{}) bool { return true })
-	o.Finally(func() {})
-	o.First()
-	o.IgnoreCompletion()
-	o.IgnoreElements()
-	o.Last()
-	o.Map(func(interface{}) interface{} { return zero })
-	i.MapObservable(func(int) Observable { return zeroObservable })
-	i.Max()
-	o.Merge()
-	oo.MergeAll()
-	o.MergeDelayError()
-	o.MergeMap(func(interface{}) Observable { return o })
-	i.Min()
-	o.ObserveOn(func(task func()) { task() })
-	o.OnlyBool()
-	o.OnlyInt()
-	// Passthrough
-	o.Reduce(func(acc interface{}, value interface{}) interface{} { return zero }, zero)
-	o.Repeat(1)
-	o.Retry()
-	o.Sample(time.Millisecond)
-	o.Scan(func(acc interface{}, value interface{}) interface{} { return zero }, zero)
-	// Serialize
-	o.Single()
-	o.Skip(1)
-	o.SkipLast(1)
-	o.SubscribeOn(TrampolineScheduler())
-	i.Sum()
-	oo.SwitchAll()
-	o.SwitchMap(func(interface{}) Observable { return o })
-	o.Take(1)
-	i.Take(1)
-	o.TakeLast(1)
-	o.TakeUntil(o)
-	o.TakeWhile(func(interface{}) bool { return true })
-	o.Timeout(time.Millisecond)
 
 	/*
 		Observable Create Functions
@@ -87,13 +31,99 @@ func require() {
 	FromChan(make(chan interface{}))
 	Interval(time.Millisecond)
 	Just(1)
-	Concat(o)
-	Merge(o)
 	Never()
 	Range(1, 2)
-	Repeat(zero, 1)
+	Repeat(nil, 1)
 	Start(func() (interface{}, error) { return o, nil })
 	Throw(RxError("sad"))
+
+	/*
+		Observable Operator Methods
+	*/
+	CombineLatest(o)
+	o.CombineLatestWith(o)
+	o.CombineLatestMap(func(interface{}) Observable { return nil })
+	o.CombineLatestMapTo(o)
+	oo.CombineLatestAll()
+
+	Concat(o)
+	o.Concat() // With
+	// o.ConcatMap
+	// o.ConcatMapTo
+	// o.ConcatScan
+	// o.ConcatReduce
+	oo.ConcatAll()
+
+	o.SwitchMap(func(interface{}) Observable { return o })
+	// o.SwitchMapTo
+	// o.SwitchScan
+	// o.SwitchReduce
+	oo.SwitchAll()
+
+	// ExhaustMap
+	// ExhaustMapTo
+	// ExhaustAll
+
+	Merge(o)
+	o.Merge() // With
+	o.MergeMap(func(interface{}) Observable { return o })
+	// o.MergeMapTo(o)
+	oo.MergeAll()
+
+	MergeDelayError(o)
+	o.MergeDelayError() //With
+	//o.MergeDelayErrorMap(func(interface{}) Observable { return o })
+	// o.MergeDelayErrorMapTo(o)
+	//oo.MergeDelayErrorAll()
+
+
+	o.All(func(next interface{}) bool { return true })
+	o.AsObservableBool()
+	o.AsObservableInt()
+	b.AsObservable()
+	i.AsObservable()
+	i.Average()
+	o.Catch(o)
+
+	o.Count()
+	o.Debounce(time.Millisecond)
+	o.Delay(time.Millisecond)
+	o.Distinct()
+	o.Do(func(interface{}) {})
+	o.DoOnComplete(func() {})
+	o.DoOnError(func(error) {})
+	o.ElementAt(0)
+	o.Filter(func(interface{}) bool { return true })
+	o.Finally(func() {})
+	o.First()
+	o.IgnoreCompletion()
+	o.IgnoreElements()
+	o.Last()
+	o.Map(func(interface{}) interface{} { return nil })
+	i.MapObservable(func(int) Observable { return nil })
+	i.Max()
+	i.Min()
+	o.ObserveOn(func(task func()) { task() })
+	o.OnlyBool()
+	o.OnlyInt()
+	// Passthrough
+	o.Reduce(func(acc interface{}, value interface{}) interface{} { return nil }, nil)
+	o.Repeat(1)
+	o.Retry()
+	o.Sample(time.Millisecond)
+	o.Scan(func(acc interface{}, value interface{}) interface{} { return nil }, nil)
+	o.Serialize()
+	o.Single()
+	o.Skip(1)
+	o.SkipLast(1)
+	o.SubscribeOn(t)
+	i.Sum()
+	o.Take(1)
+	i.Take(1)
+	o.TakeLast(1)
+	o.TakeUntil(o)
+	o.TakeWhile(func(interface{}) bool { return true })
+	o.Timeout(time.Millisecond)
 
 	/*
 		Observable Subscribe Methods

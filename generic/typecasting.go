@@ -23,7 +23,7 @@ func (o ObservableFoo) AsObservableBar() ObservableBar {
 const ErrTypecastToFoo = RxError("typecast to foo failed")
 
 //jig:template Observable AsObservable<Foo>
-//jig:needs Observable<Foo>, ErrTypecastTo<Foo>, zero<Foo>
+//jig:needs Observable<Foo>, ErrTypecastTo<Foo>
 //jig:required-vars Foo
 
 // AsFoo turns an Observable of interface{} into an ObservableFoo. If during
@@ -35,9 +35,11 @@ func (o Observable) AsObservableFoo() ObservableFoo {
 				if nextFoo, ok := next.(foo); ok {
 					observe(nextFoo, err, done)
 				} else {
+					var zeroFoo foo
 					observe(zeroFoo, ErrTypecastToFoo, true)
 				}
 			} else {
+				var zeroFoo foo
 				observe(zeroFoo, err, true)
 			}
 		}
@@ -47,7 +49,7 @@ func (o Observable) AsObservableFoo() ObservableFoo {
 }
 
 //jig:template Observable Only<Foo>
-//jig:needs Observable<Foo>, zero<Foo>
+//jig:needs Observable<Foo>
 //jig:required-vars Foo
 
 // OnlyFoo filters the value stream of an Observable of interface{} and outputs only the
@@ -60,6 +62,7 @@ func (o Observable) OnlyFoo() ObservableFoo {
 					observe(nextFoo, err, done)
 				}
 			} else {
+				var zeroFoo foo
 				observe(zeroFoo, err, true)
 			}
 		}

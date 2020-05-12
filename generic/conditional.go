@@ -3,7 +3,7 @@ package rx
 import "sync/atomic"
 
 //jig:template Observable All
-//jig:needs ObservableBool, zeroBool
+//jig:needs ObservableBool
 
 // All determines whether all items emitted by an Observable meet some
 // criteria.
@@ -22,13 +22,13 @@ func (o Observable) All(predicate func(next interface{}) bool) ObservableBool {
 			case !done:
 				if !predicate(next) {
 					observe(false, nil, false)
-					observe(zeroBool, nil, true)
+					observe(false, nil, true)
 				}
 			case err!=nil:
-				observe(zeroBool, err, true)
+				observe(false, err, true)
 			default:
 				observe(true, nil, false)
-				observe(zeroBool, nil, true)
+				observe(false, nil, true)
 			}
 		}
 		o(observer, subscribeOn, subscriber)
@@ -56,7 +56,6 @@ func (o ObservableFoo) All(predicate func(next foo) bool) ObservableBool {
 }
 
 //jig:template Observable TakeWhile
-//jig:needs zero
 
 // TakeWhile mirrors items emitted by an Observable until a specified condition becomes false.
 //
@@ -69,7 +68,7 @@ func (o Observable) TakeWhile(condition func(next interface{}) bool) Observable 
 			if done || condition(next) {
 				observe(next, err, done)
 			} else {
-				observe(zero, nil, true)
+				observe(nil, nil, true)
 			}
 		}
 		o(observer, subscribeOn, subscriber)
@@ -93,7 +92,7 @@ func (o ObservableFoo) TakeWhile(condition func(next foo) bool) ObservableFoo {
 }
 
 //jig:template Observable TakeUntil
-//jig:needs zero
+//jig:needs nil
 
 // TakeUntil emits items emitted by an Observable until another Observable emits an item.
 func (o Observable) TakeUntil(other Observable) Observable {
@@ -112,7 +111,7 @@ func (o Observable) TakeUntil(other Observable) Observable {
 			if done || atomic.LoadInt32(&watcherNext) != 1 {
 				observe(next, err, done)
 			} else {
-				observe(zero, nil, true)
+				observe(nil, nil, true)
 			}
 		}
 		o(observer, subscribeOn, subscriber)

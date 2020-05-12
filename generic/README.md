@@ -57,7 +57,6 @@ generating "JustString"
   ObservableString
   JustString
 generating "ObservableString Println"
-  Schedulers
   ObservableString Println
 writing file "rx.go"
 

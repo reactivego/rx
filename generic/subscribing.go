@@ -8,6 +8,11 @@ import (
 	"github.com/reactivego/subscriber"
 )
 
+//jig:template Subscription
+
+// Subscription is an alias for the subscriber.Subscription interface type.
+type Subscription = subscriber.Subscription
+
 //jig:template Subscriber
 
 // Subscriber is an interface that can be passed in when subscribing to an
@@ -22,11 +27,6 @@ type Subscriber = subscriber.Subscriber
 func NewSubscriber() Subscriber {
 	return subscriber.New()
 }
-
-//jig:template Subscription
-
-// Subscription is an alias for the subscriber.Subscription interface type.
-type Subscription = subscriber.Subscription
 
 //jig:template Observable<Foo> Println
 //jig:needs Scheduler, Subscriber
@@ -53,14 +53,13 @@ func (o ObservableFoo) Println() (err error) {
 }
 
 //jig:template Observable<Foo> Wait
-//jig:needs Schedulers, NewSubscriber
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
 // Subscribing is performed on the Trampoline scheduler.
 func (o ObservableFoo) Wait() (err error) {
-	subscriber := NewSubscriber()
-	scheduler := TrampolineScheduler()
+	subscriber := subscriber.New()
+	scheduler := scheduler.Trampoline
 	observer := func(next foo, e error, done bool) {
 		if done {
 			err = e
@@ -74,13 +73,12 @@ func (o ObservableFoo) Wait() (err error) {
 }
 
 //jig:template Observable<Foo> ToSlice
-//jig:needs Schedulers, NewSubscriber
 
 // ToSlice collects all values from the ObservableFoo into an slice. The
 // complete slice and any error are returned.
 func (o ObservableFoo) ToSlice() (slice []foo, err error) {
-	subscriber := NewSubscriber()
-	scheduler := TrampolineScheduler()
+	subscriber := subscriber.New()
+	scheduler := scheduler.Trampoline
 	observer := func(next foo, e error, done bool) {
 		if !done {
 			slice = append(slice, next)
@@ -96,14 +94,13 @@ func (o ObservableFoo) ToSlice() (slice []foo, err error) {
 }
 
 //jig:template Observable<Foo> ToSingle
-//jig:needs Schedulers, NewSubscriber
 
 // ToSingle blocks until the ObservableFoo emits exactly one value or an error.
 // The value and any error are returned.
 func (o ObservableFoo) ToSingle() (entry foo, err error) {
 	o = o.Single()
-	subscriber := NewSubscriber()
-	scheduler := TrampolineScheduler()
+	subscriber := subscriber.New()
+	scheduler := scheduler.Trampoline
 	observer := func(next foo, e error, done bool) {
 		if !done {
 			entry = next
@@ -119,7 +116,6 @@ func (o ObservableFoo) ToSingle() (entry foo, err error) {
 }
 
 //jig:template Observable ToChan
-//jig:needs Schedulers, NewSubscriber
 
 // ToChan returns a channel that emits interface{} values. If the source
 // observable does not emit values but emits an error or complete, then the
@@ -131,8 +127,8 @@ func (o ObservableFoo) ToSingle() (entry foo, err error) {
 // by the calling code directly. To cancel ToChan you will need to supply a
 // subscriber that you hold on to.
 func (o Observable) ToChan(subscribers ...Subscriber) <-chan interface{} {
-	scheduler := GoroutineScheduler()
-	subscribers = append(subscribers, NewSubscriber())
+	scheduler := scheduler.Goroutine
+	subscribers = append(subscribers, subscriber.New())
 	donech := make(chan struct{})
 	nextch := make(chan interface{})
 	const (
@@ -182,7 +178,6 @@ func (o Observable) ToChan(subscribers ...Subscriber) <-chan interface{} {
 }
 
 //jig:template Observable<Foo> ToChan
-//jig:needs Schedulers, NewSubscriber
 //jig:required-vars Foo
 
 // ToChan returns a channel that emits foo values. If the source observable does
@@ -194,8 +189,8 @@ func (o Observable) ToChan(subscribers ...Subscriber) <-chan interface{} {
 // by the calling code directly. To cancel ToChan you will need to supply a
 // subscriber that you hold on to.
 func (o ObservableFoo) ToChan(subscribers ...Subscriber) <-chan foo {
-	scheduler := GoroutineScheduler()
-	subscribers = append(subscribers, NewSubscriber())
+	scheduler := scheduler.Goroutine
+	subscribers = append(subscribers, subscriber.New())
 	donech := make(chan struct{})
 	nextch := make(chan foo)
 	const (
@@ -241,18 +236,19 @@ func (o ObservableFoo) ToChan(subscribers ...Subscriber) <-chan foo {
 }
 
 //jig:template Observable<Foo> Subscribe
-//jig:needs Schedulers, Subscription, NewSubscriber, zero<Foo>
+//jig:needs Subscription
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
 // Subscribe by default is performed on the Trampoline scheduler.
 func (o ObservableFoo) Subscribe(observe FooObserver, subscribers ...Subscriber) Subscription {
-	subscribers = append(subscribers, NewSubscriber())
-	scheduler := TrampolineScheduler()
+	subscribers = append(subscribers, subscriber.New())
+	scheduler := scheduler.Trampoline
 	observer := func(next foo, err error, done bool) {
 		if !done {
 			observe(next, err, done)
 		} else {
+			var zeroFoo foo
 			observe(zeroFoo, err, true)
 			subscribers[0].Unsubscribe()
 		}

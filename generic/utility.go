@@ -129,7 +129,7 @@ func (o ObservableFoo) Serialize() ObservableFoo {
 }
 
 //jig:template Observable Timeout
-//jig:needs RxError, Observable Serialize, zero
+//jig:needs RxError, Observable Serialize, nil
 
 // ErrTimeout is delivered to an observer if the stream times out.
 const ErrTimeout = RxError("timeout")
@@ -161,7 +161,7 @@ func (o Observable) Timeout(timeout time.Duration) Observable {
 				return
 			}
 			last.done = true
-			observe(zero, ErrTimeout, true)
+			observe(nil, ErrTimeout, true)
 		}
 		runner := subscribeOn.ScheduleFutureRecursive(timeout, timer)
 		subscriber.OnUnsubscribe(runner.Cancel)
@@ -209,7 +209,7 @@ const ErrObservableContractViolationErrorAfterTermination = RxError("observable 
 const ErrObservableContractViolationCompleteAfterTermination = RxError("observable contract violation: complete after termination")
 
 //jig:template Observable<Foo> Validated
-//jig:needs ErrObservableContractViolation, zero<Foo>
+//jig:needs ErrObservableContractViolation
 
 // Validated will check for violations of the observable contract. More specific
 // it will detect concurrent notifications from the observable and it will
@@ -243,6 +243,7 @@ func (o ObservableFoo) Validated(onViolation func(err error)) ObservableFoo {
 				mu.Lock()
 				if atomic.CompareAndSwapInt32(&state, operational, violation) {
 					err = ErrObservableContractViolationConcurrentNotifications
+					var zeroFoo foo
 					observe(zeroFoo, err, true)
 					onViolation(err)
 				} else if atomic.CompareAndSwapInt32(&state, terminated, violation) {

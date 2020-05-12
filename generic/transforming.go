@@ -28,7 +28,6 @@ func (o ObservableFoo) MergeMapBar(project func(foo) ObservableBar) ObservableBa
 }
 
 //jig:template Observable<Foo> Scan<Bar>
-//jig:needs zero<Bar>
 
 // ScanBar applies a accumulator function to each item emitted by an
 // ObservableFoo and the previous accumulator result. The operator accepts a
@@ -42,6 +41,7 @@ func (o ObservableFoo) ScanBar(accumulator func(bar, foo) bar, seed bar) Observa
 				state = accumulator(state, next)
 				observe(state, nil, false)
 			} else {
+				var zeroBar bar
 				observe(zeroBar, err, done)
 			}
 		}

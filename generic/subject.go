@@ -8,7 +8,7 @@ import (
 
 
 //jig:template Subject<Foo>
-//jig:embeds Observable<Foo>, <Foo>Observer, zero<Foo>
+//jig:embeds Observable<Foo>, <Foo>Observer
 
 // SubjectFoo is a combination of an observer and observable. Subjects are
 // special because they are the only reactive constructs that support
@@ -39,12 +39,14 @@ func (f FooObserver) Next(next foo) {
 
 // Error is called by an ObservableFoo to report an error to the Observer.
 func (f FooObserver) Error(err error) {
+	var zeroFoo foo
 	f(zeroFoo, err, true)
 }
 
 // Complete is called by an ObservableFoo to signal that no more data is
 // forthcoming to the Observer.
 func (f FooObserver) Complete() {
+	var zeroFoo foo
 	f(zeroFoo, nil, true)
 }
 

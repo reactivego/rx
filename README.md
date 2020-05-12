@@ -171,22 +171,44 @@ Operators that selectively emit items from a source Observable.
 ### Combining Operators
 Operators that work with multiple source Observables to create a single Observable.
 
-- (Observable<sup>2</sup>) [**CombineAll**](https://godoc.org/github.com/reactivego/rx/test/CombineAll/)() Observable
-- CombineLatest(f FunctionN, observable Observable, observables ...Observable) Observable :star:
+#### CombineLatest
+
+- [**CombineLatest**](https://godoc.org/github.com/reactivego/rx/test/CombineLatest/)() Observable
+- (Observable) [**ConbineLatestWith**](https://godoc.org/github.com/reactivego/rx/test/CombineLatestWith/)() Observable
+- (Observable) [**CombineLatestMap**](https://godoc.org/github.com/reactivego/rx/test/CombineLatestMap/)() Observable
+- (Observable) [**CombineLatestMapTo**](https://godoc.org/github.com/reactivego/rx/test/CombineLatestMapTo/)() Observable
+- (Observable<sup>2</sup>) [**CombineLatestAll**](https://godoc.org/github.com/reactivego/rx/test/CombineLatestAll/)() Observable
+
+#### Concat
+
 - [**Concat**](https://godoc.org/github.com/reactivego/rx/test/Concat/)() :star: Observable
 - (Observable) [**Concat**](https://godoc.org/github.com/reactivego/rx/test/Concat/)() :star: Observable
 - (Observable<sup>2</sup>) [**ConcatAll**](https://godoc.org/github.com/reactivego/rx/test/ConcatAll/)() Observable
+
+#### Merge
+
 - [**Merge**](https://godoc.org/github.com/reactivego/rx/test/Merge/)() Observable
 - (Observable) [**Merge**](https://godoc.org/github.com/reactivego/rx/test/Merge/)() :star: Observable
 - (Observable<sup>2</sup>) [**MergeAll**](https://godoc.org/github.com/reactivego/rx/test/MergeAll/)() Observable
 - [**MergeDelayError**](https://godoc.org/github.com/reactivego/rx/test/MergeDelayError/)() Observable
 - (Observable) [**MergeDelayError**](https://godoc.org/github.com/reactivego/rx/test/MergeDelayError/)() Observable
+
+#### StartWith
+
 - StartWith :star:
 - StartWithItems(item interface{}, items ...interface{}) Observable
 - StartWithIterable(iterable Iterable) Observable
 - StartWithObservable(observable Observable) Observable
+
+#### Switch
+
 - (Observable<sup>2</sup>) [**SwitchAll**](https://godoc.org/github.com/reactivego/rx/test/SwitchAll/)() Observable
+
+#### WithLatest
 - WithLatestFrom :star:
+
+#### Zip
+
 - ZipFromObservable(publisher Observable, zipper Function2) Observable
 
 ### Error Handling Operators
