@@ -2,7 +2,7 @@
 
 //go:generate jig
 
-package CombineLatest
+package CombineLatestWith
 
 import (
 	"fmt"
@@ -24,28 +24,28 @@ type Scheduler = scheduler.Scheduler
 // from a single subscriber at the root of the subscription tree.
 type Subscriber = subscriber.Subscriber
 
-//jig:name IntObserver
+//jig:name Observer
 
-// IntObserver is a function that gets called whenever the Observable has
+// Observer is a function that gets called whenever the Observable has
 // something to report. The next argument is the item value that is only
 // valid when the done argument is false. When done is true and the err
 // argument is not nil, then the Observable has terminated with an error.
 // When done is true and the err argument is nil, then the Observable has
 // completed normally.
-type IntObserver func(next int, err error, done bool)
+type Observer func(next interface{}, err error, done bool)
 
-//jig:name ObservableInt
+//jig:name Observable
 
-// ObservableInt is a function taking an Observer, Scheduler and Subscriber.
+// Observable is a function taking an Observer, Scheduler and Subscriber.
 // Calling it will subscribe the Observer to events from the Observable.
-type ObservableInt func(IntObserver, Scheduler, Subscriber)
+type Observable func(Observer, Scheduler, Subscriber)
 
-//jig:name FromInt
+//jig:name From
 
-// FromInt creates an ObservableInt from multiple int values passed in.
-func FromInt(slice ...int) ObservableInt {
-	var zeroInt int
-	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
+// From creates an Observable from multiple interface{} values passed in.
+func From(slice ...interface{}) Observable {
+	var zero interface{}
+	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Subscribed() {
@@ -56,7 +56,7 @@ func FromInt(slice ...int) ObservableInt {
 						self()
 					}
 				} else {
-					observe(zeroInt, nil, true)
+					observe(zero, nil, true)
 				}
 			}
 		})
@@ -65,38 +65,33 @@ func FromInt(slice ...int) ObservableInt {
 	return observable
 }
 
-//jig:name IntSlice
+//jig:name Slice
 
-type IntSlice = []int
+type Slice = []interface{}
 
-//jig:name ObservableObservableIntCombineLatestAll
+//jig:name ObservableObservableCombineLatestAll
 
-// CombineLatestAll flattens a higher order observable
-// (e.g. ObservableObservableInt) by subscribing to
-// all emitted observables (ie. ObservableInt entries) until the source
-// completes. It will then wait for all of the subscribed ObservableInts
-// to emit before emitting the first slice. Whenever any of the subscribed
-// observables emits, a new slice will be emitted containing all the latest
-// value.
-func (o ObservableObservableInt) CombineLatestAll() ObservableIntSlice {
-	var zeroInt int
-	var zeroIntSlice []int
-	observable := func(observe IntSliceObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		observables := []ObservableInt(nil)
+// CombineLatestAll flattens an ObservableObservable by applying combineLatest
+// when the ObservableObservable completes.
+func (o ObservableObservable) CombineLatestAll() ObservableSlice {
+	var zero interface{}
+	var zeroSlice []interface{}
+	observable := func(observe SliceObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		observables := []Observable(nil)
 		var observers struct {
 			sync.Mutex
-			values		[]int
+			values		[]interface{}
 			initialized	int
 			active		int
 		}
-		makeObserver := func(index int) IntObserver {
-			observer := func(next int, err error, done bool) {
+		makeObserver := func(index int) Observer {
+			observer := func(next interface{}, err error, done bool) {
 				observers.Lock()
 				defer observers.Unlock()
 				if observers.active > 0 {
 					switch {
 					case !done:
-						if observers.values[index] == zeroInt {
+						if observers.values[index] == zero {
 							observers.initialized++
 						}
 						observers.values[index] = next
@@ -105,10 +100,10 @@ func (o ObservableObservableInt) CombineLatestAll() ObservableIntSlice {
 						}
 					case err != nil:
 						observers.active = 0
-						observe(zeroIntSlice, err, true)
+						observe(zeroSlice, err, true)
 					default:
 						if observers.active--; observers.active == 0 {
-							observe(zeroIntSlice, nil, true)
+							observe(zeroSlice, nil, true)
 						}
 					}
 				}
@@ -116,17 +111,17 @@ func (o ObservableObservableInt) CombineLatestAll() ObservableIntSlice {
 			return observer
 		}
 
-		observer := func(next ObservableInt, err error, done bool) {
+		observer := func(next Observable, err error, done bool) {
 			switch {
 			case !done:
 				observables = append(observables, next)
 			case err != nil:
-				observe(zeroIntSlice, err, true)
+				observe(zeroSlice, err, true)
 			default:
 				subscribeOn.Schedule(func() {
 					if !subscriber.Canceled() {
 						numObservables := len(observables)
-						observers.values = make([]int, numObservables)
+						observers.values = make([]interface{}, numObservables)
 						observers.active = numObservables
 						for i, v := range observables {
 							if subscriber.Canceled() {
@@ -143,54 +138,52 @@ func (o ObservableObservableInt) CombineLatestAll() ObservableIntSlice {
 	return observable
 }
 
-//jig:name CombineLatestInt
+//jig:name ObservableCombineLatestWith
 
-// CombineLatest will subscribe to all ObservableInts. It will then wait for
-// all of them to emit before emitting the first slice. Whenever any of the
-// subscribed observables emits, a new slice will be emitted containing all
-// the latest value.
-func CombineLatestInt(observables ...ObservableInt) ObservableIntSlice {
-	return FromObservableInt(observables...).CombineLatestAll()
+// Combines multiple Observables to create an Observable whose values are
+// calculated from the latest values of each of its input Observables.
+func (o Observable) CombineLatestWith(observables ...Observable) ObservableSlice {
+	return FromObservable(append([]Observable{o}, observables...)...).CombineLatestAll()
 }
 
-//jig:name ObservableIntObserver
+//jig:name ObservableObserver
 
-// ObservableIntObserver is a function that gets called whenever the Observable has
+// ObservableObserver is a function that gets called whenever the Observable has
 // something to report. The next argument is the item value that is only
 // valid when the done argument is false. When done is true and the err
 // argument is not nil, then the Observable has terminated with an error.
 // When done is true and the err argument is nil, then the Observable has
 // completed normally.
-type ObservableIntObserver func(next ObservableInt, err error, done bool)
+type ObservableObserver func(next Observable, err error, done bool)
 
-//jig:name ObservableObservableInt
+//jig:name ObservableObservable
 
-// ObservableObservableInt is a function taking an Observer, Scheduler and Subscriber.
+// ObservableObservable is a function taking an Observer, Scheduler and Subscriber.
 // Calling it will subscribe the Observer to events from the Observable.
-type ObservableObservableInt func(ObservableIntObserver, Scheduler, Subscriber)
+type ObservableObservable func(ObservableObserver, Scheduler, Subscriber)
 
-//jig:name IntSliceObserver
+//jig:name SliceObserver
 
-// IntSliceObserver is a function that gets called whenever the Observable has
+// SliceObserver is a function that gets called whenever the Observable has
 // something to report. The next argument is the item value that is only
 // valid when the done argument is false. When done is true and the err
 // argument is not nil, then the Observable has terminated with an error.
 // When done is true and the err argument is nil, then the Observable has
 // completed normally.
-type IntSliceObserver func(next IntSlice, err error, done bool)
+type SliceObserver func(next Slice, err error, done bool)
 
-//jig:name ObservableIntSlice
+//jig:name ObservableSlice
 
-// ObservableIntSlice is a function taking an Observer, Scheduler and Subscriber.
+// ObservableSlice is a function taking an Observer, Scheduler and Subscriber.
 // Calling it will subscribe the Observer to events from the Observable.
-type ObservableIntSlice func(IntSliceObserver, Scheduler, Subscriber)
+type ObservableSlice func(SliceObserver, Scheduler, Subscriber)
 
-//jig:name FromObservableInt
+//jig:name FromObservable
 
-// FromObservableInt creates an ObservableObservableInt from multiple ObservableInt values passed in.
-func FromObservableInt(slice ...ObservableInt) ObservableObservableInt {
-	var zeroObservableInt ObservableInt
-	observable := func(observe ObservableIntObserver, scheduler Scheduler, subscriber Subscriber) {
+// FromObservable creates an ObservableObservable from multiple Observable values passed in.
+func FromObservable(slice ...Observable) ObservableObservable {
+	var zeroObservable Observable
+	observable := func(observe ObservableObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Subscribed() {
@@ -201,7 +194,7 @@ func FromObservableInt(slice ...ObservableInt) ObservableObservableInt {
 						self()
 					}
 				} else {
-					observe(zeroObservableInt, nil, true)
+					observe(zeroObservable, nil, true)
 				}
 			}
 		})
@@ -210,16 +203,16 @@ func FromObservableInt(slice ...ObservableInt) ObservableObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntSlicePrintln
+//jig:name ObservableSlicePrintln
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
 // Println is performed on the Trampoline scheduler.
-func (o ObservableIntSlice) Println() (err error) {
+func (o ObservableSlice) Println() (err error) {
 	subscriber := subscriber.New()
 	scheduler := scheduler.Trampoline
-	observer := func(next IntSlice, e error, done bool) {
+	observer := func(next Slice, e error, done bool) {
 		if !done {
 			fmt.Println(next)
 		} else {
