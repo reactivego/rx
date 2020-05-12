@@ -10,13 +10,13 @@ func ConcatFoo(observables ...ObservableFoo) ObservableFoo {
 	if len(observables) == 0 {
 		return EmptyFoo()
 	}
-	return observables[0].Concat(observables[1:]...)
+	return observables[0].ConcatWith(observables[1:]...)
 }
 
-//jig:template Observable<Foo> Concat
+//jig:template Observable<Foo> ConcatWith
 
-// Concat emits the emissions from two or more ObservableFoos without interleaving them.
-func (o ObservableFoo) Concat(other ...ObservableFoo) ObservableFoo {
+// ConcatWith emits the emissions from two or more ObservableFoos without interleaving them.
+func (o ObservableFoo) ConcatWith(other ...ObservableFoo) ObservableFoo {
 	var zeroFoo foo
 	if len(other) == 0 {
 		return o
@@ -42,6 +42,16 @@ func (o ObservableFoo) Concat(other ...ObservableFoo) ObservableFoo {
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
+}
+
+//jig:template Observable<Foo> ConcatMap<Bar>
+
+// ConcatMapBar transforms the items emitted by an ObservableFoo by applying a
+// function to each item and returning an ObservableBar. The stream of
+// ObservableBar items is then flattened by concattenating the emissions from
+// the observables without interleaving.
+func (o ObservableFoo) ConcatMapBar(project func(foo) ObservableBar) ObservableBar {
+	return o.MapObservableBar(project).ConcatAll()
 }
 
 //jig:template ObservableObservable<Foo> ConcatAll

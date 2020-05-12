@@ -47,7 +47,7 @@ func require() {
 	oo.CombineLatestAll()
 
 	Concat(o)
-	o.Concat() // With
+	o.ConcatWith()
 	// o.ConcatMap
 	// o.ConcatMapTo
 	// o.ConcatScan

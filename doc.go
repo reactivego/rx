@@ -100,11 +100,8 @@ Transforming Operators
 
 Operators that transform items that are emitted by an Observable.
 
-	ConcatMap 
 	Map              https://godoc.org/github.com/reactivego/rx/test/Map/
-	MergeMap         https://godoc.org/github.com/reactivego/rx/test/MergeMap/
 	Scan             https://godoc.org/github.com/reactivego/rx/test/Scan/
-	SwitchMap        https://godoc.org/github.com/reactivego/rx/test/SwitchMap/
 
 Filtering Operators
 
@@ -127,19 +124,35 @@ Operators that selectively emit items from a source Observable.
 	TakeUntil        https://godoc.org/github.com/reactivego/rx/test/TakeUntil/ 
 	TakeWhile        https://godoc.org/github.com/reactivego/rx/test/TakeWhile/ 
 
+Sequencing Operators
+
+Operators that work with multiple source Observables to create a single Observable.
+This Observable then flattens the emissions into a single stream.
+
+	Concat           https://godoc.org/github.com/reactivego/rx/test/Concat/ 
+	ConcatWith       https://godoc.org/github.com/reactivego/rx/test/ConcatWith/
+	ConcatMap        https://godoc.org/github.com/reactivego/rx/test/ConcatMap/
+	ConcatMapTo      https://godoc.org/github.com/reactivego/rx/test/ConcatMapTo/
+	ConcatAll        https://godoc.org/github.com/reactivego/rx/test/ConcatAll/
+	SwitchMap        https://godoc.org/github.com/reactivego/rx/test/SwitchMap/
+	SwitchAll        https://godoc.org/github.com/reactivego/rx/test/SwitchAll/
+	Merge            https://godoc.org/github.com/reactivego/rx/test/Merge/
+	MergeWith        https://godoc.org/github.com/reactivego/rx/test/MergeWith/
+	MergeMap         https://godoc.org/github.com/reactivego/rx/test/MergeMap/
+	MergeAll         https://godoc.org/github.com/reactivego/rx/test/MergeAll/
+	MergeDelayError  https://godoc.org/github.com/reactivego/rx/test/MergeDelayError/
+	MergeDelayErrorWith https://godoc.org/github.com/reactivego/rx/test/MergeDelayErrorWith/
+
 Combining Operators
 
 Operators that work with multiple source Observables to create a single Observable.
+This Observable emits the emissions of the source Observables as slices.
 
-	CombineAll       https://godoc.org/github.com/reactivego/rx/test/CombineAll/
-	CombineLatest     
-	Concat           https://godoc.org/github.com/reactivego/rx/test/Concat/ 
-	ConcatAll        https://godoc.org/github.com/reactivego/rx/test/ConcatAll/
-	Merge            https://godoc.org/github.com/reactivego/rx/test/Merge/
-	MergeAll         https://godoc.org/github.com/reactivego/rx/test/MergeAll/
-	MergeDelayError	 https://godoc.org/github.com/reactivego/rx/test/MergeDelayError/
-	MergeDelayError	 https://godoc.org/github.com/reactivego/rx/test/MergeDelayError/
-	SwitchAll        https://godoc.org/github.com/reactivego/rx/test/SwitchAll/
+	CombineLatest      https://godoc.org/github.com/reactivego/rx/test/CombineLatest/
+	CombineLatestWith  https://godoc.org/github.com/reactivego/rx/test/CombineLatestWith/
+	CombineLatestMap   https://godoc.org/github.com/reactivego/rx/test/CombineLatestMap/
+	CombineLatestMapTo https://godoc.org/github.com/reactivego/rx/test/CombineLatestMapTo/
+	CombineLatestAll   https://godoc.org/github.com/reactivego/rx/test/CombineLatestAll/
 
 Error Handling Operators
 
@@ -172,7 +185,7 @@ Mathematical and Aggregate Operators
 Operators that operate on the entire sequence of items emitted by an Observable.
 
 	Average           https://godoc.org/github.com/reactivego/rx/test/Average/
-	Count             https://godoc.org/github.com/reactivego/rx/test/Count/ ObservableInt
+	Count             https://godoc.org/github.com/reactivego/rx/test/Count/
 	Max               https://godoc.org/github.com/reactivego/rx/test/Max/
 	Min               https://godoc.org/github.com/reactivego/rx/test/Min/
 	Reduce            https://godoc.org/github.com/reactivego/rx/test/Reduce/
@@ -194,12 +207,13 @@ Change the scheduler for subscribing and observing.
 
 Multicasting Operators
 
-A *Connectable* is an *Observable* that can multicast to observers subscribed to it. The *Connectable* itself will subscribe to the *Observable* when the *Connect* method is called on it.
+A Connectable is an Observable that can multicast to observers subscribed to it.
+The Connectable itself will subscribe to the Observable when the Connect method is called on it.
 
 	Publish           https://godoc.org/github.com/reactivego/rx/test/Publish/ Connectable
 	PublishReplay     https://godoc.org/github.com/reactivego/rx/test/PublishReplay/ Connectable
 
-*Connectable* supports different strategies for subscribing to the *Observable* from which it was created.
+Connectable supports different strategies for subscribing to the Observable from which it was created.
 
 	RefCount          https://godoc.org/github.com/reactivego/rx/test/RefCount/
 	AutoConnect       https://godoc.org/github.com/reactivego/rx/test/AutoConnect/
@@ -207,7 +221,9 @@ A *Connectable* is an *Observable* that can multicast to observers subscribed to
 
 Subjects
 
-A *Subject* is both a multicasting *Observable* as well as an *Observer*. The *Observable* side allows multiple simultaneous subscribers. The *Observer* side allows you to directly feed it data or subscribe it to another *Observable*.
+A Subject is both a multicasting Observable as well as an Observer.
+The Observable side allows multiple simultaneous subscribers.
+The Observer side allows you to directly feed it data or subscribe it to another Observable.
 
 	Subject           https://godoc.org/github.com/reactivego/rx/test/Subject
 	ReplaySubject     https://godoc.org/github.com/reactivego/rx/test/ReplaySubject
@@ -216,7 +232,7 @@ Subscribing
 
 Subscribing breathes life into a chain of observables. An observable may be subscribed to many times. 
 
-**Println** and **Subscribe** implement subscribing behavior directly.
+Println and Subscribe implement subscribing behavior directly.
 
 	Println          https://godoc.org/github.com/reactivego/rx/test/Println
 	Subscribe        https://godoc.org/github.com/reactivego/rx/test/Subscribe
@@ -226,20 +242,16 @@ Subscribing breathes life into a chain of observables. An observable may be subs
 	ToSlice          https://godoc.org/github.com/reactivego/rx/test/ToSlice
 	Wait             https://godoc.org/github.com/reactivego/rx/test/Wait
 
-**Connect** is called internally by **RefCount** and **AutoConnect**.
+Connect is called internally by RefCount and AutoConnect.
 
-	- RefCount		https://godoc.org/github.com/reactivego/rx/test/RefCount
-	- AutoConnect	https://godoc.org/github.com/reactivego/rx/test/AutoConnect
-
-Acknowledgements
-
-This library started life as Reactive eXtensions for Go (https://github.com/alecthomas/gorx) by *Alec Thomas*.
-Although the library has been through the metaphorical meat grinder a few times, its DNA is still clearly present
-in this library and I owe Alec a debt of grattitude for the work he has made so generously available.
+	RefCount         https://godoc.org/github.com/reactivego/rx/test/RefCount
+	AutoConnect      https://godoc.org/github.com/reactivego/rx/test/AutoConnect
 
 License
 
-This library is licensed under the terms of the MIT License. See LICENSE file for copyright notice and exact wording.
+This library is licensed under the terms of the MIT License.
+See https://github.com/reactivego/rx/blob/master/LICENSE copyright notice and
+exact wording.
 */
 package rx
 

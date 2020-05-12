@@ -2,7 +2,7 @@
 
 //go:generate jig
 
-package Concat
+package ConcatWith
 
 import (
 	"fmt"
@@ -64,55 +64,6 @@ func FromInt(slice ...int) ObservableInt {
 	return observable
 }
 
-//jig:name ConcatInt
-
-// ConcatInt emits the emissions from two or more ObservableInts without interleaving them.
-func ConcatInt(observables ...ObservableInt) ObservableInt {
-	if len(observables) == 0 {
-		return EmptyInt()
-	}
-	return observables[0].ConcatWith(observables[1:]...)
-}
-
-//jig:name ObservableIntPrintln
-
-// Println subscribes to the Observable and prints every item to os.Stdout
-// while it waits for completion or error. Returns either the error or nil
-// when the Observable completed normally.
-// Println is performed on the Trampoline scheduler.
-func (o ObservableInt) Println() (err error) {
-	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
-	observer := func(next int, e error, done bool) {
-		if !done {
-			fmt.Println(next)
-		} else {
-			err = e
-			subscriber.Unsubscribe()
-		}
-	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
-}
-
-//jig:name EmptyInt
-
-// EmptyInt creates an Observable that emits no items but terminates normally.
-func EmptyInt() ObservableInt {
-	var zeroInt int
-	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
-		runner := scheduler.Schedule(func() {
-			if subscriber.Subscribed() {
-				observe(zeroInt, nil, true)
-			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
-}
-
 //jig:name ObservableIntConcatWith
 
 // ConcatWith emits the emissions from two or more ObservableInts without interleaving them.
@@ -142,4 +93,27 @@ func (o ObservableInt) ConcatWith(other ...ObservableInt) ObservableInt {
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
+}
+
+//jig:name ObservableIntPrintln
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println is performed on the Trampoline scheduler.
+func (o ObservableInt) Println() (err error) {
+	subscriber := subscriber.New()
+	scheduler := scheduler.Trampoline
+	observer := func(next int, e error, done bool) {
+		if !done {
+			fmt.Println(next)
+		} else {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
 }
