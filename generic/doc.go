@@ -1,41 +1,5 @@
-/*
-Package rx/generic provides Reactive Extensions for Go.
-
-It's a generics library for composing asynchronous and event-based programs
-using observable sequences. The library consists of more than a 100 generic 
-templates to enable type-safe programming with observable streams.
-In order to use it, you will need to go get the jig tool
-(https://github.com/reactivego/jig).
-
-Using the library is simple. Start by creating a file "main.go":
-
-	package main
-
-	import _ "github.com/reactivego/rx/generic"
-
-	func main() {
-		FromInt(1,2,3).Println()
-	}
-	
-The import is purely done for jig. Jig searches for generic templates inside
-the imported package. FromInt matches generic function template From<Foo>.
-Running jig will generate the code:
-
-	go get github.com/reactivego/rx
-	go get github.com/reactivego/jig
-	go run github.com/reactivego/jig -v
-
-The code has been generated into file "rx.go".
-You can now build and run the generated code:
-
-	go run *.go
-
-For more information about the available generic functions and operators
-see either:
-https://github.com/reactivego/rx#operators
-or
-https://godoc.org/github.com/reactivego/rx
-*/
+// Package rx/generic provides Reactive Extensions for Go.
+// A generics library for asynchronous programming with observable streams.
 package rx
 
 // foo is the first metasyntactic type. Use the jig:type pragma to tell jig that
