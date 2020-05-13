@@ -1,5 +1,7 @@
-// Package rx/generic provides Reactive Extensions for Go.
-// A generics library for asynchronous programming with observable streams.
+/*
+Package rx/generic provides Reactive Extensions for Go, a generics library for
+asynchronous programming with observable streams.
+*/
 package rx
 
 // foo is the first metasyntactic type. Use the jig:type pragma to tell jig that

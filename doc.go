@@ -1,90 +1,8 @@
 /*
-Package rx provides Go with Reactive Extensions, an API for asynchronous
-programming with Observables.
+Package rx provides Reactive Extensions for Go, an API for asynchronous
+programming with observable streams.
 
-Ways of using this library
-
-You can use this package directly as follows:
-
-	import "github.com/reactivego/rx"
-
-Then you just use the code directly from the library:
-
-	rx.From(1,2,"hello").Println()	
-
-Alternatively you can use the library as a generics library and use
-a tool to generate statically typed  observables and operators:
-
-	import _ "github.com/reactivego/rx/generic"
-
-Then you use the code as follows:
-	
-	FromInt(1,2).Println()
-
-You'll need to generate the observables and operators by running the jig tool.
-For details about the jig tool see https://github.com/reactivego/jig 
-
-For more information about the available generic functions and operators
-see the list of operators below. Every implemented operator has a link
-to an example where it is showed being used in a statically typed context.
-
-Observables
-
-The main focus of rx is on Observables.
-
-An Observable; is a stream of events, assumes zero to many values over time,
-pushes values, can take any amount of time to complete (or may never), is
-cancellable, is lazy (it doesn't do anything until you subscribe).
-
-This package uses `interface{}` for entry types, so an observable can emit a
-mix of differently typed entries. To create an observable that emits three
-values of different types you could write the following little program.
-
-	package main
-
-	import "github.com/reactivego/rx"
-
-	func main() {
-		rx.From(1,"hi",2.3).Println()
-	}
-
-The code above creates an observable from numbers and strings and then prints
-them.
-
-Observables in rx are somewhat similar to Go channels but have much richer
-semantics:
-
-Observables can be hot or cold. A hot observable will try to emit values even
-when nobody is subscribed. As long as there are no subscribers the values of
-a hot observable are lost. The position of a mouse pointer or the current time
-are examples of hot observables. 
-
-A cold observable will only start emitting values when somebody subscribes.
-The contents of a file or a database are examples of cold observables.
-
-An observable can complete normally or with an error, it uses subscriptions
-that can be canceled from the subscriber side. Where a normal variable is
-just a place where you read and write values from, an observable captures how
-the value of this variable changes over time.
-
-Concurrency follows naturally from the fact that an observable is an ever
-changing stream of values.
-
-Operators 
-
-The combination of Observables and a set of expressive Operators is the real
-strength of Reactive Extensions. Operators work on one or more Observables.
-They are the language you use to describe the way in which observables should
-be combined to form new Observables. Operators specify how Observables
-representing streams of values are e.g. merged, transformed, concatenated,
-split, multicasted, replayed, delayed and debounced.
-
-This implementation takes most of its cues from
-RxJS 6 (https://github.com/ReactiveX/rxjs) and
-RxJava 2 (https://github.com/ReactiveX/RxJava).
-Both libaries have been pushing the envelope in evolving operator semantics.
-
-Below is the list of implemented operators.
+Below is the list of supported operators:
 
 Creating Operators
 
@@ -261,28 +179,6 @@ Connect is called internally by RefCount and AutoConnect.
 
 	RefCount         https://godoc.org/github.com/reactivego/rx/test/RefCount
 	AutoConnect      https://godoc.org/github.com/reactivego/rx/test/AutoConnect
-
-Regenerating this Package
-
-This package is generated from the sub-folder generic by the jig tool.
-You don't need to regenerate the package in order to use it. However, if you
-are interested in regenerating it, then read on.
-
-The jig tool provides the parametric polymorphism capability that Go 1 is
-missing. It works by replacing place-holder types of generic functions and
-datatypes with interface{} (it can also generate statically typed code though).
-
-To regenerate, change the current working directory to the package directory
-and run the jig tool as follows:
-
-	$ go get -d github.com/reactivego/jig
-	$ go run github.com/reactivego/jig -v
-
-License
-
-This library is licensed under the terms of the MIT License.
-See https://github.com/reactivego/rx/blob/master/LICENSE copyright notice and
-exact wording.
 */
 package rx
 
