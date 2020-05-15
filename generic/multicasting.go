@@ -15,12 +15,12 @@ import (
 const ErrDisconnect = RxError("disconnect")
 
 // Connectable provides the Connect method for a Multicaster.
-type Connectable func() Subscription
+type Connectable func(subscribers ...Subscriber) Subscription
 
 // Connect instructs a multicaster to subscribe to its source and begin
 // multicasting items to its subscribers.
-func (f Connectable) Connect() Subscription {
-	return f()
+func (f Connectable) Connect(subscribers ...Subscriber) Subscription {
+	return f(subscribers...)
 }
 
 //jig:template <Foo>Multicaster
@@ -79,22 +79,22 @@ func (o ObservableFoo) Multicast(factory func() SubjectFoo) FooMulticaster {
 		state int32
 		atomic.Value
 	}
-	connectable := func() Subscription {
+	connectable := func(subscribers ...Subscriber) Subscription {
 		if atomic.CompareAndSwapInt32(&subjectValue.state, terminated, active) {
 			subjectValue.Store(factory())
 		}
 		if atomic.CompareAndSwapInt32(&subscriberValue.state, unsubscribed, subscribed) {
-			subscriber := subscriber.New()
-			o.Subscribe(observer, subscriber)
-			subscriberValue.Store(subscriber)
-			subscriber.OnUnsubscribe(func() {
+			subscribers := append(subscribers, subscriber.New())
+			o.Subscribe(observer, subscribers[0])
+			subscriberValue.Store(subscribers[0])
+			subscribers[0].OnUnsubscribe(func() {
 				atomic.CompareAndSwapInt32(&subscriberValue.state, subscribed, unsubscribed)
 				var zero foo
 				observer(zero, ErrDisconnect, true)
 			})
 		}
 		subscriber := subscriberValue.Load().(Subscriber)
-		subscription := subscriber.Add(subscriber.Unsubscribe)
+		subscription := subscribers[0].Add(subscriber.Unsubscribe)
 		subscription.OnWait(subscriber.Wait)
 		return subscription
 	}
@@ -146,18 +146,25 @@ func (o ObservableFoo) PublishReplay(bufferCapacity int, windowDuration time.Dur
 // Unsubscribe on the subscription returned by the call to Connect.
 func (o FooMulticaster) RefCount() ObservableFoo {
 	var (
-		refcount   int32
-		connection Subscription
+		refcount     int32
+		subscription Subscription
 	)
-	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
+	connect := func(subscribeOn Scheduler) {
 		if atomic.AddInt32(&refcount, 1) == 1 {
-			connection = o.Connect()
+			subscriber := subscriber.New()
+			subscription = o.Connect(subscriber)
+			runner := subscribeOn.Schedule(subscriber.Wait)
+			subscriber.OnUnsubscribe(runner.Cancel)
 		}
-		subscriber.OnUnsubscribe(func() {
-			if atomic.AddInt32(&refcount, -1) == 0 {
-				connection.Unsubscribe()
-			}
-		})
+	}
+	unsubscribe := func() {
+		if atomic.AddInt32(&refcount, -1) == 0 {
+			subscription.Unsubscribe()
+		}
+	}
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		connect(subscribeOn)
+		subscriber.OnUnsubscribe(unsubscribe)
 		o.ObservableFoo(observe, subscribeOn, subscriber)
 	}
 	return observable
