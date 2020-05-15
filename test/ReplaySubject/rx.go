@@ -12,6 +12,16 @@ import (
 	"github.com/reactivego/subscriber"
 )
 
+//jig:name IntObserver
+
+// IntObserver is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
+// completed normally.
+type IntObserver func(next int, err error, done bool)
+
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
@@ -24,16 +34,6 @@ type Scheduler = scheduler.Scheduler
 // from a single subscriber at the root of the subscription tree.
 type Subscriber = subscriber.Subscriber
 
-//jig:name IntObserver
-
-// IntObserver is a function that gets called whenever the Observable has
-// something to report. The next argument is the item value that is only
-// valid when the done argument is false. When done is true and the err
-// argument is not nil, then the Observable has terminated with an error.
-// When done is true and the err argument is nil, then the Observable has
-// completed normally.
-type IntObserver func(next int, err error, done bool)
-
 //jig:name ObservableInt
 
 // ObservableInt is a function taking an Observer, Scheduler and Subscriber.
@@ -42,15 +42,14 @@ type ObservableInt func(IntObserver, Scheduler, Subscriber)
 
 //jig:name SubjectInt
 
-// SubjectInt is a combination of an observer and observable. Subjects are
-// special because they are the only reactive constructs that support
-// multicasting. The items sent to it through its observer side are
+// SubjectInt is a combination of an IntObserver and ObservableInt.
+// Subjects are special because they are the only reactive constructs that
+// support multicasting. The items sent to it through its observer side are
 // multicasted to multiple clients subscribed to its observable side.
 //
-// A SubjectInt embeds ObservableInt and IntObserver. This exposes the
-// methods and fields of both types on SubjectInt. Use the ObservableInt
-// methods to subscribe to it. Use the IntObserver Next, Error and Complete
-// methods to feed data to it.
+// The SubjectInt exposes all methods from the embedded IntObserver and
+// ObservableInt. Use the IntObserver Next, Error and Complete methods to feed
+// data to it. Use the ObservableInt methods to subscribe to it.
 //
 // After a subject has been terminated by calling either Error or Complete,
 // it goes into terminated state. All subsequent calls to its observer side
@@ -59,8 +58,8 @@ type ObservableInt func(IntObserver, Scheduler, Subscriber)
 // There are different types of subjects, see the different NewXxxSubjectInt
 // functions for more info.
 type SubjectInt struct {
-	ObservableInt
 	IntObserver
+	ObservableInt
 }
 
 // Next is called by an ObservableInt to emit the next int value to the
@@ -99,7 +98,15 @@ func NewReplaySubjectInt(bufferCapacity int, windowDuration time.Duration) Subje
 		bufferCapacity = MaxReplayCapacity
 	}
 	ch := multicast.NewChan(bufferCapacity, 16)
-
+	observer := func(next int, err error, done bool) {
+		if !ch.Closed() {
+			if !done {
+				ch.Send(next)
+			} else {
+				ch.Close(err)
+			}
+		}
+	}
 	observable := Observable(func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		ep, err := ch.NewEndpoint(multicast.ReplayAll)
 		if err != nil {
@@ -122,18 +129,7 @@ func NewReplaySubjectInt(bufferCapacity int, windowDuration time.Duration) Subje
 		})
 		observable(observe, subscribeOn, subscriber.Add(ep.Cancel))
 	})
-
-	observer := func(next int, err error, done bool) {
-		if !ch.Closed() {
-			if !done {
-				ch.Send(next)
-			} else {
-				ch.Close(err)
-			}
-		}
-	}
-
-	return SubjectInt{observable.AsObservableInt(), observer}
+	return SubjectInt{observer, observable.AsObservableInt()}
 }
 
 //jig:name StringObserver
@@ -154,15 +150,14 @@ type ObservableString func(StringObserver, Scheduler, Subscriber)
 
 //jig:name SubjectString
 
-// SubjectString is a combination of an observer and observable. Subjects are
-// special because they are the only reactive constructs that support
-// multicasting. The items sent to it through its observer side are
+// SubjectString is a combination of an StringObserver and ObservableString.
+// Subjects are special because they are the only reactive constructs that
+// support multicasting. The items sent to it through its observer side are
 // multicasted to multiple clients subscribed to its observable side.
 //
-// A SubjectString embeds ObservableString and StringObserver. This exposes the
-// methods and fields of both types on SubjectString. Use the ObservableString
-// methods to subscribe to it. Use the StringObserver Next, Error and Complete
-// methods to feed data to it.
+// The SubjectString exposes all methods from the embedded StringObserver and
+// ObservableString. Use the StringObserver Next, Error and Complete methods to feed
+// data to it. Use the ObservableString methods to subscribe to it.
 //
 // After a subject has been terminated by calling either Error or Complete,
 // it goes into terminated state. All subsequent calls to its observer side
@@ -171,8 +166,8 @@ type ObservableString func(StringObserver, Scheduler, Subscriber)
 // There are different types of subjects, see the different NewXxxSubjectString
 // functions for more info.
 type SubjectString struct {
-	ObservableString
 	StringObserver
+	ObservableString
 }
 
 // Next is called by an ObservableString to emit the next string value to the
@@ -206,7 +201,15 @@ func NewReplaySubjectString(bufferCapacity int, windowDuration time.Duration) Su
 		bufferCapacity = MaxReplayCapacity
 	}
 	ch := multicast.NewChan(bufferCapacity, 16)
-
+	observer := func(next string, err error, done bool) {
+		if !ch.Closed() {
+			if !done {
+				ch.Send(next)
+			} else {
+				ch.Close(err)
+			}
+		}
+	}
 	observable := Observable(func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		ep, err := ch.NewEndpoint(multicast.ReplayAll)
 		if err != nil {
@@ -229,18 +232,7 @@ func NewReplaySubjectString(bufferCapacity int, windowDuration time.Duration) Su
 		})
 		observable(observe, subscribeOn, subscriber.Add(ep.Cancel))
 	})
-
-	observer := func(next string, err error, done bool) {
-		if !ch.Closed() {
-			if !done {
-				ch.Send(next)
-			} else {
-				ch.Close(err)
-			}
-		}
-	}
-
-	return SubjectString{observable.AsObservableString(), observer}
+	return SubjectString{observer, observable.AsObservableString()}
 }
 
 //jig:name GoroutineScheduler
@@ -253,40 +245,6 @@ func GoroutineScheduler() Scheduler {
 
 // Subscription is an alias for the subscriber.Subscription interface type.
 type Subscription = subscriber.Subscription
-
-//jig:name ObservableIntSubscribe
-
-// Subscribe operates upon the emissions and notifications from an Observable.
-// This method returns a Subscription.
-// Subscribe by default is performed on the Trampoline scheduler.
-func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber) Subscription {
-	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.Trampoline
-	observer := func(next int, err error, done bool) {
-		if !done {
-			observe(next, err, done)
-		} else {
-			var zeroInt int
-			observe(zeroInt, err, true)
-			subscribers[0].Unsubscribe()
-		}
-	}
-	subscribers[0].OnWait(scheduler.Wait)
-	o(observer, scheduler, subscribers[0])
-	return subscribers[0]
-}
-
-//jig:name ObservableStringSubscribeOn
-
-// SubscribeOn specifies the scheduler an ObservableString should use when it is
-// subscribed to.
-func (o ObservableString) SubscribeOn(subscribeOn Scheduler) ObservableString {
-	observable := func(observe StringObserver, _ Scheduler, subscriber Subscriber) {
-		subscriber.OnWait(subscribeOn.Wait)
-		o(observe, subscribeOn, subscriber)
-	}
-	return observable
-}
 
 //jig:name Observer
 
@@ -365,6 +323,62 @@ func Create(create func(Next, Error, Complete, Canceled)) Observable {
 	return observable
 }
 
+//jig:name ObservableIntSubscribe
+
+// Subscribe operates upon the emissions and notifications from an Observable.
+// This method returns a Subscription.
+// Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber) Subscription {
+	subscribers = append(subscribers, subscriber.New())
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next int, err error, done bool) {
+		if !done {
+			observe(next, err, done)
+		} else {
+			var zeroInt int
+			observe(zeroInt, err, true)
+			subscribers[0].Unsubscribe()
+		}
+	}
+	subscribers[0].OnWait(scheduler.Wait)
+	o(observer, scheduler, subscribers[0])
+	return subscribers[0]
+}
+
+//jig:name ObservableStringSubscribeOn
+
+// SubscribeOn specifies the scheduler an ObservableString should use when it is
+// subscribed to.
+func (o ObservableString) SubscribeOn(subscribeOn Scheduler) ObservableString {
+	observable := func(observe StringObserver, _ Scheduler, subscriber Subscriber) {
+		subscriber.OnWait(subscribeOn.Wait)
+		o(observe, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableStringSubscribe
+
+// Subscribe operates upon the emissions and notifications from an Observable.
+// This method returns a Subscription.
+// Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableString) Subscribe(observe StringObserver, subscribers ...Subscriber) Subscription {
+	subscribers = append(subscribers, subscriber.New())
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next string, err error, done bool) {
+		if !done {
+			observe(next, err, done)
+		} else {
+			var zeroString string
+			observe(zeroString, err, true)
+			subscribers[0].Unsubscribe()
+		}
+	}
+	subscribers[0].OnWait(scheduler.Wait)
+	o(observer, scheduler, subscribers[0])
+	return subscribers[0]
+}
+
 //jig:name RxError
 
 type RxError string
@@ -379,8 +393,9 @@ const ErrTypecastToInt = RxError("typecast to int failed")
 
 //jig:name ObservableAsObservableInt
 
-// AsInt turns an Observable of interface{} into an ObservableInt. If during
-// observing a typecast fails, the error ErrTypecastToInt will be emitted.
+// AsObservableInt turns an Observable of interface{} into an ObservableInt.
+// If during observing a typecast fails, the error ErrTypecastToInt will be
+// emitted.
 func (o Observable) AsObservableInt() ObservableInt {
 	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
@@ -409,8 +424,9 @@ const ErrTypecastToString = RxError("typecast to string failed")
 
 //jig:name ObservableAsObservableString
 
-// AsString turns an Observable of interface{} into an ObservableString. If during
-// observing a typecast fails, the error ErrTypecastToString will be emitted.
+// AsObservableString turns an Observable of interface{} into an ObservableString.
+// If during observing a typecast fails, the error ErrTypecastToString will be
+// emitted.
 func (o Observable) AsObservableString() ObservableString {
 	observable := func(observe StringObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
@@ -429,26 +445,4 @@ func (o Observable) AsObservableString() ObservableString {
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
-}
-
-//jig:name ObservableStringSubscribe
-
-// Subscribe operates upon the emissions and notifications from an Observable.
-// This method returns a Subscription.
-// Subscribe by default is performed on the Trampoline scheduler.
-func (o ObservableString) Subscribe(observe StringObserver, subscribers ...Subscriber) Subscription {
-	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.Trampoline
-	observer := func(next string, err error, done bool) {
-		if !done {
-			observe(next, err, done)
-		} else {
-			var zeroString string
-			observe(zeroString, err, true)
-			subscribers[0].Unsubscribe()
-		}
-	}
-	subscribers[0].OnWait(scheduler.Wait)
-	o(observer, scheduler, subscribers[0])
-	return subscribers[0]
 }

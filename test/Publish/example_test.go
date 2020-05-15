@@ -15,11 +15,13 @@ func Example_basic() {
 	// pub is a ConnectableInt
 	pub := source.Publish()
 
-	// scheduler will run a task asynchronously on a new goroutine.
-	scheduler := GoroutineScheduler()
+	// scheduler will run a task concurrently
+	concurrent := GoroutineScheduler()
+
+	multicast := pub.SubscribeOn(concurrent)
 
 	// First subscriber (asynchronous)
-	sub1 := pub.SubscribeOn(scheduler).
+	sub1 := multicast.
 		MapString(func(v int) string {
 			return fmt.Sprintf("value is %d", v)
 		}).
@@ -30,7 +32,7 @@ func Example_basic() {
 		})
 
 	// Second subscriber (asynchronous)
-	sub2 := pub.SubscribeOn(scheduler).
+	sub2 := multicast.
 		MapBool(func(v int) bool {
 			return v > 1
 		}).
@@ -41,7 +43,7 @@ func Example_basic() {
 		})
 
 	// Third subscriber (asynchronous)
-	sub3 := pub.SubscribeOn(scheduler).
+	sub3 := multicast.
 		Subscribe(func(next int, err error, done bool) {
 			if !done {
 				fmt.Println("sub3", next)
@@ -49,7 +51,7 @@ func Example_basic() {
 		})
 
 	// Connect will cause the publisher to subscribe to the source
-	pub.Connect()
+	pub.Connect().Wait()
 
 	// Wait for all subscribers to finish.
 	sub1.Wait()

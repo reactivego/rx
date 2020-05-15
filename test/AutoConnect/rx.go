@@ -5,6 +5,7 @@
 package AutoConnect
 
 import (
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -172,10 +173,10 @@ type Subscription = subscriber.Subscription
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
-// Subscribe by default is performed on the Trampoline scheduler.
+// Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber) Subscription {
 	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next int, err error, done bool) {
 		if !done {
 			observe(next, err, done)
@@ -190,23 +191,50 @@ func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber)
 	return subscribers[0]
 }
 
-//jig:name ConnectableInt
+//jig:name RxError
 
-// ConnectableInt is an ObservableInt that has an additional method Connect()
-// used to Subscribe to the parent observable and then multicasting values to
-// all subscribers of ConnectableInt.
-type ConnectableInt struct {
+type RxError string
+
+func (e RxError) Error() string	{ return string(e) }
+
+//jig:name Connectable
+
+// ErrDisconnect is sent to all subscribed observers when the subscription
+// returned by Connect is cancelled by calling its Unsubscribe method.
+const ErrDisconnect = RxError("disconnect")
+
+// Connectable provides the Connect method for a Multicaster.
+type Connectable func(Scheduler, Subscriber)
+
+// Connect instructs a multicaster to subscribe to its source and begin
+// multicasting items to its subscribers.
+func (c Connectable) Connect(subscribers ...Subscriber) Subscription {
+	subscribers = append(subscribers, subscriber.New())
+	scheduler := scheduler.MakeTrampoline()
+	subscribers[0].OnWait(scheduler.Wait)
+	c(scheduler, subscribers[0])
+	return subscribers[0]
+}
+
+//jig:name IntMulticaster
+
+// IntMulticaster is a multicasting connectable observable. One or more
+// IntObservers can subscribe to it simultaneously. It will subscribe to the
+// source ObservableInt when Connect is called. After that, every emission
+// from the source is multcast to all subscribed IntObservers.
+type IntMulticaster struct {
 	ObservableInt
-	connect	func() Subscription
+	Connectable
 }
 
 //jig:name ObservableIntMulticast
 
-// Multicast converts an ordinary Observable into a connectable Observable.
-// A connectable observable will only start emitting values after its Connect
-// method has been called. The factory method passed in should return a
-// new SubjectInt that implements the actual multicasting behavior.
-func (o ObservableInt) Multicast(factory func() SubjectInt) ConnectableInt {
+// Multicast converts an ordinary observable into a multicasting connectable
+// observable or multicaster for short. A multicaster will only start emitting
+// values after its Connect method has been called. The factory method passed
+// in should return a new SubjectInt that implements the actual multicasting
+// behavior.
+func (o ObservableInt) Multicast(factory func() SubjectInt) IntMulticaster {
 	const (
 		active	int32	= iota
 		notifying
@@ -217,11 +245,6 @@ func (o ObservableInt) Multicast(factory func() SubjectInt) ConnectableInt {
 		atomic.Value
 	}
 	subjectValue.Store(factory())
-	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		if s, ok := subjectValue.Load().(SubjectInt); ok {
-			s.ObservableInt(observe, subscribeOn, subscriber)
-		}
-	}
 	observer := func(next int, err error, done bool) {
 		if atomic.CompareAndSwapInt32(&subjectValue.state, active, notifying) {
 			if s, ok := subjectValue.Load().(SubjectInt); ok {
@@ -234,44 +257,52 @@ func (o ObservableInt) Multicast(factory func() SubjectInt) ConnectableInt {
 			}
 		}
 	}
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		if s, ok := subjectValue.Load().(SubjectInt); ok {
+			s.ObservableInt(observe, subscribeOn, subscriber)
+		}
+	}
 	const (
 		unsubscribed	int32	= iota
 		subscribed
 	)
-	var subscriberValue struct {
-		state	int32
-		atomic.Value
+	var connection struct {
+		sync.Mutex
+		state		int32
+		subscriber	Subscriber
 	}
-	connect := func() Subscription {
+	connectable := func(subscribeOn Scheduler, subscriber Subscriber) {
+		connection.Lock()
 		if atomic.CompareAndSwapInt32(&subjectValue.state, terminated, active) {
 			subjectValue.Store(factory())
 		}
-		if atomic.CompareAndSwapInt32(&subscriberValue.state, unsubscribed, subscribed) {
-			scheduler := GoroutineScheduler()
-			subscriber := subscriber.New()
-			o.SubscribeOn(scheduler).Subscribe(observer, subscriber)
-			subscriberValue.Store(subscriber)
+		if atomic.CompareAndSwapInt32(&connection.state, unsubscribed, subscribed) {
+			o(observer, subscribeOn, subscriber)
+			connection.subscriber = subscriber
 			subscriber.OnUnsubscribe(func() {
-				atomic.CompareAndSwapInt32(&subscriberValue.state, subscribed, unsubscribed)
+				atomic.CompareAndSwapInt32(&connection.state, subscribed, unsubscribed)
+				var zero int
+				observer(zero, ErrDisconnect, true)
 			})
+		} else {
+			connection.subscriber.OnUnsubscribe(subscriber.Unsubscribe)
+			subscriber.OnUnsubscribe(connection.subscriber.Unsubscribe)
 		}
-		subscription := subscriberValue.Load().(Subscriber)
-		return subscription.Add(func() { subscription.Unsubscribe() })
+		connection.Unlock()
 	}
-	return ConnectableInt{ObservableInt: observable, connect: connect}
+	return IntMulticaster{ObservableInt: observable, Connectable: connectable}
 }
 
 //jig:name SubjectInt
 
-// SubjectInt is a combination of an observer and observable. Subjects are
-// special because they are the only reactive constructs that support
-// multicasting. The items sent to it through its observer side are
+// SubjectInt is a combination of an IntObserver and ObservableInt.
+// Subjects are special because they are the only reactive constructs that
+// support multicasting. The items sent to it through its observer side are
 // multicasted to multiple clients subscribed to its observable side.
 //
-// A SubjectInt embeds ObservableInt and IntObserver. This exposes the
-// methods and fields of both types on SubjectInt. Use the ObservableInt
-// methods to subscribe to it. Use the IntObserver Next, Error and Complete
-// methods to feed data to it.
+// The SubjectInt exposes all methods from the embedded IntObserver and
+// ObservableInt. Use the IntObserver Next, Error and Complete methods to feed
+// data to it. Use the ObservableInt methods to subscribe to it.
 //
 // After a subject has been terminated by calling either Error or Complete,
 // it goes into terminated state. All subsequent calls to its observer side
@@ -280,8 +311,8 @@ func (o ObservableInt) Multicast(factory func() SubjectInt) ConnectableInt {
 // There are different types of subjects, see the different NewXxxSubjectInt
 // functions for more info.
 type SubjectInt struct {
-	ObservableInt
 	IntObserver
+	ObservableInt
 }
 
 // Next is called by an ObservableInt to emit the next int value to the
@@ -320,7 +351,15 @@ func NewReplaySubjectInt(bufferCapacity int, windowDuration time.Duration) Subje
 		bufferCapacity = MaxReplayCapacity
 	}
 	ch := multicast.NewChan(bufferCapacity, 16)
-
+	observer := func(next int, err error, done bool) {
+		if !ch.Closed() {
+			if !done {
+				ch.Send(next)
+			} else {
+				ch.Close(err)
+			}
+		}
+	}
 	observable := Observable(func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		ep, err := ch.NewEndpoint(multicast.ReplayAll)
 		if err != nil {
@@ -343,66 +382,71 @@ func NewReplaySubjectInt(bufferCapacity int, windowDuration time.Duration) Subje
 		})
 		observable(observe, subscribeOn, subscriber.Add(ep.Cancel))
 	})
-
-	observer := func(next int, err error, done bool) {
-		if !ch.Closed() {
-			if !done {
-				ch.Send(next)
-			} else {
-				ch.Close(err)
-			}
-		}
-	}
-
-	return SubjectInt{observable.AsObservableInt(), observer}
+	return SubjectInt{observer, observable.AsObservableInt()}
 }
 
 //jig:name ObservableIntPublishReplay
 
-// Replay uses Multicast to control the subscription of a ReplaySubject to a
-// source observable and turns the subject into a connectable observable.
-// A ReplaySubject emits to any observer all of the items that were emitted by
-// the source observable, regardless of when the observer subscribes.
+// Replay uses the Multicast operator to control the subscription of a
+// ReplaySubject to a source observable and turns the subject into a
+// connectable observable. A ReplaySubject emits to any observer all of the
+// items that were emitted by the source observable, regardless of when the
+// observer subscribes.
 //
 // If the source completed and as a result the internal ReplaySubject
 // terminated, then calling Connect again will replace the old ReplaySubject
 // with a newly created one.
-func (o ObservableInt) PublishReplay(bufferCapacity int, windowDuration time.Duration) ConnectableInt {
+func (o ObservableInt) PublishReplay(bufferCapacity int, windowDuration time.Duration) IntMulticaster {
 	factory := func() SubjectInt {
 		return NewReplaySubjectInt(bufferCapacity, windowDuration)
 	}
 	return o.Multicast(factory)
 }
 
-//jig:name ConnectableIntAutoConnect
+//jig:name ThrowInt
 
-// AutoConnect makes a ConnectableInt behave like an ordinary ObservableInt that
-// automatically connects when the specified number of clients subscribe to it.
-// If count is 0, then AutoConnect will immediately call connect on the
-// ConnectableInt before returning the ObservableInt part of the ConnectableInt.
-func (o ConnectableInt) AutoConnect(count int) ObservableInt {
-	if count == 0 {
-		o.connect()
-		return o.ObservableInt
-	}
-	var refcount int32
-	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		if atomic.AddInt32(&refcount, 1) == int32(count) {
-			o.connect()
-		}
-		o.ObservableInt(observe, subscribeOn, subscriber)
+// ThrowInt creates an Observable that emits no items and terminates with an
+// error.
+func ThrowInt(err error) ObservableInt {
+	var zeroInt int
+	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
+		runner := scheduler.Schedule(func() {
+			if subscriber.Subscribed() {
+				observe(zeroInt, err, true)
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }
 
-//jig:name ObservableIntSubscribeOn
+//jig:name ErrAutoConnect
 
-// SubscribeOn specifies the scheduler an ObservableInt should use when it is
-// subscribed to.
-func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
-	observable := func(observe IntObserver, _ Scheduler, subscriber Subscriber) {
-		subscriber.OnWait(subscribeOn.Wait)
-		o(observe, subscribeOn, subscriber)
+const ErrAutoConnectInvalidCount = RxError("invalid count")
+
+const ErrAutoConnectNeedsConcurrentScheduler = RxError("needs concurrent scheduler")
+
+//jig:name IntMulticasterAutoConnect
+
+// AutoConnect makes a IntMulticaster behave like an ordinary ObservableInt
+// that automatically connects when the specified number of clients have
+// subscribed to it. AutoConnect values should be larger or equal to 1.
+// AutoConnect will throw an ErrInvalidCount if the count is out of range.
+func (o IntMulticaster) AutoConnect(count int) ObservableInt {
+	if count < 1 {
+		return ThrowInt(ErrAutoConnectInvalidCount)
+	}
+	var refcount int32
+	observable := func(observe IntObserver, subscribeOn Scheduler, withSubscriber Subscriber) {
+		if !subscribeOn.IsConcurrent() {
+			var zero int
+			observe(zero, ErrAutoConnectNeedsConcurrentScheduler, true)
+			return
+		}
+		if atomic.AddInt32(&refcount, 1) == int32(count) {
+			o.Connectable(subscribeOn, subscriber.New())
+		}
+		o.ObservableInt(observe, subscribeOn, withSubscriber)
 	}
 	return observable
 }
@@ -469,11 +513,17 @@ func Create(create func(Next, Error, Complete, Canceled)) Observable {
 	return observable
 }
 
-//jig:name RxError
+//jig:name ObservableIntSubscribeOn
 
-type RxError string
-
-func (e RxError) Error() string	{ return string(e) }
+// SubscribeOn specifies the scheduler an ObservableInt should use when it is
+// subscribed to.
+func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
+	observable := func(observe IntObserver, _ Scheduler, subscriber Subscriber) {
+		subscriber.OnWait(subscribeOn.Wait)
+		o(observe, subscribeOn, subscriber)
+	}
+	return observable
+}
 
 //jig:name ErrTypecastToInt
 
@@ -483,8 +533,9 @@ const ErrTypecastToInt = RxError("typecast to int failed")
 
 //jig:name ObservableAsObservableInt
 
-// AsInt turns an Observable of interface{} into an ObservableInt. If during
-// observing a typecast fails, the error ErrTypecastToInt will be emitted.
+// AsObservableInt turns an Observable of interface{} into an ObservableInt.
+// If during observing a typecast fails, the error ErrTypecastToInt will be
+// emitted.
 func (o Observable) AsObservableInt() ObservableInt {
 	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {

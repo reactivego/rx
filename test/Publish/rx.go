@@ -5,6 +5,7 @@
 package Publish
 
 import (
+	"sync"
 	"sync/atomic"
 
 	"github.com/reactivego/multicast"
@@ -111,10 +112,10 @@ type Subscription = subscriber.Subscription
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
-// Subscribe by default is performed on the Trampoline scheduler.
+// Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber) Subscription {
 	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next int, err error, done bool) {
 		if !done {
 			observe(next, err, done)
@@ -129,15 +130,29 @@ func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber)
 	return subscribers[0]
 }
 
+//jig:name RxError
+
+type RxError string
+
+func (e RxError) Error() string	{ return string(e) }
+
 //jig:name Connectable
 
+// ErrDisconnect is sent to all subscribed observers when the subscription
+// returned by Connect is cancelled by calling its Unsubscribe method.
+const ErrDisconnect = RxError("disconnect")
+
 // Connectable provides the Connect method for a Multicaster.
-type Connectable func() Subscription
+type Connectable func(Scheduler, Subscriber)
 
 // Connect instructs a multicaster to subscribe to its source and begin
 // multicasting items to its subscribers.
-func (f Connectable) Connect() Subscription {
-	return f()
+func (c Connectable) Connect(subscribers ...Subscriber) Subscription {
+	subscribers = append(subscribers, subscriber.New())
+	scheduler := scheduler.MakeTrampoline()
+	subscribers[0].OnWait(scheduler.Wait)
+	c(scheduler, subscribers[0])
+	return subscribers[0]
 }
 
 //jig:name IntMulticaster
@@ -169,11 +184,6 @@ func (o ObservableInt) Multicast(factory func() SubjectInt) IntMulticaster {
 		atomic.Value
 	}
 	subjectValue.Store(factory())
-	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		if s, ok := subjectValue.Load().(SubjectInt); ok {
-			s.ObservableInt(observe, subscribeOn, subscriber)
-		}
-	}
 	observer := func(next int, err error, done bool) {
 		if atomic.CompareAndSwapInt32(&subjectValue.state, active, notifying) {
 			if s, ok := subjectValue.Load().(SubjectInt); ok {
@@ -186,29 +196,38 @@ func (o ObservableInt) Multicast(factory func() SubjectInt) IntMulticaster {
 			}
 		}
 	}
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		if s, ok := subjectValue.Load().(SubjectInt); ok {
+			s.ObservableInt(observe, subscribeOn, subscriber)
+		}
+	}
 	const (
 		unsubscribed	int32	= iota
 		subscribed
 	)
-	var subscriberValue struct {
-		state	int32
-		atomic.Value
+	var connection struct {
+		sync.Mutex
+		state		int32
+		subscriber	Subscriber
 	}
-	connectable := func() Subscription {
+	connectable := func(subscribeOn Scheduler, subscriber Subscriber) {
+		connection.Lock()
 		if atomic.CompareAndSwapInt32(&subjectValue.state, terminated, active) {
 			subjectValue.Store(factory())
 		}
-		if atomic.CompareAndSwapInt32(&subscriberValue.state, unsubscribed, subscribed) {
-			scheduler := GoroutineScheduler()
-			subscriber := subscriber.New()
-			o.SubscribeOn(scheduler).Subscribe(observer, subscriber)
-			subscriberValue.Store(subscriber)
+		if atomic.CompareAndSwapInt32(&connection.state, unsubscribed, subscribed) {
+			o(observer, subscribeOn, subscriber)
+			connection.subscriber = subscriber
 			subscriber.OnUnsubscribe(func() {
-				atomic.CompareAndSwapInt32(&subscriberValue.state, subscribed, unsubscribed)
+				atomic.CompareAndSwapInt32(&connection.state, subscribed, unsubscribed)
+				var zero int
+				observer(zero, ErrDisconnect, true)
 			})
+		} else {
+			connection.subscriber.OnUnsubscribe(subscriber.Unsubscribe)
+			subscriber.OnUnsubscribe(connection.subscriber.Unsubscribe)
 		}
-		subscription := subscriberValue.Load().(Subscriber)
-		return subscription.Add(func() { subscription.Unsubscribe() })
+		connection.Unlock()
 	}
 	return IntMulticaster{ObservableInt: observable, Connectable: connectable}
 }
@@ -329,6 +348,10 @@ func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
 	return observable
 }
 
+//jig:name ErrRefCount
+
+const ErrRefCountNeedsConcurrentScheduler = RxError("needs concurrent scheduler")
+
 //jig:name IntMulticasterRefCount
 
 // RefCount makes a IntMulticaster behave like an ordinary ObservableInt. On
@@ -338,18 +361,25 @@ func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
 func (o IntMulticaster) RefCount() ObservableInt {
 	var (
 		refcount	int32
-		connection	Subscription
+		subscription	Subscription
 	)
-	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		if atomic.AddInt32(&refcount, 1) == 1 {
-			connection = o.Connect()
+	observable := func(observe IntObserver, subscribeOn Scheduler, withSubscriber Subscriber) {
+		if !subscribeOn.IsConcurrent() {
+			var zero int
+			observe(zero, ErrRefCountNeedsConcurrentScheduler, true)
+			return
 		}
-		subscriber.OnUnsubscribe(func() {
+		if atomic.AddInt32(&refcount, 1) == 1 {
+			s := subscriber.New()
+			o.Connectable(subscribeOn, s)
+			subscription = s
+		}
+		withSubscriber.OnUnsubscribe(func() {
 			if atomic.AddInt32(&refcount, -1) == 0 {
-				connection.Unsubscribe()
+				subscription.Unsubscribe()
 			}
 		})
-		o.ObservableInt(observe, subscribeOn, subscriber)
+		o.ObservableInt(observe, subscribeOn, withSubscriber)
 	}
 	return observable
 }
@@ -431,6 +461,37 @@ func Create(create func(Next, Error, Complete, Canceled)) Observable {
 	return observable
 }
 
+//jig:name ErrTypecastToInt
+
+// ErrTypecastToInt is delivered to an observer if the generic value cannot be
+// typecast to int.
+const ErrTypecastToInt = RxError("typecast to int failed")
+
+//jig:name ObservableAsObservableInt
+
+// AsObservableInt turns an Observable of interface{} into an ObservableInt.
+// If during observing a typecast fails, the error ErrTypecastToInt will be
+// emitted.
+func (o Observable) AsObservableInt() ObservableInt {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				if nextInt, ok := next.(int); ok {
+					observe(nextInt, err, done)
+				} else {
+					var zeroInt int
+					observe(zeroInt, ErrTypecastToInt, true)
+				}
+			} else {
+				var zeroInt int
+				observe(zeroInt, err, true)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name ObservableIntMapString
 
 // MapString transforms the items emitted by an ObservableInt by applying a
@@ -461,43 +522,6 @@ func (o ObservableInt) MapBool(project func(int) bool) ObservableBool {
 				mapped = project(next)
 			}
 			observe(mapped, err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name RxError
-
-type RxError string
-
-func (e RxError) Error() string	{ return string(e) }
-
-//jig:name ErrTypecastToInt
-
-// ErrTypecastToInt is delivered to an observer if the generic value cannot be
-// typecast to int.
-const ErrTypecastToInt = RxError("typecast to int failed")
-
-//jig:name ObservableAsObservableInt
-
-// AsObservableInt turns an Observable of interface{} into an ObservableInt.
-// If during observing a typecast fails, the error ErrTypecastToInt will be
-// emitted.
-func (o Observable) AsObservableInt() ObservableInt {
-	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				if nextInt, ok := next.(int); ok {
-					observe(nextInt, err, done)
-				} else {
-					var zeroInt int
-					observe(zeroInt, ErrTypecastToInt, true)
-				}
-			} else {
-				var zeroInt int
-				observe(zeroInt, err, true)
-			}
 		}
 		o(observer, subscribeOn, subscriber)
 	}
@@ -540,10 +564,10 @@ type ObservableBool func(BoolObserver, Scheduler, Subscriber)
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
-// Subscribe by default is performed on the Trampoline scheduler.
+// Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o ObservableString) Subscribe(observe StringObserver, subscribers ...Subscriber) Subscription {
 	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next string, err error, done bool) {
 		if !done {
 			observe(next, err, done)
@@ -562,10 +586,10 @@ func (o ObservableString) Subscribe(observe StringObserver, subscribers ...Subsc
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
-// Subscribe by default is performed on the Trampoline scheduler.
+// Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o ObservableBool) Subscribe(observe BoolObserver, subscribers ...Subscriber) Subscription {
 	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next bool, err error, done bool) {
 		if !done {
 			observe(next, err, done)

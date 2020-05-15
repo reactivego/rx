@@ -16,7 +16,7 @@ func Example_basic() {
 	}
 	close(ch)
 	source := FromChanInt(ch).PublishReplay(0, 0)
-	source.Connect()
+	source.Connect().Wait()
 
 	err := source.Println()
 	fmt.Println(err)
@@ -46,7 +46,8 @@ func Example_replayWithSize() {
 		ch <- i
 	}
 	close(ch)
-	source := FromChanInt(ch).PublishReplay(2, 0).AutoConnect(1)
+	concurrent := GoroutineScheduler()
+	source := FromChanInt(ch).PublishReplay(2, 0).AutoConnect(1).SubscribeOn(concurrent)
 
 	err := source.Println()
 	fmt.Println(err)
@@ -83,19 +84,26 @@ func Example_replayWithExpiry() {
 		close(ch)
 	}()
 	source := FromChanInt(ch).PublishReplay(0, 600*time.Millisecond)
-	source.Connect()
 
-	time.Sleep(500 * time.Millisecond)
+	scheduler := GoroutineScheduler()
+	scheduler.Schedule(func() {
 
-	// 500ms has passed, everything should still be present
-	err := source.Println()
-	fmt.Println(err)
+		time.Sleep(500 * time.Millisecond)
+		// 500ms has passed, everything should still be present
+		err := source.Println()
+		fmt.Println(err)
 
-	time.Sleep(100 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 
-	// 600ms has passed, first value should be gone by now.
-	err = source.Println()
-	fmt.Println(err)
+		// 600ms has passed, first value should be gone by now.
+		err = source.Println()
+		fmt.Println(err)
+
+	})
+
+	source.Connect().Wait()
+
+	scheduler.Wait()
 
 	// Output:
 	// 0
@@ -123,11 +131,16 @@ func Example_replayWithExpiryAndSubscribe() {
 		close(ch)
 	}()
 	source := FromChanInt(ch).PublishReplay(0, 500*time.Millisecond)
-	source.Connect()
 
-	if err := source.Wait(); err != nil {
-		fmt.Println(err)
-	}
+	concurrent := GoroutineScheduler()
+	concurrent.Schedule(func(){
+		if err := source.Wait(); err != nil {
+			fmt.Println(err)
+		}
+	})
+
+	source.Connect().Wait()
+	concurrent.Wait()
 
 	print := func(next int, err error, done bool) {
 		switch {
@@ -142,20 +155,20 @@ func Example_replayWithExpiryAndSubscribe() {
 
 	sub := source.Subscribe(print)
 	sub.Wait()
-	if sub.Canceled() {
-		fmt.Println("subscription was canceled")
-	} else {
+	if sub.Subscribed() {
 		fmt.Println("subscription was still subscribed")
+	} else {
+		fmt.Println("subscription was unsubscribed")
 	}
 
 	time.Sleep(300 * time.Millisecond)
 
 	sub = source.Subscribe(print)
 	sub.Wait()
-	if sub.Canceled() {
-		fmt.Println("subscription was canceled")
-	} else {
+	if sub.Subscribed() {
 		fmt.Println("subscription was still subscribed")
+	} else {
+		fmt.Println("subscription was unsubscribed")
 	}
 
 	//Output:
@@ -165,9 +178,9 @@ func Example_replayWithExpiryAndSubscribe() {
 	// 3
 	// 4
 	// complete
-	// subscription was canceled
+	// subscription was unsubscribed
 	// 3
 	// 4
 	// complete
-	// subscription was canceled
+	// subscription was unsubscribed
 }

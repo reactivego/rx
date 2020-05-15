@@ -7,21 +7,24 @@ import "fmt"
 // to range1to9. The second Subscribe call will cause the sequence to be
 // replayed without doing a subscribe to range1to9.
 func Example_autoConnect() {
+	// We will be subscribing using a concurrent scheduler
+	// otherwise AutoConnect will fail with an error.
+	concurrent := GoroutineScheduler()
 
 	range1to9 := DeferInt(func () ObservableInt {
 		fmt.Println("subscribed")
 		i := 1
-		return CreateRecursiveInt(func(next NextInt, error Error, complete Complete) {
+		return CreateRecursiveInt(func(N NextInt, E Error, C Complete) {
 			if i < 10 {
-				next(i)
+				N(i)
 				i++
 			} else {
-				complete()
+				C()
 			}
 		})
 	})
 
-	source := range1to9.PublishReplay(10, 0).AutoConnect(1)
+	source := range1to9.PublishReplay(10, 0).AutoConnect(1).SubscribeOn(concurrent)
 
 	observe := func(next int, err error, done bool) {
 		switch {
@@ -51,22 +54,22 @@ func Example_autoConnect() {
 // calls can be made to an AutoConnect(2) operator that will only connect on
 // the second subscription.
 func Example_autoConnectMulti() {
-	// We will be subscribing on an asynchronous scheduler, otherwise first
-	// call to Subscribe will lockup.
-	scheduler := GoroutineScheduler()
+	// We will be subscribing using a concurrent scheduler
+	// otherwise AutoConnect will fail with an error.
+	concurrent := GoroutineScheduler()
 
-	range1to99 := CreateInt(func(next NextInt, error Error, complete Complete, canceled Canceled) {
+	range1to99 := CreateInt(func(N NextInt, E Error, C Complete, X Canceled) {
 		fmt.Println("subscribed")
 		for i := 1; i < 100; i++ {
-			if canceled() {
+			if X() {
 				return
 			}
-			next(i)
+			N(i)
 		}
-		complete()
+		C()
 	})
 
-	source := range1to99.PublishReplay(10, 0).AutoConnect(2).SubscribeOn(scheduler)
+	source := range1to99.PublishReplay(10, 0).AutoConnect(2).SubscribeOn(concurrent)
 
 	observe := func(next int, err error, done bool) {
 		switch {

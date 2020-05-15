@@ -1,9 +1,11 @@
 package rx
 
 import (
+	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/reactivego/scheduler"
 	"github.com/reactivego/subscriber"
 )
 
@@ -15,12 +17,16 @@ import (
 const ErrDisconnect = RxError("disconnect")
 
 // Connectable provides the Connect method for a Multicaster.
-type Connectable func(subscribers ...Subscriber) Subscription
+type Connectable func(Scheduler, Subscriber)
 
 // Connect instructs a multicaster to subscribe to its source and begin
 // multicasting items to its subscribers.
-func (f Connectable) Connect(subscribers ...Subscriber) Subscription {
-	return f(subscribers...)
+func (c Connectable) Connect(subscribers ...Subscriber) Subscription {
+	subscribers = append(subscribers, subscriber.New())
+	scheduler := scheduler.MakeTrampoline()
+	subscribers[0].OnWait(scheduler.Wait)
+	c(scheduler, subscribers[0])
+	return subscribers[0]
 }
 
 //jig:template <Foo>Multicaster
@@ -75,28 +81,29 @@ func (o ObservableFoo) Multicast(factory func() SubjectFoo) FooMulticaster {
 		unsubscribed int32 = iota
 		subscribed
 	)
-	var subscriberValue struct {
-		state int32
-		atomic.Value
+	var connection struct {
+		sync.Mutex
+		state      int32
+		subscriber Subscriber
 	}
-	connectable := func(subscribers ...Subscriber) Subscription {
+	connectable := func(subscribeOn Scheduler, subscriber Subscriber) {
+		connection.Lock()
 		if atomic.CompareAndSwapInt32(&subjectValue.state, terminated, active) {
 			subjectValue.Store(factory())
 		}
-		if atomic.CompareAndSwapInt32(&subscriberValue.state, unsubscribed, subscribed) {
-			subscribers := append(subscribers, subscriber.New())
-			o.Subscribe(observer, subscribers[0])
-			subscriberValue.Store(subscribers[0])
-			subscribers[0].OnUnsubscribe(func() {
-				atomic.CompareAndSwapInt32(&subscriberValue.state, subscribed, unsubscribed)
+		if atomic.CompareAndSwapInt32(&connection.state, unsubscribed, subscribed) {
+			o(observer, subscribeOn, subscriber)
+			connection.subscriber = subscriber
+			subscriber.OnUnsubscribe(func() {
+				atomic.CompareAndSwapInt32(&connection.state, subscribed, unsubscribed)
 				var zero foo
 				observer(zero, ErrDisconnect, true)
 			})
+		} else {
+			connection.subscriber.OnUnsubscribe(subscriber.Unsubscribe)
+			subscriber.OnUnsubscribe(connection.subscriber.Unsubscribe)
 		}
-		subscriber := subscriberValue.Load().(Subscriber)
-		subscription := subscribers[0].Add(subscriber.Unsubscribe)
-		subscription.OnWait(subscriber.Wait)
-		return subscription
+		connection.Unlock()
 	}
 	return FooMulticaster{ObservableFoo: observable, Connectable: connectable}
 }
@@ -137,8 +144,14 @@ func (o ObservableFoo) PublishReplay(bufferCapacity int, windowDuration time.Dur
 	return o.Multicast(factory)
 }
 
+
+//jig:template ErrRefCount
+//jig:needs RxError
+
+const ErrRefCountNeedsConcurrentScheduler = RxError("needs concurrent scheduler")
+
 //jig:template <Foo>Multicaster RefCount
-//jig:needs Observable<Foo>
+//jig:needs Observable<Foo>, ErrRefCount
 
 // RefCount makes a FooMulticaster behave like an ordinary ObservableFoo. On
 // first Subscribe it will call Connect on its FooMulticaster and when its last
@@ -149,45 +162,55 @@ func (o FooMulticaster) RefCount() ObservableFoo {
 		refcount     int32
 		subscription Subscription
 	)
-	connect := func(subscribeOn Scheduler) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, withSubscriber Subscriber) {
+		if !subscribeOn.IsConcurrent() {
+			var zero foo
+			observe(zero, ErrRefCountNeedsConcurrentScheduler, true)
+			return
+		}
 		if atomic.AddInt32(&refcount, 1) == 1 {
-			subscriber := subscriber.New()
-			subscription = o.Connect(subscriber)
-			runner := subscribeOn.Schedule(subscriber.Wait)
-			subscriber.OnUnsubscribe(runner.Cancel)
+			s := subscriber.New()
+			o.Connectable(subscribeOn, s)
+			subscription = s
 		}
-	}
-	unsubscribe := func() {
-		if atomic.AddInt32(&refcount, -1) == 0 {
-			subscription.Unsubscribe()
-		}
-	}
-	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		connect(subscribeOn)
-		subscriber.OnUnsubscribe(unsubscribe)
-		o.ObservableFoo(observe, subscribeOn, subscriber)
+		withSubscriber.OnUnsubscribe(func() {
+			if atomic.AddInt32(&refcount, -1) == 0 {
+				subscription.Unsubscribe()
+			}
+		})
+		o.ObservableFoo(observe, subscribeOn, withSubscriber)
 	}
 	return observable
 }
 
-//jig:template <Foo>Multicaster AutoConnect
-//jig:needs Observable<Foo>
+//jig:template ErrAutoConnect
+//jig:needs RxError
 
-// AutoConnect makes a FooMulticaster behave like an ordinary ObservableFoo that
-// automatically connects when the specified number of clients have subscribed
-// to it. If count is 0, then AutoConnect will immediately call connect on the
-// FooMulticaster before returning the ObservableFoo part of it.
+const ErrAutoConnectInvalidCount = RxError("invalid count")
+const ErrAutoConnectNeedsConcurrentScheduler = RxError("needs concurrent scheduler")
+
+//jig:template <Foo>Multicaster AutoConnect
+//jig:needs Observable<Foo>, Throw<Foo>, ErrAutoConnect
+
+// AutoConnect makes a FooMulticaster behave like an ordinary ObservableFoo
+// that automatically connects when the specified number of clients have
+// subscribed to it. AutoConnect values should be larger or equal to 1.
+// AutoConnect will throw an ErrInvalidCount if the count is out of range.
 func (o FooMulticaster) AutoConnect(count int) ObservableFoo {
-	if count == 0 {
-		o.Connect()
-		return o.ObservableFoo
+	if count < 1 {
+		return ThrowFoo(ErrAutoConnectInvalidCount)
 	}
 	var refcount int32
-	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		if atomic.AddInt32(&refcount, 1) == int32(count) {
-			o.Connect()
+	observable := func(observe FooObserver, subscribeOn Scheduler, withSubscriber Subscriber) {
+		if !subscribeOn.IsConcurrent() {
+			var zero foo
+			observe(zero, ErrAutoConnectNeedsConcurrentScheduler, true)
+			return
 		}
-		o.ObservableFoo(observe, subscribeOn, subscriber)
+		if atomic.AddInt32(&refcount, 1) == int32(count) {
+			o.Connectable(subscribeOn, subscriber.New())
+		}
+		o.ObservableFoo(observe, subscribeOn, withSubscriber)
 	}
 	return observable
 }
