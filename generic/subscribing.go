@@ -34,13 +34,13 @@ func NewSubscriber() Subscriber {
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
-// Println is performed on the Trampoline scheduler.
-func (o ObservableFoo) Println() (err error) {
+// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableFoo) Println(a ...interface{}) (err error) {
 	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next foo, e error, done bool) {
 		if !done {
-			fmt.Println(next)
+			fmt.Println(append(a, next)...)
 		} else {
 			err = e
 			subscriber.Unsubscribe()
@@ -56,10 +56,10 @@ func (o ObservableFoo) Println() (err error) {
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
-// Subscribing is performed on the Trampoline scheduler.
+// Wait uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o ObservableFoo) Wait() (err error) {
 	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next foo, e error, done bool) {
 		if done {
 			err = e
@@ -76,9 +76,10 @@ func (o ObservableFoo) Wait() (err error) {
 
 // ToSlice collects all values from the ObservableFoo into an slice. The
 // complete slice and any error are returned.
+// ToSlice uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o ObservableFoo) ToSlice() (slice []foo, err error) {
 	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next foo, e error, done bool) {
 		if !done {
 			slice = append(slice, next)
@@ -97,10 +98,11 @@ func (o ObservableFoo) ToSlice() (slice []foo, err error) {
 
 // ToSingle blocks until the ObservableFoo emits exactly one value or an error.
 // The value and any error are returned.
+// ToSingle uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o ObservableFoo) ToSingle() (entry foo, err error) {
 	o = o.Single()
 	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next foo, e error, done bool) {
 		if !done {
 			entry = next
@@ -122,13 +124,13 @@ func (o ObservableFoo) ToSingle() (entry foo, err error) {
 // returned channel will enit any error and then close without emitting any
 // values.
 //
-// This method subscribes to the observable on the Goroutine scheduler because
+// ToChan uses the public scheduler.Goroutine variable for scheduling, because
 // it needs the concurrency so the returned channel can be used by used
 // by the calling code directly. To cancel ToChan you will need to supply a
 // subscriber that you hold on to.
 func (o Observable) ToChan(subscribers ...Subscriber) <-chan interface{} {
-	scheduler := scheduler.Goroutine
 	subscribers = append(subscribers, subscriber.New())
+	scheduler := scheduler.Goroutine
 	donech := make(chan struct{})
 	nextch := make(chan interface{})
 	const (
@@ -184,13 +186,13 @@ func (o Observable) ToChan(subscribers ...Subscriber) <-chan interface{} {
 // not emit values but emits an error or complete, then the returned channel
 // will close without emitting any values.
 //
-// This method subscribes to the observable on the Goroutine scheduler because
+// ToChan uses the public scheduler.Goroutine variable for scheduling, because
 // it needs the concurrency so the returned channel can be used by used
 // by the calling code directly. To cancel ToChan you will need to supply a
 // subscriber that you hold on to.
 func (o ObservableFoo) ToChan(subscribers ...Subscriber) <-chan foo {
-	scheduler := scheduler.Goroutine
 	subscribers = append(subscribers, subscriber.New())
+	scheduler := scheduler.Goroutine
 	donech := make(chan struct{})
 	nextch := make(chan foo)
 	const (
@@ -240,10 +242,10 @@ func (o ObservableFoo) ToChan(subscribers ...Subscriber) <-chan foo {
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
-// Subscribe by default is performed on the Trampoline scheduler.
+// Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o ObservableFoo) Subscribe(observe FooObserver, subscribers ...Subscriber) Subscription {
 	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next foo, err error, done bool) {
 		if !done {
 			observe(next, err, done)

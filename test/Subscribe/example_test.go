@@ -76,7 +76,7 @@ func Example_direct() {
 
 	// Non standard way of subscribing to an observable. But it does illustrate
 	// that an observable is just a function that can be called directly.
-	scheduler := TrampolineScheduler()
+	scheduler := MakeTrampolineScheduler()
 	subscriber := NewSubscriber()
 	observable(observe, scheduler, subscriber)
 

@@ -19,7 +19,7 @@ func Example_retry() {
 			E(RxError("error"))
 			errored = true
 		}
-	}).SubscribeOn(TrampolineScheduler())
+	})
 	err := a.Retry().Println()
 	fmt.Println(errored)
 	fmt.Println(err)

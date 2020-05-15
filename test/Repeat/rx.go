@@ -117,10 +117,10 @@ func CreateInt(create func(NextInt, Error, Complete, Canceled)) ObservableInt {
 	return observable
 }
 
-//jig:name TrampolineScheduler
+//jig:name MakeTrampolineScheduler
 
-func TrampolineScheduler() Scheduler {
-	return scheduler.Trampoline
+func MakeTrampolineScheduler() Scheduler {
+	return scheduler.MakeTrampoline()
 }
 
 //jig:name GoroutineScheduler
@@ -183,9 +183,10 @@ type Observable func(Observer, Scheduler, Subscriber)
 
 // ToSlice collects all values from the ObservableInt into an slice. The
 // complete slice and any error are returned.
+// ToSlice uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o ObservableInt) ToSlice() (slice []int, err error) {
 	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next int, e error, done bool) {
 		if !done {
 			slice = append(slice, next)
@@ -291,8 +292,9 @@ const ErrTypecastToInt = RxError("typecast to int failed")
 
 //jig:name ObservableAsObservableInt
 
-// AsInt turns an Observable of interface{} into an ObservableInt. If during
-// observing a typecast fails, the error ErrTypecastToInt will be emitted.
+// AsObservableInt turns an Observable of interface{} into an ObservableInt.
+// If during observing a typecast fails, the error ErrTypecastToInt will be
+// emitted.
 func (o Observable) AsObservableInt() ObservableInt {
 	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {

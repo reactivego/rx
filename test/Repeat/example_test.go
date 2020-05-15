@@ -33,13 +33,15 @@ func Example_trampoline() {
 		N(3)
 		C()
 	})
-	slice, err := source.Repeat(_1M).TakeLast(9).SubscribeOn(TrampolineScheduler()).ToSlice()
 
-	fmt.Println(TrampolineScheduler())
+	scheduler := MakeTrampolineScheduler()
+	slice, err := source.Repeat(_1M).TakeLast(9).SubscribeOn(scheduler).ToSlice()
+
+	fmt.Println(scheduler)
 	fmt.Println(slice)
 	fmt.Println(err)
 	// Output:
-	// Trampoline{ Asynchronous:Serial(0) }
+	// Trampoline{ tasks = 0 }
 	// [1 2 3 1 2 3 1 2 3]
 	// <nil>
 }
@@ -59,13 +61,14 @@ func Example_goroutine() {
 		N(3)
 		C()
 	})
-	slice, err := source.Repeat(_1M).TakeLast(9).SubscribeOn(GoroutineScheduler()).ToSlice()
+	scheduler := GoroutineScheduler()
+	slice, err := source.Repeat(_1M).TakeLast(9).SubscribeOn(scheduler).ToSlice()
 
-	fmt.Println(GoroutineScheduler())
+	fmt.Println(scheduler)
 	fmt.Println(slice)
 	fmt.Println(err)
 	// Output:
-	// Goroutine{ Asynchronous:Concurrent(0) }
+	// Goroutine{ goroutines = 0 }
 	// [1 2 3 1 2 3 1 2 3]
 	// <nil>
 }

@@ -26,8 +26,9 @@ const ErrTypecastToFoo = RxError("typecast to foo failed")
 //jig:needs Observable<Foo>, ErrTypecastTo<Foo>
 //jig:required-vars Foo
 
-// AsFoo turns an Observable of interface{} into an ObservableFoo. If during
-// observing a typecast fails, the error ErrTypecastToFoo will be emitted.
+// AsObservableFoo turns an Observable of interface{} into an ObservableFoo.
+// If during observing a typecast fails, the error ErrTypecastToFoo will be
+// emitted.
 func (o Observable) AsObservableFoo() ObservableFoo {
 	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
@@ -46,6 +47,15 @@ func (o Observable) AsObservableFoo() ObservableFoo {
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
+}
+
+//jig:template Observable AsObservable
+//jig:needs Observable
+
+// AsObservable returns the source Observable unchanged.
+// This is a special case needed for internal plumbing.
+func (o Observable) AsObservable() Observable {
+	return o
 }
 
 //jig:template Observable Only<Foo>

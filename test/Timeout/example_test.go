@@ -12,7 +12,7 @@ func Example_timeout() {
 	const _250ms = 250 * time.Millisecond
 	const _500ms = 500 * time.Millisecond
 
-	scheduler := TrampolineScheduler()
+	scheduler := MakeTrampolineScheduler()
 	//scheduler := GoroutineScheduler()
 	start := scheduler.Now()
 

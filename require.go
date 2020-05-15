@@ -7,7 +7,7 @@ import "time"
 func require() {
 	_ = NewSubscriber()
 	_ = GoroutineScheduler()
-	t := TrampolineScheduler()
+	t := MakeTrampolineScheduler()
 
 	/*
 		Observable Types
@@ -150,20 +150,13 @@ func require() {
 	i.Wait()
 
 	/*
-		Connectable Types, Operator Methods and Subscribe Methods
+		Multicast Types, Operator Methods and Connect Method
 	*/
 
-	// var c Connectable
-	// o.Publish()
-	// p.PublishReplay()
-	// c.Connect()
-	// c.AutoConnect()
-	// c.RefCount()
-
-	/*
-		Subject Types
-	*/
-
-	// Subject
-	// ReplaySubject
+	var m Multicaster
+	m.Connect()
+	m.AutoConnect(0)
+	m.RefCount()
+	o.Publish()
+	o.PublishReplay(0, 0)
 }

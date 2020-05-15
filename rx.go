@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/reactivego/multicast"
 	"github.com/reactivego/scheduler"
 	"github.com/reactivego/subscriber"
 )
@@ -39,10 +40,10 @@ func GoroutineScheduler() Scheduler {
 	return scheduler.Goroutine
 }
 
-//jig:name TrampolineScheduler
+//jig:name MakeTrampolineScheduler
 
-func TrampolineScheduler() Scheduler {
-	return scheduler.Trampoline
+func MakeTrampolineScheduler() Scheduler {
+	return scheduler.MakeTrampoline()
 }
 
 //jig:name Observer
@@ -352,6 +353,32 @@ func FromChan(ch <-chan interface{}) Observable {
 	return observable
 }
 
+//jig:name Of
+
+// Of emits a variable amount of values in a sequence and then emits a
+// complete notification.
+func Of(slice ...interface{}) Observable {
+	var zero interface{}
+	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
+		i := 0
+		runner := scheduler.ScheduleRecursive(func(self func()) {
+			if subscriber.Subscribed() {
+				if i < len(slice) {
+					observe(slice[i], nil, false)
+					if subscriber.Subscribed() {
+						i++
+						self()
+					}
+				} else {
+					observe(zero, nil, true)
+				}
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
+}
+
 //jig:name Interval
 
 // Interval creates an ObservableInt that emits a sequence of integers spaced
@@ -647,6 +674,37 @@ func MergeDelayError(observables ...Observable) Observable {
 		return Empty()
 	}
 	return observables[0].MergeDelayError(observables[1:]...)
+}
+
+//jig:name Subscription
+
+// Subscription is an alias for the subscriber.Subscription interface type.
+type Subscription = subscriber.Subscription
+
+//jig:name Connectable
+
+// ErrDisconnect is sent to all subscribed observers when the subscription
+// returned by Connect is cancelled by calling its Unsubscribe method.
+const ErrDisconnect = RxError("disconnect")
+
+// Connectable provides the Connect method for a Multicaster.
+type Connectable func() Subscription
+
+// Connect instructs a multicaster to subscribe to its source and begin
+// multicasting items to its subscribers.
+func (f Connectable) Connect() Subscription {
+	return f()
+}
+
+//jig:name Multicaster
+
+// Multicaster is a multicasting connectable observable. One or more
+// Observers can subscribe to it simultaneously. It will subscribe to the
+// source Observable when Connect is called. After that, every emission
+// from the source is multcast to all subscribed Observers.
+type Multicaster struct {
+	Observable
+	Connectable
 }
 
 //jig:name SliceObserver
@@ -1116,8 +1174,9 @@ const ErrTypecastToBool = RxError("typecast to bool failed")
 
 //jig:name ObservableAsObservableBool
 
-// AsBool turns an Observable of interface{} into an ObservableBool. If during
-// observing a typecast fails, the error ErrTypecastToBool will be emitted.
+// AsObservableBool turns an Observable of interface{} into an ObservableBool.
+// If during observing a typecast fails, the error ErrTypecastToBool will be
+// emitted.
 func (o Observable) AsObservableBool() ObservableBool {
 	observable := func(observe BoolObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
@@ -1146,8 +1205,9 @@ const ErrTypecastToInt = RxError("typecast to int failed")
 
 //jig:name ObservableAsObservableInt
 
-// AsInt turns an Observable of interface{} into an ObservableInt. If during
-// observing a typecast fails, the error ErrTypecastToInt will be emitted.
+// AsObservableInt turns an Observable of interface{} into an ObservableInt.
+// If during observing a typecast fails, the error ErrTypecastToInt will be
+// emitted.
 func (o Observable) AsObservableInt() ObservableInt {
 	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
@@ -1618,14 +1678,14 @@ func (o ObservableInt) Min() ObservableInt {
 
 //jig:name ObservableObserveOn
 
-// ObserveOn specifies a schedule function to use for delivering values to the observer.
-func (o Observable) ObserveOn(schedule func(task func())) Observable {
+// ObserveOn specifies a dispatch function to use for delivering values to the observer.
+func (o Observable) ObserveOn(dispatch func(task func())) Observable {
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
 			task := func() {
 				observe(next, err, done)
 			}
-			schedule(task)
+			dispatch(task)
 		}
 		o(observer, subscribeOn, subscriber)
 	}
@@ -2125,13 +2185,13 @@ func (o Observable) Timeout(timeout time.Duration) Observable {
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
-// Println is performed on the Trampoline scheduler.
-func (o Observable) Println() (err error) {
+// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o Observable) Println(a ...interface{}) (err error) {
 	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next interface{}, e error, done bool) {
 		if !done {
-			fmt.Println(next)
+			fmt.Println(append(a, next)...)
 		} else {
 			err = e
 			subscriber.Unsubscribe()
@@ -2148,13 +2208,13 @@ func (o Observable) Println() (err error) {
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
-// Println is performed on the Trampoline scheduler.
-func (o ObservableBool) Println() (err error) {
+// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableBool) Println(a ...interface{}) (err error) {
 	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next bool, e error, done bool) {
 		if !done {
-			fmt.Println(next)
+			fmt.Println(append(a, next)...)
 		} else {
 			err = e
 			subscriber.Unsubscribe()
@@ -2171,13 +2231,13 @@ func (o ObservableBool) Println() (err error) {
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
-// Println is performed on the Trampoline scheduler.
-func (o ObservableInt) Println() (err error) {
+// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableInt) Println(a ...interface{}) (err error) {
 	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next int, e error, done bool) {
 		if !done {
-			fmt.Println(next)
+			fmt.Println(append(a, next)...)
 		} else {
 			err = e
 			subscriber.Unsubscribe()
@@ -2189,19 +2249,14 @@ func (o ObservableInt) Println() (err error) {
 	return
 }
 
-//jig:name Subscription
-
-// Subscription is an alias for the subscriber.Subscription interface type.
-type Subscription = subscriber.Subscription
-
 //jig:name ObservableSubscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
-// Subscribe by default is performed on the Trampoline scheduler.
+// Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o Observable) Subscribe(observe Observer, subscribers ...Subscriber) Subscription {
 	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next interface{}, err error, done bool) {
 		if !done {
 			observe(next, err, done)
@@ -2220,10 +2275,10 @@ func (o Observable) Subscribe(observe Observer, subscribers ...Subscriber) Subsc
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
-// Subscribe by default is performed on the Trampoline scheduler.
+// Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o ObservableBool) Subscribe(observe BoolObserver, subscribers ...Subscriber) Subscription {
 	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next bool, err error, done bool) {
 		if !done {
 			observe(next, err, done)
@@ -2242,10 +2297,10 @@ func (o ObservableBool) Subscribe(observe BoolObserver, subscribers ...Subscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
-// Subscribe by default is performed on the Trampoline scheduler.
+// Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber) Subscription {
 	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next int, err error, done bool) {
 		if !done {
 			observe(next, err, done)
@@ -2267,13 +2322,13 @@ func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber)
 // returned channel will enit any error and then close without emitting any
 // values.
 //
-// This method subscribes to the observable on the Goroutine scheduler because
+// ToChan uses the public scheduler.Goroutine variable for scheduling, because
 // it needs the concurrency so the returned channel can be used by used
 // by the calling code directly. To cancel ToChan you will need to supply a
 // subscriber that you hold on to.
 func (o Observable) ToChan(subscribers ...Subscriber) <-chan interface{} {
-	scheduler := scheduler.Goroutine
 	subscribers = append(subscribers, subscriber.New())
+	scheduler := scheduler.Goroutine
 	donech := make(chan struct{})
 	nextch := make(chan interface{})
 	const (
@@ -2328,13 +2383,13 @@ func (o Observable) ToChan(subscribers ...Subscriber) <-chan interface{} {
 // not emit values but emits an error or complete, then the returned channel
 // will close without emitting any values.
 //
-// This method subscribes to the observable on the Goroutine scheduler because
+// ToChan uses the public scheduler.Goroutine variable for scheduling, because
 // it needs the concurrency so the returned channel can be used by used
 // by the calling code directly. To cancel ToChan you will need to supply a
 // subscriber that you hold on to.
 func (o ObservableBool) ToChan(subscribers ...Subscriber) <-chan bool {
-	scheduler := scheduler.Goroutine
 	subscribers = append(subscribers, subscriber.New())
+	scheduler := scheduler.Goroutine
 	donech := make(chan struct{})
 	nextch := make(chan bool)
 	const (
@@ -2385,13 +2440,13 @@ func (o ObservableBool) ToChan(subscribers ...Subscriber) <-chan bool {
 // not emit values but emits an error or complete, then the returned channel
 // will close without emitting any values.
 //
-// This method subscribes to the observable on the Goroutine scheduler because
+// ToChan uses the public scheduler.Goroutine variable for scheduling, because
 // it needs the concurrency so the returned channel can be used by used
 // by the calling code directly. To cancel ToChan you will need to supply a
 // subscriber that you hold on to.
 func (o ObservableInt) ToChan(subscribers ...Subscriber) <-chan int {
-	scheduler := scheduler.Goroutine
 	subscribers = append(subscribers, subscriber.New())
+	scheduler := scheduler.Goroutine
 	donech := make(chan struct{})
 	nextch := make(chan int)
 	const (
@@ -2440,10 +2495,11 @@ func (o ObservableInt) ToChan(subscribers ...Subscriber) <-chan int {
 
 // ToSingle blocks until the Observable emits exactly one value or an error.
 // The value and any error are returned.
+// ToSingle uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o Observable) ToSingle() (entry interface{}, err error) {
 	o = o.Single()
 	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next interface{}, e error, done bool) {
 		if !done {
 			entry = next
@@ -2462,10 +2518,11 @@ func (o Observable) ToSingle() (entry interface{}, err error) {
 
 // ToSingle blocks until the ObservableBool emits exactly one value or an error.
 // The value and any error are returned.
+// ToSingle uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o ObservableBool) ToSingle() (entry bool, err error) {
 	o = o.Single()
 	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next bool, e error, done bool) {
 		if !done {
 			entry = next
@@ -2484,10 +2541,11 @@ func (o ObservableBool) ToSingle() (entry bool, err error) {
 
 // ToSingle blocks until the ObservableInt emits exactly one value or an error.
 // The value and any error are returned.
+// ToSingle uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o ObservableInt) ToSingle() (entry int, err error) {
 	o = o.Single()
 	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next int, e error, done bool) {
 		if !done {
 			entry = next
@@ -2506,9 +2564,10 @@ func (o ObservableInt) ToSingle() (entry int, err error) {
 
 // ToSlice collects all values from the Observable into an slice. The
 // complete slice and any error are returned.
+// ToSlice uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o Observable) ToSlice() (slice []interface{}, err error) {
 	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next interface{}, e error, done bool) {
 		if !done {
 			slice = append(slice, next)
@@ -2527,9 +2586,10 @@ func (o Observable) ToSlice() (slice []interface{}, err error) {
 
 // ToSlice collects all values from the ObservableBool into an slice. The
 // complete slice and any error are returned.
+// ToSlice uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o ObservableBool) ToSlice() (slice []bool, err error) {
 	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next bool, e error, done bool) {
 		if !done {
 			slice = append(slice, next)
@@ -2548,9 +2608,10 @@ func (o ObservableBool) ToSlice() (slice []bool, err error) {
 
 // ToSlice collects all values from the ObservableInt into an slice. The
 // complete slice and any error are returned.
+// ToSlice uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o ObservableInt) ToSlice() (slice []int, err error) {
 	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next int, e error, done bool) {
 		if !done {
 			slice = append(slice, next)
@@ -2569,10 +2630,10 @@ func (o ObservableInt) ToSlice() (slice []int, err error) {
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
-// Subscribing is performed on the Trampoline scheduler.
+// Wait uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o Observable) Wait() (err error) {
 	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next interface{}, e error, done bool) {
 		if done {
 			err = e
@@ -2589,10 +2650,10 @@ func (o Observable) Wait() (err error) {
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
-// Subscribing is performed on the Trampoline scheduler.
+// Wait uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o ObservableBool) Wait() (err error) {
 	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next bool, e error, done bool) {
 		if done {
 			err = e
@@ -2609,10 +2670,10 @@ func (o ObservableBool) Wait() (err error) {
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
-// Subscribing is performed on the Trampoline scheduler.
+// Wait uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o ObservableInt) Wait() (err error) {
 	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next int, e error, done bool) {
 		if done {
 			err = e
@@ -2623,6 +2684,290 @@ func (o ObservableInt) Wait() (err error) {
 	o(observer, scheduler, subscriber)
 	subscriber.Wait()
 	return
+}
+
+//jig:name MulticasterAutoConnect
+
+// AutoConnect makes a Multicaster behave like an ordinary Observable that
+// automatically connects when the specified number of clients have subscribed
+// to it. If count is 0, then AutoConnect will immediately call connect on the
+// Multicaster before returning the Observable part of it.
+func (o Multicaster) AutoConnect(count int) Observable {
+	if count == 0 {
+		o.Connect()
+		return o.Observable
+	}
+	var refcount int32
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		if atomic.AddInt32(&refcount, 1) == int32(count) {
+			o.Connect()
+		}
+		o.Observable(observe, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name MulticasterRefCount
+
+// RefCount makes a Multicaster behave like an ordinary Observable. On
+// first Subscribe it will call Connect on its Multicaster and when its last
+// subscriber is Unsubscribed it will cancel the connection by calling
+// Unsubscribe on the subscription returned by the call to Connect.
+func (o Multicaster) RefCount() Observable {
+	var (
+		refcount	int32
+		connection	Subscription
+	)
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		if atomic.AddInt32(&refcount, 1) == 1 {
+			connection = o.Connect()
+		}
+		subscriber.OnUnsubscribe(func() {
+			if atomic.AddInt32(&refcount, -1) == 0 {
+				connection.Unsubscribe()
+			}
+		})
+		o.Observable(observe, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableMulticast
+
+// Multicast converts an ordinary observable into a multicasting connectable
+// observable or multicaster for short. A multicaster will only start emitting
+// values after its Connect method has been called. The factory method passed
+// in should return a new Subject that implements the actual multicasting
+// behavior.
+func (o Observable) Multicast(factory func() Subject) Multicaster {
+	const (
+		active	int32	= iota
+		notifying
+		terminated
+	)
+	var subjectValue struct {
+		state	int32
+		atomic.Value
+	}
+	subjectValue.Store(factory())
+	observer := func(next interface{}, err error, done bool) {
+		if atomic.CompareAndSwapInt32(&subjectValue.state, active, notifying) {
+			if s, ok := subjectValue.Load().(Subject); ok {
+				s.Observer(next, err, done)
+			}
+			if !done {
+				atomic.CompareAndSwapInt32(&subjectValue.state, notifying, active)
+			} else {
+				atomic.CompareAndSwapInt32(&subjectValue.state, notifying, terminated)
+			}
+		}
+	}
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		if s, ok := subjectValue.Load().(Subject); ok {
+			s.Observable(observe, subscribeOn, subscriber)
+		}
+	}
+	const (
+		unsubscribed	int32	= iota
+		subscribed
+	)
+	var subscriberValue struct {
+		state	int32
+		atomic.Value
+	}
+	connectable := func() Subscription {
+		if atomic.CompareAndSwapInt32(&subjectValue.state, terminated, active) {
+			subjectValue.Store(factory())
+		}
+		if atomic.CompareAndSwapInt32(&subscriberValue.state, unsubscribed, subscribed) {
+			subscriber := subscriber.New()
+			o.Subscribe(observer, subscriber)
+			subscriberValue.Store(subscriber)
+			subscriber.OnUnsubscribe(func() {
+				atomic.CompareAndSwapInt32(&subscriberValue.state, subscribed, unsubscribed)
+				var zero interface{}
+				observer(zero, ErrDisconnect, true)
+			})
+		}
+		subscriber := subscriberValue.Load().(Subscriber)
+		subscription := subscriber.Add(subscriber.Unsubscribe)
+		subscription.OnWait(subscriber.Wait)
+		return subscription
+	}
+	return Multicaster{Observable: observable, Connectable: connectable}
+}
+
+//jig:name Subject
+
+// Subject is a combination of an Observer and Observable.
+// Subjects are special because they are the only reactive constructs that
+// support multicasting. The items sent to it through its observer side are
+// multicasted to multiple clients subscribed to its observable side.
+//
+// The Subject exposes all methods from the embedded Observer and
+// Observable. Use the Observer Next, Error and Complete methods to feed
+// data to it. Use the Observable methods to subscribe to it.
+//
+// After a subject has been terminated by calling either Error or Complete,
+// it goes into terminated state. All subsequent calls to its observer side
+// will be silently ignored. All subsequent subscriptions to the observable
+// side will be handled according to the specific behavior of the subject.
+// There are different types of subjects, see the different NewXxxSubject
+// functions for more info.
+type Subject struct {
+	Observer
+	Observable
+}
+
+// Next is called by an Observable to emit the next interface{} value to the
+// Observer.
+func (f Observer) Next(next interface{}) {
+	f(next, nil, false)
+}
+
+// Error is called by an Observable to report an error to the Observer.
+func (f Observer) Error(err error) {
+	var zero interface{}
+	f(zero, err, true)
+}
+
+// Complete is called by an Observable to signal that no more data is
+// forthcoming to the Observer.
+func (f Observer) Complete() {
+	var zero interface{}
+	f(zero, nil, true)
+}
+
+//jig:name NewSubject
+
+// NewSubject creates a new Subject. After the subject is
+// terminated, all subsequent subscriptions to the observable side will be
+// terminated immediately with either an Error or Complete notification send to
+// the subscribing client
+//
+// Note that this implementation is blocking. When no subcribers are present
+// then the data can flow freely. But when there are subscribers, the observable
+// goroutine is blocked until all subscribers have processed the next, error or
+// complete notification.
+func NewSubject() Subject {
+	ch := multicast.NewChan(1, 16)
+	observer := func(next interface{}, err error, done bool) {
+		if !ch.Closed() {
+			if !done {
+				ch.FastSend(next)
+			} else {
+				ch.Close(err)
+			}
+		}
+	}
+	observable := Observable(func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		ep, err := ch.NewEndpoint(0)
+		if err != nil {
+			observe(nil, err, true)
+			return
+		}
+		observable := Create(func(Next Next, Error Error, Complete Complete, Canceled Canceled) {
+			receive := func(next interface{}, err error, closed bool) bool {
+				switch {
+				case !closed:
+					Next(next)
+				case err != nil:
+					Error(err)
+				default:
+					Complete()
+				}
+				return !Canceled()
+			}
+			ep.Range(receive, 0)
+		})
+		observable(observe, subscribeOn, subscriber.Add(ep.Cancel))
+	})
+	return Subject{observer, observable.AsObservable()}
+}
+
+//jig:name ObservablePublish
+
+// Publish uses the Multicast operator to control the subscription of a
+// Subject to a source observable and turns the subject it into a connnectable
+// observable. A Subject emits to an observer only those items that are emitted
+// by the source Observable subsequent to the time of the observer subscribes.
+//
+// If the source completed and as a result the internal Subject terminated, then
+// calling Connect again will replace the old Subject with a newly created one.
+// So this Publish operator is re-connectable, unlike the RxJS 5 behavior that
+// isn't. To simulate the RxJS 5 behavior use Publish().AutoConnect(1) this will
+// connect on the first subscription but will never re-connect.
+func (o Observable) Publish() Multicaster {
+	return o.Multicast(NewSubject)
+}
+
+//jig:name MaxReplayCapacity
+
+// MaxReplayCapacity is the maximum size of a replay buffer. Can be modified.
+var MaxReplayCapacity = 16383
+
+//jig:name NewReplaySubject
+
+// NewReplaySubject creates a new ReplaySubject. ReplaySubject ensures that
+// all observers see the same sequence of emitted items, even if they
+// subscribe after. When bufferCapacity argument is 0, then MaxReplayCapacity is
+// used (currently 16383). When windowDuration argument is 0, then entries added
+// to the buffer will remain fresh forever.
+func NewReplaySubject(bufferCapacity int, windowDuration time.Duration) Subject {
+	if bufferCapacity == 0 {
+		bufferCapacity = MaxReplayCapacity
+	}
+	ch := multicast.NewChan(bufferCapacity, 16)
+	observer := func(next interface{}, err error, done bool) {
+		if !ch.Closed() {
+			if !done {
+				ch.Send(next)
+			} else {
+				ch.Close(err)
+			}
+		}
+	}
+	observable := Observable(func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		ep, err := ch.NewEndpoint(multicast.ReplayAll)
+		if err != nil {
+			observe(nil, err, true)
+			return
+		}
+		observable := Create(func(Next Next, Error Error, Complete Complete, Canceled Canceled) {
+			receive := func(next interface{}, err error, closed bool) bool {
+				switch {
+				case !closed:
+					Next(next)
+				case err != nil:
+					Error(err)
+				default:
+					Complete()
+				}
+				return !Canceled()
+			}
+			ep.Range(receive, windowDuration)
+		})
+		observable(observe, subscribeOn, subscriber.Add(ep.Cancel))
+	})
+	return Subject{observer, observable.AsObservable()}
+}
+
+//jig:name ObservablePublishReplay
+
+// Replay uses the Multicast operator to control the subscription of a
+// ReplaySubject to a source observable and turns the subject into a
+// connectable observable. A ReplaySubject emits to any observer all of the
+// items that were emitted by the source observable, regardless of when the
+// observer subscribes.
+//
+// If the source completed and as a result the internal ReplaySubject
+// terminated, then calling Connect again will replace the old ReplaySubject
+// with a newly created one.
+func (o Observable) PublishReplay(bufferCapacity int, windowDuration time.Duration) Multicaster {
+	factory := func() Subject {
+		return NewReplaySubject(bufferCapacity, windowDuration)
+	}
+	return o.Multicast(factory)
 }
 
 //jig:name FromObservable
@@ -2684,4 +3029,12 @@ func (o ObservableBool) Single() ObservableBool {
 // than 1 item before completing  this reported as an error to the observer.
 func (o ObservableInt) Single() ObservableInt {
 	return o.AsObservable().Single().AsObservableInt()
+}
+
+//jig:name ObservableAsObservable
+
+// AsObservable returns the source Observable unchanged.
+// This is a special case needed for internal plumbing.
+func (o Observable) AsObservable() Observable {
+	return o
 }
