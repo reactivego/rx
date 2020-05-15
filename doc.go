@@ -2,8 +2,6 @@
 Package rx provides Reactive Extensions for Go, an API for asynchronous
 programming with observable streams.
 
-Below is the list of supported operators:
-
 Creating Operators
 
 Operators that originate new Observables.
@@ -111,7 +109,7 @@ Conditional and Boolean Operators
 
 Operators that evaluate one or more Observables or items emitted by Observables.
 
-	All              https://godoc.org/github.com/reactivego/rx/test/All/ ObservableBool
+	All              https://godoc.org/github.com/reactivego/rx/test/All/
 
 Aggregate Operators
 

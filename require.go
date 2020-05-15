@@ -29,6 +29,7 @@ func require() {
 	Empty()
 	From(1, 2)
 	FromChan(make(chan interface{}))
+	Of(1,2)
 	Interval(time.Millisecond)
 	Just(1)
 	Never()

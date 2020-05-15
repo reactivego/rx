@@ -7,12 +7,12 @@ import (
 	"github.com/reactivego/rx"
 )
 
-func ExampleObservable_Concat() {
+func ExampleObservable_ConcatWith() {
 	oa := rx.From(0, 1, 2, 3)
 	ob := rx.From(4, 5)
 	oc := rx.From(6)
 	od := rx.From(7, 8, 9)
-	oa.Concat(ob, oc).Concat(od).Subscribe(func(next interface{}, err error, done bool) {
+	oa.ConcatWith(ob, oc).ConcatWith(od).Subscribe(func(next interface{}, err error, done bool) {
 		switch {
 		case !done:
 			fmt.Printf("%d,", next.(int))
@@ -25,6 +25,28 @@ func ExampleObservable_Concat() {
 
 	// Output:
 	// 0,1,2,3,4,5,6,7,8,9,complete
+}
+
+
+func ExampleObservable_Defer() {
+	count := 0
+	source := rx.Defer(func() rx.Observable {
+		return rx.From(count)
+	})
+	mapped := source.Map(func(next interface{}) interface{} {
+		return fmt.Sprintf("observable %d", next)
+	})
+
+	mapped.Println()
+	count = 123
+	mapped.Println()
+	count = 456
+	mapped.Println()
+
+	// Output:
+	// observable 0
+	// observable 123
+	// observable 456
 }
 
 func ExampleObservable_Do() {
