@@ -27,8 +27,7 @@ func ExampleObservable_ConcatWith() {
 	// 0,1,2,3,4,5,6,7,8,9,complete
 }
 
-
-func ExampleObservable_Defer() {
+func ExampleDefer() {
 	count := 0
 	source := rx.Defer(func() rx.Observable {
 		return rx.From(count)
@@ -102,7 +101,7 @@ func ExampleFrom() {
 	// 5
 }
 
-func ExampleFromSlice() {
+func ExampleFrom_slice() {
 	rx.From([]interface{}{1, 2, 3, 4, 5}...).Println()
 
 	// Output:
