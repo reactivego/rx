@@ -104,9 +104,10 @@ func (o ObservableInt) DoOnComplete(f func()) ObservableInt {
 
 // ToSlice collects all values from the ObservableInt into an slice. The
 // complete slice and any error are returned.
+// ToSlice uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o ObservableInt) ToSlice() (slice []int, err error) {
 	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next int, e error, done bool) {
 		if !done {
 			slice = append(slice, next)
@@ -142,10 +143,10 @@ type Subscription = subscriber.Subscription
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
-// Subscribe by default is performed on the Trampoline scheduler.
+// Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber) Subscription {
 	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next int, err error, done bool) {
 		if !done {
 			observe(next, err, done)

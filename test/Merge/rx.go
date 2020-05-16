@@ -65,11 +65,61 @@ func FromInt(slice ...int) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntMerge
+//jig:name MergeInt
 
-// Merge combines multiple Observables into one by merging their emissions.
+// MergeInt combines multiple Observables into one by merging their emissions.
 // An error from any of the observables will terminate the merged observables.
-func (o ObservableInt) Merge(other ...ObservableInt) ObservableInt {
+func MergeInt(observables ...ObservableInt) ObservableInt {
+	if len(observables) == 0 {
+		return EmptyInt()
+	}
+	return observables[0].MergeWith(observables[1:]...)
+}
+
+//jig:name ObservableIntPrintln
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableInt) Println(a ...interface{}) (err error) {
+	subscriber := subscriber.New()
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next int, e error, done bool) {
+		if !done {
+			fmt.Println(append(a, next)...)
+		} else {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
+}
+
+//jig:name EmptyInt
+
+// EmptyInt creates an Observable that emits no items but terminates normally.
+func EmptyInt() ObservableInt {
+	var zeroInt int
+	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
+		runner := scheduler.Schedule(func() {
+			if subscriber.Subscribed() {
+				observe(zeroInt, nil, true)
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
+}
+
+//jig:name ObservableIntMergeWith
+
+// MergeWith combines multiple Observables into one by merging their emissions.
+// An error from any of the observables will terminate the merged observables.
+func (o ObservableInt) MergeWith(other ...ObservableInt) ObservableInt {
 	if len(other) == 0 {
 		return o
 	}
@@ -110,56 +160,6 @@ func (o ObservableInt) Merge(other ...ObservableInt) ObservableInt {
 				}
 			}
 		})
-	}
-	return observable
-}
-
-//jig:name MergeInt
-
-// MergeInt combines multiple Observables into one by merging their emissions.
-// An error from any of the observables will terminate the merged observables.
-func MergeInt(observables ...ObservableInt) ObservableInt {
-	if len(observables) == 0 {
-		return EmptyInt()
-	}
-	return observables[0].Merge(observables[1:]...)
-}
-
-//jig:name ObservableIntPrintln
-
-// Println subscribes to the Observable and prints every item to os.Stdout
-// while it waits for completion or error. Returns either the error or nil
-// when the Observable completed normally.
-// Println is performed on the Trampoline scheduler.
-func (o ObservableInt) Println() (err error) {
-	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
-	observer := func(next int, e error, done bool) {
-		if !done {
-			fmt.Println(next)
-		} else {
-			err = e
-			subscriber.Unsubscribe()
-		}
-	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
-}
-
-//jig:name EmptyInt
-
-// EmptyInt creates an Observable that emits no items but terminates normally.
-func EmptyInt() ObservableInt {
-	var zeroInt int
-	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
-		runner := scheduler.Schedule(func() {
-			if subscriber.Subscribed() {
-				observe(zeroInt, nil, true)
-			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }

@@ -688,12 +688,16 @@ type Subscription = subscriber.Subscription
 const ErrDisconnect = RxError("disconnect")
 
 // Connectable provides the Connect method for a Multicaster.
-type Connectable func() Subscription
+type Connectable func(Scheduler, Subscriber)
 
 // Connect instructs a multicaster to subscribe to its source and begin
 // multicasting items to its subscribers.
-func (f Connectable) Connect() Subscription {
-	return f()
+func (c Connectable) Connect(subscribers ...Subscriber) Subscription {
+	subscribers = append(subscribers, subscriber.New())
+	scheduler := scheduler.MakeTrampoline()
+	subscribers[0].OnWait(scheduler.Wait)
+	c(scheduler, subscribers[0])
+	return subscribers[0]
 }
 
 //jig:name Multicaster
@@ -722,6 +726,111 @@ type SliceObserver func(next Slice, err error, done bool)
 // ObservableSlice is a function taking an Observer, Scheduler and Subscriber.
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableSlice func(SliceObserver, Scheduler, Subscriber)
+
+//jig:name FromObservable
+
+// FromObservable creates an ObservableObservable from multiple Observable values passed in.
+func FromObservable(slice ...Observable) ObservableObservable {
+	var zeroObservable Observable
+	observable := func(observe ObservableObserver, scheduler Scheduler, subscriber Subscriber) {
+		i := 0
+		runner := scheduler.ScheduleRecursive(func(self func()) {
+			if subscriber.Subscribed() {
+				if i < len(slice) {
+					observe(slice[i], nil, false)
+					if subscriber.Subscribed() {
+						i++
+						self()
+					}
+				} else {
+					observe(zeroObservable, nil, true)
+				}
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
+}
+
+//jig:name ObservableConcatWith
+
+// ConcatWith emits the emissions from two or more Observables without interleaving them.
+func (o Observable) ConcatWith(other ...Observable) Observable {
+	var zero interface{}
+	if len(other) == 0 {
+		return o
+	}
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		var (
+			observables	= append([]Observable{}, other...)
+			observer	Observer
+		)
+		observer = func(next interface{}, err error, done bool) {
+			if !done || err != nil {
+				observe(next, err, done)
+			} else {
+				if len(observables) == 0 {
+					observe(zero, nil, true)
+				} else {
+					o := observables[0]
+					observables = observables[1:]
+					o(observer, subscribeOn, subscriber)
+				}
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableMergeWith
+
+// MergeWith combines multiple Observables into one by merging their emissions.
+// An error from any of the observables will terminate the merged observables.
+func (o Observable) MergeWith(other ...Observable) Observable {
+	if len(other) == 0 {
+		return o
+	}
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		var observers struct {
+			sync.Mutex
+			done	bool
+			len	int
+		}
+		observer := func(next interface{}, err error, done bool) {
+			observers.Lock()
+			defer observers.Unlock()
+			if !observers.done {
+				switch {
+				case !done:
+					observe(next, nil, false)
+				case err != nil:
+					observers.done = true
+					var zero interface{}
+					observe(zero, err, true)
+				default:
+					if observers.len--; observers.len == 0 {
+						var zero interface{}
+						observe(zero, nil, true)
+					}
+				}
+			}
+		}
+		subscribeOn.Schedule(func() {
+			if !subscriber.Canceled() {
+				observers.len = 1 + len(other)
+				o(observer, subscribeOn, subscriber)
+				for _, o := range other {
+					if subscriber.Canceled() {
+						return
+					}
+					o(observer, subscribeOn, subscriber)
+				}
+			}
+		})
+	}
+	return observable
+}
 
 //jig:name ObservableCombineLatestWith
 
@@ -756,37 +865,6 @@ func (o Observable) CombineLatestMap(project func(interface{}) Observable) Obser
 func (o Observable) CombineLatestMapTo(inner Observable) ObservableSlice {
 	project := func(interface{}) Observable { return inner }
 	return o.MapObservable(project).CombineLatestAll()
-}
-
-//jig:name ObservableConcatWith
-
-// ConcatWith emits the emissions from two or more Observables without interleaving them.
-func (o Observable) ConcatWith(other ...Observable) Observable {
-	var zero interface{}
-	if len(other) == 0 {
-		return o
-	}
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		var (
-			observables	= append([]Observable{}, other...)
-			observer	Observer
-		)
-		observer = func(next interface{}, err error, done bool) {
-			if !done || err != nil {
-				observe(next, err, done)
-			} else {
-				if len(observables) == 0 {
-					observe(zero, nil, true)
-				} else {
-					o := observables[0]
-					observables = observables[1:]
-					o(observer, subscribeOn, subscriber)
-				}
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
 }
 
 //jig:name ObservableObservableConcatAll
@@ -1023,55 +1101,6 @@ func (o ObservableObservable) SwitchAll() Observable {
 			}
 		}
 		o(switcher, subscribeOn, switcherSubscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableMergeWith
-
-// MergeWith combines multiple Observables into one by merging their emissions.
-// An error from any of the observables will terminate the merged observables.
-func (o Observable) MergeWith(other ...Observable) Observable {
-	if len(other) == 0 {
-		return o
-	}
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		var observers struct {
-			sync.Mutex
-			done	bool
-			len	int
-		}
-		observer := func(next interface{}, err error, done bool) {
-			observers.Lock()
-			defer observers.Unlock()
-			if !observers.done {
-				switch {
-				case !done:
-					observe(next, nil, false)
-				case err != nil:
-					observers.done = true
-					var zero interface{}
-					observe(zero, err, true)
-				default:
-					if observers.len--; observers.len == 0 {
-						var zero interface{}
-						observe(zero, nil, true)
-					}
-				}
-			}
-		}
-		subscribeOn.Schedule(func() {
-			if !subscriber.Canceled() {
-				observers.len = 1 + len(other)
-				o(observer, subscribeOn, subscriber)
-				for _, o := range other {
-					if subscriber.Canceled() {
-						return
-					}
-					o(observer, subscribeOn, subscriber)
-				}
-			}
-		})
 	}
 	return observable
 }
@@ -2686,26 +2715,40 @@ func (o ObservableInt) Wait() (err error) {
 	return
 }
 
+//jig:name ErrAutoConnect
+
+const ErrAutoConnectInvalidCount = RxError("invalid count")
+
+const ErrAutoConnectNeedsConcurrentScheduler = RxError("needs concurrent scheduler")
+
 //jig:name MulticasterAutoConnect
 
-// AutoConnect makes a Multicaster behave like an ordinary Observable that
-// automatically connects when the specified number of clients have subscribed
-// to it. If count is 0, then AutoConnect will immediately call connect on the
-// Multicaster before returning the Observable part of it.
+// AutoConnect makes a Multicaster behave like an ordinary Observable
+// that automatically connects when the specified number of clients have
+// subscribed to it. AutoConnect values should be larger or equal to 1.
+// AutoConnect will throw an ErrInvalidCount if the count is out of range.
 func (o Multicaster) AutoConnect(count int) Observable {
-	if count == 0 {
-		o.Connect()
-		return o.Observable
+	if count < 1 {
+		return Throw(ErrAutoConnectInvalidCount)
 	}
 	var refcount int32
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		if atomic.AddInt32(&refcount, 1) == int32(count) {
-			o.Connect()
+	observable := func(observe Observer, subscribeOn Scheduler, withSubscriber Subscriber) {
+		if !subscribeOn.IsConcurrent() {
+			var zero interface{}
+			observe(zero, ErrAutoConnectNeedsConcurrentScheduler, true)
+			return
 		}
-		o.Observable(observe, subscribeOn, subscriber)
+		if atomic.AddInt32(&refcount, 1) == int32(count) {
+			o.Connectable(subscribeOn, subscriber.New())
+		}
+		o.Observable(observe, subscribeOn, withSubscriber)
 	}
 	return observable
 }
+
+//jig:name ErrRefCount
+
+const ErrRefCountNeedsConcurrentScheduler = RxError("needs concurrent scheduler")
 
 //jig:name MulticasterRefCount
 
@@ -2716,18 +2759,25 @@ func (o Multicaster) AutoConnect(count int) Observable {
 func (o Multicaster) RefCount() Observable {
 	var (
 		refcount	int32
-		connection	Subscription
+		subscription	Subscription
 	)
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		if atomic.AddInt32(&refcount, 1) == 1 {
-			connection = o.Connect()
+	observable := func(observe Observer, subscribeOn Scheduler, withSubscriber Subscriber) {
+		if !subscribeOn.IsConcurrent() {
+			var zero interface{}
+			observe(zero, ErrRefCountNeedsConcurrentScheduler, true)
+			return
 		}
-		subscriber.OnUnsubscribe(func() {
+		if atomic.AddInt32(&refcount, 1) == 1 {
+			s := subscriber.New()
+			o.Connectable(subscribeOn, s)
+			subscription = s
+		}
+		withSubscriber.OnUnsubscribe(func() {
 			if atomic.AddInt32(&refcount, -1) == 0 {
-				connection.Unsubscribe()
+				subscription.Unsubscribe()
 			}
 		})
-		o.Observable(observe, subscribeOn, subscriber)
+		o.Observable(observe, subscribeOn, withSubscriber)
 	}
 	return observable
 }
@@ -2771,28 +2821,29 @@ func (o Observable) Multicast(factory func() Subject) Multicaster {
 		unsubscribed	int32	= iota
 		subscribed
 	)
-	var subscriberValue struct {
-		state	int32
-		atomic.Value
+	var connection struct {
+		sync.Mutex
+		state		int32
+		subscriber	Subscriber
 	}
-	connectable := func() Subscription {
+	connectable := func(subscribeOn Scheduler, subscriber Subscriber) {
+		connection.Lock()
 		if atomic.CompareAndSwapInt32(&subjectValue.state, terminated, active) {
 			subjectValue.Store(factory())
 		}
-		if atomic.CompareAndSwapInt32(&subscriberValue.state, unsubscribed, subscribed) {
-			subscriber := subscriber.New()
-			o.Subscribe(observer, subscriber)
-			subscriberValue.Store(subscriber)
+		if atomic.CompareAndSwapInt32(&connection.state, unsubscribed, subscribed) {
+			o(observer, subscribeOn, subscriber)
+			connection.subscriber = subscriber
 			subscriber.OnUnsubscribe(func() {
-				atomic.CompareAndSwapInt32(&subscriberValue.state, subscribed, unsubscribed)
+				atomic.CompareAndSwapInt32(&connection.state, subscribed, unsubscribed)
 				var zero interface{}
 				observer(zero, ErrDisconnect, true)
 			})
+		} else {
+			connection.subscriber.OnUnsubscribe(subscriber.Unsubscribe)
+			subscriber.OnUnsubscribe(connection.subscriber.Unsubscribe)
 		}
-		subscriber := subscriberValue.Load().(Subscriber)
-		subscription := subscriber.Add(subscriber.Unsubscribe)
-		subscription.OnWait(subscriber.Wait)
-		return subscription
+		connection.Unlock()
 	}
 	return Multicaster{Observable: observable, Connectable: connectable}
 }
@@ -2968,31 +3019,6 @@ func (o Observable) PublishReplay(bufferCapacity int, windowDuration time.Durati
 		return NewReplaySubject(bufferCapacity, windowDuration)
 	}
 	return o.Multicast(factory)
-}
-
-//jig:name FromObservable
-
-// FromObservable creates an ObservableObservable from multiple Observable values passed in.
-func FromObservable(slice ...Observable) ObservableObservable {
-	var zeroObservable Observable
-	observable := func(observe ObservableObserver, scheduler Scheduler, subscriber Subscriber) {
-		i := 0
-		runner := scheduler.ScheduleRecursive(func(self func()) {
-			if subscriber.Subscribed() {
-				if i < len(slice) {
-					observe(slice[i], nil, false)
-					if subscriber.Subscribed() {
-						i++
-						self()
-					}
-				} else {
-					observe(zeroObservable, nil, true)
-				}
-			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
 }
 
 //jig:name ObservableMapObservable

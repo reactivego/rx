@@ -241,8 +241,9 @@ const ErrTypecastToString = RxError("typecast to string failed")
 
 //jig:name ObservableAsObservableString
 
-// AsString turns an Observable of interface{} into an ObservableString. If during
-// observing a typecast fails, the error ErrTypecastToString will be emitted.
+// AsObservableString turns an Observable of interface{} into an ObservableString.
+// If during observing a typecast fails, the error ErrTypecastToString will be
+// emitted.
 func (o Observable) AsObservableString() ObservableString {
 	observable := func(observe StringObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
@@ -335,6 +336,29 @@ func (o ObservableInt) AsObservable() Observable {
 	return observable
 }
 
+//jig:name ObservableStringPrintln
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableString) Println(a ...interface{}) (err error) {
+	subscriber := subscriber.New()
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next string, e error, done bool) {
+		if !done {
+			fmt.Println(append(a, next)...)
+		} else {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
+}
+
 //jig:name ErrTypecastToInt
 
 // ErrTypecastToInt is delivered to an observer if the generic value cannot be
@@ -343,8 +367,9 @@ const ErrTypecastToInt = RxError("typecast to int failed")
 
 //jig:name ObservableAsObservableInt
 
-// AsInt turns an Observable of interface{} into an ObservableInt. If during
-// observing a typecast fails, the error ErrTypecastToInt will be emitted.
+// AsObservableInt turns an Observable of interface{} into an ObservableInt.
+// If during observing a typecast fails, the error ErrTypecastToInt will be
+// emitted.
 func (o Observable) AsObservableInt() ObservableInt {
 	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {
@@ -381,29 +406,6 @@ func (o ObservableInt) MapObservableString(project func(int) ObservableString) O
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
-}
-
-//jig:name ObservableStringPrintln
-
-// Println subscribes to the Observable and prints every item to os.Stdout
-// while it waits for completion or error. Returns either the error or nil
-// when the Observable completed normally.
-// Println is performed on the Trampoline scheduler.
-func (o ObservableString) Println() (err error) {
-	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
-	observer := func(next string, e error, done bool) {
-		if !done {
-			fmt.Println(next)
-		} else {
-			err = e
-			subscriber.Unsubscribe()
-		}
-	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
 }
 
 //jig:name ObservableStringObserver

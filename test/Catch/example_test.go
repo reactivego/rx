@@ -11,7 +11,7 @@ func Example_catch() {
 	o45 := FromInt(4, 5)
 	oThrowError := ThrowInt(RxError("error"))
 
-	err := o123.Concat(oThrowError).Catch(o45).Println()
+	err := o123.ConcatWith(oThrowError).Catch(o45).Println()
 	fmt.Println(err)
 
 	// Output:

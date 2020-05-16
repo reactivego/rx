@@ -19,6 +19,12 @@ import (
 // Scheduler is used to schedule tasks to support subscribing and observing.
 type Scheduler = scheduler.Scheduler
 
+//jig:name GoroutineScheduler
+
+func GoroutineScheduler() Scheduler {
+	return scheduler.Goroutine
+}
+
 //jig:name Subscriber
 
 // Subscriber is an interface that can be passed in when subscribing to an
@@ -110,12 +116,6 @@ func CreateRecursiveInt(create func(NextInt, Error, Complete)) ObservableInt {
 		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
-}
-
-//jig:name GoroutineScheduler
-
-func GoroutineScheduler() Scheduler {
-	return scheduler.Goroutine
 }
 
 //jig:name Canceled
@@ -403,54 +403,6 @@ func (o ObservableInt) PublishReplay(bufferCapacity int, windowDuration time.Dur
 	return o.Multicast(factory)
 }
 
-//jig:name ThrowInt
-
-// ThrowInt creates an Observable that emits no items and terminates with an
-// error.
-func ThrowInt(err error) ObservableInt {
-	var zeroInt int
-	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
-		runner := scheduler.Schedule(func() {
-			if subscriber.Subscribed() {
-				observe(zeroInt, err, true)
-			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
-}
-
-//jig:name ErrAutoConnect
-
-const ErrAutoConnectInvalidCount = RxError("invalid count")
-
-const ErrAutoConnectNeedsConcurrentScheduler = RxError("needs concurrent scheduler")
-
-//jig:name IntMulticasterAutoConnect
-
-// AutoConnect makes a IntMulticaster behave like an ordinary ObservableInt
-// that automatically connects when the specified number of clients have
-// subscribed to it. AutoConnect values should be larger or equal to 1.
-// AutoConnect will throw an ErrInvalidCount if the count is out of range.
-func (o IntMulticaster) AutoConnect(count int) ObservableInt {
-	if count < 1 {
-		return ThrowInt(ErrAutoConnectInvalidCount)
-	}
-	var refcount int32
-	observable := func(observe IntObserver, subscribeOn Scheduler, withSubscriber Subscriber) {
-		if !subscribeOn.IsConcurrent() {
-			var zero int
-			observe(zero, ErrAutoConnectNeedsConcurrentScheduler, true)
-			return
-		}
-		if atomic.AddInt32(&refcount, 1) == int32(count) {
-			o.Connectable(subscribeOn, subscriber.New())
-		}
-		o.ObservableInt(observe, subscribeOn, withSubscriber)
-	}
-	return observable
-}
-
 //jig:name Observer
 
 // Observer is a function that gets called whenever the Observable has
@@ -509,6 +461,54 @@ func Create(create func(Next, Error, Complete, Canceled)) Observable {
 			create(n, e, c, x)
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
+}
+
+//jig:name ThrowInt
+
+// ThrowInt creates an Observable that emits no items and terminates with an
+// error.
+func ThrowInt(err error) ObservableInt {
+	var zeroInt int
+	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
+		runner := scheduler.Schedule(func() {
+			if subscriber.Subscribed() {
+				observe(zeroInt, err, true)
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
+}
+
+//jig:name ErrAutoConnect
+
+const ErrAutoConnectInvalidCount = RxError("invalid count")
+
+const ErrAutoConnectNeedsConcurrentScheduler = RxError("needs concurrent scheduler")
+
+//jig:name IntMulticasterAutoConnect
+
+// AutoConnect makes a IntMulticaster behave like an ordinary ObservableInt
+// that automatically connects when the specified number of clients have
+// subscribed to it. AutoConnect values should be larger or equal to 1.
+// AutoConnect will throw an ErrInvalidCount if the count is out of range.
+func (o IntMulticaster) AutoConnect(count int) ObservableInt {
+	if count < 1 {
+		return ThrowInt(ErrAutoConnectInvalidCount)
+	}
+	var refcount int32
+	observable := func(observe IntObserver, subscribeOn Scheduler, withSubscriber Subscriber) {
+		if !subscribeOn.IsConcurrent() {
+			var zero int
+			observe(zero, ErrAutoConnectNeedsConcurrentScheduler, true)
+			return
+		}
+		if atomic.AddInt32(&refcount, 1) == int32(count) {
+			o.Connectable(subscribeOn, subscriber.New())
+		}
+		o.ObservableInt(observe, subscribeOn, withSubscriber)
 	}
 	return observable
 }

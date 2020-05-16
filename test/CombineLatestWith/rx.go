@@ -150,8 +150,8 @@ func (o ObservableObservable) CombineLatestAll() ObservableSlice {
 // to emit before emitting the first slice. Whenever any of the subscribed
 // observables emits, a new slice will be emitted containing all the latest
 // value.
-func (o Observable) CombineLatestWith(observables ...Observable) ObservableSlice {
-	return FromObservable(append([]Observable{o}, observables...)...).CombineLatestAll()
+func (o Observable) CombineLatestWith(other ...Observable) ObservableSlice {
+	return FromObservable(append([]Observable{o}, other...)...).CombineLatestAll()
 }
 
 //jig:name ObservableObserver
@@ -216,13 +216,13 @@ func FromObservable(slice ...Observable) ObservableObservable {
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
-// Println is performed on the Trampoline scheduler.
-func (o ObservableSlice) Println() (err error) {
+// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableSlice) Println(a ...interface{}) (err error) {
 	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next Slice, e error, done bool) {
 		if !done {
-			fmt.Println(next)
+			fmt.Println(append(a, next)...)
 		} else {
 			err = e
 			subscriber.Unsubscribe()

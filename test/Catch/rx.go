@@ -87,10 +87,10 @@ type RxError string
 
 func (e RxError) Error() string	{ return string(e) }
 
-//jig:name ObservableIntConcat
+//jig:name ObservableIntConcatWith
 
-// Concat emits the emissions from two or more ObservableInts without interleaving them.
-func (o ObservableInt) Concat(other ...ObservableInt) ObservableInt {
+// ConcatWith emits the emissions from two or more ObservableInts without interleaving them.
+func (o ObservableInt) ConcatWith(other ...ObservableInt) ObservableInt {
 	var zeroInt int
 	if len(other) == 0 {
 		return o
@@ -142,13 +142,13 @@ func (o ObservableInt) Catch(catch ObservableInt) ObservableInt {
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
-// Println is performed on the Trampoline scheduler.
-func (o ObservableInt) Println() (err error) {
+// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableInt) Println(a ...interface{}) (err error) {
 	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next int, e error, done bool) {
 		if !done {
-			fmt.Println(next)
+			fmt.Println(append(a, next)...)
 		} else {
 			err = e
 			subscriber.Unsubscribe()

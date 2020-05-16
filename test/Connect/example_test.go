@@ -47,13 +47,11 @@ func Example_connect() {
 		})
 
 	// Connect will cause the publisher to subscribe to the source
-	subc := pub.Connect()
+	pub.Connect().Wait()
 
 	sub1.Wait()
 	sub2.Wait()
 	sub3.Wait()
-
-	subc.Wait()
 
 	// Unordered output:
 	// sub1 value is 1

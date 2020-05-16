@@ -151,13 +151,13 @@ type Observable func(Observer, Scheduler, Subscriber)
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
-// Println is performed on the Trampoline scheduler.
-func (o ObservableFloat32) Println() (err error) {
+// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableFloat32) Println(a ...interface{}) (err error) {
 	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next float32, e error, done bool) {
 		if !done {
-			fmt.Println(next)
+			fmt.Println(append(a, next)...)
 		} else {
 			err = e
 			subscriber.Unsubscribe()
@@ -174,13 +174,13 @@ func (o ObservableFloat32) Println() (err error) {
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
-// Println is performed on the Trampoline scheduler.
-func (o Observable) Println() (err error) {
+// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o Observable) Println(a ...interface{}) (err error) {
 	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next interface{}, e error, done bool) {
 		if !done {
-			fmt.Println(next)
+			fmt.Println(append(a, next)...)
 		} else {
 			err = e
 			subscriber.Unsubscribe()

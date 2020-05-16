@@ -80,10 +80,10 @@ func (o Observable) DoOnError(f func(err error)) Observable {
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
-// Subscribing is performed on the Trampoline scheduler.
+// Wait uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o Observable) Wait() (err error) {
 	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next interface{}, e error, done bool) {
 		if done {
 			err = e

@@ -143,38 +143,6 @@ func (e RxError) Error() string	{ return string(e) }
 // Subscription is an alias for the subscriber.Subscription interface type.
 type Subscription = subscriber.Subscription
 
-//jig:name ObservableIntSubscribeOn
-
-// SubscribeOn specifies the scheduler an ObservableInt should use when it is
-// subscribed to.
-func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
-	observable := func(observe IntObserver, _ Scheduler, subscriber Subscriber) {
-		subscriber.OnWait(subscribeOn.Wait)
-		o(observe, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableIntWait
-
-// Wait subscribes to the Observable and waits for completion or error.
-// Returns either the error or nil when the Observable completed normally.
-// Wait uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) Wait() (err error) {
-	subscriber := subscriber.New()
-	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, e error, done bool) {
-		if done {
-			err = e
-			subscriber.Unsubscribe()
-		}
-	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
-}
-
 //jig:name Observer
 
 // Observer is a function that gets called whenever the Observable has
@@ -252,6 +220,60 @@ func Create(create func(Next, Error, Complete, Canceled)) Observable {
 	return observable
 }
 
+//jig:name ObservableIntSubscribeOn
+
+// SubscribeOn specifies the scheduler an ObservableInt should use when it is
+// subscribed to.
+func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
+	observable := func(observe IntObserver, _ Scheduler, subscriber Subscriber) {
+		subscriber.OnWait(subscribeOn.Wait)
+		o(observe, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableIntWait
+
+// Wait subscribes to the Observable and waits for completion or error.
+// Returns either the error or nil when the Observable completed normally.
+// Wait uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableInt) Wait() (err error) {
+	subscriber := subscriber.New()
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next int, e error, done bool) {
+		if done {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
+}
+
+//jig:name ObservableIntSubscribe
+
+// Subscribe operates upon the emissions and notifications from an Observable.
+// This method returns a Subscription.
+// Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber) Subscription {
+	subscribers = append(subscribers, subscriber.New())
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next int, err error, done bool) {
+		if !done {
+			observe(next, err, done)
+		} else {
+			var zeroInt int
+			observe(zeroInt, err, true)
+			subscribers[0].Unsubscribe()
+		}
+	}
+	subscribers[0].OnWait(scheduler.Wait)
+	o(observer, scheduler, subscribers[0])
+	return subscribers[0]
+}
+
 //jig:name ErrTypecastToInt
 
 // ErrTypecastToInt is delivered to an observer if the generic value cannot be
@@ -281,26 +303,4 @@ func (o Observable) AsObservableInt() ObservableInt {
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
-}
-
-//jig:name ObservableIntSubscribe
-
-// Subscribe operates upon the emissions and notifications from an Observable.
-// This method returns a Subscription.
-// Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber) Subscription {
-	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, err error, done bool) {
-		if !done {
-			observe(next, err, done)
-		} else {
-			var zeroInt int
-			observe(zeroInt, err, true)
-			subscribers[0].Unsubscribe()
-		}
-	}
-	subscribers[0].OnWait(scheduler.Wait)
-	o(observer, scheduler, subscribers[0])
-	return subscribers[0]
 }

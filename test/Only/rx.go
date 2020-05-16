@@ -218,10 +218,10 @@ type Subscription = subscriber.Subscription
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
-// Subscribe by default is performed on the Trampoline scheduler.
+// Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o ObservableString) Subscribe(observe StringObserver, subscribers ...Subscriber) Subscription {
 	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next string, err error, done bool) {
 		if !done {
 			observe(next, err, done)
@@ -240,10 +240,10 @@ func (o ObservableString) Subscribe(observe StringObserver, subscribers ...Subsc
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
-// Subscribe by default is performed on the Trampoline scheduler.
+// Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o ObservableSize) Subscribe(observe SizeObserver, subscribers ...Subscriber) Subscription {
 	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next Size, err error, done bool) {
 		if !done {
 			observe(next, err, done)
@@ -262,10 +262,10 @@ func (o ObservableSize) Subscribe(observe SizeObserver, subscribers ...Subscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
-// Subscribe by default is performed on the Trampoline scheduler.
+// Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o ObservablePoint) Subscribe(observe PointObserver, subscribers ...Subscriber) Subscription {
 	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next []point, err error, done bool) {
 		if !done {
 			observe(next, err, done)

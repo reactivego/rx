@@ -64,14 +64,14 @@ func FromInt(slice ...int) ObservableInt {
 
 //jig:name ObservableIntObserveOn
 
-// ObserveOn specifies a schedule function to use for delivering values to the observer.
-func (o ObservableInt) ObserveOn(schedule func(task func())) ObservableInt {
+// ObserveOn specifies a dispatch function to use for delivering values to the observer.
+func (o ObservableInt) ObserveOn(dispatch func(task func())) ObservableInt {
 	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next int, err error, done bool) {
 			task := func() {
 				observe(next, err, done)
 			}
-			schedule(task)
+			dispatch(task)
 		}
 		o(observer, subscribeOn, subscriber)
 	}
@@ -87,10 +87,10 @@ type Subscription = subscriber.Subscription
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
-// Subscribe by default is performed on the Trampoline scheduler.
+// Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber) Subscription {
 	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next int, err error, done bool) {
 		if !done {
 			observe(next, err, done)

@@ -97,10 +97,10 @@ func (o ObservableInt) Finally(f func()) ObservableInt {
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
-// Subscribing is performed on the Trampoline scheduler.
+// Wait uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o ObservableInt) Wait() (err error) {
 	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next int, e error, done bool) {
 		if done {
 			err = e

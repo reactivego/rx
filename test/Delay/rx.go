@@ -86,9 +86,10 @@ func (o ObservableInt) Delay(duration time.Duration) ObservableInt {
 
 // ToSlice collects all values from the ObservableInt into an slice. The
 // complete slice and any error are returned.
+// ToSlice uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o ObservableInt) ToSlice() (slice []int, err error) {
 	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next int, e error, done bool) {
 		if !done {
 			slice = append(slice, next)

@@ -75,29 +75,6 @@ func (o ObservableInt) MergeMapInt(project func(int) ObservableInt) ObservableIn
 	return o.MapObservableInt(project).MergeAll()
 }
 
-//jig:name ObservableIntPrintln
-
-// Println subscribes to the Observable and prints every item to os.Stdout
-// while it waits for completion or error. Returns either the error or nil
-// when the Observable completed normally.
-// Println is performed on the Trampoline scheduler.
-func (o ObservableInt) Println() (err error) {
-	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
-	observer := func(next int, e error, done bool) {
-		if !done {
-			fmt.Println(next)
-		} else {
-			err = e
-			subscriber.Unsubscribe()
-		}
-	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
-}
-
 //jig:name ObservableIntMapObservableInt
 
 // MapObservableInt transforms the items emitted by an ObservableInt by applying a
@@ -114,6 +91,29 @@ func (o ObservableInt) MapObservableInt(project func(int) ObservableInt) Observa
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
+}
+
+//jig:name ObservableIntPrintln
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableInt) Println(a ...interface{}) (err error) {
+	subscriber := subscriber.New()
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next int, e error, done bool) {
+		if !done {
+			fmt.Println(append(a, next)...)
+		} else {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
 }
 
 //jig:name ObservableIntObserver

@@ -89,13 +89,13 @@ func (o ObservableInt) Count() ObservableInt {
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
-// Println is performed on the Trampoline scheduler.
-func (o ObservableInt) Println() (err error) {
+// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableInt) Println(a ...interface{}) (err error) {
 	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next int, e error, done bool) {
 		if !done {
-			fmt.Println(next)
+			fmt.Println(append(a, next)...)
 		} else {
 			err = e
 			subscriber.Unsubscribe()
@@ -111,10 +111,11 @@ func (o ObservableInt) Println() (err error) {
 
 // ToSingle blocks until the ObservableInt emits exactly one value or an error.
 // The value and any error are returned.
+// ToSingle uses a trampoline scheduler created with scheduler.MakeTrampoline().
 func (o ObservableInt) ToSingle() (entry int, err error) {
 	o = o.Single()
 	subscriber := subscriber.New()
-	scheduler := scheduler.Trampoline
+	scheduler := scheduler.MakeTrampoline()
 	observer := func(next int, e error, done bool) {
 		if !done {
 			entry = next
@@ -220,8 +221,9 @@ const ErrTypecastToInt = RxError("typecast to int failed")
 
 //jig:name ObservableAsObservableInt
 
-// AsInt turns an Observable of interface{} into an ObservableInt. If during
-// observing a typecast fails, the error ErrTypecastToInt will be emitted.
+// AsObservableInt turns an Observable of interface{} into an ObservableInt.
+// If during observing a typecast fails, the error ErrTypecastToInt will be
+// emitted.
 func (o Observable) AsObservableInt() ObservableInt {
 	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next interface{}, err error, done bool) {

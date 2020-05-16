@@ -186,13 +186,13 @@ func (e RxError) Error() string	{ return string(e) }
 // returned channel will enit any error and then close without emitting any
 // values.
 //
-// This method subscribes to the observable on the Goroutine scheduler because
+// ToChan uses the public scheduler.Goroutine variable for scheduling, because
 // it needs the concurrency so the returned channel can be used by used
 // by the calling code directly. To cancel ToChan you will need to supply a
 // subscriber that you hold on to.
 func (o Observable) ToChan(subscribers ...Subscriber) <-chan interface{} {
-	scheduler := scheduler.Goroutine
 	subscribers = append(subscribers, subscriber.New())
+	scheduler := scheduler.Goroutine
 	donech := make(chan struct{})
 	nextch := make(chan interface{})
 	const (
@@ -247,13 +247,13 @@ func (o Observable) ToChan(subscribers ...Subscriber) <-chan interface{} {
 // not emit values but emits an error or complete, then the returned channel
 // will close without emitting any values.
 //
-// This method subscribes to the observable on the Goroutine scheduler because
+// ToChan uses the public scheduler.Goroutine variable for scheduling, because
 // it needs the concurrency so the returned channel can be used by used
 // by the calling code directly. To cancel ToChan you will need to supply a
 // subscriber that you hold on to.
 func (o ObservableInt) ToChan(subscribers ...Subscriber) <-chan int {
-	scheduler := scheduler.Goroutine
 	subscribers = append(subscribers, subscriber.New())
+	scheduler := scheduler.Goroutine
 	donech := make(chan struct{})
 	nextch := make(chan int)
 	const (
