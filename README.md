@@ -4,28 +4,17 @@
 
 [![](https://godoc.org/github.com/reactivego/rx?status.png)](http://godoc.org/github.com/reactivego/rx)
 
-Package `rx` provides [Reactive Extensions](http://reactivex.io/), an API for asynchronous programming with Observables.
+Package `rx` provides [Reactive Extensions](http://reactivex.io/) for Go.
+An API for asynchronous programming with observable streams.
 
 ## Table of Contents
 
 <!-- MarkdownTOC -->
 
-- [Ways of using this library](#ways-of-using-this-library)
+- [Installation](#installation)
+- [Usage](#usage)
 - [Observables](#observables)
 - [Operators](#operators)
-	- [Creating Operators](#creating-operators)
-	- [Transforming Operators](#transforming-operators)
-	- [Filtering Operators](#filtering-operators)
-	- [Combining Operators](#combining-operators)
-	- [Error Handling Operators](#error-handling-operators)
-	- [Utility Operators](#utility-operators)
-	- [Conditional and Boolean Operators](#conditional-and-boolean-operators)
-	- [Mathematical and Aggregate Operators](#mathematical-and-aggregate-operators)
-	- [Type Casting, Type Filtering Operators](#type-casting-and-type-filtering-operators)
-	- [Scheduling Operators](#scheduling-operators)
-	- [Multicasting Operators](#multicasting-operators)
-- [Subjects](#subjects)
-- [Subscribing](#subscribing)
 - [Regenerating this Package](#regenerating-this-package)
 - [Obligatory Dijkstra Quote](#obligatory-dijkstra-quote)
 - [Acknowledgements](#acknowledgements)
@@ -33,7 +22,29 @@ Package `rx` provides [Reactive Extensions](http://reactivex.io/), an API for as
 
 <!-- /MarkdownTOC -->
 
-## Ways of using this library
+### Installation
+
+To use the `rx` package, you just import it in your code:
+
+```go
+import "github.com/reactivego/rx"
+```
+Access the package api directly through the `rx` prefix.
+
+To use the package purely as a generic programming library, first install the [*jig*](../jig) tool, then import as follows:
+```go
+import _ "github.com/reactivego/rx"
+```
+The use of `_` stops the *go* tool from complaining about you not using any code from the package while at the same time allowing the [*jig*](../jig) tool to actually find the generics in the library.
+
+## Usage
+The library can be used in two ways
+
+1. Direct API from `github.com/reactivego/rx`
+2. Generics from `github.com/reactivego/rx/generic`
+
+### Direct API
+To use the API for asynchronous programming with observables 
 
 You can use this package directly as follows:
 
@@ -43,6 +54,7 @@ Then you just use the code directly from the library:
 
 	rx.From(1,2,"hello").Println()	
 
+### Generics
 Alternatively you can use the library as a generics library and use
 a tool to generate statically typed  observables and operators:
 
@@ -53,6 +65,90 @@ Then you use the code as follows:
 	FromInt(1,2).Println()
 
 You'll need to generate the observables and operators by running the [jig tool](https://github.com/reactivego/jig).
+
+#### Overview
+- You write code that references templates from the `rx` library.
+- You run the `jig` command in the directory where your code is located.
+- **Now `jig` analyzes your code and determines what additional code is needed to make it build**.
+- *Jig* takes templates from the `rx` library and specializes them on specific types.
+- Specializations are generated into the file `rx.go` alongside your own code.
+- If all went well, your code will now build.
+
+#### Preparing the Working Directory
+Let's create a new folder for our simple program and start editing the file `main.go`.
+
+```bash
+$ mkdir -p ~/go/hellorx
+$ cd ~/go/hello/rx
+$ subl main.go
+```
+> We use [*Sublime Text*](https://www.sublimetext.com/) for code editing, hence the use of the `subl` command.
+
+#### Writing Code
+Now that you have your `main.go` file open in your editor of choice, type the following code:
+
+```go
+package main
+
+import _ "github.com/reactivego/rx"
+
+func main() {
+	FromString("You!", "Gophers!", "World!").
+		MapString(func(x string) string {
+			return "Hello, " + x
+		}).
+		Println()
+}
+```
+
+If you go to the command-line now and run `jig` it would do the following:
+
+1. Import `github.com/reactivego/rx/generic` to access the generics in that library.
+2. Generate `FromString` by specializing the template `From<Foo>` from the library on type `string`. Generate dependencies of `FromString` like the type `ObservableString` that is returned by `FromString`.
+3. Generate the `MapString` method of `ObservableString` by specializing the template `Observable<Foo> Map<Bar>` for `Foo` as type `string` and `Bar` (the type to map to) also as type `string`.
+4. Map function from `string` to `string` just concatenates two strings and returns the result.
+5. Print every string returned by the Map function.
+6. The output you can expect when you run the program.
+
+#### Generating Code
+
+Now actually go to the command-line and run `jig -v`. Use the verbose flag `-v` because otherwise `jig` will be silent.
+
+```bash
+$ jig -v
+found 126 templates in package "rx" (github.com/reactivego/rx/generic)
+found 16 templates in package "multicast" (github.com/reactivego/multicast/generic)
+generating "FromString"
+  Scheduler
+  Subscriber
+  StringObserveFunc
+  zeroString
+  ObservableString
+  FromSliceString
+  FromString
+generating "ObservableString MapString"
+  ObservableString MapString
+generating "ObservableString Println"
+  Schedulers
+  ObservableString Println
+writing file "rx.go"
+```
+
+#### Running the Program
+
+Now we can try to run the code and see what it does.
+
+```bash
+$ go run *.go
+Hello, You!
+Hello, Gophers!
+Hello, World!
+```
+
+Success! `jig` generated the code into the file `rx.go` and we were able to run the program.
+Turns out the generated file [`rx.go`](../example/rx/rx.go) contains less than 125 lines of code.
+
+If you add additional code to the program that uses different generics of the `rx` library, then you should run `jig` again to generate specializations of those generics.
 
 ## Observables
 
@@ -109,178 +205,7 @@ Operators work on one or more Observables. They are the language you use to desc
 
 This implementation takes most of its cues from [RxJS 6](https://github.com/ReactiveX/rxjs) and [RxJava 2](https://github.com/ReactiveX/RxJava). Both libaries have been pushing the envelope in evolving operator semantics.
 
-Below is the list of implemented [operators](http://reactivex.io/documentation/operators.html). Operators with a :star: are the most commonly used ones.
-
-### Creating Operators
-Operators that originate new Observables.
-
-- [**Create**](https://godoc.org/github.com/reactivego/rx/test/Create/)() :star: Observable
-- [**CreateRecursive**](https://godoc.org/github.com/reactivego/rx/test/CreateRecursive/)() Observable
-- [**CreateFutureRecursive**](https://godoc.org/github.com/reactivego/rx/test/CreateFutureRecursive/)() Observable
-- [**Defer**](https://godoc.org/github.com/reactivego/rx/test/Defer/)() Observable
-- [**Empty**](https://godoc.org/github.com/reactivego/rx/test/Empty/)() Observable
-- [**From**](https://godoc.org/github.com/reactivego/rx/test/From/)() :star: Observable
-- [**FromChan**](https://godoc.org/github.com/reactivego/rx/test/FromChan/)() Observable
-- [**Interval**](https://godoc.org/github.com/reactivego/rx/test/Interval/)() ObservableInt
-- [**Just**](https://godoc.org/github.com/reactivego/rx/test/Just/)() :star: Observable
-- [**Never**](https://godoc.org/github.com/reactivego/rx/test/Never/)() Observable
-- [**Of**](https://godoc.org/github.com/reactivego/rx/test/Of/)() :star: Observable
-- [**Range**](https://godoc.org/github.com/reactivego/rx/test/Range/)() ObservableInt
-- [**Start**](https://godoc.org/github.com/reactivego/rx/test/Start/)() Observable
-- [**Throw**](https://godoc.org/github.com/reactivego/rx/test/Throw/)() Observable
-- FromEventSource(ch chan interface{}, opts ...options.Option) Observable
-
-### Transforming Operators
-Operators that transform items that are emitted by an Observable.
-
-- (Observable) [**Map**](https://godoc.org/github.com/reactivego/rx/test/Map/)() :star: Observable
-- (Observable) [**Scan**](https://godoc.org/github.com/reactivego/rx/test/Scan/)() :star: Observable
-- BufferWithCount(count, skip int) Observable
-- BufferWithTime(timespan, timeshift Duration) Observable
-- BufferWithTimeOrCount(timespan Duration, count int) Observable
-
-### Filtering Operators
-Operators that selectively emit items from a source Observable.
-
-- (Observable) [**Debounce**](https://godoc.org/github.com/reactivego/rx/test/Debounce/)() Observable
-- (Observable) [**Distinct**](https://godoc.org/github.com/reactivego/rx/test/Distinct/)() Observable
-- (Observable) [**ElementAt**](https://godoc.org/github.com/reactivego/rx/test/ElementAt/)() Observable
-- (Observable) [**Filter**](https://godoc.org/github.com/reactivego/rx/test/Filter/)() :star: Observable
-- (Observable) [**First**](https://godoc.org/github.com/reactivego/rx/test/First/)() Observable
-- (Observable) [**IgnoreElements**](https://godoc.org/github.com/reactivego/rx/test/IgnoreElements/)() Observable
-- (Observable) [**IgnoreCompletion**](https://godoc.org/github.com/reactivego/rx/test/IgnoreCompletion/)() Observable
-- (Observable) [**Last**](https://godoc.org/github.com/reactivego/rx/test/Last/)() Observable
-- (Observable) [**Sample**](https://godoc.org/github.com/reactivego/rx/test/Sample/)() Observable
-- (Observable) [**Single**](https://godoc.org/github.com/reactivego/rx/test/Single/)() Observable
-- (Observable) [**Skip**](https://godoc.org/github.com/reactivego/rx/test/Skip/)() Observable
-- (Observable) [**SkipLast**](https://godoc.org/github.com/reactivego/rx/test/SkipLast/)() Observable
-- (Observable) [**Take**](https://godoc.org/github.com/reactivego/rx/test/Take/)() :star: Observable
-- (Observable) [**TakeLast**](https://godoc.org/github.com/reactivego/rx/test/TakeLast/)() Observable
-- (Observable) [**TakeUntil**](https://godoc.org/github.com/reactivego/rx/test/TakeUntil/)() :star: Observable
-- (Observable) [**TakeWhile**](https://godoc.org/github.com/reactivego/rx/test/TakeWhile/)() :star: Observable
-- DebounceTime :star:
-- DistinctUntilChanged(apply Function) Observable :star:
-- FirstOrDefault(defaultValue interface{}) Single
-- LastOrDefault(defaultValue interface{}) Single
-- SkipWhile(apply Predicate) Observable
-
-### Combining Operators
-Operators that work with multiple source observables to create a single observable. It looks like there is an underlying logic at play for naming the different kinds of combining operators. The matrix below guides the naming of the operators. Where operators don't make sense we've placed a `-` in the cell. If it is not known yet whether an operator makes sense, a `?` is placed in the cell.
-
-| Function | Operator | Map | MapTo | All |
-| -------- | -------- | --- | ----- | --- |
-| [**Concat**](https://godoc.org/github.com/reactivego/rx/test/Concat/) :star: | [**ConcatWith**](https://godoc.org/github.com/reactivego/rx/test/ConcatWith/) :star: | [**ConcatMap**](https://godoc.org/github.com/reactivego/rx/test/ConcatMap/) | [**ConcatMapTo**](https://godoc.org/github.com/reactivego/rx/test/ConcatMapTo/) | [**ConcatAll**](https://godoc.org/github.com/reactivego/rx/test/ConcatAll/) |
-| -             | -                 | [**SwitchMap**](https://godoc.org/github.com/reactivego/rx/test/SwitchMap/) :star: | SwitchMapTo        | [**SwitchAll**](https://godoc.org/github.com/reactivego/rx/test/SwitchAll/) |
-| -             | -                 | ExhaustMap       | ExhaustMapTo       | ExhaustAll       |
-| [**Merge**](https://godoc.org/github.com/reactivego/rx/test/Merge/) :star: | [**MergeWith**](https://godoc.org/github.com/reactivego/rx/test/MergeWith/) :star: | [**MergeMap**](https://godoc.org/github.com/reactivego/rx/test/MergeMap/) :star: | MergeMapTo         | [**MergeAll**](https://godoc.org/github.com/reactivego/rx/test/MergeAll/) |
-| [**MergeDelayError**](https://godoc.org/github.com/reactivego/rx/test/MergeDelayError/) | [**MergeDelayErrorWith**](https://godoc.org/github.com/reactivego/rx/test/MergeDelayErrorWith/) | MergeDelayErrorMap         | MergeDelayErrorMapTo         | MergeDelayErrorAll         |
-| Race          | RaceWith          | RaceMap          | RaceMapTo          | RaceAll          |
-| [**CombineLatest**](https://godoc.org/github.com/reactivego/rx/test/CombineLatest/) | [**CombineLatestWith**](https://godoc.org/github.com/reactivego/rx/test/CombineLatestWith/) | [**CombineLatestMap**](https://godoc.org/github.com/reactivego/rx/test/CombineLatestMap/) | [**CombineLatestMapTo**](https://godoc.org/github.com/reactivego/rx/test/CombineLatestMapTo/) | [**CombineLatestAll**](https://godoc.org/github.com/reactivego/rx/test/CombineLatestAll/) |
-| Zip           | ZipWith           | ZipMap           | ZipMapTo           | ZipAll           |
-| ?             | WithLatestFrom :star:| ?                | ?                  | ?                |
-| ForkJoin      | ?                 | ?                | ?                  | ?                |
-
-**Concat**, **Switch** and **Exhaust** are all operators that flatten the emissions of multiple observables into a single stream by subscribing to every observable *stricly in sequence*. Observables may be added while the flattening is already going on.
-
-**Merge**, **MergeDelayError** and **Race** are operators that flatten the emissions of multiple observables into a single stream by subscribing to all observables *concurrently*. Here also, observables may be added while the flattening is already going on.
-
-**CombineLatest**, **Zip**, **WithLatestFrom** and **ForkJoin** are operators that flatten the emissions of multiple observables into a single observable that emits slices of values. Differently from the previous two sets of operators, these operators only start emitting once the list of observables to flatten is complete. 
-
-### Error Handling Operators
-Operators that help to recover from error notifications from an Observable.
-
-- (Observable) [**Catch**](https://godoc.org/github.com/reactivego/rx/test/Catch/)() :star: Observable
-- (Observable) [**Retry**](https://godoc.org/github.com/reactivego/rx/test/Retry/)() Observable
-- OnErrorResumeNext(resumeSequence ErrorToObservableFunction) Observable
-- OnErrorReturn(resumeFunc ErrorFunction) Observable
-- OnErrorReturnItem(item interface{}) Observable
-
-### Utility Operators
-A toolbox of useful Operators for working with Observables.
-
-- (Observable) [**Delay**](https://godoc.org/github.com/reactivego/rx/test/Delay/)() Observable
-- (Observable) [**Do**](https://godoc.org/github.com/reactivego/rx/test/Do/)() :star: Observable
-- (Observable) [**DoOnError**](https://godoc.org/github.com/reactivego/rx/test/DoOnError/)() Observable
-- (Observable) [**DoOnComplete**](https://godoc.org/github.com/reactivego/rx/test/DoOnComplete/)() Observable
-- (Observable) [**Finally**](https://godoc.org/github.com/reactivego/rx/test/Finally/)() Observable
-- (Observable) [**Passthrough**](https://godoc.org/github.com/reactivego/rx/test/Passthrough/)() Observable
-- (Observable) [**Repeat**](https://godoc.org/github.com/reactivego/rx/test/Repeat/)() Observable
-- (Observable) [**Serialize**](https://godoc.org/github.com/reactivego/rx/test/Serialize/)() Observable
-- (Observable) [**Timeout**](https://godoc.org/github.com/reactivego/rx/test/Timeout/)() Observable
-- Repeat(count int64, frequency Duration) Observable
-- StartWith :star:
-- StartWithItems(item interface{}, items ...interface{}) Observable
-- StartWithObservable(observable Observable) Observable
-- EndWith
-
-### Conditional and Boolean Operators
-Operators that evaluate one or more Observables or items emitted by Observables.
-
-- (Observable) [**All**](https://godoc.org/github.com/reactivego/rx/test/All/)() ObservableBool
-- Amb(observable Observable, observables ...Observable) Observable
-- Contains(equal Predicate) Single
-- DefaultIfEmpty(defaultValue interface{}) Observable
-- SequenceEqual(obs Observable) Single
-
-### Aggregate Operators
-Operators that operate on the entire sequence of items emitted by an Observable.
-
-- (Observable) [**Average**](https://godoc.org/github.com/reactivego/rx/test/Average/)() Observable
-- (Observable) [**Count**](https://godoc.org/github.com/reactivego/rx/test/Count/)() ObservableInt
-- (Observable) [**Max**](https://godoc.org/github.com/reactivego/rx/test/Max/)() Observable
-- (Observable) [**Min**](https://godoc.org/github.com/reactivego/rx/test/Min/)() Observable
-- (Observable) [**Reduce**](https://godoc.org/github.com/reactivego/rx/test/Reduce/)() Observable
-- (Observable) [**Sum**](https://godoc.org/github.com/reactivego/rx/test/Sum/)() Observable
-
-### Type Casting and Type Filtering Operators
-Operators to type cast, type filter observables.
-
-- (Observable) [**AsObservable**](https://godoc.org/github.com/reactivego/rx/test/AsObservable)() Observable
-- (Observable) [**Only**](https://godoc.org/github.com/reactivego/rx/test/Only/)() Observable
-
-### Scheduling Operators
-Change the scheduler for subscribing and observing.
-
-- (Observable) [**ObserveOn**](https://godoc.org/github.com/reactivego/rx/test/ObserveOn/)() Observable
-- (Observable) [**SubscribeOn**](https://godoc.org/github.com/reactivego/rx/test/SubscribeOn/)() Observable
-
-### Multicasting Operators
-A *Connectable* is an *Observable* that can multicast to observers subscribed to it. The *Connectable* itself will subscribe to the *Observable* when the *Connect* method is called on it.
-
-- (Observable) [**Publish**](https://godoc.org/github.com/reactivego/rx/test/Publish/)() Connectable
-- (Observable) [**PublishReplay**](https://godoc.org/github.com/reactivego/rx/test/PublishReplay/)() Connectable
-- PublishLast
-- PublishBehavior
-
-*Connectable* supports different strategies for subscribing to the *Observable* from which it was created.
-
-- (Connectable) [**RefCount**](https://godoc.org/github.com/reactivego/rx/test/RefCount/)() Observable
-- (Connectable) [**AutoConnect**](https://godoc.org/github.com/reactivego/rx/test/AutoConnect/)() Observable
-- (Connectable) [**Connect**](https://godoc.org/github.com/reactivego/rx/test/Connect)() Subscription
-
-## Subjects
-A *Subject* is both a multicasting *Observable* as well as an *Observer*. The *Observable* side allows multiple simultaneous subscribers. The *Observer* side allows you to directly feed it data or subscribe it to another *Observable*.
-
-- [**Subject**](https://godoc.org/github.com/reactivego/rx/test/Subject)() Subject
-- [**ReplaySubject**](https://godoc.org/github.com/reactivego/rx/test/ReplaySubject)() Subject
-
-## Subscribing
-Subscribing breathes life into a chain of observables. An observable may be subscribed to many times. 
-
-**Println** and **Subscribe** implement subscribing behavior directly.
-
-- (Observable) [**Println**](https://godoc.org/github.com/reactivego/rx/test/Println)() error
-- (Observable) [**Subscribe**](https://godoc.org/github.com/reactivego/rx/test/Subscribe)() Subscription
-- (Connectable) [**Connect**](https://godoc.org/github.com/reactivego/rx/test/Connect)() Subscription
-- (Observable) [**ToChan**](https://godoc.org/github.com/reactivego/rx/test/ToChan)() chan foo
-- (Observable) [**ToSingle**](https://godoc.org/github.com/reactivego/rx/test/ToSingle)() (foo, error)
-- (Observable) [**ToSlice**](https://godoc.org/github.com/reactivego/rx/test/ToSlice)() ([]foo, error)
-- (Observable) [**Wait**](https://godoc.org/github.com/reactivego/rx/test/Wait)() error
-
-**Connect** is called internally by **RefCount** and **AutoConnect**.
-
-- (Connectable) [**RefCount**](https://godoc.org/github.com/reactivego/rx/test/RefCount)() Observable
-- (Connectable) [**AutoConnect**](https://godoc.org/github.com/reactivego/rx/test/AutoConnect)() Observable
+A list of implemented [operators](http://reactivex.io/documentation/operators.html) can be found in the [test directory](test).
 
 ## Regenerating this Package
 

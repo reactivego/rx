@@ -6,6 +6,7 @@ Package `test` provides tests for the generic rx package.
 
 Every operator / data type has its own subdirectory named after it containing one or more tests that exercise its functionality.
 
+## Operators
 Below is the list of implemented [operators](http://reactivex.io/documentation/operators.html). Operators with a :star: are the most commonly used ones.
 
 ### Creating Operators
