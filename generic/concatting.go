@@ -54,6 +54,16 @@ func (o ObservableFoo) ConcatMapBar(project func(foo) ObservableBar) ObservableB
 	return o.MapObservableBar(project).ConcatAll()
 }
 
+//jig:template Observable<Foo> ConcatMapTo<Bar>
+
+// ConcatMapToBar maps every entry emitted by the ObservableFoo into a single
+// ObservableBar. The stream of ObservableBar items is then flattened by
+// concattenating the emissions from the observables without interleaving.
+func (o ObservableFoo) ConcatMapToBar(inner ObservableBar) ObservableBar {
+	project := func(foo) ObservableBar { return inner }
+	return o.MapObservableBar(project).ConcatAll()
+}
+
 //jig:template ObservableObservable<Foo> ConcatAll
 
 // ConcatAll flattens a higher order observable by concattenating the observables it emits.
