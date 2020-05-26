@@ -31,11 +31,11 @@ import "github.com/reactivego/rx"
 ```
 Access the package api directly through the `rx` prefix.
 
-To use the package purely as a generic programming library, first install the [*jig*](github.com/reactivego/jig) tool, then import as follows:
+To use the package purely as a generic programming library, first install the [*jig*](https://github.com/reactivego/jig) tool, then import as follows:
 ```go
 import _ "github.com/reactivego/rx"
 ```
-The use of `_` stops the *go* tool from complaining about you not using any code from the package while at the same time allowing the [*jig*](github.com/reactivego/jig) tool to actually find the generics in the library.
+The use of `_` stops the *go* tool from complaining about you not using any code from the package while at the same time allowing the [*jig*](https://github.com/reactivego/jig) tool to actually find the generics in the library.
 
 ## Usage
 The library can be used in two ways
