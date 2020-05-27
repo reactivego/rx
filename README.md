@@ -134,7 +134,7 @@ func main() {
 ```
 > Note that From**String** is statically typed.
 
-Instructions on how to use the package this way, is in the [GENERIC](GENERIC.MD) document.
+Instructions on how to use the package this way, is in the [GENERIC](GENERIC.md) document.
 
 ## Acknowledgements
 This library started life as the [Reactive eXtensions for Go](https://github.com/alecthomas/gorx) library by *Alec Thomas*. Although the library has been through the metaphorical meat grinder a few times, its DNA is still clearly present in this library and I owe Alec a debt of grattitude for the work he has made so generously available.
