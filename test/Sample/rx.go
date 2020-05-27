@@ -44,21 +44,19 @@ type ObservableInt func(IntObserver, Scheduler, Subscriber)
 //jig:name Interval
 
 // Interval creates an ObservableInt that emits a sequence of integers spaced
-// by a particular time interval. First integer is emitted after the first time
-// interval expires.
+// by a particular time interval. First integer is not emitted immediately, but
+// only after the first time interval has passed.
 func Interval(interval time.Duration) ObservableInt {
-	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		i := 0
-		runner := scheduler.ScheduleFutureRecursive(interval, func(self func(time.Duration)) {
-			if subscriber.Canceled() {
-				return
+		runner := subscribeOn.ScheduleFutureRecursive(interval, func(self func(time.Duration)) {
+			if subscriber.Subscribed() {
+				observe(i, nil, false)
+				i++
+				if subscriber.Subscribed() {
+					self(interval)
+				}
 			}
-			observe(i, nil, false)
-			if subscriber.Canceled() {
-				return
-			}
-			i++
-			self(interval)
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
 	}
@@ -69,52 +67,43 @@ func Interval(interval time.Duration) ObservableInt {
 
 // Sample emits the most recent item emitted by an Observable within periodic time intervals.
 func (o Observable) Sample(window time.Duration) Observable {
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		var unsubscribe = make(chan struct{})
-		var last struct {
+	observable := Observable(func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		var sample struct {
 			sync.Mutex
-			Fresh	bool
-			Value	interface{}
+			at	time.Time
+			next	interface{}
+			done	bool
 		}
-		sampler := func() {
-			for {
-				select {
-				case <-time.After(window):
-					var (
-						fresh	bool
-						value	interface{}
-					)
-					last.Lock()
-					if last.Fresh {
-						last.Fresh = false
-						fresh = true
-						value = last.Value
+		sampler := subscribeOn.ScheduleFutureRecursive(window, func(self func(time.Duration)) {
+			if subscriber.Subscribed() {
+				sample.Lock()
+				if !sample.done {
+					begin := subscribeOn.Now().Add(-window)
+					if !sample.at.Before(begin) {
+						observe(sample.next, nil, false)
 					}
-					last.Unlock()
-					if fresh {
-						observe(value, nil, false)
+					if subscriber.Subscribed() {
+						self(window)
 					}
-				case <-unsubscribe:
-					return
+				}
+				sample.Unlock()
+			}
+		})
+		subscriber.OnUnsubscribe(sampler.Cancel)
+		observer := func(next interface{}, err error, done bool) {
+			if subscriber.Subscribed() {
+				sample.Lock()
+				sample.at = subscribeOn.Now()
+				sample.next = next
+				sample.done = done
+				sample.Unlock()
+				if done {
+					observe(nil, err, true)
 				}
 			}
 		}
-		go sampler()
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				last.Lock()
-				last.Fresh = true
-				last.Value = next
-				last.Unlock()
-			} else {
-				observe(nil, err, true)
-			}
-		}
-		subscriber.OnUnsubscribe(func() {
-			close(unsubscribe)
-		})
 		o(observer, subscribeOn, subscriber)
-	}
+	})
 	return observable
 }
 
@@ -141,6 +130,19 @@ type Observer func(next interface{}, err error, done bool)
 // Observable is a function taking an Observer, Scheduler and Subscriber.
 // Calling it will subscribe the Observer to events from the Observable.
 type Observable func(Observer, Scheduler, Subscriber)
+
+//jig:name ObservableIntAsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
 
 //jig:name ObservableTake
 
@@ -169,19 +171,6 @@ func (o Observable) Take(n int) Observable {
 // Take emits only the first n items emitted by an ObservableInt.
 func (o ObservableInt) Take(n int) ObservableInt {
 	return o.AsObservable().Take(n).AsObservableInt()
-}
-
-//jig:name ObservableIntAsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
 }
 
 //jig:name ObservableIntPrintln

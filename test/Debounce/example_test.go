@@ -7,36 +7,47 @@ import (
 	_ "github.com/reactivego/rx"
 )
 
+
+// Debounce sees 100 emissions [0..99] at 1ms intervals.
+// Then an interval of 11ms, so long enough for Debounce to emit 99.
 func Example_debounce() {
+	const ms = time.Millisecond
 
-	i := 1
-	due := []time.Duration{
-		0,
-		300 * time.Millisecond,
-		80 * time.Millisecond, // 80ms < 100ms => '2' is ignored
-		110 * time.Millisecond,
-		0,
-	}
-	source := CreateFutureRecursiveInt(due[0],
-		func(N NextInt, E Error, C Complete) time.Duration {
-			if i < len(due) {
-				N(i)
-				i++
-				return due[i-1]
-			} else {
-				C()
-				return 0
-			}
-		})
+	interval := ConcatInt(Interval(1*ms).Take(100), Interval(11*ms).Take(1))
 
-	debounced := source.Debounce(100 * time.Millisecond)
+	interval.Debounce(10 * ms).Println()
+	// Output: 99
+}
 
-	if err := debounced.Println(); err != nil {
-		fmt.Println(err)
-	}
+// Debounce does not see a 10ms period in which nothing is emitted.
+// So in this case it does not emit anything.
+func Example_debounceNoEmit() {
+	const ms = time.Millisecond
 
+	Interval(1*ms).Take(100).Debounce(10 * ms).Println()
 	// Output:
-	// 1
+}
+
+func Example_debounceBursts() {
+	const ms = time.Millisecond
+
+	burst := func(i int) ObservableInt {
+		return Interval(5 * ms).Take(4).MapInt(func(j int) int {
+			return i*100 + j
+		})
+	}
+
+	fmt.Println("-1-")
+
+	Interval(100 * ms).Take(4).MergeMapInt(burst).Debounce(20 * ms).Println()
+
+	fmt.Println("-2-")
+
+	Interval(20 * ms).Take(4).MergeMapInt(burst).Debounce(20 * ms).Println()
+	// Output:
+	// -1-
 	// 3
-	// 4
+	// 103
+	// 203
+	// -2-
 }

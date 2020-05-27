@@ -14,7 +14,6 @@ Operators that originate new Observables.
 	Empty            https://godoc.org/github.com/reactivego/rx/test/Empty/
 	From             https://godoc.org/github.com/reactivego/rx/test/From/
 	FromChan         https://godoc.org/github.com/reactivego/rx/test/FromChan/
-	Interval         https://godoc.org/github.com/reactivego/rx/test/Interval/
 	Just             https://godoc.org/github.com/reactivego/rx/test/Just/
 	Never            https://godoc.org/github.com/reactivego/rx/test/Never/
 	Of               https://godoc.org/github.com/reactivego/rx/test/Of/
@@ -33,7 +32,6 @@ Filtering Operators
 
 Operators that selectively emit items from a source Observable.
 
-	Debounce         https://godoc.org/github.com/reactivego/rx/test/Debounce/
 	Distinct         https://godoc.org/github.com/reactivego/rx/test/Distinct/
 	ElementAt        https://godoc.org/github.com/reactivego/rx/test/ElementAt/
 	Filter           https://godoc.org/github.com/reactivego/rx/test/Filter/ 
@@ -49,6 +47,22 @@ Operators that selectively emit items from a source Observable.
 	TakeLast         https://godoc.org/github.com/reactivego/rx/test/TakeLast/
 	TakeUntil        https://godoc.org/github.com/reactivego/rx/test/TakeUntil/ 
 	TakeWhile        https://godoc.org/github.com/reactivego/rx/test/TakeWhile/ 
+
+Time Based Operators
+
+Time based creating and filtering operators.
+
+	Audit            https://godoc.org/github.com/reactivego/rx/test/Audit/
+	Debounce         https://godoc.org/github.com/reactivego/rx/test/Debounce/
+	Delay            https://godoc.org/github.com/reactivego/rx/test/Delay/
+	Interval         https://godoc.org/github.com/reactivego/rx/test/Interval/
+	Sample           https://godoc.org/github.com/reactivego/rx/test/Sample/
+	Throttle         https://godoc.org/github.com/reactivego/rx/test/Throttle/
+	Ticker           https://godoc.org/github.com/reactivego/rx/test/Ticker/
+	TimeInterval     https://godoc.org/github.com/reactivego/rx/test/TimeInterval/
+	Timeout          https://godoc.org/github.com/reactivego/rx/test/Timeout/
+	Timer            https://godoc.org/github.com/reactivego/rx/test/Timer/
+	Timestamp        https://godoc.org/github.com/reactivego/rx/test/Timestamp/
 
 Combining Operators
 
@@ -96,7 +110,6 @@ Utility Operators
 
 A toolbox of useful Operators for working with Observables.
 
-	Delay            https://godoc.org/github.com/reactivego/rx/test/Delay/
 	Do               https://godoc.org/github.com/reactivego/rx/test/Do/ 
 	DoOnError        https://godoc.org/github.com/reactivego/rx/test/DoOnError/
 	DoOnComplete     https://godoc.org/github.com/reactivego/rx/test/DoOnComplete/
@@ -104,7 +117,6 @@ A toolbox of useful Operators for working with Observables.
 	Passthrough      https://godoc.org/github.com/reactivego/rx/test/Passthrough/
 	Repeat           https://godoc.org/github.com/reactivego/rx/test/Repeat/
 	Serialize        https://godoc.org/github.com/reactivego/rx/test/Serialize/
-	Timeout          https://godoc.org/github.com/reactivego/rx/test/Timeout/
 
 Conditional and Boolean Operators
 
@@ -139,16 +151,22 @@ Change the scheduler for subscribing and observing.
 
 Multicasting Operators
 
-A Connectable is an Observable that can multicast to observers subscribed to it.
-The Connectable itself will subscribe to the Observable when the Connect method is called on it.
+A Multicaster is a combination of an Observable and a Connectable that will
+multicast to the observers that subscribe to it. The Multicaster itself will
+subscribe to its Observable when the Connect method is called on it.
 
-	Publish           https://godoc.org/github.com/reactivego/rx/test/Publish/ Connectable
-	PublishReplay     https://godoc.org/github.com/reactivego/rx/test/PublishReplay/ Connectable
+	Publish           https://godoc.org/github.com/reactivego/rx/test/Publish/
+	PublishReplay     https://godoc.org/github.com/reactivego/rx/test/PublishReplay/
 
-Connectable supports different strategies for subscribing to the Observable from which it was created.
+Multicaster supports different strategies for subscribing to the Observable
+from which it was created.
 
 	RefCount          https://godoc.org/github.com/reactivego/rx/test/RefCount/
 	AutoConnect       https://godoc.org/github.com/reactivego/rx/test/AutoConnect/
+
+Connectable is a data type that implements the Connect method. It is used as
+part of a Multicaster.
+
 	Connect           https://godoc.org/github.com/reactivego/rx/test/Connect
 
 Subjects
@@ -164,19 +182,17 @@ Subscribing
 
 Subscribing breathes life into a chain of observables. An observable may be subscribed to many times. 
 
-Println and Subscribe implement subscribing behavior directly.
-
 	Println          https://godoc.org/github.com/reactivego/rx/test/Println
 	Subscribe        https://godoc.org/github.com/reactivego/rx/test/Subscribe
-	Connect          https://godoc.org/github.com/reactivego/rx/test/Connect
 	ToChan           https://godoc.org/github.com/reactivego/rx/test/ToChan
 	ToSingle         https://godoc.org/github.com/reactivego/rx/test/ToSingle
 	ToSlice          https://godoc.org/github.com/reactivego/rx/test/ToSlice
 	Wait             https://godoc.org/github.com/reactivego/rx/test/Wait
 
-Connect is called internally by RefCount and AutoConnect.
-
+	Connect          https://godoc.org/github.com/reactivego/rx/test/Connect
 	RefCount         https://godoc.org/github.com/reactivego/rx/test/RefCount
 	AutoConnect      https://godoc.org/github.com/reactivego/rx/test/AutoConnect
+
+Connect is called internally by RefCount and AutoConnect.
 */
 package test

@@ -8,31 +8,19 @@ import (
 )
 
 func Example_delay() {
-	const (
-		_240ms = 240 * time.Millisecond
-		_250ms = 250 * time.Millisecond
-		_260ms = 260 * time.Millisecond
-	)
-
+	const ms = time.Millisecond
 	start := time.Now()
 
-	slice, err := FromInt(1, 2, 3).Delay(_250ms).ToSlice()
+	slice, err := FromInt(0, 1, 2, 3, 4).Delay(250 * ms).ToSlice()
 
-	// check the slice was created after a delay of 250 milliseconds
-	duration := time.Since(start)
-	if duration < _240ms || duration > _260ms {
-		fmt.Println("delay must be between 240 and 260 miliseconds")
-	} else {
-		fmt.Println("delay was 250 miliseconds")
+	delay := time.Since(start)
+	if 249*ms < delay && delay < 251*ms {
+		fmt.Println("delay was 250 ms")
 	}
-
-	// print the slice we got
 	fmt.Println(slice)
-
-	// print any error that was returned
 	fmt.Println("error", err)
 	// Output:
-	// delay was 250 miliseconds
-	// [1 2 3]
+	// delay was 250 ms
+	// [0 1 2 3 4]
 	// error <nil>
 }

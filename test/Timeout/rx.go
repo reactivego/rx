@@ -147,65 +147,57 @@ const ErrTimeout = RxError("timeout")
 
 // Timeout mirrors the source Observable, but issues an error notification if a
 // particular period of time elapses without any emitted items.
-// Timeout schedules tasks on the scheduler passed to this
-func (o Observable) Timeout(timeout time.Duration) Observable {
+// Timeout schedules a task on the scheduler passed to it during subscription.
+func (o Observable) Timeout(due time.Duration) Observable {
 	observable := Observable(func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		if subscriber.Canceled() {
-			return
-		}
-		var last struct {
+		var timeout struct {
 			sync.Mutex
-			at	time.Time
-			done	bool
+			at		time.Time
+			occurred	bool
 		}
-		last.at = subscribeOn.Now()
-		timer := func(self func(time.Duration)) {
-			last.Lock()
-			defer last.Unlock()
-			if last.done || subscriber.Canceled() {
-				return
+		timeout.at = subscribeOn.Now().Add(due)
+		timer := subscribeOn.ScheduleFutureRecursive(due, func(self func(time.Duration)) {
+			if subscriber.Subscribed() {
+				timeout.Lock()
+				if !timeout.occurred {
+					due := timeout.at.Sub(subscribeOn.Now())
+					if due > 0 {
+						self(due)
+					} else {
+						timeout.occurred = true
+						timeout.Unlock()
+						observe(nil, ErrTimeout, true)
+						timeout.Lock()
+					}
+				}
+				timeout.Unlock()
 			}
-			deadline := last.at.Add(timeout)
-			now := subscribeOn.Now()
-			if now.Before(deadline) {
-				self(deadline.Sub(now))
-				return
-			}
-			last.done = true
-			observe(nil, ErrTimeout, true)
-		}
-		runner := subscribeOn.ScheduleFutureRecursive(timeout, timer)
-		subscriber.OnUnsubscribe(runner.Cancel)
+		})
+		subscriber.OnUnsubscribe(timer.Cancel)
 		observer := func(next interface{}, err error, done bool) {
-			last.Lock()
-			defer last.Unlock()
-			if last.done || subscriber.Canceled() {
-				return
+			if subscriber.Subscribed() {
+				timeout.Lock()
+				if !timeout.occurred {
+					now := subscribeOn.Now()
+					if now.Before(timeout.at) {
+						timeout.at = now.Add(due)
+						timeout.occurred = done
+						observe(next, err, done)
+					}
+				}
+				timeout.Unlock()
 			}
-			now := subscribeOn.Now()
-			deadline := last.at.Add(timeout)
-			if !now.Before(deadline) {
-				return
-			}
-			last.done = done
-			last.at = now
-			observe(next, err, done)
 		}
 		o(observer, subscribeOn, subscriber)
 	})
-	return observable.Serialize()
+	return observable
 }
 
 //jig:name ObservableIntTimeout
 
 // Timeout mirrors the source ObservableInt, but issues an error notification if
 // a particular period of time elapses without any emitted items.
-//
-// This observer starts a goroutine for every subscription to monitor the
-// timeout deadline. It is guaranteed that calls to the observer for this
-// subscription will never be called concurrently. It is however almost certain
-// that any timeout error will be delivered on a goroutine other than the one
-// delivering the next values.
+// Timeout schedules a task on the scheduler passed to it during subscription.
 func (o ObservableInt) Timeout(timeout time.Duration) ObservableInt {
 	return o.AsObservable().Timeout(timeout).AsObservableInt()
 }

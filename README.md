@@ -83,25 +83,28 @@ concurrently running process that pushes out values.
 Operators form a language in which programs featuring Observables can be expressed.
 They work on one or more Observables to transform, filter and combine them into new Observables.
 
-Currently 88 operators have been implemented:
+Currently 90 operators have been implemented:
 
-| A … C                | C … E                   | F … M            | M … R         | R … S         | T … W     |
-|:---------------------|:------------------------|:-----------------|:--------------|:--------------|:----------|
-| [All]                | [ConcatWith]              | [Filter]           | [MergeMap]      | [ReplaySubject] | [Take]      |
-| [AsObservable]       | [Connect]                 | [Finally]          | [MergeWith]     | [Retry]         | [TakeLast]  |
-| [Audit]              | [Count]                   | [First]            | [Min]           | [Sample]        | [TakeUntil] |
-| [AutoConnect]        | [Create]                  | [From]             | [Never]         | [Scan]          | [TakeWhile] |
-| [Average]            | [CreateFutureRecursive]   | [FromChan]         | [ObserveOn]     | [Serialize]     | [Throttle]  |
-| [Catch]              | [CreateRecursive]         | [IgnoreCompletion] | [Of]            | [Single]        | [Throw]     |
-| [CombineLatest]      | [Debounce]                | [IgnoreElements]   | [Only]          | [Skip]          | [Ticker]    |
-| [CombineLatestAll]   | [Defer]                   | [Interval]         | [Passthrough]   | [SkipLast]      | [Timeout]   |
-| [CombineLatestMap]   | [Delay]                   | [Just]             | [Println]       | [Start]         | [Timer]     |
-| [CombineLatestMapTo] | [Distinct]                | [Last]             | [Publish]       | [Subject]       | [ToChan]    |
-| [CombineLatestWith]  | [Do]                      | [Map]              | [PublishReplay] | [Subscribe]     | [ToSingle]  |
-| [Concat]             | [DoOnComplete]            | [Max]              | [Range]         | [SubscribeOn]   | [ToSlice]   |
-| [ConcatAll]          | [DoOnError]               | [Merge]            | [Reduce]        | [Sum]           | [Wait]      |
-| [ConcatMap]          | [ElementAt]               | [MergeAll]         | [RefCount]      | [SwitchAll]     |             |
-| [ConcatMapTo]        | [Empty]                   | [MergeDelayError]  | [Repeat]        | [SwitchMap]     |             |
+| A … C                | C … I                   | I … P             | P … S           | S … W          |
+|:---------------------|:------------------------|:------------------|:----------------|:---------------|
+| [All]                | [Create]                | [IgnoreElements]  | [Publish]       | [Sum]          |
+| [AsObservable]       | [CreateFutureRecursive] | [Interval]        | [PublishReplay] | [SwitchAll]    |
+| [Audit]              | [CreateRecursive]       | [Just]            | [Range]         | [SwitchMap]    |
+| [AutoConnect]        | [Debounce]              | [Last]            | [Reduce]        | [Take]         |
+| [Average]            | [Defer]                 | [Map]             | [RefCount]      | [TakeLast]     |
+| [Catch]              | [Delay]                 | [Max]             | [Repeat]        | [TakeUntil]    |
+| [CombineLatest]      | [Distinct]              | [Merge]           | [ReplaySubject] | [TakeWhile]    |
+| [CombineLatestAll]   | [Do]                    | [MergeAll]        | [Retry]         | [Throttle]     |
+| [CombineLatestMap]   | [DoOnComplete]          | [MergeDelayError] | [Sample]        | [Throw]        |
+| [CombineLatestMapTo] | [DoOnError]             | [MergeMap]        | [Scan]          | [Ticker]       |
+| [CombineLatestWith]  | [ElementAt]             | [MergeWith]       | [Serialize]     | [TimeInterval] |
+| [Concat]             | [Empty]                 | [Min]             | [Single]        | [Timeout]      |
+| [ConcatAll]          | [Filter]                | [Never]           | [Skip]          | [Timer]        |
+| [ConcatMap]          | [Finally]               | [ObserveOn]       | [SkipLast]      | [Timestamp]    |
+| [ConcatMapTo]        | [First]                 | [Of]              | [Start]         | [ToChan]       |
+| [ConcatWith]         | [From]                  | [Only]            | [Subject]       | [ToSingle]     |
+| [Connect]            | [FromChan]              | [Passthrough]     | [Subscribe]     | [ToSlice]      |
+| [Count]              | [IgnoreCompletion]      | [Println]         | [SubscribeOn]   | [Wait]         |
 > See [test directory](test) for Operators details 
 
 ## Regenerating this Package
@@ -228,8 +231,10 @@ This library is licensed under the terms of the MIT License. See [LICENSE](LICEN
 [Throttle]: test/Throttle
 [Throw]: test/Throw
 [Ticker]: test/Ticker
+[TimeInterval]: test/TimeInterval
 [Timeout]: test/Timeout
 [Timer]: test/Timer
+[Timestamp]: test/Timestamp
 [ToChan]: test/ToChan
 [ToSingle]: test/ToSingle
 [ToSlice]: test/ToSlice

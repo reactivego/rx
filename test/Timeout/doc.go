@@ -8,6 +8,8 @@ span of time.
 
 Timeout schedules tasks on the scheduler passed to this
 
-	Timeout	http://reactivex.io/documentation/operators/timeout.html
+	Timeout     http://reactivex.io/documentation/operators/timeout.html
+	            https://rxjs.dev/api/operators/timeout
+	            https://www.learnrxjs.io/learn-rxjs/operators/utility/timeout
 */
 package Timeout

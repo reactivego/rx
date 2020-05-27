@@ -5,6 +5,7 @@
 package Delay
 
 import (
+	"sync"
 	"time"
 
 	"github.com/reactivego/scheduler"
@@ -64,18 +65,85 @@ func FromInt(slice ...int) ObservableInt {
 	return observable
 }
 
+//jig:name ObservableDelay
+
+// Delay shifts an emission from an Observable forward in time by a particular
+// amount of time. The relative time intervals between emissions are preserved.
+func (o Observable) Delay(duration time.Duration) Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		type emission struct {
+			at	time.Time
+			next	interface{}
+			err	error
+			done	bool
+		}
+		var delay struct {
+			sync.Mutex
+			emissions	[]emission
+		}
+		delayer := subscribeOn.ScheduleFutureRecursive(duration, func(self func(time.Duration)) {
+			if subscriber.Subscribed() {
+				delay.Lock()
+				for _, entry := range delay.emissions {
+					delay.Unlock()
+					due := entry.at.Sub(subscribeOn.Now())
+					if due > 0 {
+						self(due)
+						return
+					}
+					observe(entry.next, entry.err, entry.done)
+					if entry.done || subscriber.Canceled() {
+						return
+					}
+					delay.Lock()
+					delay.emissions = delay.emissions[1:]
+				}
+				delay.Unlock()
+				self(duration)
+			}
+		})
+		subscriber.OnUnsubscribe(delayer.Cancel)
+		observer := func(next interface{}, err error, done bool) {
+			delay.Lock()
+			delay.emissions = append(delay.emissions, emission{subscribeOn.Now().Add(duration), next, err, done})
+			delay.Unlock()
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name ObservableIntDelay
 
-// Delay shifts the emission from an Observable forward in time by a particular amount of time.
+// Delay shifts an emission from an Observable forward in time by a particular
+// amount of time. The relative time intervals between emissions are preserved.
 func (o ObservableInt) Delay(duration time.Duration) ObservableInt {
-	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		firstTime := true
+	return o.AsObservable().Delay(duration).AsObservableInt()
+}
+
+//jig:name Observer
+
+// Observer is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
+// completed normally.
+type Observer func(next interface{}, err error, done bool)
+
+//jig:name Observable
+
+// Observable is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type Observable func(Observer, Scheduler, Subscriber)
+
+//jig:name ObservableIntAsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next int, err error, done bool) {
-			if firstTime {
-				firstTime = false
-				time.Sleep(duration)
-			}
-			observe(next, err, done)
+			observe(interface{}(next), err, done)
 		}
 		o(observer, subscribeOn, subscriber)
 	}
@@ -102,4 +170,41 @@ func (o ObservableInt) ToSlice() (slice []int, err error) {
 	o(observer, scheduler, subscriber)
 	subscriber.Wait()
 	return
+}
+
+//jig:name RxError
+
+type RxError string
+
+func (e RxError) Error() string	{ return string(e) }
+
+//jig:name ErrTypecastToInt
+
+// ErrTypecastToInt is delivered to an observer if the generic value cannot be
+// typecast to int.
+const ErrTypecastToInt = RxError("typecast to int failed")
+
+//jig:name ObservableAsObservableInt
+
+// AsObservableInt turns an Observable of interface{} into an ObservableInt.
+// If during observing a typecast fails, the error ErrTypecastToInt will be
+// emitted.
+func (o Observable) AsObservableInt() ObservableInt {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				if nextInt, ok := next.(int); ok {
+					observe(nextInt, err, done)
+				} else {
+					var zeroInt int
+					observe(zeroInt, ErrTypecastToInt, true)
+				}
+			} else {
+				var zeroInt int
+				observe(zeroInt, err, true)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
 }

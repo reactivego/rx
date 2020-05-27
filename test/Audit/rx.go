@@ -2,7 +2,7 @@
 
 //go:generate jig
 
-package Debounce
+package Audit
 
 import (
 	"fmt"
@@ -13,16 +13,6 @@ import (
 	"github.com/reactivego/scheduler"
 	"github.com/reactivego/subscriber"
 )
-
-//jig:name ConcatInt
-
-// ConcatInt emits the emissions from two or more ObservableInts without interleaving them.
-func ConcatInt(observables ...ObservableInt) ObservableInt {
-	if len(observables) == 0 {
-		return EmptyInt()
-	}
-	return observables[0].ConcatWith(observables[1:]...)
-}
 
 //jig:name Scheduler
 
@@ -74,6 +64,69 @@ func Interval(interval time.Duration) ObservableInt {
 	return observable
 }
 
+//jig:name ObservableAudit
+
+// Audit waits until the source emits and then starts a timer. When the timer
+// expires, Audit will emit the last value received from the source during the
+// time period when the timer was active.
+func (o Observable) Audit(duration time.Duration) Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		var audit struct {
+			sync.Mutex
+			runner	scheduler.Runner
+			next	interface{}
+			done	bool
+		}
+		auditer := func(self func(time.Duration)) {
+			if subscriber.Subscribed() {
+				audit.Lock()
+				audit.runner = nil
+				next := audit.next
+				done := audit.done
+				audit.Unlock()
+				if !done {
+					observe(next, nil, false)
+				}
+			}
+		}
+		observer := func(next interface{}, err error, done bool) {
+			if subscriber.Subscribed() {
+				if !done {
+					audit.Lock()
+					audit.next = next
+					if audit.runner == nil {
+						audit.runner = subscribeOn.ScheduleFutureRecursive(duration, auditer)
+					}
+					audit.Unlock()
+				} else {
+					audit.Lock()
+					audit.done = true
+					audit.Unlock()
+					observe(nil, err, true)
+				}
+			}
+		}
+		subscriber.OnUnsubscribe(func() {
+			audit.Lock()
+			if audit.runner != nil {
+				audit.runner.Cancel()
+			}
+			audit.Unlock()
+		})
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableIntAudit
+
+// Audit waits until the source emits and then starts a timer. When the timer
+// expires, Audit will emit the last value received from the source during the
+// time period when the timer was active.
+func (o ObservableInt) Audit(duration time.Duration) ObservableInt {
+	return o.AsObservable().Audit(duration).AsObservableInt()
+}
+
 //jig:name ObservableTake
 
 // Take emits only the first n items emitted by an Observable.
@@ -101,115 +154,6 @@ func (o Observable) Take(n int) Observable {
 // Take emits only the first n items emitted by an ObservableInt.
 func (o ObservableInt) Take(n int) ObservableInt {
 	return o.AsObservable().Take(n).AsObservableInt()
-}
-
-//jig:name ObservableDebounce
-
-// Debounce only emits the last item of a burst from an Observable if a
-// particular timespan has passed without it emitting another item.
-func (o Observable) Debounce(duration time.Duration) Observable {
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		var debounce struct {
-			sync.Mutex
-			runner	scheduler.Runner
-			next	interface{}
-			done	bool
-		}
-		debouncer := func(self func(time.Duration)) {
-			if subscriber.Subscribed() {
-				debounce.Lock()
-				debounce.runner = nil
-				next := debounce.next
-				done := debounce.done
-				debounce.Unlock()
-				if !done {
-					observe(next, nil, false)
-				}
-			}
-		}
-		observer := func(next interface{}, err error, done bool) {
-			if subscriber.Subscribed() {
-				if !done {
-					debounce.Lock()
-					debounce.next = next
-					if debounce.runner != nil {
-						debounce.runner.Cancel()
-					}
-					debounce.runner = subscribeOn.ScheduleFutureRecursive(duration, debouncer)
-					debounce.Unlock()
-				} else {
-					debounce.Lock()
-					debounce.done = true
-					debounce.Unlock()
-					observe(nil, err, true)
-				}
-			}
-		}
-		subscriber.OnUnsubscribe(func() {
-			debounce.Lock()
-			if debounce.runner != nil {
-				debounce.runner.Cancel()
-			}
-			debounce.Unlock()
-		})
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableIntDebounce
-
-// Debounce only emits the last item of a burst from an ObservableInt if a
-// particular timespan has passed without it emitting another item.
-func (o ObservableInt) Debounce(duration time.Duration) ObservableInt {
-	return o.AsObservable().Debounce(duration).AsObservableInt()
-}
-
-//jig:name EmptyInt
-
-// EmptyInt creates an Observable that emits no items but terminates normally.
-func EmptyInt() ObservableInt {
-	var zeroInt int
-	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
-		runner := scheduler.Schedule(func() {
-			if subscriber.Subscribed() {
-				observe(zeroInt, nil, true)
-			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
-}
-
-//jig:name ObservableIntConcatWith
-
-// ConcatWith emits the emissions from two or more ObservableInts without interleaving them.
-func (o ObservableInt) ConcatWith(other ...ObservableInt) ObservableInt {
-	var zeroInt int
-	if len(other) == 0 {
-		return o
-	}
-	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		var (
-			observables	= append([]ObservableInt{}, other...)
-			observer	IntObserver
-		)
-		observer = func(next int, err error, done bool) {
-			if !done || err != nil {
-				observe(next, err, done)
-			} else {
-				if len(observables) == 0 {
-					observe(zeroInt, nil, true)
-				} else {
-					o := observables[0]
-					observables = observables[1:]
-					o(observer, subscribeOn, subscriber)
-				}
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
 }
 
 //jig:name Observer

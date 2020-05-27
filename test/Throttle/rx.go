@@ -2,7 +2,7 @@
 
 //go:generate jig
 
-package Interval
+package Throttle
 
 import (
 	"fmt"
@@ -62,11 +62,51 @@ func Interval(interval time.Duration) ObservableInt {
 	return observable
 }
 
-//jig:name GoroutineScheduler
+//jig:name ObservableThrottle
 
-func GoroutineScheduler() Scheduler {
-	return scheduler.Goroutine
+// Throttle emits when the source emits and then starts a timer during which
+// all emissions from the source are ignored. After the timer expires, Throttle
+// will again emit the next item the source emits, and so on.
+func (o Observable) Throttle(duration time.Duration) Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		var deadline time.Time
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				if subscribeOn.Now().After(deadline) {
+					observe(next, nil, false)
+					deadline = subscribeOn.Now().Add(duration)
+				}
+			} else {
+				observe(nil, err, true)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
 }
+
+//jig:name ObservableIntThrottle
+
+// Throttle
+func (o ObservableInt) Throttle(duration time.Duration) ObservableInt {
+	return o.AsObservable().Throttle(duration).AsObservableInt()
+}
+
+//jig:name Observer
+
+// Observer is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
+// completed normally.
+type Observer func(next interface{}, err error, done bool)
+
+//jig:name Observable
+
+// Observable is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type Observable func(Observer, Scheduler, Subscriber)
 
 //jig:name ObservableTake
 
@@ -97,99 +137,6 @@ func (o ObservableInt) Take(n int) ObservableInt {
 	return o.AsObservable().Take(n).AsObservableInt()
 }
 
-//jig:name ObservableIntSubscribeOn
-
-// SubscribeOn specifies the scheduler an ObservableInt should use when it is
-// subscribed to.
-func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
-	observable := func(observe IntObserver, _ Scheduler, subscriber Subscriber) {
-		subscriber.OnWait(subscribeOn.Wait)
-		o(observe, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name Observer
-
-// Observer is a function that gets called whenever the Observable has
-// something to report. The next argument is the item value that is only
-// valid when the done argument is false. When done is true and the err
-// argument is not nil, then the Observable has terminated with an error.
-// When done is true and the err argument is nil, then the Observable has
-// completed normally.
-type Observer func(next interface{}, err error, done bool)
-
-//jig:name Observable
-
-// Observable is a function taking an Observer, Scheduler and Subscriber.
-// Calling it will subscribe the Observer to events from the Observable.
-type Observable func(Observer, Scheduler, Subscriber)
-
-//jig:name ObservableIntWait
-
-// Wait subscribes to the Observable and waits for completion or error.
-// Returns either the error or nil when the Observable completed normally.
-// Wait uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) Wait() (err error) {
-	subscriber := subscriber.New()
-	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, e error, done bool) {
-		if done {
-			err = e
-			subscriber.Unsubscribe()
-		}
-	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
-}
-
-//jig:name Subscription
-
-// Subscription is an alias for the subscriber.Subscription interface type.
-type Subscription = subscriber.Subscription
-
-//jig:name ObservableIntSubscribe
-
-// Subscribe operates upon the emissions and notifications from an Observable.
-// This method returns a Subscription.
-// Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber) Subscription {
-	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, err error, done bool) {
-		if !done {
-			observe(next, err, done)
-		} else {
-			var zeroInt int
-			observe(zeroInt, err, true)
-			subscribers[0].Unsubscribe()
-		}
-	}
-	subscribers[0].OnWait(scheduler.Wait)
-	o(observer, scheduler, subscribers[0])
-	return subscribers[0]
-}
-
-//jig:name ObservableIntMapString
-
-// MapString transforms the items emitted by an ObservableInt by applying a
-// function to each item.
-func (o ObservableInt) MapString(project func(int) string) ObservableString {
-	observable := func(observe StringObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			var mapped string
-			if !done {
-				mapped = project(next)
-			}
-			observe(mapped, err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name ObservableIntAsObservable
 
 // AsObservable turns a typed ObservableInt into an Observable of interface{}.
@@ -202,22 +149,6 @@ func (o ObservableInt) AsObservable() Observable {
 	}
 	return observable
 }
-
-//jig:name StringObserver
-
-// StringObserver is a function that gets called whenever the Observable has
-// something to report. The next argument is the item value that is only
-// valid when the done argument is false. When done is true and the err
-// argument is not nil, then the Observable has terminated with an error.
-// When done is true and the err argument is nil, then the Observable has
-// completed normally.
-type StringObserver func(next string, err error, done bool)
-
-//jig:name ObservableString
-
-// ObservableString is a function taking an Observer, Scheduler and Subscriber.
-// Calling it will subscribe the Observer to events from the Observable.
-type ObservableString func(StringObserver, Scheduler, Subscriber)
 
 //jig:name RxError
 
@@ -256,16 +187,16 @@ func (o Observable) AsObservableInt() ObservableInt {
 	return observable
 }
 
-//jig:name ObservableStringPrintln
+//jig:name ObservableIntPrintln
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
 // Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableString) Println(a ...interface{}) (err error) {
+func (o ObservableInt) Println(a ...interface{}) (err error) {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next string, e error, done bool) {
+	observer := func(next int, e error, done bool) {
 		if !done {
 			fmt.Println(append(a, next)...)
 		} else {
