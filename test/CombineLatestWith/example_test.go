@@ -2,7 +2,7 @@ package CombineLatestWith
 
 import _ "github.com/reactivego/rx/generic"
 
-func Example_basic() {
+func Example_combineLatestWith() {
 
 	A := From(1, 4, 7)
 	B := From("two", "five", "eight")

@@ -4,7 +4,7 @@ import (
 	_ "github.com/reactivego/rx/generic"
 )
 
-func Example_basic() {
+func Example_combineLatestMapToString() {
 	From(1, 2, 3, 4).CombineLatestMapToString(OfString("Hey", "Ho")).Println()
 
 	// Output:

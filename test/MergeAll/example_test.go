@@ -29,3 +29,25 @@ func Example_mergeAll() {
 	// First 2
 	// Second 2
 }
+
+func Example_mergeAllInterval() {
+	const ms = time.Millisecond
+
+	intv1ms := Interval(1*ms).Take(2)
+	intv10ms := Interval(10*ms).Take(2)
+	intv100ms := Interval(100*ms).Take(2)
+
+	sub := NewSubscriber()
+	go sub.Unsubscribe()
+
+
+	FromObservableInt(intv1ms, intv10ms, intv100ms).IgnoreCompletion().MergeAll().Println(sub)
+
+	// Output:
+	// 0
+	// 1
+	// 0
+	// 1
+	// 0
+	// 1
+}

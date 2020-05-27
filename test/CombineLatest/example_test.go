@@ -2,7 +2,7 @@ package CombineLatest
 
 import _ "github.com/reactivego/rx/generic"
 
-func Example_basic() {
+func Example_combineLatestInt() {
 
 	A := FromInt(1, 3, 5)
 	B := FromInt(2, 4, 6)

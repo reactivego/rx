@@ -6,7 +6,7 @@ import (
 	_ "github.com/reactivego/rx"
 )
 
-func Example_basic() {
+func Example_concatMapString() {
 	FromInt(0, 1, 2, 3).ConcatMapString(func(v int) ObservableString {
 		return JustString(fmt.Sprintf("v = %v", v))
 	}).Println()

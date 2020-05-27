@@ -6,7 +6,7 @@ import (
 	_ "github.com/reactivego/rx/generic"
 )
 
-func Example_basic() {
+func Example_combineLatestMapString() {
 	project := func(next int) ObservableString {
 		return OfString(fmt.Sprintf(" %d ", next),fmt.Sprintf(">%d<", next))
 	}

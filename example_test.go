@@ -7,6 +7,24 @@ import (
 	"github.com/reactivego/rx"
 )
 
+func ExampleObservable__All() {
+	// Setup All to produce true only when all source values are less than 5
+	lessthan5 := func(i interface{}) bool {
+		return i.(int) < 5
+	}
+
+	result, err := rx.From(1, 2, 5, 2, 1).All(lessthan5).ToSingle()
+
+	fmt.Println("All values less than 5?", result, err)
+
+	result, err = rx.From(4, 1, 0, -1, 2, 3, 4).All(lessthan5).ToSingle()
+
+	fmt.Println("All values less than 5?", result, err)
+	// Output:
+	// All values less than 5? false <nil>
+	// All values less than 5? true <nil>
+}
+
 func ExampleObservable_ConcatWith() {
 	oa := rx.From(0, 1, 2, 3)
 	ob := rx.From(4, 5)
