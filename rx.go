@@ -382,21 +382,19 @@ func Of(slice ...interface{}) Observable {
 //jig:name Interval
 
 // Interval creates an ObservableInt that emits a sequence of integers spaced
-// by a particular time interval. First integer is emitted after the first time
-// interval expires.
+// by a particular time interval. First integer is not emitted immediately, but
+// only after the first time interval has passed.
 func Interval(interval time.Duration) ObservableInt {
-	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		i := 0
-		runner := scheduler.ScheduleFutureRecursive(interval, func(self func(time.Duration)) {
-			if subscriber.Canceled() {
-				return
+		runner := subscribeOn.ScheduleFutureRecursive(interval, func(self func(time.Duration)) {
+			if subscriber.Subscribed() {
+				observe(i, nil, false)
+				i++
+				if subscriber.Subscribed() {
+					self(interval)
+				}
 			}
-			observe(i, nil, false)
-			if subscriber.Canceled() {
-				return
-			}
-			i++
-			self(interval)
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
 	}
@@ -727,111 +725,6 @@ type SliceObserver func(next Slice, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableSlice func(SliceObserver, Scheduler, Subscriber)
 
-//jig:name FromObservable
-
-// FromObservable creates an ObservableObservable from multiple Observable values passed in.
-func FromObservable(slice ...Observable) ObservableObservable {
-	var zeroObservable Observable
-	observable := func(observe ObservableObserver, scheduler Scheduler, subscriber Subscriber) {
-		i := 0
-		runner := scheduler.ScheduleRecursive(func(self func()) {
-			if subscriber.Subscribed() {
-				if i < len(slice) {
-					observe(slice[i], nil, false)
-					if subscriber.Subscribed() {
-						i++
-						self()
-					}
-				} else {
-					observe(zeroObservable, nil, true)
-				}
-			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
-}
-
-//jig:name ObservableConcatWith
-
-// ConcatWith emits the emissions from two or more Observables without interleaving them.
-func (o Observable) ConcatWith(other ...Observable) Observable {
-	var zero interface{}
-	if len(other) == 0 {
-		return o
-	}
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		var (
-			observables	= append([]Observable{}, other...)
-			observer	Observer
-		)
-		observer = func(next interface{}, err error, done bool) {
-			if !done || err != nil {
-				observe(next, err, done)
-			} else {
-				if len(observables) == 0 {
-					observe(zero, nil, true)
-				} else {
-					o := observables[0]
-					observables = observables[1:]
-					o(observer, subscribeOn, subscriber)
-				}
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableMergeWith
-
-// MergeWith combines multiple Observables into one by merging their emissions.
-// An error from any of the observables will terminate the merged observables.
-func (o Observable) MergeWith(other ...Observable) Observable {
-	if len(other) == 0 {
-		return o
-	}
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		var observers struct {
-			sync.Mutex
-			done	bool
-			len	int
-		}
-		observer := func(next interface{}, err error, done bool) {
-			observers.Lock()
-			defer observers.Unlock()
-			if !observers.done {
-				switch {
-				case !done:
-					observe(next, nil, false)
-				case err != nil:
-					observers.done = true
-					var zero interface{}
-					observe(zero, err, true)
-				default:
-					if observers.len--; observers.len == 0 {
-						var zero interface{}
-						observe(zero, nil, true)
-					}
-				}
-			}
-		}
-		subscribeOn.Schedule(func() {
-			if !subscriber.Canceled() {
-				observers.len = 1 + len(other)
-				o(observer, subscribeOn, subscriber)
-				for _, o := range other {
-					if subscriber.Canceled() {
-						return
-					}
-					o(observer, subscribeOn, subscriber)
-				}
-			}
-		})
-	}
-	return observable
-}
-
 //jig:name ObservableCombineLatestWith
 
 // CombineLatestWith will subscribe to its Observable and all other
@@ -865,6 +758,37 @@ func (o Observable) CombineLatestMap(project func(interface{}) Observable) Obser
 func (o Observable) CombineLatestMapTo(inner Observable) ObservableSlice {
 	project := func(interface{}) Observable { return inner }
 	return o.MapObservable(project).CombineLatestAll()
+}
+
+//jig:name ObservableConcatWith
+
+// ConcatWith emits the emissions from two or more Observables without interleaving them.
+func (o Observable) ConcatWith(other ...Observable) Observable {
+	var zero interface{}
+	if len(other) == 0 {
+		return o
+	}
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		var (
+			observables	= append([]Observable{}, other...)
+			observer	Observer
+		)
+		observer = func(next interface{}, err error, done bool) {
+			if !done || err != nil {
+				observe(next, err, done)
+			} else {
+				if len(observables) == 0 {
+					observe(zero, nil, true)
+				} else {
+					o := observables[0]
+					observables = observables[1:]
+					o(observer, subscribeOn, subscriber)
+				}
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
 }
 
 //jig:name ObservableObservableConcatAll
@@ -1101,6 +1025,55 @@ func (o ObservableObservable) SwitchAll() Observable {
 			}
 		}
 		o(switcher, subscribeOn, switcherSubscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableMergeWith
+
+// MergeWith combines multiple Observables into one by merging their emissions.
+// An error from any of the observables will terminate the merged observables.
+func (o Observable) MergeWith(other ...Observable) Observable {
+	if len(other) == 0 {
+		return o
+	}
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		var observers struct {
+			sync.Mutex
+			done	bool
+			len	int
+		}
+		observer := func(next interface{}, err error, done bool) {
+			observers.Lock()
+			defer observers.Unlock()
+			if !observers.done {
+				switch {
+				case !done:
+					observe(next, nil, false)
+				case err != nil:
+					observers.done = true
+					var zero interface{}
+					observe(zero, err, true)
+				default:
+					if observers.len--; observers.len == 0 {
+						var zero interface{}
+						observe(zero, nil, true)
+					}
+				}
+			}
+		}
+		subscribeOn.Schedule(func() {
+			if !subscriber.Canceled() {
+				observers.len = 1 + len(other)
+				o(observer, subscribeOn, subscriber)
+				for _, o := range other {
+					if subscriber.Canceled() {
+						return
+					}
+					o(observer, subscribeOn, subscriber)
+				}
+			}
+		})
 	}
 	return observable
 }
@@ -1352,43 +1325,48 @@ func (o Observable) Count() ObservableInt {
 // particular timespan has passed without it emitting another item.
 func (o Observable) Debounce(duration time.Duration) Observable {
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		valuech := make(chan interface{})
-		donech := make(chan error)
-		debouncer := func() {
-			var nextValue interface{}
-			var timeout <-chan time.Time
-			for {
-				select {
-				case nextValue = <-valuech:
-					timeout = time.After(duration)
-				case err, subscribed := <-donech:
-					if !subscribed {
-						return
-					}
-					if timeout != nil {
-						observe(nextValue, nil, false)
-					}
-					if err != nil {
-						observe(nil, err, true)
-					} else {
-						observe(nil, nil, true)
-					}
-				case <-timeout:
-					observe(nextValue, nil, false)
-					timeout = nil
+		var debounce struct {
+			sync.Mutex
+			runner	scheduler.Runner
+			next	interface{}
+			done	bool
+		}
+		debouncer := func(self func(time.Duration)) {
+			if subscriber.Subscribed() {
+				debounce.Lock()
+				debounce.runner = nil
+				next := debounce.next
+				done := debounce.done
+				debounce.Unlock()
+				if !done {
+					observe(next, nil, false)
 				}
 			}
 		}
-		go debouncer()
 		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				valuech <- next
-			} else {
-				donech <- err
+			if subscriber.Subscribed() {
+				if !done {
+					debounce.Lock()
+					debounce.next = next
+					if debounce.runner != nil {
+						debounce.runner.Cancel()
+					}
+					debounce.runner = subscribeOn.ScheduleFutureRecursive(duration, debouncer)
+					debounce.Unlock()
+				} else {
+					debounce.Lock()
+					debounce.done = true
+					debounce.Unlock()
+					observe(nil, err, true)
+				}
 			}
 		}
 		subscriber.OnUnsubscribe(func() {
-			close(donech)
+			debounce.Lock()
+			if debounce.runner != nil {
+				debounce.runner.Cancel()
+			}
+			debounce.Unlock()
 		})
 		o(observer, subscribeOn, subscriber)
 	}
@@ -1397,16 +1375,46 @@ func (o Observable) Debounce(duration time.Duration) Observable {
 
 //jig:name ObservableDelay
 
-// Delay shifts the emission from an Observable forward in time by a particular amount of time.
+// Delay shifts an emission from an Observable forward in time by a particular
+// amount of time. The relative time intervals between emissions are preserved.
 func (o Observable) Delay(duration time.Duration) Observable {
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		firstTime := true
-		observer := func(next interface{}, err error, done bool) {
-			if firstTime {
-				firstTime = false
-				time.Sleep(duration)
+		type emission struct {
+			at	time.Time
+			next	interface{}
+			err	error
+			done	bool
+		}
+		var delay struct {
+			sync.Mutex
+			emissions	[]emission
+		}
+		delayer := subscribeOn.ScheduleFutureRecursive(duration, func(self func(time.Duration)) {
+			if subscriber.Subscribed() {
+				delay.Lock()
+				for _, entry := range delay.emissions {
+					delay.Unlock()
+					due := entry.at.Sub(subscribeOn.Now())
+					if due > 0 {
+						self(due)
+						return
+					}
+					observe(entry.next, entry.err, entry.done)
+					if entry.done || subscriber.Canceled() {
+						return
+					}
+					delay.Lock()
+					delay.emissions = delay.emissions[1:]
+				}
+				delay.Unlock()
+				self(duration)
 			}
-			observe(next, err, done)
+		})
+		subscriber.OnUnsubscribe(delayer.Cancel)
+		observer := func(next interface{}, err error, done bool) {
+			delay.Lock()
+			delay.emissions = append(delay.emissions, emission{subscribeOn.Now().Add(duration), next, err, done})
+			delay.Unlock()
 		}
 		o(observer, subscribeOn, subscriber)
 	}
@@ -1838,52 +1846,43 @@ func (o Observable) Retry() Observable {
 
 // Sample emits the most recent item emitted by an Observable within periodic time intervals.
 func (o Observable) Sample(window time.Duration) Observable {
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		var unsubscribe = make(chan struct{})
-		var last struct {
+	observable := Observable(func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		var sample struct {
 			sync.Mutex
-			Fresh	bool
-			Value	interface{}
+			at	time.Time
+			next	interface{}
+			done	bool
 		}
-		sampler := func() {
-			for {
-				select {
-				case <-time.After(window):
-					var (
-						fresh	bool
-						value	interface{}
-					)
-					last.Lock()
-					if last.Fresh {
-						last.Fresh = false
-						fresh = true
-						value = last.Value
+		sampler := subscribeOn.ScheduleFutureRecursive(window, func(self func(time.Duration)) {
+			if subscriber.Subscribed() {
+				sample.Lock()
+				if !sample.done {
+					begin := subscribeOn.Now().Add(-window)
+					if !sample.at.Before(begin) {
+						observe(sample.next, nil, false)
 					}
-					last.Unlock()
-					if fresh {
-						observe(value, nil, false)
+					if subscriber.Subscribed() {
+						self(window)
 					}
-				case <-unsubscribe:
-					return
+				}
+				sample.Unlock()
+			}
+		})
+		subscriber.OnUnsubscribe(sampler.Cancel)
+		observer := func(next interface{}, err error, done bool) {
+			if subscriber.Subscribed() {
+				sample.Lock()
+				sample.at = subscribeOn.Now()
+				sample.next = next
+				sample.done = done
+				sample.Unlock()
+				if done {
+					observe(nil, err, true)
 				}
 			}
 		}
-		go sampler()
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				last.Lock()
-				last.Fresh = true
-				last.Value = next
-				last.Unlock()
-			} else {
-				observe(nil, err, true)
-			}
-		}
-		subscriber.OnUnsubscribe(func() {
-			close(unsubscribe)
-		})
 		o(observer, subscribeOn, subscriber)
-	}
+	})
 	return observable
 }
 
@@ -2160,53 +2159,50 @@ const ErrTimeout = RxError("timeout")
 
 // Timeout mirrors the source Observable, but issues an error notification if a
 // particular period of time elapses without any emitted items.
-// Timeout schedules tasks on the scheduler passed to this
-func (o Observable) Timeout(timeout time.Duration) Observable {
+// Timeout schedules a task on the scheduler passed to it during subscription.
+func (o Observable) Timeout(due time.Duration) Observable {
 	observable := Observable(func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		if subscriber.Canceled() {
-			return
-		}
-		var last struct {
+		var timeout struct {
 			sync.Mutex
-			at	time.Time
-			done	bool
+			at		time.Time
+			occurred	bool
 		}
-		last.at = subscribeOn.Now()
-		timer := func(self func(time.Duration)) {
-			last.Lock()
-			defer last.Unlock()
-			if last.done || subscriber.Canceled() {
-				return
+		timeout.at = subscribeOn.Now().Add(due)
+		timer := subscribeOn.ScheduleFutureRecursive(due, func(self func(time.Duration)) {
+			if subscriber.Subscribed() {
+				timeout.Lock()
+				if !timeout.occurred {
+					due := timeout.at.Sub(subscribeOn.Now())
+					if due > 0 {
+						self(due)
+					} else {
+						timeout.occurred = true
+						timeout.Unlock()
+						observe(nil, ErrTimeout, true)
+						timeout.Lock()
+					}
+				}
+				timeout.Unlock()
 			}
-			deadline := last.at.Add(timeout)
-			now := subscribeOn.Now()
-			if now.Before(deadline) {
-				self(deadline.Sub(now))
-				return
-			}
-			last.done = true
-			observe(nil, ErrTimeout, true)
-		}
-		runner := subscribeOn.ScheduleFutureRecursive(timeout, timer)
-		subscriber.OnUnsubscribe(runner.Cancel)
+		})
+		subscriber.OnUnsubscribe(timer.Cancel)
 		observer := func(next interface{}, err error, done bool) {
-			last.Lock()
-			defer last.Unlock()
-			if last.done || subscriber.Canceled() {
-				return
+			if subscriber.Subscribed() {
+				timeout.Lock()
+				if !timeout.occurred {
+					now := subscribeOn.Now()
+					if now.Before(timeout.at) {
+						timeout.at = now.Add(due)
+						timeout.occurred = done
+						observe(next, err, done)
+					}
+				}
+				timeout.Unlock()
 			}
-			now := subscribeOn.Now()
-			deadline := last.at.Add(timeout)
-			if !now.Before(deadline) {
-				return
-			}
-			last.done = done
-			last.at = now
-			observe(next, err, done)
 		}
 		o(observer, subscribeOn, subscriber)
 	})
-	return observable.Serialize()
+	return observable
 }
 
 //jig:name ObservablePrintln
@@ -3019,6 +3015,31 @@ func (o Observable) PublishReplay(bufferCapacity int, windowDuration time.Durati
 		return NewReplaySubject(bufferCapacity, windowDuration)
 	}
 	return o.Multicast(factory)
+}
+
+//jig:name FromObservable
+
+// FromObservable creates an ObservableObservable from multiple Observable values passed in.
+func FromObservable(slice ...Observable) ObservableObservable {
+	var zeroObservable Observable
+	observable := func(observe ObservableObserver, scheduler Scheduler, subscriber Subscriber) {
+		i := 0
+		runner := scheduler.ScheduleRecursive(func(self func()) {
+			if subscriber.Subscribed() {
+				if i < len(slice) {
+					observe(slice[i], nil, false)
+					if subscriber.Subscribed() {
+						i++
+						self()
+					}
+				} else {
+					observe(zeroObservable, nil, true)
+				}
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
 }
 
 //jig:name ObservableMapObservable
