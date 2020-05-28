@@ -47,8 +47,8 @@ type ObservableTime func(TimeObserver, Scheduler, Subscriber)
 //jig:name Ticker
 
 // Ticker creates an ObservableTime that emits a sequence of timestamps after
-//an initialDelay has passed. Subsequent timestamps are emitted using a
-// schedule of intervals passed in. If only the initialDelay is given, Tichker
+// an initialDelay has passed. Subsequent timestamps are emitted using a
+// schedule of intervals passed in. If only the initialDelay is given, Ticker
 // will emit only once.
 func Ticker(initialDelay time.Duration, intervals ...time.Duration) ObservableTime {
 	observable := func(observe TimeObserver, subscribeOn Scheduler, subscriber Subscriber) {

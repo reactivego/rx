@@ -36,6 +36,8 @@ func require() {
 	Range(1, 2)
 	Start(func() (interface{}, error) { return o, nil })
 	Throw(RxError("sad"))
+	Ticker(time.Millisecond)
+	Timer(time.Millisecond)
 
 	/*
 		Observable Operator Methods
@@ -82,9 +84,9 @@ func require() {
 	o.AsObservableInt()
 	b.AsObservable()
 	i.AsObservable()
+	o.Audit(time.Millisecond)
 	i.Average()
 	o.Catch(o)
-
 	o.Count()
 	o.Debounce(time.Millisecond)
 	o.Delay(time.Millisecond)
@@ -123,7 +125,10 @@ func require() {
 	o.TakeLast(1)
 	o.TakeUntil(o)
 	o.TakeWhile(func(interface{}) bool { return true })
+	o.Throttle(time.Millisecond)
+	o.TimeInterval()
 	o.Timeout(time.Millisecond)
+	o.Timestamp()
 
 	/*
 		Observable Subscribe Methods

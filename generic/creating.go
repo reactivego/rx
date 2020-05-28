@@ -221,7 +221,7 @@ func FromChanFoo(ch <-chan foo) ObservableFoo {
 }
 
 //jig:template FromChan
-//jig:needs Observable, nil
+//jig:needs Observable
 
 // FromChan creates an Observable from a Go channel of interface{}
 // values. This allows the code feeding into the channel to send either an error

@@ -92,7 +92,6 @@ func (o ObservableFoo) TakeWhile(condition func(next foo) bool) ObservableFoo {
 }
 
 //jig:template Observable TakeUntil
-//jig:needs nil
 
 // TakeUntil emits items emitted by an Observable until another Observable emits an item.
 func (o Observable) TakeUntil(other Observable) Observable {

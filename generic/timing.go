@@ -308,8 +308,8 @@ type Time = time.Time
 //jig:needs Time, ObservableTime
 
 // Ticker creates an ObservableTime that emits a sequence of timestamps after
-//an initialDelay has passed. Subsequent timestamps are emitted using a
-// schedule of intervals passed in. If only the initialDelay is given, Tichker
+// an initialDelay has passed. Subsequent timestamps are emitted using a
+// schedule of intervals passed in. If only the initialDelay is given, Ticker
 // will emit only once.
 func Ticker(initialDelay time.Duration, intervals ...time.Duration) ObservableTime {
 	observable := func(observe TimeObserver, subscribeOn Scheduler, subscriber Subscriber) {
@@ -331,7 +331,7 @@ func Ticker(initialDelay time.Duration, intervals ...time.Duration) ObservableTi
 }
 
 //jig:template Observable Timeout
-//jig:needs RxError, Observable Serialize, nil
+//jig:needs RxError, Observable Serialize
 
 // ErrTimeout is delivered to an observer if the stream times out.
 const ErrTimeout = RxError("timeout")
@@ -428,11 +428,11 @@ type TimestampFoo struct {
 }
 
 //jig:template Observable<Foo> Timestamp
-//jig:needs Timestamp<Foo>, ObservableTimestamp<Foo>
+//jig:needs Timestamp<Foo>
 
 // Timestamp attaches a timestamp to each item emitted by an observable
 // indicating when it was emitted.
-func (o ObservableFoo) Timestamp() ObservableTimestampFoo {
+func (o ObservableFoo) Timestamp() ObservableTimestampFoo  {
 	observable := func(observe TimestampFooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next foo, err error, done bool) {
 			if subscriber.Subscribed() {
@@ -457,7 +457,7 @@ type TimeIntervalFoo struct {
 }
 
 //jig:template Observable<Foo> TimeInterval
-//jig:needs TimeInterval<Foo>, ObservableTimeInterval<Foo>
+//jig:needs TimeInterval<Foo>
 
 // TimeInterval intercepts the items from the source Observable and emits in
 // their place a struct that indicates the amount of time that elapsed between

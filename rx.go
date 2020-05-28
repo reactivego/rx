@@ -509,11 +509,81 @@ type RxError string
 
 func (e RxError) Error() string	{ return string(e) }
 
+//jig:name Time
+
+type Time = time.Time
+
+//jig:name TimeObserver
+
+// TimeObserver is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
+// completed normally.
+type TimeObserver func(next Time, err error, done bool)
+
+//jig:name ObservableTime
+
+// ObservableTime is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type ObservableTime func(TimeObserver, Scheduler, Subscriber)
+
+//jig:name Ticker
+
+// Ticker creates an ObservableTime that emits a sequence of timestamps after
+// an initialDelay has passed. Subsequent timestamps are emitted using a
+// schedule of intervals passed in. If only the initialDelay is given, Ticker
+// will emit only once.
+func Ticker(initialDelay time.Duration, intervals ...time.Duration) ObservableTime {
+	observable := func(observe TimeObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		i := 0
+		runner := subscribeOn.ScheduleFutureRecursive(initialDelay, func(self func(time.Duration)) {
+			if subscriber.Subscribed() {
+				observe(subscribeOn.Now(), nil, false)
+				if subscriber.Subscribed() {
+					if len(intervals) > 0 {
+						self(intervals[i%len(intervals)])
+					}
+				}
+				i++
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
+}
+
+//jig:name Timer
+
+// Timer creates an ObservableInt that emits a sequence of integers (starting
+// at zero) after an initialDelay has passed. Subsequent values are emitted
+// using  a schedule of intervals passed in. If only the initialDelay is
+// given, Timer will emit only once.
+func Timer(initialDelay time.Duration, intervals ...time.Duration) ObservableInt {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		i := 0
+		runner := subscribeOn.ScheduleFutureRecursive(initialDelay, func(self func(time.Duration)) {
+			if subscriber.Subscribed() {
+				observe(i, nil, false)
+				if subscriber.Subscribed() {
+					if len(intervals) > 0 {
+						self(intervals[i%len(intervals)])
+					}
+				}
+				i++
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
+}
+
 //jig:name Slice
 
 type Slice = []interface{}
 
-//jig:name ObservableObservableCombineLatestAll
+//jig:name ObservableObservable_CombineLatestAll
 
 // CombineLatestAll flattens a higher order observable
 // (e.g. ObservableObservable) by subscribing to
@@ -618,7 +688,7 @@ func Merge(observables ...Observable) Observable {
 	return observables[0].MergeWith(observables[1:]...)
 }
 
-//jig:name ObservableMergeDelayError
+//jig:name Observable_MergeDelayError
 
 // MergeDelayError combines multiple Observables into one by merging their emissions.
 // Any error will be deferred until all observables terminate.
@@ -725,7 +795,7 @@ type SliceObserver func(next Slice, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableSlice func(SliceObserver, Scheduler, Subscriber)
 
-//jig:name ObservableCombineLatestWith
+//jig:name Observable_CombineLatestWith
 
 // CombineLatestWith will subscribe to its Observable and all other
 // Observables passed in. It will then wait for all of the ObservableBars
@@ -736,7 +806,7 @@ func (o Observable) CombineLatestWith(other ...Observable) ObservableSlice {
 	return FromObservable(append([]Observable{o}, other...)...).CombineLatestAll()
 }
 
-//jig:name ObservableCombineLatestMap
+//jig:name Observable_CombineLatestMap
 
 // CombinesLatestMap maps every entry emitted by the Observable into an
 // Observable, and then subscribe to it, until the source observable
@@ -747,7 +817,7 @@ func (o Observable) CombineLatestMap(project func(interface{}) Observable) Obser
 	return o.MapObservable(project).CombineLatestAll()
 }
 
-//jig:name ObservableCombineLatestMapTo
+//jig:name Observable_CombineLatestMapTo
 
 // CombinesLatestMapTo maps every entry emitted by the Observable into a
 // single Observable, and then subscribe to it, until the source
@@ -760,7 +830,7 @@ func (o Observable) CombineLatestMapTo(inner Observable) ObservableSlice {
 	return o.MapObservable(project).CombineLatestAll()
 }
 
-//jig:name ObservableConcatWith
+//jig:name Observable_ConcatWith
 
 // ConcatWith emits the emissions from two or more Observables without interleaving them.
 func (o Observable) ConcatWith(other ...Observable) Observable {
@@ -791,7 +861,7 @@ func (o Observable) ConcatWith(other ...Observable) Observable {
 	return observable
 }
 
-//jig:name ObservableObservableConcatAll
+//jig:name ObservableObservable_ConcatAll
 
 // ConcatAll flattens a higher order observable by concattenating the observables it emits.
 func (o ObservableObservable) ConcatAll() Observable {
@@ -833,7 +903,7 @@ func (o ObservableObservable) ConcatAll() Observable {
 	return observable
 }
 
-//jig:name ObservableSwitchMap
+//jig:name Observable_SwitchMap
 
 // SwitchMap transforms the items emitted by an Observable by applying a
 // function to each item an returning an Observable. In doing so, it behaves much like
@@ -980,7 +1050,7 @@ func (o *link) OnComplete(callback func()) error {
 	return nil
 }
 
-//jig:name ObservableObservableSwitchAll
+//jig:name ObservableObservable_SwitchAll
 
 // SwitchAll converts an Observable that emits Observables into a single Observable
 // that emits the items emitted by the most-recently-emitted of those Observables.
@@ -1029,7 +1099,7 @@ func (o ObservableObservable) SwitchAll() Observable {
 	return observable
 }
 
-//jig:name ObservableMergeWith
+//jig:name Observable_MergeWith
 
 // MergeWith combines multiple Observables into one by merging their emissions.
 // An error from any of the observables will terminate the merged observables.
@@ -1078,7 +1148,7 @@ func (o Observable) MergeWith(other ...Observable) Observable {
 	return observable
 }
 
-//jig:name ObservableMergeMap
+//jig:name Observable_MergeMap
 
 // MergeMap transforms the items emitted by an Observable by applying a
 // function to each item an returning an Observable. The stream of Observable
@@ -1087,7 +1157,7 @@ func (o Observable) MergeMap(project func(interface{}) Observable) Observable {
 	return o.MapObservable(project).MergeAll()
 }
 
-//jig:name ObservableObservableMergeAll
+//jig:name ObservableObservable_MergeAll
 
 // MergeAll flattens a higher order observable by merging the observables it emits.
 func (o ObservableObservable) MergeAll() Observable {
@@ -1135,7 +1205,7 @@ func (o ObservableObservable) MergeAll() Observable {
 	return observable
 }
 
-//jig:name ObservableAll
+//jig:name Observable_All
 
 // All determines whether all items emitted by an Observable meet some
 // criteria.
@@ -1174,7 +1244,7 @@ func (o Observable) All(predicate func(next interface{}) bool) ObservableBool {
 // typecast to bool.
 const ErrTypecastToBool = RxError("typecast to bool failed")
 
-//jig:name ObservableAsObservableBool
+//jig:name Observable_AsObservableBool
 
 // AsObservableBool turns an Observable of interface{} into an ObservableBool.
 // If during observing a typecast fails, the error ErrTypecastToBool will be
@@ -1205,7 +1275,7 @@ func (o Observable) AsObservableBool() ObservableBool {
 // typecast to int.
 const ErrTypecastToInt = RxError("typecast to int failed")
 
-//jig:name ObservableAsObservableInt
+//jig:name Observable_AsObservableInt
 
 // AsObservableInt turns an Observable of interface{} into an ObservableInt.
 // If during observing a typecast fails, the error ErrTypecastToInt will be
@@ -1230,7 +1300,7 @@ func (o Observable) AsObservableInt() ObservableInt {
 	return observable
 }
 
-//jig:name ObservableBoolAsObservable
+//jig:name ObservableBool_AsObservable
 
 // AsObservable turns a typed ObservableBool into an Observable of interface{}.
 func (o ObservableBool) AsObservable() Observable {
@@ -1243,7 +1313,7 @@ func (o ObservableBool) AsObservable() Observable {
 	return observable
 }
 
-//jig:name ObservableIntAsObservable
+//jig:name ObservableInt_AsObservable
 
 // AsObservable turns a typed ObservableInt into an Observable of interface{}.
 func (o ObservableInt) AsObservable() Observable {
@@ -1256,7 +1326,61 @@ func (o ObservableInt) AsObservable() Observable {
 	return observable
 }
 
-//jig:name ObservableIntAverage
+//jig:name Observable_Audit
+
+// Audit waits until the source emits and then starts a timer. When the timer
+// expires, Audit will emit the last value received from the source during the
+// time period when the timer was active.
+func (o Observable) Audit(duration time.Duration) Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		var audit struct {
+			sync.Mutex
+			runner	scheduler.Runner
+			next	interface{}
+			done	bool
+		}
+		auditer := func(self func(time.Duration)) {
+			if subscriber.Subscribed() {
+				audit.Lock()
+				audit.runner = nil
+				next := audit.next
+				done := audit.done
+				audit.Unlock()
+				if !done {
+					observe(next, nil, false)
+				}
+			}
+		}
+		observer := func(next interface{}, err error, done bool) {
+			if subscriber.Subscribed() {
+				if !done {
+					audit.Lock()
+					audit.next = next
+					if audit.runner == nil {
+						audit.runner = subscribeOn.ScheduleFutureRecursive(duration, auditer)
+					}
+					audit.Unlock()
+				} else {
+					audit.Lock()
+					audit.done = true
+					audit.Unlock()
+					observe(nil, err, true)
+				}
+			}
+		}
+		subscriber.OnUnsubscribe(func() {
+			audit.Lock()
+			if audit.runner != nil {
+				audit.runner.Cancel()
+			}
+			audit.Unlock()
+		})
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableInt_Average
 
 // Average calculates the average of numbers emitted by an ObservableInt and
 // emits this average.
@@ -1280,7 +1404,7 @@ func (o ObservableInt) Average() ObservableInt {
 	return observable
 }
 
-//jig:name ObservableCatch
+//jig:name Observable_Catch
 
 // Catch recovers from an error notification by continuing the sequence without
 // emitting the error but by switching to the catch Observable to provide
@@ -1299,7 +1423,7 @@ func (o Observable) Catch(catch Observable) Observable {
 	return observable
 }
 
-//jig:name ObservableCount
+//jig:name Observable_Count
 
 // Count counts the number of items emitted by the source Observable and
 // emits only this value.
@@ -1319,7 +1443,7 @@ func (o Observable) Count() ObservableInt {
 	return observable
 }
 
-//jig:name ObservableDebounce
+//jig:name Observable_Debounce
 
 // Debounce only emits the last item of a burst from an Observable if a
 // particular timespan has passed without it emitting another item.
@@ -1373,7 +1497,7 @@ func (o Observable) Debounce(duration time.Duration) Observable {
 	return observable
 }
 
-//jig:name ObservableDelay
+//jig:name Observable_Delay
 
 // Delay shifts an emission from an Observable forward in time by a particular
 // amount of time. The relative time intervals between emissions are preserved.
@@ -1421,7 +1545,7 @@ func (o Observable) Delay(duration time.Duration) Observable {
 	return observable
 }
 
-//jig:name ObservableDistinct
+//jig:name Observable_Distinct
 
 // Distinct suppress duplicate items emitted by an Observable
 func (o Observable) Distinct() Observable {
@@ -1441,7 +1565,7 @@ func (o Observable) Distinct() Observable {
 	return observable
 }
 
-//jig:name ObservableDo
+//jig:name Observable_Do
 
 // Do calls a function for each next value passing through the observable.
 func (o Observable) Do(f func(next interface{})) Observable {
@@ -1457,7 +1581,7 @@ func (o Observable) Do(f func(next interface{})) Observable {
 	return observable
 }
 
-//jig:name ObservableDoOnComplete
+//jig:name Observable_DoOnComplete
 
 // DoOnComplete calls a function when the stream completes.
 func (o Observable) DoOnComplete(f func()) Observable {
@@ -1473,7 +1597,7 @@ func (o Observable) DoOnComplete(f func()) Observable {
 	return observable
 }
 
-//jig:name ObservableDoOnError
+//jig:name Observable_DoOnError
 
 // DoOnError calls a function for any error on the stream.
 func (o Observable) DoOnError(f func(err error)) Observable {
@@ -1489,7 +1613,7 @@ func (o Observable) DoOnError(f func(err error)) Observable {
 	return observable
 }
 
-//jig:name ObservableElementAt
+//jig:name Observable_ElementAt
 
 // ElementAt emit only item n emitted by an Observable
 func (o Observable) ElementAt(n int) Observable {
@@ -1506,7 +1630,7 @@ func (o Observable) ElementAt(n int) Observable {
 	return observable
 }
 
-//jig:name ObservableFilter
+//jig:name Observable_Filter
 
 // Filter emits only those items from an Observable that pass a predicate test.
 func (o Observable) Filter(predicate func(next interface{}) bool) Observable {
@@ -1521,7 +1645,7 @@ func (o Observable) Filter(predicate func(next interface{}) bool) Observable {
 	return observable
 }
 
-//jig:name ObservableFinally
+//jig:name Observable_Finally
 
 // Finally applies a function for any error or completion on the stream.
 // This doesn't expose whether this was an error or a completion.
@@ -1538,7 +1662,7 @@ func (o Observable) Finally(f func()) Observable {
 	return observable
 }
 
-//jig:name ObservableFirst
+//jig:name Observable_First
 
 // First emits only the first item, or the first item that meets a condition, from an Observable.
 func (o Observable) First() Observable {
@@ -1555,7 +1679,7 @@ func (o Observable) First() Observable {
 	return observable
 }
 
-//jig:name ObservableIgnoreCompletion
+//jig:name Observable_IgnoreCompletion
 
 // IgnoreCompletion only emits items and never completes, neither with Error nor with Complete.
 func (o Observable) IgnoreCompletion() Observable {
@@ -1570,7 +1694,7 @@ func (o Observable) IgnoreCompletion() Observable {
 	return observable
 }
 
-//jig:name ObservableIgnoreElements
+//jig:name Observable_IgnoreElements
 
 // IgnoreElements does not emit any items from an Observable but mirrors its termination notification.
 func (o Observable) IgnoreElements() Observable {
@@ -1585,7 +1709,7 @@ func (o Observable) IgnoreElements() Observable {
 	return observable
 }
 
-//jig:name ObservableLast
+//jig:name Observable_Last
 
 // Last emits only the last item emitted by an Observable.
 func (o Observable) Last() Observable {
@@ -1608,7 +1732,7 @@ func (o Observable) Last() Observable {
 	return observable
 }
 
-//jig:name ObservableMap
+//jig:name Observable_Map
 
 // Map transforms the items emitted by an Observable by applying a
 // function to each item.
@@ -1626,7 +1750,7 @@ func (o Observable) Map(project func(interface{}) interface{}) Observable {
 	return observable
 }
 
-//jig:name ObservableIntMapObservable
+//jig:name ObservableInt_MapObservable
 
 // MapObservable transforms the items emitted by an ObservableInt by applying a
 // function to each item.
@@ -1644,7 +1768,7 @@ func (o ObservableInt) MapObservable(project func(int) Observable) ObservableObs
 	return observable
 }
 
-//jig:name ObservableIntMax
+//jig:name ObservableInt_Max
 
 // Max determines, and emits, the maximum-valued item emitted by an
 // ObservableInt.
@@ -1678,7 +1802,7 @@ func (o ObservableInt) Max() ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntMin
+//jig:name ObservableInt_Min
 
 // Min determines, and emits, the minimum-valued item emitted by an
 // ObservableInt.
@@ -1713,7 +1837,7 @@ func (o ObservableInt) Min() ObservableInt {
 	return observable
 }
 
-//jig:name ObservableObserveOn
+//jig:name Observable_ObserveOn
 
 // ObserveOn specifies a dispatch function to use for delivering values to the observer.
 func (o Observable) ObserveOn(dispatch func(task func())) Observable {
@@ -1729,7 +1853,7 @@ func (o Observable) ObserveOn(dispatch func(task func())) Observable {
 	return observable
 }
 
-//jig:name ObservableOnlyBool
+//jig:name Observable_OnlyBool
 
 // OnlyBool filters the value stream of an Observable of interface{} and outputs only the
 // bool typed values.
@@ -1750,7 +1874,7 @@ func (o Observable) OnlyBool() ObservableBool {
 	return observable
 }
 
-//jig:name ObservableOnlyInt
+//jig:name Observable_OnlyInt
 
 // OnlyInt filters the value stream of an Observable of interface{} and outputs only the
 // int typed values.
@@ -1771,7 +1895,7 @@ func (o Observable) OnlyInt() ObservableInt {
 	return observable
 }
 
-//jig:name ObservableReduce
+//jig:name Observable_Reduce
 
 // Reduce applies a reducer function to each item emitted by an Observable
 // and the previous reducer result. The operator accepts a seed argument that
@@ -1796,7 +1920,7 @@ func (o Observable) Reduce(reducer func(interface{}, interface{}) interface{}, s
 	return observable
 }
 
-//jig:name ObservableRepeat
+//jig:name Observable_Repeat
 
 // Repeat creates an Observable that emits a sequence of items repeatedly.
 func (o Observable) Repeat(count int) Observable {
@@ -1823,7 +1947,7 @@ func (o Observable) Repeat(count int) Observable {
 	return observable
 }
 
-//jig:name ObservableRetry
+//jig:name Observable_Retry
 
 // Retry if a source Observable sends an error notification, resubscribe to
 // it in the hopes that it will complete without error.
@@ -1842,7 +1966,7 @@ func (o Observable) Retry() Observable {
 	return observable
 }
 
-//jig:name ObservableSample
+//jig:name Observable_Sample
 
 // Sample emits the most recent item emitted by an Observable within periodic time intervals.
 func (o Observable) Sample(window time.Duration) Observable {
@@ -1886,7 +2010,7 @@ func (o Observable) Sample(window time.Duration) Observable {
 	return observable
 }
 
-//jig:name ObservableScan
+//jig:name Observable_Scan
 
 // Scan applies a accumulator function to each item emitted by an
 // Observable and the previous accumulator result. The operator accepts a
@@ -1909,7 +2033,7 @@ func (o Observable) Scan(accumulator func(interface{}, interface{}) interface{},
 	return observable
 }
 
-//jig:name ObservableSerialize
+//jig:name Observable_Serialize
 
 // Serialize forces an Observable to make serialized calls and to be
 // well-behaved.
@@ -1932,7 +2056,7 @@ func (o Observable) Serialize() Observable {
 	return observable
 }
 
-//jig:name ObservableSingle
+//jig:name Observable_Single
 
 // Single enforces that the observable sends exactly one data item and then
 // completes. If the observable sends no data before completing or sends more
@@ -1971,7 +2095,7 @@ func (o Observable) Single() Observable {
 	return observable
 }
 
-//jig:name ObservableSkip
+//jig:name Observable_Skip
 
 // Skip suppresses the first n items emitted by an Observable.
 func (o Observable) Skip(n int) Observable {
@@ -1988,7 +2112,7 @@ func (o Observable) Skip(n int) Observable {
 	return observable
 }
 
-//jig:name ObservableSkipLast
+//jig:name Observable_SkipLast
 
 // SkipLast suppresses the last n items emitted by an Observable.
 func (o Observable) SkipLast(n int) Observable {
@@ -2014,7 +2138,7 @@ func (o Observable) SkipLast(n int) Observable {
 	return observable
 }
 
-//jig:name ObservableSubscribeOn
+//jig:name Observable_SubscribeOn
 
 // SubscribeOn specifies the scheduler an Observable should use when it is
 // subscribed to.
@@ -2026,7 +2150,7 @@ func (o Observable) SubscribeOn(subscribeOn Scheduler) Observable {
 	return observable
 }
 
-//jig:name ObservableIntSum
+//jig:name ObservableInt_Sum
 
 // Sum calculates the sum of numbers emitted by an ObservableInt and emits this sum.
 func (o ObservableInt) Sum() ObservableInt {
@@ -2046,7 +2170,7 @@ func (o ObservableInt) Sum() ObservableInt {
 	return observable
 }
 
-//jig:name ObservableTake
+//jig:name Observable_Take
 
 // Take emits only the first n items emitted by an Observable.
 func (o Observable) Take(n int) Observable {
@@ -2068,14 +2192,14 @@ func (o Observable) Take(n int) Observable {
 	return observable
 }
 
-//jig:name ObservableIntTake
+//jig:name ObservableInt_Take
 
 // Take emits only the first n items emitted by an ObservableInt.
 func (o ObservableInt) Take(n int) ObservableInt {
 	return o.AsObservable().Take(n).AsObservableInt()
 }
 
-//jig:name ObservableTakeLast
+//jig:name Observable_TakeLast
 
 // TakeLast emits only the last n items emitted by an Observable.
 func (o Observable) TakeLast(n int) Observable {
@@ -2104,7 +2228,7 @@ func (o Observable) TakeLast(n int) Observable {
 	return observable
 }
 
-//jig:name ObservableTakeUntil
+//jig:name Observable_TakeUntil
 
 // TakeUntil emits items emitted by an Observable until another Observable emits an item.
 func (o Observable) TakeUntil(other Observable) Observable {
@@ -2131,7 +2255,7 @@ func (o Observable) TakeUntil(other Observable) Observable {
 	return observable
 }
 
-//jig:name ObservableTakeWhile
+//jig:name Observable_TakeWhile
 
 // TakeWhile mirrors items emitted by an Observable until a specified condition becomes false.
 //
@@ -2152,7 +2276,62 @@ func (o Observable) TakeWhile(condition func(next interface{}) bool) Observable 
 	return observable
 }
 
-//jig:name ObservableTimeout
+//jig:name Observable_Throttle
+
+// Throttle emits when the source emits and then starts a timer during which
+// all emissions from the source are ignored. After the timer expires, Throttle
+// will again emit the next item the source emits, and so on.
+func (o Observable) Throttle(duration time.Duration) Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		var deadline time.Time
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				if subscribeOn.Now().After(deadline) {
+					observe(next, nil, false)
+					deadline = subscribeOn.Now().Add(duration)
+				}
+			} else {
+				observe(nil, err, true)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name TimeInterval
+
+type TimeInterval struct {
+	Value		interface{}
+	Interval	time.Duration
+}
+
+//jig:name Observable_TimeInterval
+
+// TimeInterval intercepts the items from the source Observable and emits in
+// their place a struct that indicates the amount of time that elapsed between
+// pairs of emissions.
+func (o Observable) TimeInterval() ObservableTimeInterval {
+	observable := func(observe TimeIntervalObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		begin := subscribeOn.Now()
+		observer := func(next interface{}, err error, done bool) {
+			if subscriber.Subscribed() {
+				if !done {
+					now := subscribeOn.Now()
+					observe(TimeInterval{next, now.Sub(begin).Round(time.Millisecond)}, nil, false)
+					begin = now
+				} else {
+					var zero TimeInterval
+					observe(zero, err, done)
+				}
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name Observable_Timeout
 
 // ErrTimeout is delivered to an observer if the stream times out.
 const ErrTimeout = RxError("timeout")
@@ -2205,7 +2384,35 @@ func (o Observable) Timeout(due time.Duration) Observable {
 	return observable
 }
 
-//jig:name ObservablePrintln
+//jig:name Timestamp
+
+type Timestamp struct {
+	Value		interface{}
+	Timestamp	time.Time
+}
+
+//jig:name Observable_Timestamp
+
+// Timestamp attaches a timestamp to each item emitted by an observable
+// indicating when it was emitted.
+func (o Observable) Timestamp() ObservableTimestamp {
+	observable := func(observe TimestampObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if subscriber.Subscribed() {
+				if !done {
+					observe(Timestamp{next, subscribeOn.Now()}, nil, false)
+				} else {
+					var zero Timestamp
+					observe(zero, err, done)
+				}
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name Observable_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
@@ -2228,7 +2435,7 @@ func (o Observable) Println(a ...interface{}) (err error) {
 	return
 }
 
-//jig:name ObservableBoolPrintln
+//jig:name ObservableBool_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
@@ -2251,7 +2458,7 @@ func (o ObservableBool) Println(a ...interface{}) (err error) {
 	return
 }
 
-//jig:name ObservableIntPrintln
+//jig:name ObservableInt_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
@@ -2274,7 +2481,7 @@ func (o ObservableInt) Println(a ...interface{}) (err error) {
 	return
 }
 
-//jig:name ObservableSubscribe
+//jig:name Observable_Subscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
@@ -2296,7 +2503,7 @@ func (o Observable) Subscribe(observe Observer, subscribers ...Subscriber) Subsc
 	return subscribers[0]
 }
 
-//jig:name ObservableBoolSubscribe
+//jig:name ObservableBool_Subscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
@@ -2318,7 +2525,7 @@ func (o ObservableBool) Subscribe(observe BoolObserver, subscribers ...Subscribe
 	return subscribers[0]
 }
 
-//jig:name ObservableIntSubscribe
+//jig:name ObservableInt_Subscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
@@ -2340,7 +2547,7 @@ func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber)
 	return subscribers[0]
 }
 
-//jig:name ObservableToChan
+//jig:name Observable_ToChan
 
 // ToChan returns a channel that emits interface{} values. If the source
 // observable does not emit values but emits an error or complete, then the
@@ -2402,7 +2609,7 @@ func (o Observable) ToChan(subscribers ...Subscriber) <-chan interface{} {
 	return nextch
 }
 
-//jig:name ObservableBoolToChan
+//jig:name ObservableBool_ToChan
 
 // ToChan returns a channel that emits bool values. If the source observable does
 // not emit values but emits an error or complete, then the returned channel
@@ -2459,7 +2666,7 @@ func (o ObservableBool) ToChan(subscribers ...Subscriber) <-chan bool {
 	return nextch
 }
 
-//jig:name ObservableIntToChan
+//jig:name ObservableInt_ToChan
 
 // ToChan returns a channel that emits int values. If the source observable does
 // not emit values but emits an error or complete, then the returned channel
@@ -2516,7 +2723,7 @@ func (o ObservableInt) ToChan(subscribers ...Subscriber) <-chan int {
 	return nextch
 }
 
-//jig:name ObservableToSingle
+//jig:name Observable_ToSingle
 
 // ToSingle blocks until the Observable emits exactly one value or an error.
 // The value and any error are returned.
@@ -2539,7 +2746,7 @@ func (o Observable) ToSingle() (entry interface{}, err error) {
 	return
 }
 
-//jig:name ObservableBoolToSingle
+//jig:name ObservableBool_ToSingle
 
 // ToSingle blocks until the ObservableBool emits exactly one value or an error.
 // The value and any error are returned.
@@ -2562,7 +2769,7 @@ func (o ObservableBool) ToSingle() (entry bool, err error) {
 	return
 }
 
-//jig:name ObservableIntToSingle
+//jig:name ObservableInt_ToSingle
 
 // ToSingle blocks until the ObservableInt emits exactly one value or an error.
 // The value and any error are returned.
@@ -2585,7 +2792,7 @@ func (o ObservableInt) ToSingle() (entry int, err error) {
 	return
 }
 
-//jig:name ObservableToSlice
+//jig:name Observable_ToSlice
 
 // ToSlice collects all values from the Observable into an slice. The
 // complete slice and any error are returned.
@@ -2607,7 +2814,7 @@ func (o Observable) ToSlice() (slice []interface{}, err error) {
 	return
 }
 
-//jig:name ObservableBoolToSlice
+//jig:name ObservableBool_ToSlice
 
 // ToSlice collects all values from the ObservableBool into an slice. The
 // complete slice and any error are returned.
@@ -2629,7 +2836,7 @@ func (o ObservableBool) ToSlice() (slice []bool, err error) {
 	return
 }
 
-//jig:name ObservableIntToSlice
+//jig:name ObservableInt_ToSlice
 
 // ToSlice collects all values from the ObservableInt into an slice. The
 // complete slice and any error are returned.
@@ -2651,7 +2858,7 @@ func (o ObservableInt) ToSlice() (slice []int, err error) {
 	return
 }
 
-//jig:name ObservableWait
+//jig:name Observable_Wait
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
@@ -2671,7 +2878,7 @@ func (o Observable) Wait() (err error) {
 	return
 }
 
-//jig:name ObservableBoolWait
+//jig:name ObservableBool_Wait
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
@@ -2691,7 +2898,7 @@ func (o ObservableBool) Wait() (err error) {
 	return
 }
 
-//jig:name ObservableIntWait
+//jig:name ObservableInt_Wait
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
@@ -2717,7 +2924,7 @@ const ErrAutoConnectInvalidCount = RxError("invalid count")
 
 const ErrAutoConnectNeedsConcurrentScheduler = RxError("needs concurrent scheduler")
 
-//jig:name MulticasterAutoConnect
+//jig:name Multicaster_AutoConnect
 
 // AutoConnect makes a Multicaster behave like an ordinary Observable
 // that automatically connects when the specified number of clients have
@@ -2746,7 +2953,7 @@ func (o Multicaster) AutoConnect(count int) Observable {
 
 const ErrRefCountNeedsConcurrentScheduler = RxError("needs concurrent scheduler")
 
-//jig:name MulticasterRefCount
+//jig:name Multicaster_RefCount
 
 // RefCount makes a Multicaster behave like an ordinary Observable. On
 // first Subscribe it will call Connect on its Multicaster and when its last
@@ -2778,7 +2985,7 @@ func (o Multicaster) RefCount() Observable {
 	return observable
 }
 
-//jig:name ObservableMulticast
+//jig:name Observable_Multicast
 
 // Multicast converts an ordinary observable into a multicasting connectable
 // observable or multicaster for short. A multicaster will only start emitting
@@ -2932,7 +3139,7 @@ func NewSubject() Subject {
 	return Subject{observer, observable.AsObservable()}
 }
 
-//jig:name ObservablePublish
+//jig:name Observable_Publish
 
 // Publish uses the Multicast operator to control the subscription of a
 // Subject to a source observable and turns the subject it into a connnectable
@@ -2999,7 +3206,7 @@ func NewReplaySubject(bufferCapacity int, windowDuration time.Duration) Subject 
 	return Subject{observer, observable.AsObservable()}
 }
 
-//jig:name ObservablePublishReplay
+//jig:name Observable_PublishReplay
 
 // Replay uses the Multicast operator to control the subscription of a
 // ReplaySubject to a source observable and turns the subject into a
@@ -3042,7 +3249,39 @@ func FromObservable(slice ...Observable) ObservableObservable {
 	return observable
 }
 
-//jig:name ObservableMapObservable
+//jig:name TimeIntervalObserver
+
+// TimeIntervalObserver is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
+// completed normally.
+type TimeIntervalObserver func(next TimeInterval, err error, done bool)
+
+//jig:name ObservableTimeInterval
+
+// ObservableTimeInterval is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type ObservableTimeInterval func(TimeIntervalObserver, Scheduler, Subscriber)
+
+//jig:name TimestampObserver
+
+// TimestampObserver is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
+// completed normally.
+type TimestampObserver func(next Timestamp, err error, done bool)
+
+//jig:name ObservableTimestamp
+
+// ObservableTimestamp is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type ObservableTimestamp func(TimestampObserver, Scheduler, Subscriber)
+
+//jig:name Observable_MapObservable
 
 // MapObservable transforms the items emitted by an Observable by applying a
 // function to each item.
@@ -3060,7 +3299,7 @@ func (o Observable) MapObservable(project func(interface{}) Observable) Observab
 	return observable
 }
 
-//jig:name ObservableBoolSingle
+//jig:name ObservableBool_Single
 
 // Single enforces that the observableBool sends exactly one data item and then
 // completes. If the observable sends no data before completing or sends more
@@ -3069,7 +3308,7 @@ func (o ObservableBool) Single() ObservableBool {
 	return o.AsObservable().Single().AsObservableBool()
 }
 
-//jig:name ObservableIntSingle
+//jig:name ObservableInt_Single
 
 // Single enforces that the observableInt sends exactly one data item and then
 // completes. If the observable sends no data before completing or sends more
@@ -3078,7 +3317,7 @@ func (o ObservableInt) Single() ObservableInt {
 	return o.AsObservable().Single().AsObservableInt()
 }
 
-//jig:name ObservableAsObservable
+//jig:name Observable_AsObservable
 
 // AsObservable returns the source Observable unchanged.
 // This is a special case needed for internal plumbing.
