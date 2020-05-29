@@ -1,8 +1,9 @@
 # All
 
-## Overview
+[![](../rxdoc.svg)](http://reactivex.io/documentation/operators/all.html)
+[![](https://godoc.org/github.com/reactivego/rx/test/All?status.png)](http://godoc.org/github.com/reactivego/rx/test/All)
 
-[All](http://reactivex.io/documentation/operators/all.html) determines whether all items emitted by an Observable meet some
+**All** determines whether all items emitted by an Observable meet some
 criteria.
 
 Pass a predicate function to the All operator that accepts an item emitted
@@ -13,45 +14,24 @@ normally and every item emitted by the source Observable evaluated as
 true according to the predicate; false if any item emitted by the source
 Observable evaluates as false according to the predicate.
 
-![All](http://reactivex.io/documentation/operators/images/all.png)
+<!--
+marble marble
+{
+	source a:                 +-1-2-6-2-1-|
+	operator All(Less<Than5): +-----------(false)|
+}
+-->
+![All](marble.svg)
 
-## Example (All)
 Code:
 ```go
-source := CreateInt(func(N NextInt, E Error, C Complete, X Canceled) {
-	N(1)
-	N(2)
-	N(6)
-	N(2)
-	N(1)
-	C()
-})
-
-// Print the sequence of numbers
-source.Println()
-fmt.Println("Source observable completed")
-
-// Setup All to produce true only when all source values are less than 5
-predicate := func(i int) bool {
+LessThan5 := func(i int) bool {
 	return i < 5
 }
-
-// Observer prints a message describing the next value it observes.
-observer := func(next bool, err error, done bool) {
-	if !done {
-		fmt.Println("All values less than 5?", next)
-	}
-}
-
-source.All(predicate).Subscribe(observer).Wait()
+FromInt(1, 2, 6, 2, 1).All(LessThan5).Println("All values less than 5?")
 ```
+
 Output:
 ```
-1
-2
-6
-2
-1
-Source observable completed
 All values less than 5? false
 ```

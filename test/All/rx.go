@@ -11,26 +11,6 @@ import (
 	"github.com/reactivego/subscriber"
 )
 
-//jig:name Error
-
-// Error signals an error condition.
-type Error func(error)
-
-//jig:name Complete
-
-// Complete signals that no more data is to be expected.
-type Complete func()
-
-//jig:name Canceled
-
-// Canceled returns true when the observer has unsubscribed.
-type Canceled func() bool
-
-//jig:name NextInt
-
-// NextInt can be called to emit the next value to the IntObserver.
-type NextInt func(int)
-
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
@@ -59,71 +39,32 @@ type IntObserver func(next int, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableInt func(IntObserver, Scheduler, Subscriber)
 
-//jig:name CreateInt
+//jig:name FromInt
 
-// CreateInt provides a way of creating an ObservableInt from
-// scratch by calling observer methods programmatically.
-//
-// The create function provided to CreateInt will be called once
-// to implement the observable. It is provided with a NextInt, Error,
-// Complete and Canceled function that can be called by the code that
-// implements the Observable.
-func CreateInt(create func(NextInt, Error, Complete, Canceled)) ObservableInt {
+// FromInt creates an ObservableInt from multiple int values passed in.
+func FromInt(slice ...int) ObservableInt {
 	var zeroInt int
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
-		runner := scheduler.Schedule(func() {
-			if subscriber.Canceled() {
-				return
-			}
-			n := func(next int) {
-				if subscriber.Subscribed() {
-					observe(next, nil, false)
-				}
-			}
-			e := func(err error) {
-				if subscriber.Subscribed() {
-					observe(zeroInt, err, true)
-				}
-			}
-			c := func() {
-				if subscriber.Subscribed() {
+		i := 0
+		runner := scheduler.ScheduleRecursive(func(self func()) {
+			if subscriber.Subscribed() {
+				if i < len(slice) {
+					observe(slice[i], nil, false)
+					if subscriber.Subscribed() {
+						i++
+						self()
+					}
+				} else {
 					observe(zeroInt, nil, true)
 				}
 			}
-			x := func() bool {
-				return subscriber.Canceled()
-			}
-			create(n, e, c, x)
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }
 
-//jig:name ObservableIntPrintln
-
-// Println subscribes to the Observable and prints every item to os.Stdout
-// while it waits for completion or error. Returns either the error or nil
-// when the Observable completed normally.
-// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) Println(a ...interface{}) (err error) {
-	subscriber := subscriber.New()
-	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, e error, done bool) {
-		if !done {
-			fmt.Println(append(a, next)...)
-		} else {
-			err = e
-			subscriber.Unsubscribe()
-		}
-	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
-}
-
-//jig:name ObservableIntAll
+//jig:name ObservableInt_All
 
 // All determines whether all items emitted by an ObservableInt meet some
 // criteria.
@@ -174,7 +115,7 @@ type Observer func(next interface{}, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type Observable func(Observer, Scheduler, Subscriber)
 
-//jig:name ObservableIntAsObservable
+//jig:name ObservableInt_AsObservable
 
 // AsObservable turns a typed ObservableInt into an Observable of interface{}.
 func (o ObservableInt) AsObservable() Observable {
@@ -187,34 +128,7 @@ func (o ObservableInt) AsObservable() Observable {
 	return observable
 }
 
-//jig:name Subscription
-
-// Subscription is an alias for the subscriber.Subscription interface type.
-type Subscription = subscriber.Subscription
-
-//jig:name ObservableBoolSubscribe
-
-// Subscribe operates upon the emissions and notifications from an Observable.
-// This method returns a Subscription.
-// Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableBool) Subscribe(observe BoolObserver, subscribers ...Subscriber) Subscription {
-	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.MakeTrampoline()
-	observer := func(next bool, err error, done bool) {
-		if !done {
-			observe(next, err, done)
-		} else {
-			var zeroBool bool
-			observe(zeroBool, err, true)
-			subscribers[0].Unsubscribe()
-		}
-	}
-	subscribers[0].OnWait(scheduler.Wait)
-	o(observer, scheduler, subscribers[0])
-	return subscribers[0]
-}
-
-//jig:name ObservableAll
+//jig:name Observable_All
 
 // All determines whether all items emitted by an Observable meet some
 // criteria.
@@ -245,4 +159,27 @@ func (o Observable) All(predicate func(next interface{}) bool) ObservableBool {
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
+}
+
+//jig:name ObservableBool_Println
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableBool) Println(a ...interface{}) (err error) {
+	subscriber := subscriber.New()
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next bool, e error, done bool) {
+		if !done {
+			fmt.Println(append(a, next)...)
+		} else {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
 }
