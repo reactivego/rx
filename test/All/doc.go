@@ -1,4 +1,6 @@
 /*
+	reactivex|doc	http://reactivex.io/documentation/operators/all.html
+
 All determines whether all items emitted by an Observable meet some
 criteria.
 
@@ -9,8 +11,6 @@ boolean value: true if and only if the source Observable terminates
 normally and every item emitted by the source Observable evaluated as
 true according to the predicate; false if any item emitted by the source
 Observable evaluates as false according to the predicate.
-
-	All	http://reactivex.io/documentation/operators/all.html
 */
 package All
 
