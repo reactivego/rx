@@ -1,7 +1,6 @@
 # Generics Library
 
-In order to use the package as a generic programming library, first install the [*jig*](https://github.com/reactivego/jig) tool.
-It generates source code from a generics library. 
+In order to use the package as a generic programming library for *Go 1*, first install the [*jig* generator tool](https://github.com/reactivego/jig). It will generate source code from a generics library.
 
 Using the library is very simple. Just import the library with the blank identifier `_`.
 

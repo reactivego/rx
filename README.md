@@ -18,7 +18,7 @@ Use the go tool to get the package:
 $ go get github.com/reactivego/rx
 ```
 
-Then import it in your code:
+Then import it in your program:
 
 ```go
 import "github.com/reactivego/rx"
@@ -29,6 +29,8 @@ The API is accessed directly through the `rx` prefix.
 rx.From(1,2,"hello").Println()
 ```
 For documentation and examples, see the online [godoc](http://godoc.org/github.com/reactivego/rx) reference.
+
+> NOTE : this package can also be used as a *Generics Library* for *Go 1* see [below](#generics-library)
 
 ## Observables
 The main focus of `rx` is on [Observables](http://reactivex.io/documentation/observable.html).
@@ -124,7 +126,7 @@ $ go get -d github.com/reactivego/jig
 $ go run github.com/reactivego/jig -v
 ```
 ## Generics Library
-This package can be used as a *Generics Library*. Allowing you to write programs using statically typed *Observables* and *Operators*. For example:
+This package can be used as a *Generics Library* for *Go 1*. It supports the writing of programs that use statically typed *Observables* and *Operators*. For example:
 
 ```go
 package main
