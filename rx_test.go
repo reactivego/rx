@@ -142,6 +142,60 @@ func ExampleObservable_Map() {
 	// 4!
 }
 
+func ExampleObservable_MergeDelayError() {
+	const ms = time.Millisecond
+	AddMul := func(add, mul int) func(interface{}) interface{}{
+		return func(i interface{}) interface{} {
+			return mul * (i.(int)+add)
+		}
+	}
+	To := func(to int) func(interface{}) interface{} {
+		return func(interface{}) interface{} {
+			return to
+		}
+	}
+
+	a := rx.Interval(20 * ms).AsObservable().Map(AddMul(1, 20)).Take(4).ConcatWith(rx.Throw(rx.RxError("boom")))
+	b := rx.Timer(70 * ms, 20 * ms).AsObservable().Map(To(1)).Take(2)
+	err := rx.MergeDelayError(a, b).Println()
+	fmt.Println(err)
+	// Output:
+	// 20
+	// 40
+	// 60
+	// 1
+	// 80
+	// 1
+	// boom
+}
+
+func ExampleObservable_MergeDelayErrorWith() {
+	const ms = time.Millisecond
+
+	Access := func(slice ...interface{}) func(interface{}) interface{}{
+		return func(i interface{}) interface{} {
+			if i.(int) < len(slice) {
+				return slice[i.(int)]
+			} else {
+				return rx.RxError("bool")
+			}
+		}
+	}
+
+	a := rx.Interval(20 * ms).AsObservable().Map(Access(20,40,60,80))
+	b := rx.Timer(70 * ms, 20 * ms).AsObservable().Map(Access(1,1)).Take(2)
+
+	fmt.Println(a.MergeDelayErrorWith(b).Println())
+	// Output:
+	// 20
+	// 40
+	// 60
+	// 1
+	// 80
+	// 1
+	// boom
+}
+
 func ExampleObservable_MergeMap() {
 	source := rx.From(1, 2).
 		MergeMap(func(n interface{}) rx.Observable {

@@ -87,29 +87,230 @@ concurrently running process that pushes out values.
 Operators form a language in which programs featuring Observables can be expressed.
 They work on one or more Observables to transform, filter and combine them into new Observables.
 
-Currently 90 operators have been implemented:
+<details><summary>Ajax</summary>
 
-| A … C                | C … I                   | I … P             | P … S           | S … W          |
-|:---------------------|:------------------------|:------------------|:----------------|:---------------|
-| [All]                | [Create]                | [IgnoreElements]  | [Publish]       | [Sum]          |
-| [AsObservable]       | [CreateFutureRecursive] | [Interval]        | [PublishReplay] | [SwitchAll]    |
-| [Audit]              | [CreateRecursive]       | [Just]            | [Range]         | [SwitchMap]    |
-| [AutoConnect]        | [Debounce]              | [Last]            | [Reduce]        | [Take]         |
-| [Average]            | [Defer]                 | [Map]             | [RefCount]      | [TakeLast]     |
-| [Catch]              | [Delay]                 | [Max]             | [Repeat]        | [TakeUntil]    |
-| [CombineLatest]      | [Distinct]              | [Merge]           | [ReplaySubject] | [TakeWhile]    |
-| [CombineLatestAll]   | [Do]                    | [MergeAll]        | [Retry]         | [Throttle]     |
-| [CombineLatestMap]   | [DoOnComplete]          | [MergeDelayError] | [Sample]        | [Throw]        |
-| [CombineLatestMapTo] | [DoOnError]             | [MergeMap]        | [Scan]          | [Ticker]       |
-| [CombineLatestWith]  | [ElementAt]             | [MergeWith]       | [Serialize]     | [TimeInterval] |
-| [Concat]             | [Empty]                 | [Min]             | [Single]        | [Timeout]      |
-| [ConcatAll]          | [Filter]                | [Never]           | [Skip]          | [Timer]        |
-| [ConcatMap]          | [Finally]               | [ObserveOn]       | [SkipLast]      | [Timestamp]    |
-| [ConcatMapTo]        | [First]                 | [Of]              | [Start]         | [ToChan]       |
-| [ConcatWith]         | [From]                  | [Only]            | [Subject]       | [ToSingle]     |
-| [Connect]            | [FromChan]              | [Passthrough]     | [Subscribe]     | [ToSlice]      |
-| [Count]              | [IgnoreCompletion]      | [Println]         | [SubscribeOn]   | [Wait]         |
-> See [test directory](test) for Operators details 
+#### TBD
+
+</details>
+<details><summary>All</summary>
+
+Determines whether all items emitted by an Observable meet some criteria.
+
+Pass a predicate function to the **All** operator that accepts an item emitted
+by the source Observable and returns a boolean value based on an
+evaluation of that item. **All** returns an ObservableBool that emits a single
+boolean value: true if and only if the source Observable terminates
+normally and every item emitted by the source Observable evaluated as
+true according to the predicate; false if any item emitted by the source
+Observable evaluates as false according to the predicate.
+
+![All](svg/All.svg)
+
+Code:
+```go
+LessThan5 := func(i interface{}) bool {
+	return i.(int) < 5
+}
+rx.From(1, 2, 6, 2, 1).All(LessThan5).Println("All values less than 5?")
+```
+Output:
+```
+All values less than 5? false
+```
+
+</details>
+<details><summary>BufferTime</summary>
+
+#### TBD
+
+</details>
+<details><summary>Catch</summary>
+
+#### TBD
+
+</details>
+<details><summary>CatchError</summary>
+
+#### TBD
+
+</details>
+<details><summary>CombineLatest</summary>
+
+#### TBD
+
+</details>
+<details><summary>Concat</summary>
+
+#### TBD
+
+</details>
+<details><summary>ConcatMap</summary>
+
+#### TBD
+
+</details>
+<details><summary>ConcatWith</summary>
+
+#### TBD
+
+</details>
+<details><summary>Create</summary>
+
+#### TBD
+
+</details>
+<details><summary>DebounceTime</summary>
+
+#### TBD
+
+</details>
+<details><summary>DistinctUntilChanged</summary>
+
+#### TBD
+
+</details>
+<details><summary>Do</summary>
+
+#### TBD
+
+</details>
+<details><summary>Filter</summary>
+
+#### TBD
+
+</details>
+<details><summary>From</summary>
+
+#### TBD
+
+</details>
+<details><summary>Just</summary>
+
+#### TBD
+
+</details>
+<details><summary>Map</summary>
+
+#### TBD
+
+</details>
+<details><summary>Merge</summary>
+
+#### TBD
+
+</details>
+<details><summary>MergeDelayError</summary>
+
+Combines multiple Observables into one by merging their emissions.
+Any error will be deferred until all observables terminate.
+
+![MergeDelayError](svg/MergeDelayError.svg)
+
+Code:
+```go
+const ms = time.Millisecond
+Mul := func(factor int) func(interface{}) interface{}{
+	return func(i interface{}) interface{} {
+		return factor * (i.(int)+1)
+	}
+}
+To := func(to int) func(interface{}) interface{} {
+	return func(interface{}) interface{} {
+		return to
+	}
+}
+
+a := rx.Interval(20 * ms).AsObservable().Map(Mul(20)).Take(4).ConcatWith(rx.Throw(rx.RxError("boom")))
+b := rx.Timer(70 * ms, 20 * ms).AsObservable().Map(To(1)).Take(2)
+err := rx.MergeDelayError(a, b).Println()
+fmt.Println(err)
+```
+
+Output:
+```
+20
+40
+60
+1
+80
+1
+boom
+```
+
+</details>
+<details><summary>MergeDelayErrorWith</summary>
+
+Combines multiple Observables into one by merging their emissions.
+Any error will be deferred until all observables terminate.
+
+![MergeDelayError](svg/MergeDelayError.svg)
+
+Code:
+```go
+
+```
+
+Output:
+```
+
+```
+
+</details>
+<details><summary>MergeMap</summary>
+
+#### TBD
+
+</details>
+<details><summary>MergeWith</summary>
+
+#### TBD
+
+</details>
+<details><summary>Of</summary>
+
+#### TBD
+
+</details>
+<details><summary>Publish</summary>
+
+#### TBD
+
+</details>
+<details><summary>PublishReplay</summary>
+
+#### TBD
+
+</details>
+<details><summary>Scan</summary>
+
+#### TBD
+
+</details>
+<details><summary>StartWith</summary>
+
+#### TBD
+
+</details>
+<details><summary>SwitchMap</summary>
+
+#### TBD
+
+</details>
+<details><summary>Take</summary>
+
+#### TBD
+
+</details>
+<details><summary>TakeUntil</summary>
+
+#### TBD
+
+</details>
+<details><summary>WithLatestFrom</summary>
+
+#### TBD
+
+</details>
 
 ## Regenerating this Package
 This package is generated from generics in the sub-folder generic by the [jig](http://github.com/reactivego/jig) tool.
@@ -151,95 +352,3 @@ It is the ReactiveX incarnation that pushes the envelope in evolving operator se
 
 ## License
 This library is licensed under the terms of the MIT License. See [LICENSE](LICENSE) file for copyright notice and exact wording.
-
-[All]: test/All
-[All]: test/All
-[AsObservable]: test/AsObservable
-[Audit]: test/Audit
-[AutoConnect]: test/AutoConnect
-[Average]: test/Average
-[Catch]: test/Catch
-[CombineLatest]: test/CombineLatest
-[CombineLatestAll]: test/CombineLatestAll
-[CombineLatestMap]: test/CombineLatestMap
-[CombineLatestMapTo]: test/CombineLatestMapTo
-[CombineLatestWith]: test/CombineLatestWith
-[Concat]: test/Concat
-[ConcatAll]: test/ConcatAll
-[ConcatMap]: test/ConcatMap
-[ConcatMapTo]: test/ConcatMapTo
-[ConcatWith]: test/ConcatWith
-[Connect]: test/Connect
-[Count]: test/Count
-[Create]: test/Create
-[CreateFutureRecursive]: test/CreateFutureRecursive
-[CreateRecursive]: test/CreateRecursive
-[Debounce]: test/Debounce
-[Defer]: test/Defer
-[Delay]: test/Delay
-[Distinct]: test/Distinct
-[Do]: test/Do
-[DoOnComplete]: test/DoOnComplete
-[DoOnError]: test/DoOnError
-[ElementAt]: test/ElementAt
-[Empty]: test/Empty
-[Filter]: test/Filter
-[Finally]: test/Finally
-[First]: test/First
-[From]: test/From
-[FromChan]: test/FromChan
-[IgnoreCompletion]: test/IgnoreCompletion
-[IgnoreElements]: test/IgnoreElements
-[Interval]: test/Interval
-[Just]: test/Just
-[Last]: test/Last
-[Map]: test/Map
-[Max]: test/Max
-[Merge]: test/Merge
-[MergeAll]: test/MergeAll
-[MergeDelayError]: test/MergeDelayError
-[MergeMap]: test/MergeMap
-[MergeWith]: test/MergeWith
-[Min]: test/Min
-[Never]: test/Never
-[ObserveOn]: test/ObserveOn
-[Of]: test/Of
-[Only]: test/Only
-[Passthrough]: test/Passthrough
-[Println]: test/Println
-[Publish]: test/Publish
-[PublishReplay]: test/PublishReplay
-[Range]: test/Range
-[Reduce]: test/Reduce
-[RefCount]: test/RefCount
-[Repeat]: test/Repeat
-[ReplaySubject]: test/ReplaySubject
-[Retry]: test/Retry
-[Sample]: test/Sample
-[Scan]: test/Scan
-[Serialize]: test/Serialize
-[Single]: test/Single
-[Skip]: test/Skip
-[SkipLast]: test/SkipLast
-[Start]: test/Start
-[Subject]: test/Subject
-[Subscribe]: test/Subscribe
-[SubscribeOn]: test/SubscribeOn
-[Sum]: test/Sum
-[SwitchAll]: test/SwitchAll
-[SwitchMap]: test/SwitchMap
-[Take]: test/Take
-[TakeLast]: test/TakeLast
-[TakeUntil]: test/TakeUntil
-[TakeWhile]: test/TakeWhile
-[Throttle]: test/Throttle
-[Throw]: test/Throw
-[Ticker]: test/Ticker
-[TimeInterval]: test/TimeInterval
-[Timeout]: test/Timeout
-[Timer]: test/Timer
-[Timestamp]: test/Timestamp
-[ToChan]: test/ToChan
-[ToSingle]: test/ToSingle
-[ToSlice]: test/ToSlice
-[Wait]: test/Wait

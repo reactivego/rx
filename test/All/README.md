@@ -15,13 +15,6 @@ normally and every item emitted by the source Observable evaluated as
 true according to the predicate; false if any item emitted by the source
 Observable evaluates as false according to the predicate.
 
-<!--
-marble all
-{
-	source a:                 +-1-2-6-2-1-|
-	operator All(Less<Than5): +-----------(false)|
-}
--->
 ![All](../../svg/All.svg)
 ## Example
 ```go

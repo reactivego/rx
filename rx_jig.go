@@ -77,7 +77,7 @@ func require() {
 	oo.MergeAll()
 
 	MergeDelayError(o)
-	o.MergeDelayError() //With
+	o.MergeDelayErrorWith()
 	//o.MergeDelayErrorMap(func(interface{}) Observable { return o })
 	// o.MergeDelayErrorMapTo(o)
 	//oo.MergeDelayErrorAll()

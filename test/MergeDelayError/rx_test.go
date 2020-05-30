@@ -24,8 +24,7 @@ func Example_mergeDelayError() {
 		C()
 	})
 
-	result, err := sourceA.MergeDelayError(sourceB).ToSlice()
+	result, err := MergeDelayErrorInt(sourceA, sourceB).ToSlice()
 	fmt.Println(result, err)
-
 	// Output: [1 0 2] error.sourceA
 }

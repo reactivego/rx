@@ -2,7 +2,7 @@
 
 //go:generate jig
 
-package MergeDelayError
+package MergeDelayErrorWith
 
 import (
 	"sync"
@@ -105,33 +105,6 @@ func CreateInt(create func(NextInt, Error, Complete, Canceled)) ObservableInt {
 type RxError string
 
 func (e RxError) Error() string	{ return string(e) }
-
-//jig:name MergeDelayErrorInt
-
-// MergeDelayErrorInt combines multiple Observables into one by merging their emissions.
-// Any error will be deferred until all observables terminate.
-func MergeDelayErrorInt(observables ...ObservableInt) ObservableInt {
-	if len(observables) == 0 {
-		return EmptyInt()
-	}
-	return observables[0].MergeDelayErrorWith(observables[1:]...)
-}
-
-//jig:name EmptyInt
-
-// EmptyInt creates an Observable that emits no items but terminates normally.
-func EmptyInt() ObservableInt {
-	var zeroInt int
-	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
-		runner := scheduler.Schedule(func() {
-			if subscriber.Subscribed() {
-				observe(zeroInt, nil, true)
-			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
-}
 
 //jig:name ObservableInt_MergeDelayErrorWith
 

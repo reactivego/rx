@@ -132,14 +132,14 @@ func MergeDelayErrorFoo(observables ...ObservableFoo) ObservableFoo {
 	if len(observables) == 0 {
 		return EmptyFoo()
 	}
-	return observables[0].MergeDelayError(observables[1:]...)
+	return observables[0].MergeDelayErrorWith(observables[1:]...)
 }
 
-//jig:template Observable<Foo> MergeDelayError
+//jig:template Observable<Foo> MergeDelayErrorWith
 
 // MergeDelayError combines multiple Observables into one by merging their emissions.
 // Any error will be deferred until all observables terminate.
-func (o ObservableFoo) MergeDelayError(other ...ObservableFoo) ObservableFoo {
+func (o ObservableFoo) MergeDelayErrorWith(other ...ObservableFoo) ObservableFoo {
 	if len(other) == 0 {
 		return o
 	}

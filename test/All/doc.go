@@ -11,7 +11,3 @@ true according to the predicate; false if any item emitted by the source
 Observable evaluates as false according to the predicate.
 */
 package All
-
-
-//	reactivex|doc	http://reactivex.io/documentation/operators/all.html
-
