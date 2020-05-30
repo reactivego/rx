@@ -1,4 +1,4 @@
-package Audit
+package AuditTime
 
 import (
 	"fmt"
@@ -7,10 +7,10 @@ import (
 	_ "github.com/reactivego/rx"
 )
 
-func Example_audit() {
+func Example_auditTime() {
 	const ms = time.Millisecond
 
-	Interval(1 * ms).Audit(10 * ms).Take(5).Println()
+	Interval(1 * ms).AuditTime(10 * ms).Take(5).Println()
 	// Output:
 	// 9
 	// 19
@@ -19,7 +19,7 @@ func Example_audit() {
 	// 49
 }
 
-func Example_auditBursts() {
+func Example_auditTimeBursts() {
 	const ms = time.Millisecond
 
 	burst20ms := func(i int) ObservableInt {
@@ -30,11 +30,11 @@ func Example_auditBursts() {
 
 	fmt.Println("-1-")
 
-	Interval(25 * ms).Take(4).MergeMapInt(burst20ms).Audit(21 * ms).Println()
+	Interval(25 * ms).Take(4).MergeMapInt(burst20ms).AuditTime(21 * ms).Println()
 
 	fmt.Println("-2-")
 
-	Interval(50 * ms).Take(4).MergeMapInt(burst20ms).Audit(14 * ms).Println()
+	Interval(50 * ms).Take(4).MergeMapInt(burst20ms).AuditTime(14 * ms).Println()
 	// Output:
 	// -1-
 	// 3

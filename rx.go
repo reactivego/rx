@@ -1351,12 +1351,12 @@ func (o ObservableInt) AsObservable() Observable {
 	return observable
 }
 
-//jig:name Observable_Audit
+//jig:name Observable_AuditTime
 
-// Audit waits until the source emits and then starts a timer. When the timer
-// expires, Audit will emit the last value received from the source during the
-// time period when the timer was active.
-func (o Observable) Audit(duration time.Duration) Observable {
+// AuditTime waits until the source emits and then starts a timer. When the
+// timer expires, AuditTime will emit the last value received from the source
+// during the time period when the timer was active.
+func (o Observable) AuditTime(duration time.Duration) Observable {
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		var audit struct {
 			sync.Mutex

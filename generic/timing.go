@@ -7,12 +7,12 @@ import (
 	"github.com/reactivego/scheduler"
 )
 
-//jig:template Observable Audit
+//jig:template Observable AuditTime
 
-// Audit waits until the source emits and then starts a timer. When the timer
-// expires, Audit will emit the last value received from the source during the
-// time period when the timer was active.
-func (o Observable) Audit(duration time.Duration) Observable {
+// AuditTime waits until the source emits and then starts a timer. When the
+// timer expires, AuditTime will emit the last value received from the source
+// during the time period when the timer was active.
+func (o Observable) AuditTime(duration time.Duration) Observable {
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		var audit struct {
 			sync.Mutex
@@ -61,14 +61,14 @@ func (o Observable) Audit(duration time.Duration) Observable {
 	return observable
 }
 
-//jig:template Observable<Foo> Audit
-//jig:needs Observable Audit
+//jig:template Observable<Foo> AuditTime
+//jig:needs Observable AuditTime
 
-// Audit waits until the source emits and then starts a timer. When the timer
-// expires, Audit will emit the last value received from the source during the
-// time period when the timer was active.
-func (o ObservableFoo) Audit(duration time.Duration) ObservableFoo {
-	return o.AsObservable().Audit(duration).AsObservableFoo()
+// AuditTime waits until the source emits and then starts a timer. When the
+// timer expires, AuditTime will emit the last value received from the source
+// during the time period when the timer was active.
+func (o ObservableFoo) AuditTime(duration time.Duration) ObservableFoo {
+	return o.AsObservable().AuditTime(duration).AsObservableFoo()
 }
 
 //jig:template Observable Debounce

@@ -16,7 +16,7 @@ Currently 91 operators have been implemented:
 |:------------------------|:------------------------|:----------------------|:----------------|:---------------|
 | [All]                   | [Debounce]              | [Merge]               | [Sample]        | [Timeout]      |
 | [AsObservable]          | [Defer]                 | [MergeAll]            | [Scan]          | [Timer]        |
-| [Audit]                 | [Delay]                 | [MergeDelayError]     | [Serialize]     | [Timestamp]    |
+| [AuditTime]             | [Delay]                 | [MergeDelayError]     | [Serialize]     | [Timestamp]    |
 | [AutoConnect]           | [Distinct]              | [MergeDelayErrorWith] | [Single]        | [ToChan]       |
 | [Average]               | [Do]                    | [MergeMap]            | [Skip]          | [ToSingle]     |
 | [Catch]                 | [DoOnComplete]          | [MergeWith]           | [SkipLast]      | [ToSlice]      |
@@ -39,7 +39,7 @@ Currently 91 operators have been implemented:
 [All]: All
 [All]: All
 [AsObservable]: AsObservable
-[Audit]: Audit
+[AuditTime]: AuditTime
 [AutoConnect]: AutoConnect
 [Average]: Average
 [Catch]: Catch

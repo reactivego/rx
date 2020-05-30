@@ -88,7 +88,7 @@ func require() {
 	o.AsObservableInt()
 	b.AsObservable()
 	i.AsObservable()
-	o.Audit(time.Millisecond)
+	o.AuditTime(time.Millisecond)
 	i.Average()
 	o.Catch(o)
 	o.Count()
