@@ -87,11 +87,6 @@ concurrently running process that pushes out values.
 Operators form a language in which programs featuring Observables can be expressed.
 They work on one or more Observables to transform, filter and combine them into new Observables.
 
-<details><summary>Ajax</summary>
-
-#### TBD
-
-</details>
 <details><summary>BufferTime</summary>
 
 #### TBD
