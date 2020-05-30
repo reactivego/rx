@@ -92,7 +92,7 @@ func require() {
 	i.Average()
 	o.Catch(o)
 	o.Count()
-	o.Debounce(time.Millisecond)
+	o.DebounceTime(time.Millisecond)
 	o.Delay(time.Millisecond)
 	o.Distinct()
 	o.Do(func(interface{}) {})

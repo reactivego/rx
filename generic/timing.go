@@ -71,11 +71,11 @@ func (o ObservableFoo) AuditTime(duration time.Duration) ObservableFoo {
 	return o.AsObservable().AuditTime(duration).AsObservableFoo()
 }
 
-//jig:template Observable Debounce
+//jig:template Observable DebounceTime
 
-// Debounce only emits the last item of a burst from an Observable if a
+// DebounceTime only emits the last item of a burst from an Observable if a
 // particular timespan has passed without it emitting another item.
-func (o Observable) Debounce(duration time.Duration) Observable {
+func (o Observable) DebounceTime(duration time.Duration) Observable {
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		var debounce struct {
 			sync.Mutex
@@ -125,13 +125,13 @@ func (o Observable) Debounce(duration time.Duration) Observable {
 	return observable
 }
 
-//jig:template Observable<Foo> Debounce
-//jig:needs Observable Debounce
+//jig:template Observable<Foo> DebounceTime
+//jig:needs Observable DebounceTime
 
-// Debounce only emits the last item of a burst from an ObservableFoo if a
+// DebounceTime only emits the last item of a burst from an ObservableFoo if a
 // particular timespan has passed without it emitting another item.
-func (o ObservableFoo) Debounce(duration time.Duration) ObservableFoo {
-	return o.AsObservable().Debounce(duration).AsObservableFoo()
+func (o ObservableFoo) DebounceTime(duration time.Duration) ObservableFoo {
+	return o.AsObservable().DebounceTime(duration).AsObservableFoo()
 }
 
 //jig:template Observable Delay

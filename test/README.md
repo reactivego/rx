@@ -14,7 +14,7 @@ Currently 91 operators have been implemented:
    
 | A … C                   | D … M                   | M … S                 | S … T           | T … W          |
 |:------------------------|:------------------------|:----------------------|:----------------|:---------------|
-| [All]                   | [Debounce]              | [Merge]               | [Sample]        | [Timeout]      |
+| [All]                   | [DebounceTime]          | [Merge]               | [Sample]        | [Timeout]      |
 | [AsObservable]          | [Defer]                 | [MergeAll]            | [Scan]          | [Timer]        |
 | [AuditTime]             | [Delay]                 | [MergeDelayError]     | [Serialize]     | [Timestamp]    |
 | [AutoConnect]           | [Distinct]              | [MergeDelayErrorWith] | [Single]        | [ToChan]       |
@@ -58,7 +58,7 @@ Currently 91 operators have been implemented:
 [Create]: Create
 [CreateFutureRecursive]: CreateFutureRecursive
 [CreateRecursive]: CreateRecursive
-[Debounce]: Debounce
+[DebounceTime]: DebounceTime
 [Defer]: Defer
 [Delay]: Delay
 [Distinct]: Distinct

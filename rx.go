@@ -1468,11 +1468,11 @@ func (o Observable) Count() ObservableInt {
 	return observable
 }
 
-//jig:name Observable_Debounce
+//jig:name Observable_DebounceTime
 
-// Debounce only emits the last item of a burst from an Observable if a
+// DebounceTime only emits the last item of a burst from an Observable if a
 // particular timespan has passed without it emitting another item.
-func (o Observable) Debounce(duration time.Duration) Observable {
+func (o Observable) DebounceTime(duration time.Duration) Observable {
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		var debounce struct {
 			sync.Mutex

@@ -2,7 +2,7 @@
 
 //go:generate jig
 
-package Debounce
+package DebounceTime
 
 import (
 	"fmt"
@@ -74,7 +74,7 @@ func Interval(interval time.Duration) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableTake
+//jig:name Observable_Take
 
 // Take emits only the first n items emitted by an Observable.
 func (o Observable) Take(n int) Observable {
@@ -96,18 +96,18 @@ func (o Observable) Take(n int) Observable {
 	return observable
 }
 
-//jig:name ObservableIntTake
+//jig:name ObservableInt_Take
 
 // Take emits only the first n items emitted by an ObservableInt.
 func (o ObservableInt) Take(n int) ObservableInt {
 	return o.AsObservable().Take(n).AsObservableInt()
 }
 
-//jig:name ObservableDebounce
+//jig:name Observable_DebounceTime
 
-// Debounce only emits the last item of a burst from an Observable if a
+// DebounceTime only emits the last item of a burst from an Observable if a
 // particular timespan has passed without it emitting another item.
-func (o Observable) Debounce(duration time.Duration) Observable {
+func (o Observable) DebounceTime(duration time.Duration) Observable {
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		var debounce struct {
 			sync.Mutex
@@ -157,12 +157,12 @@ func (o Observable) Debounce(duration time.Duration) Observable {
 	return observable
 }
 
-//jig:name ObservableIntDebounce
+//jig:name ObservableInt_DebounceTime
 
-// Debounce only emits the last item of a burst from an ObservableInt if a
+// DebounceTime only emits the last item of a burst from an ObservableInt if a
 // particular timespan has passed without it emitting another item.
-func (o ObservableInt) Debounce(duration time.Duration) ObservableInt {
-	return o.AsObservable().Debounce(duration).AsObservableInt()
+func (o ObservableInt) DebounceTime(duration time.Duration) ObservableInt {
+	return o.AsObservable().DebounceTime(duration).AsObservableInt()
 }
 
 //jig:name EmptyInt
@@ -181,7 +181,7 @@ func EmptyInt() ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntConcatWith
+//jig:name ObservableInt_ConcatWith
 
 // ConcatWith emits the emissions from two or more ObservableInts without interleaving them.
 func (o ObservableInt) ConcatWith(other ...ObservableInt) ObservableInt {
@@ -228,7 +228,7 @@ type Observer func(next interface{}, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type Observable func(Observer, Scheduler, Subscriber)
 
-//jig:name ObservableIntPrintln
+//jig:name ObservableInt_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
@@ -251,7 +251,7 @@ func (o ObservableInt) Println(a ...interface{}) (err error) {
 	return
 }
 
-//jig:name ObservableIntMapInt
+//jig:name ObservableInt_MapInt
 
 // MapInt transforms the items emitted by an ObservableInt by applying a
 // function to each item.
@@ -269,7 +269,7 @@ func (o ObservableInt) MapInt(project func(int) int) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntMergeMapInt
+//jig:name ObservableInt_MergeMapInt
 
 // MergeMapInt transforms the items emitted by an ObservableInt by applying a
 // function to each item an returning an ObservableInt. The stream of ObservableInt
@@ -278,7 +278,7 @@ func (o ObservableInt) MergeMapInt(project func(int) ObservableInt) ObservableIn
 	return o.MapObservableInt(project).MergeAll()
 }
 
-//jig:name ObservableIntAsObservable
+//jig:name ObservableInt_AsObservable
 
 // AsObservable turns a typed ObservableInt into an Observable of interface{}.
 func (o ObservableInt) AsObservable() Observable {
@@ -303,7 +303,7 @@ func (e RxError) Error() string	{ return string(e) }
 // typecast to int.
 const ErrTypecastToInt = RxError("typecast to int failed")
 
-//jig:name ObservableAsObservableInt
+//jig:name Observable_AsObservableInt
 
 // AsObservableInt turns an Observable of interface{} into an ObservableInt.
 // If during observing a typecast fails, the error ErrTypecastToInt will be
@@ -328,7 +328,7 @@ func (o Observable) AsObservableInt() ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntMapObservableInt
+//jig:name ObservableInt_MapObservableInt
 
 // MapObservableInt transforms the items emitted by an ObservableInt by applying a
 // function to each item.
@@ -362,7 +362,7 @@ type ObservableIntObserver func(next ObservableInt, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableObservableInt func(ObservableIntObserver, Scheduler, Subscriber)
 
-//jig:name ObservableObservableIntMergeAll
+//jig:name ObservableObservableInt_MergeAll
 
 // MergeAll flattens a higher order observable by merging the observables it emits.
 func (o ObservableObservableInt) MergeAll() ObservableInt {
