@@ -129,7 +129,7 @@ func require() {
 	o.TakeLast(1)
 	o.TakeUntil(o)
 	o.TakeWhile(func(interface{}) bool { return true })
-	o.Throttle(time.Millisecond)
+	o.ThrottleTime(time.Millisecond)
 	o.TimeInterval()
 	o.Timeout(time.Millisecond)
 	o.Timestamp()

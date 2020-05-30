@@ -267,12 +267,12 @@ func (o ObservableFoo) Sample(window time.Duration) ObservableFoo {
 	return o.AsObservable().Sample(window).AsObservableFoo()
 }
 
-//jig:template Observable Throttle
+//jig:template Observable ThrottleTime
 
-// Throttle emits when the source emits and then starts a timer during which
-// all emissions from the source are ignored. After the timer expires, Throttle
+// ThrottleTime emits when the source emits and then starts a timer during which
+// all emissions from the source are ignored. After the timer expires, ThrottleTime
 // will again emit the next item the source emits, and so on.
-func (o Observable) Throttle(duration time.Duration) Observable {
+func (o Observable) ThrottleTime(duration time.Duration) Observable {
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		var deadline time.Time
 		observer := func(next interface{}, err error, done bool) {
@@ -290,12 +290,12 @@ func (o Observable) Throttle(duration time.Duration) Observable {
 	return observable
 }
 
-//jig:template Observable<Foo> Throttle
-//jig:needs Observable Throttle
+//jig:template Observable<Foo> ThrottleTime
+//jig:needs Observable ThrottleTime
 
-// Throttle
-func (o ObservableFoo) Throttle(duration time.Duration) ObservableFoo {
-	return o.AsObservable().Throttle(duration).AsObservableFoo()
+// ThrottleTime
+func (o ObservableFoo) ThrottleTime(duration time.Duration) ObservableFoo {
+	return o.AsObservable().ThrottleTime(duration).AsObservableFoo()
 }
 
 //jig:type Time time.Time

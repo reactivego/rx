@@ -1,4 +1,4 @@
-package Throttle
+package ThrottleTime
 
 import (
 	"time"
@@ -6,10 +6,10 @@ import (
 	_ "github.com/reactivego/rx"
 )
 
-func Example_throttle() {
+func Example_throttleTime() {
 	const ms = time.Millisecond
 
-	Interval(1 * ms).Throttle(10 * ms).Take(5).Println()
+	Interval(1 * ms).ThrottleTime(10 * ms).Take(5).Println()
 	// Output:
 	// 0
 	// 10

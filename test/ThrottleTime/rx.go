@@ -2,7 +2,7 @@
 
 //go:generate jig
 
-package Throttle
+package ThrottleTime
 
 import (
 	"fmt"
@@ -62,12 +62,12 @@ func Interval(interval time.Duration) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableThrottle
+//jig:name Observable_ThrottleTime
 
-// Throttle emits when the source emits and then starts a timer during which
-// all emissions from the source are ignored. After the timer expires, Throttle
+// ThrottleTime emits when the source emits and then starts a timer during which
+// all emissions from the source are ignored. After the timer expires, ThrottleTime
 // will again emit the next item the source emits, and so on.
-func (o Observable) Throttle(duration time.Duration) Observable {
+func (o Observable) ThrottleTime(duration time.Duration) Observable {
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		var deadline time.Time
 		observer := func(next interface{}, err error, done bool) {
@@ -85,11 +85,11 @@ func (o Observable) Throttle(duration time.Duration) Observable {
 	return observable
 }
 
-//jig:name ObservableIntThrottle
+//jig:name ObservableInt_ThrottleTime
 
-// Throttle
-func (o ObservableInt) Throttle(duration time.Duration) ObservableInt {
-	return o.AsObservable().Throttle(duration).AsObservableInt()
+// ThrottleTime
+func (o ObservableInt) ThrottleTime(duration time.Duration) ObservableInt {
+	return o.AsObservable().ThrottleTime(duration).AsObservableInt()
 }
 
 //jig:name Observer
@@ -108,7 +108,20 @@ type Observer func(next interface{}, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type Observable func(Observer, Scheduler, Subscriber)
 
-//jig:name ObservableTake
+//jig:name ObservableInt_AsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name Observable_Take
 
 // Take emits only the first n items emitted by an Observable.
 func (o Observable) Take(n int) Observable {
@@ -130,24 +143,11 @@ func (o Observable) Take(n int) Observable {
 	return observable
 }
 
-//jig:name ObservableIntTake
+//jig:name ObservableInt_Take
 
 // Take emits only the first n items emitted by an ObservableInt.
 func (o ObservableInt) Take(n int) ObservableInt {
 	return o.AsObservable().Take(n).AsObservableInt()
-}
-
-//jig:name ObservableIntAsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
 }
 
 //jig:name RxError
@@ -162,7 +162,7 @@ func (e RxError) Error() string	{ return string(e) }
 // typecast to int.
 const ErrTypecastToInt = RxError("typecast to int failed")
 
-//jig:name ObservableAsObservableInt
+//jig:name Observable_AsObservableInt
 
 // AsObservableInt turns an Observable of interface{} into an ObservableInt.
 // If during observing a typecast fails, the error ErrTypecastToInt will be
@@ -187,7 +187,7 @@ func (o Observable) AsObservableInt() ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntPrintln
+//jig:name ObservableInt_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil

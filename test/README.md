@@ -31,7 +31,7 @@ Currently 91 operators have been implemented:
 | [ConcatMapTo]           | [IgnoreCompletion]      | [PublishReplay]       | [TakeLast]      |
 | [ConcatWith]            | [IgnoreElements]        | [Range]               | [TakeUntil]     |
 | [Connect]               | [Interval]              | [Reduce]              | [TakeWhile]     |
-| [Count]                 | [Just]                  | [RefCount]            | [Throttle]      |
+| [Count]                 | [Just]                  | [RefCount]            | [ThrottleTime]  |
 | [Create]                | [Last]                  | [Repeat]              | [Throw]         |
 | [CreateFutureRecursive] | [Map]                   | [ReplaySubject]       | [Ticker]        |
 | [CreateRecursive]       | [Max]                   | [Retry]               | [TimeInterval]  |
@@ -117,7 +117,7 @@ Currently 91 operators have been implemented:
 [TakeLast]: TakeLast
 [TakeUntil]: TakeUntil
 [TakeWhile]: TakeWhile
-[Throttle]: Throttle
+[ThrottleTime]: ThrottleTime
 [Throw]: Throw
 [Ticker]: Ticker
 [TimeInterval]: TimeInterval

@@ -2301,12 +2301,12 @@ func (o Observable) TakeWhile(condition func(next interface{}) bool) Observable 
 	return observable
 }
 
-//jig:name Observable_Throttle
+//jig:name Observable_ThrottleTime
 
-// Throttle emits when the source emits and then starts a timer during which
-// all emissions from the source are ignored. After the timer expires, Throttle
+// ThrottleTime emits when the source emits and then starts a timer during which
+// all emissions from the source are ignored. After the timer expires, ThrottleTime
 // will again emit the next item the source emits, and so on.
-func (o Observable) Throttle(duration time.Duration) Observable {
+func (o Observable) ThrottleTime(duration time.Duration) Observable {
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		var deadline time.Time
 		observer := func(next interface{}, err error, done bool) {
