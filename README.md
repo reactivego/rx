@@ -92,33 +92,6 @@ They work on one or more Observables to transform, filter and combine them into 
 #### TBD
 
 </details>
-<details><summary>All</summary>
-
-Determines whether all items emitted by an Observable meet some criteria.
-
-Pass a predicate function to the **All** operator that accepts an item emitted
-by the source Observable and returns a boolean value based on an
-evaluation of that item. **All** returns an ObservableBool that emits a single
-boolean value: true if and only if the source Observable terminates
-normally and every item emitted by the source Observable evaluated as
-true according to the predicate; false if any item emitted by the source
-Observable evaluates as false according to the predicate.
-
-![All](svg/All.svg)
-
-Code:
-```go
-LessThan5 := func(i interface{}) bool {
-	return i.(int) < 5
-}
-rx.From(1, 2, 6, 2, 1).All(LessThan5).Println("All values less than 5?")
-```
-Output:
-```
-All values less than 5? false
-```
-
-</details>
 <details><summary>BufferTime</summary>
 
 #### TBD
@@ -197,63 +170,6 @@ All values less than 5? false
 <details><summary>Merge</summary>
 
 #### TBD
-
-</details>
-<details><summary>MergeDelayError</summary>
-
-Combines multiple Observables into one by merging their emissions.
-Any error will be deferred until all observables terminate.
-
-![MergeDelayError](svg/MergeDelayError.svg)
-
-Code:
-```go
-const ms = time.Millisecond
-Mul := func(factor int) func(interface{}) interface{}{
-	return func(i interface{}) interface{} {
-		return factor * (i.(int)+1)
-	}
-}
-To := func(to int) func(interface{}) interface{} {
-	return func(interface{}) interface{} {
-		return to
-	}
-}
-
-a := rx.Interval(20 * ms).AsObservable().Map(Mul(20)).Take(4).ConcatWith(rx.Throw(rx.RxError("boom")))
-b := rx.Timer(70 * ms, 20 * ms).AsObservable().Map(To(1)).Take(2)
-err := rx.MergeDelayError(a, b).Println()
-fmt.Println(err)
-```
-
-Output:
-```
-20
-40
-60
-1
-80
-1
-boom
-```
-
-</details>
-<details><summary>MergeDelayErrorWith</summary>
-
-Combines multiple Observables into one by merging their emissions.
-Any error will be deferred until all observables terminate.
-
-![MergeDelayError](svg/MergeDelayError.svg)
-
-Code:
-```go
-
-```
-
-Output:
-```
-
-```
 
 </details>
 <details><summary>MergeMap</summary>
