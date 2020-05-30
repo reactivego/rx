@@ -7,7 +7,7 @@ import (
 	"github.com/reactivego/rx"
 )
 
-func ExampleObservable__All() {
+func ExampleObservable_All() {
 	// Setup All to produce true only when all source values are less than 5
 	lessthan5 := func(i interface{}) bool {
 		return i.(int) < 5

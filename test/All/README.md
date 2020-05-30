@@ -1,7 +1,8 @@
 # All
 
-[![](../rxdoc.svg)](http://reactivex.io/documentation/operators/all.html)
-[![](https://godoc.org/github.com/reactivego/rx/test/All?status.png)](http://godoc.org/github.com/reactivego/rx/test/All)
+[![](../../svg/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx/test/All?tab=doc)
+[![](../../svg/godoc.svg)](https://godoc.org/github.com/reactivego/rx/test/All)
+[![](../../svg/rx.svg)](http://reactivex.io/documentation/operators/all.html)
 
 **All** determines whether all items emitted by an Observable meet some
 criteria.
@@ -21,11 +22,10 @@ marble all
 	operator All(Less<Than5): +-----------(false)|
 }
 -->
-![All](all.svg)
-
-## Example (rx generics)
+![All](../../svg/All.svg)
+## Example
 ```go
-import _ "github.com/reactivego/rx/generic"
+import _ "github.com/reactivego/rx"
 ```
 
 Code:

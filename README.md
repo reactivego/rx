@@ -2,9 +2,11 @@
 
     import "github.com/reactivego/rx"
 
-[![](https://godoc.org/github.com/reactivego/rx?status.png)](http://godoc.org/github.com/reactivego/rx)
+[![](svg/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc)
+[![](svg/godoc.svg)](https://godoc.org/github.com/reactivego/rx)
+[![](svg/rx.svg)](http://reactivex.io/intro.html)
 
-Package `rx` provides [Reactive Extensions](http://reactivex.io/) for Go, an API for asynchronous programming with observable streams.
+Package `rx` provides *Reactive Extensions* for Go, an API for asynchronous programming with observable streams.
 
 > Our intellectual powers are rather geared to master static relations and our powers to visualize processes evolving in time are relatively poorly developed.
 > For that reason we should do our utmost to shorten the conceptual gap between the static program and the dynamic process, to make the correspondence between the program (spread out in text space) and the process (spread out in time) as trivial as possible.
@@ -28,7 +30,7 @@ The API is accessed directly through the `rx` prefix.
 ```go
 rx.From(1,2,"hello").Println()
 ```
-For documentation and examples, see the online [godoc](http://godoc.org/github.com/reactivego/rx) reference.
+For documentation and examples, see the online [go.dev](https://pkg.go.dev/github.com/reactivego/rx?tab=doc) or [godoc](http://godoc.org/github.com/reactivego/rx) reference.
 
 > NOTE : this package can also be used as a *Generics Library* for *Go 1* see [below](#generics-library)
 
