@@ -1,8 +1,17 @@
 # Operators
 
 ## All
+
+See [All](test/All) in test folder.
+
 ## AsObservable
+
+See [AsObservable](test/AsObservable) in test folder.
+
 ## AuditTime
+
+See [AuditTime](test/AuditTime) in test folder.
+
 ## AutoConnect
 ## Average
 ## Catch :star:
@@ -74,6 +83,9 @@
 ## Subject
 ## Subscribe
 ## SubscribeOn
+
+See [SubscribeOn](test/SubscribeOn) in test folder.
+
 ## Sum
 ## SwitchAll
 ## SwitchMap :star:

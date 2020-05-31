@@ -273,7 +273,7 @@ Only the `Connect` and `Subscribe` methods return a subscription. The other subs
 
 The only operator that uses the *goroutine* scheduler by default is the `ToChan` operator. `ToChan` returns a channel that it feeds by subscribing on the *goroutine* scheduler.
 
-To change the scheduler on which subscribing needs to occur, use the [SubscribeOn](OPERARTORS.md#subscribeon) operator
+To change the scheduler on which subscribing needs to occur, use the [SubscribeOn](OPERATORS.md#subscribeon) operator
 
 ## Regenerating this Package
 This package is generated from generics in the sub-folder generic by the [jig](http://github.com/reactivego/jig) tool.
