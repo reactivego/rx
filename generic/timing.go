@@ -214,10 +214,10 @@ func Interval(interval time.Duration) ObservableInt {
 	return observable
 }
 
-//jig:template Observable Sample
+//jig:template Observable SampleTime
 
-// Sample emits the most recent item emitted by an Observable within periodic time intervals.
-func (o Observable) Sample(window time.Duration) Observable {
+// SampleTime emits the most recent item emitted by an Observable within periodic time intervals.
+func (o Observable) SampleTime(window time.Duration) Observable {
 	observable := Observable(func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		var sample struct {
 			sync.Mutex
@@ -258,13 +258,13 @@ func (o Observable) Sample(window time.Duration) Observable {
 	return observable
 }
 
-//jig:template Observable<Foo> Sample
-//jig:needs Observable Sample
+//jig:template Observable<Foo> SampleTime
+//jig:needs Observable SampleTime
 
-// Sample emits the most recent item emitted by an ObservableFoo within periodic
+// SampleTime emits the most recent item emitted by an ObservableFoo within periodic
 // time intervals.
-func (o ObservableFoo) Sample(window time.Duration) ObservableFoo {
-	return o.AsObservable().Sample(window).AsObservableFoo()
+func (o ObservableFoo) SampleTime(window time.Duration) ObservableFoo {
+	return o.AsObservable().SampleTime(window).AsObservableFoo()
 }
 
 //jig:template Observable ThrottleTime

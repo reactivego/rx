@@ -1,4 +1,4 @@
-package Sample
+package SampleTime
 
 import (
 	"time"
@@ -6,10 +6,10 @@ import (
 	_ "github.com/reactivego/rx"
 )
 
-func Example_sample() {
+func Example_sampleTime() {
 	const ms = time.Millisecond
 
-	Interval(90 * ms).Sample(200 * ms).Take(3).Println()
+	Interval(90 * ms).SampleTime(200 * ms).Take(3).Println()
 	// Output:
 	// 1
 	// 3

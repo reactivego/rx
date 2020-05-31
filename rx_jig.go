@@ -116,7 +116,7 @@ func require() {
 	o.Reduce(func(acc interface{}, value interface{}) interface{} { return nil }, nil)
 	o.Repeat(1)
 	o.Retry()
-	o.Sample(time.Millisecond)
+	o.SampleTime(time.Millisecond)
 	o.Scan(func(acc interface{}, value interface{}) interface{} { return nil }, nil)
 	o.Serialize()
 	o.Single()

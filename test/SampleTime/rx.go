@@ -2,7 +2,7 @@
 
 //go:generate jig
 
-package Sample
+package SampleTime
 
 import (
 	"fmt"
@@ -63,10 +63,10 @@ func Interval(interval time.Duration) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableSample
+//jig:name Observable_SampleTime
 
-// Sample emits the most recent item emitted by an Observable within periodic time intervals.
-func (o Observable) Sample(window time.Duration) Observable {
+// SampleTime emits the most recent item emitted by an Observable within periodic time intervals.
+func (o Observable) SampleTime(window time.Duration) Observable {
 	observable := Observable(func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		var sample struct {
 			sync.Mutex
@@ -107,12 +107,12 @@ func (o Observable) Sample(window time.Duration) Observable {
 	return observable
 }
 
-//jig:name ObservableIntSample
+//jig:name ObservableInt_SampleTime
 
-// Sample emits the most recent item emitted by an ObservableInt within periodic
+// SampleTime emits the most recent item emitted by an ObservableInt within periodic
 // time intervals.
-func (o ObservableInt) Sample(window time.Duration) ObservableInt {
-	return o.AsObservable().Sample(window).AsObservableInt()
+func (o ObservableInt) SampleTime(window time.Duration) ObservableInt {
+	return o.AsObservable().SampleTime(window).AsObservableInt()
 }
 
 //jig:name Observer
@@ -131,20 +131,7 @@ type Observer func(next interface{}, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type Observable func(Observer, Scheduler, Subscriber)
 
-//jig:name ObservableIntAsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableTake
+//jig:name Observable_Take
 
 // Take emits only the first n items emitted by an Observable.
 func (o Observable) Take(n int) Observable {
@@ -166,14 +153,27 @@ func (o Observable) Take(n int) Observable {
 	return observable
 }
 
-//jig:name ObservableIntTake
+//jig:name ObservableInt_Take
 
 // Take emits only the first n items emitted by an ObservableInt.
 func (o ObservableInt) Take(n int) ObservableInt {
 	return o.AsObservable().Take(n).AsObservableInt()
 }
 
-//jig:name ObservableIntPrintln
+//jig:name ObservableInt_AsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableInt_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
@@ -208,7 +208,7 @@ func (e RxError) Error() string	{ return string(e) }
 // typecast to int.
 const ErrTypecastToInt = RxError("typecast to int failed")
 
-//jig:name ObservableAsObservableInt
+//jig:name Observable_AsObservableInt
 
 // AsObservableInt turns an Observable of interface{} into an ObservableInt.
 // If during observing a typecast fails, the error ErrTypecastToInt will be

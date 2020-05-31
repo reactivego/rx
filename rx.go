@@ -1991,10 +1991,10 @@ func (o Observable) Retry() Observable {
 	return observable
 }
 
-//jig:name Observable_Sample
+//jig:name Observable_SampleTime
 
-// Sample emits the most recent item emitted by an Observable within periodic time intervals.
-func (o Observable) Sample(window time.Duration) Observable {
+// SampleTime emits the most recent item emitted by an Observable within periodic time intervals.
+func (o Observable) SampleTime(window time.Duration) Observable {
 	observable := Observable(func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		var sample struct {
 			sync.Mutex
