@@ -87,7 +87,7 @@ type RxError string
 
 func (e RxError) Error() string	{ return string(e) }
 
-//jig:name ObservableIntConcatWith
+//jig:name ObservableInt_ConcatWith
 
 // ConcatWith emits the emissions from two or more ObservableInts without interleaving them.
 func (o ObservableInt) ConcatWith(other ...ObservableInt) ObservableInt {
@@ -118,7 +118,7 @@ func (o ObservableInt) ConcatWith(other ...ObservableInt) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntCatch
+//jig:name ObservableInt_Catch
 
 // Catch recovers from an error notification by continuing the sequence without
 // emitting the error but by switching to the catch ObservableInt to provide
@@ -137,7 +137,7 @@ func (o ObservableInt) Catch(catch ObservableInt) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntPrintln
+//jig:name ObservableInt_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil

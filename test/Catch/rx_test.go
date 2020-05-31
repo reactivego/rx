@@ -13,7 +13,6 @@ func Example_catch() {
 
 	err := o123.ConcatWith(oThrowError).Catch(o45).Println()
 	fmt.Println(err)
-
 	// Output:
 	// 1
 	// 2
