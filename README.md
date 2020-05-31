@@ -164,7 +164,26 @@ They work on one or more Observables to transform, filter and combine them into 
 </details>
 <details><summary>Merge</summary>
 
-#### TBD
+combines multiple Observables into one by merging their emissions.
+An error from any of the observables will terminate the merged observables.
+
+![Merge](svg/Merge.svg)
+
+Code:
+```go
+a := rx.From(0, 2, 4)
+b := rx.From(1, 3, 5)
+rx.Merge(a, b).Println()
+```
+Output:
+```
+0
+1
+2
+3
+4
+5
+```
 
 </details>
 <details><summary>MergeMap</summary>
@@ -174,7 +193,26 @@ They work on one or more Observables to transform, filter and combine them into 
 </details>
 <details><summary>MergeWith</summary>
 
-#### TBD
+combines multiple Observables into one by merging their emissions.
+An error from any of the observables will terminate the merged observables.
+
+![Merge](svg/MergeWith.svg)
+
+Code:
+```go
+a := rx.From(0, 2, 4)
+b := rx.From(1, 3, 5)
+a.MergeWith(b).Println()
+```
+Output:
+```
+0
+1
+2
+3
+4
+5
+```
 
 </details>
 <details><summary>Of</summary>

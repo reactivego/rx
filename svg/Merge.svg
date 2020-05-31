@@ -178,9 +178,9 @@
          x="375.0"
          y="40.0"
          style="font-size:22px;font-family:sans-serif;text-align:center;text-anchor:middle;fill:#000000;"
-         xml:space="preserve">MergeWith</text>
+         xml:space="preserve">Merge</text>
     </g>
-<g id="operator_4de4c442cfdf0316cb5cd3e69d0f2648" transform="rotate(0 0.0 120) translate(0.0,120)">
+<g id="operator_68be4837f6c739877233e527a996dd00" transform="rotate(0 0.0 120) translate(0.0,120)">
   <path 
      style="fill:none;fill-rule:evenodd;stroke:#003080;stroke-width:2px;marker-end:url(#Arrow1Lend)"
      d="m 0,0 747.0,0"

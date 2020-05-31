@@ -142,6 +142,19 @@ func ExampleObservable_Map() {
 	// 4!
 }
 
+func ExampleMerge() {
+	a := rx.From(0, 2, 4)
+	b := rx.From(1, 3, 5)
+	rx.Merge(a, b).Println()
+	// Output:
+	// 0
+	// 1
+	// 2
+	// 3
+	// 4
+	// 5
+}
+
 func ExampleObservable_MergeDelayError() {
 	const ms = time.Millisecond
 	AddMul := func(add, mul int) func(interface{}) interface{}{
@@ -210,6 +223,19 @@ func ExampleObservable_MergeMap() {
 	// 2
 	// 2
 	// 3
+}
+
+func ExampleObservable_MergeWith() {
+	a := rx.From(0, 2, 4)
+	b := rx.From(1, 3, 5)
+	a.MergeWith(b).Println()
+	// Output:
+	// 0
+	// 1
+	// 2
+	// 3
+	// 4
+	// 5
 }
 
 func ExampleObservable_Scan() {
