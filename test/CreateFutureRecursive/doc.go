@@ -11,8 +11,6 @@ The timeout passed in determines the time before calling the create
 function. The time.Duration returned by the create function determines how
 long CreateFutureRecursive has to wait before calling the create function
 again.
-
-	CreateFutureRecursive
 */
 package CreateFutureRecursive
 

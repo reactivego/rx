@@ -8,8 +8,6 @@ ObservableFoo, then a type conversion is generated. This has to be possible,
 because if it is not, your generated code will simply not compile. A special
 case of this is when using AsObservable, as this will convert to interface{},
 so that will always compile and work.
-
-	AsObservable
 */
 package AsObservable
 
