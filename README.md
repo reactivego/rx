@@ -60,8 +60,7 @@ func main() {
     rx.From(1,"hi",2.3).Println()
 }
 ```
-
-The code above creates an observable from numbers and strings and then prints them.
+> Note the program creates a mixed type observable from an int, string and a float.
 
 Observables in `rx` are somewhat similar to Go channels but have much richer
 semantics:
@@ -86,6 +85,8 @@ concurrently running process that pushes out values.
 ## Operators 
 Operators form a language in which programs featuring Observables can be expressed.
 They work on one or more Observables to transform, filter and combine them into new Observables.
+
+Following are the most commonly used operators:
 
 <details><summary>BufferTime</summary>
 
@@ -260,6 +261,19 @@ Output:
 #### TBD
 
 </details>
+
+## Concurency
+
+The `rx` package does not use any 'bare' go routines internally. Concurrency is tightly controlled by the use of a specific [scheduler](https://github.com/reactivego/scheduler).
+Currently there is a choice between 2 different schedulers; a *trampoline* schedulers and a *goroutine* scheduler.
+
+By default all subscribing operators except `ToChan` use the *trampoline* scheduler. A *trampoline* puts tasks on a task queue and only starts processing them when the `Wait` method is called on a returned subscription. The subscription itself calls the `Wait` method of the scheduler.
+
+Only the `Connect` and `Subscribe` methods return a subscription. The other subscribing operators `Println`, `ToSingle`, `ToSlice` and `Wait` are blocking by default and only return when the scheduler returns after wait. In the case of `ToSingle` and `ToSlice` both a value and error are returned and in the case of `Println` and `Wait` just an error is returned or nil when the observable completed succesfully.
+
+The only operator that uses the *goroutine* scheduler by default is the `ToChan` operator. `ToChan` returns a channel that it feeds by subscribing on the *goroutine* scheduler.
+
+To change the scheduler on which subscribing needs to occur, use the [SubscribeOn](OPERARTORS.md#subscribeon) operator
 
 ## Regenerating this Package
 This package is generated from generics in the sub-folder generic by the [jig](http://github.com/reactivego/jig) tool.
