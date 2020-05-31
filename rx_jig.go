@@ -91,6 +91,7 @@ func require() {
 	o.AuditTime(time.Millisecond)
 	i.Average()
 	o.Catch(o)
+	o.CatchError(func(error, Observable) Observable {return o})
 	o.Count()
 	o.DebounceTime(time.Millisecond)
 	o.Delay(time.Millisecond)
