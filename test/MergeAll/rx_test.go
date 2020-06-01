@@ -37,11 +37,7 @@ func Example_mergeAllInterval() {
 	intv10ms := Interval(10*ms).Take(2)
 	intv100ms := Interval(100*ms).Take(2)
 
-	sub := NewSubscriber()
-	go sub.Unsubscribe()
-
-
-	FromObservableInt(intv1ms, intv10ms, intv100ms).IgnoreCompletion().MergeAll().Println(sub)
+	FromObservableInt(intv1ms, intv10ms, intv100ms).MergeAll().Println()
 
 	// Output:
 	// 0

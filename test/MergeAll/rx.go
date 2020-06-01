@@ -160,29 +160,20 @@ type ObservableInt func(IntObserver, Scheduler, Subscriber)
 // by a particular time interval. First integer is not emitted immediately, but
 // only after the first time interval has passed.
 func Interval(interval time.Duration) ObservableInt {
-	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		i := 0
-		runner := scheduler.ScheduleFutureRecursive(interval, func(self func(time.Duration)) {
-			if subscriber.Canceled() {
-				return
+		runner := subscribeOn.ScheduleFutureRecursive(interval, func(self func(time.Duration)) {
+			if subscriber.Subscribed() {
+				observe(i, nil, false)
+				i++
+				if subscriber.Subscribed() {
+					self(interval)
+				}
 			}
-			observe(i, nil, false)
-			if subscriber.Canceled() {
-				return
-			}
-			i++
-			self(interval)
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
-}
-
-//jig:name NewSubscriber
-
-// NewSubscriber creates a new subscriber.
-func NewSubscriber() Subscriber {
-	return subscriber.New()
 }
 
 //jig:name ObservableIntObserver
@@ -226,7 +217,7 @@ func FromObservableInt(slice ...ObservableInt) ObservableObservableInt {
 	return observable
 }
 
-//jig:name ObservableObservableStringMergeAll
+//jig:name ObservableObservableString_MergeAll
 
 // MergeAll flattens a higher order observable by merging the observables it emits.
 func (o ObservableObservableString) MergeAll() ObservableString {
@@ -274,7 +265,7 @@ func (o ObservableObservableString) MergeAll() ObservableString {
 	return observable
 }
 
-//jig:name ObservableTake
+//jig:name Observable_Take
 
 // Take emits only the first n items emitted by an Observable.
 func (o Observable) Take(n int) Observable {
@@ -296,101 +287,14 @@ func (o Observable) Take(n int) Observable {
 	return observable
 }
 
-//jig:name ObservableIntTake
+//jig:name ObservableInt_Take
 
 // Take emits only the first n items emitted by an ObservableInt.
 func (o ObservableInt) Take(n int) ObservableInt {
 	return o.AsObservable().Take(n).AsObservableInt()
 }
 
-//jig:name ObservableIgnoreCompletion
-
-// IgnoreCompletion only emits items and never completes, neither with Error nor with Complete.
-func (o Observable) IgnoreCompletion() Observable {
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				observe(next, err, done)
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableObservableIntIgnoreCompletion
-
-// IgnoreCompletion is unknown on the reactivex.io site do we need this?
-func (o ObservableObservableInt) IgnoreCompletion() ObservableObservableInt {
-	return o.AsObservable().IgnoreCompletion().AsObservableObservableInt()
-}
-
-//jig:name Observer
-
-// Observer is a function that gets called whenever the Observable has
-// something to report. The next argument is the item value that is only
-// valid when the done argument is false. When done is true and the err
-// argument is not nil, then the Observable has terminated with an error.
-// When done is true and the err argument is nil, then the Observable has
-// completed normally.
-type Observer func(next interface{}, err error, done bool)
-
-//jig:name Observable
-
-// Observable is a function taking an Observer, Scheduler and Subscriber.
-// Calling it will subscribe the Observer to events from the Observable.
-type Observable func(Observer, Scheduler, Subscriber)
-
-//jig:name ObservableIntAsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableObservableIntAsObservable
-
-// AsObservable turns a typed ObservableObservableInt into an Observable of interface{}.
-func (o ObservableObservableInt) AsObservable() Observable {
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next ObservableInt, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableStringPrintln
-
-// Println subscribes to the Observable and prints every item to os.Stdout
-// while it waits for completion or error. Returns either the error or nil
-// when the Observable completed normally.
-// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableString) Println(a ...interface{}) (err error) {
-	subscriber := subscriber.New()
-	scheduler := scheduler.MakeTrampoline()
-	observer := func(next string, e error, done bool) {
-		if !done {
-			fmt.Println(append(a, next)...)
-		} else {
-			err = e
-			subscriber.Unsubscribe()
-		}
-	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
-}
-
-//jig:name ObservableObservableIntMergeAll
+//jig:name ObservableObservableInt_MergeAll
 
 // MergeAll flattens a higher order observable by merging the observables it emits.
 func (o ObservableObservableInt) MergeAll() ObservableInt {
@@ -438,7 +342,46 @@ func (o ObservableObservableInt) MergeAll() ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntPrintln
+//jig:name Observer
+
+// Observer is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
+// completed normally.
+type Observer func(next interface{}, err error, done bool)
+
+//jig:name Observable
+
+// Observable is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type Observable func(Observer, Scheduler, Subscriber)
+
+//jig:name ObservableString_Println
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableString) Println(a ...interface{}) (err error) {
+	subscriber := subscriber.New()
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next string, e error, done bool) {
+		if !done {
+			fmt.Println(append(a, next)...)
+		} else {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
+}
+
+//jig:name ObservableInt_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
@@ -461,6 +404,19 @@ func (o ObservableInt) Println(a ...interface{}) (err error) {
 	return
 }
 
+//jig:name ObservableInt_AsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name RxError
 
 type RxError string
@@ -473,7 +429,7 @@ func (e RxError) Error() string	{ return string(e) }
 // typecast to int.
 const ErrTypecastToInt = RxError("typecast to int failed")
 
-//jig:name ObservableAsObservableInt
+//jig:name Observable_AsObservableInt
 
 // AsObservableInt turns an Observable of interface{} into an ObservableInt.
 // If during observing a typecast fails, the error ErrTypecastToInt will be
@@ -491,37 +447,6 @@ func (o Observable) AsObservableInt() ObservableInt {
 			} else {
 				var zeroInt int
 				observe(zeroInt, err, true)
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ErrTypecastToObservableInt
-
-// ErrTypecastToObservableInt is delivered to an observer if the generic value cannot be
-// typecast to ObservableInt.
-const ErrTypecastToObservableInt = RxError("typecast to ObservableInt failed")
-
-//jig:name ObservableAsObservableObservableInt
-
-// AsObservableObservableInt turns an Observable of interface{} into an ObservableObservableInt.
-// If during observing a typecast fails, the error ErrTypecastToObservableInt will be
-// emitted.
-func (o Observable) AsObservableObservableInt() ObservableObservableInt {
-	observable := func(observe ObservableIntObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				if nextObservableInt, ok := next.(ObservableInt); ok {
-					observe(nextObservableInt, err, done)
-				} else {
-					var zeroObservableInt ObservableInt
-					observe(zeroObservableInt, ErrTypecastToObservableInt, true)
-				}
-			} else {
-				var zeroObservableInt ObservableInt
-				observe(zeroObservableInt, err, true)
 			}
 		}
 		o(observer, subscribeOn, subscriber)
