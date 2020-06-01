@@ -68,7 +68,7 @@ func FromInt(slice ...int) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntSubscribeOn
+//jig:name ObservableInt_SubscribeOn
 
 // SubscribeOn specifies the scheduler an ObservableInt should use when it is
 // subscribed to.
@@ -85,7 +85,7 @@ func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
 // Subscription is an alias for the subscriber.Subscription interface type.
 type Subscription = subscriber.Subscription
 
-//jig:name ObservableIntSubscribe
+//jig:name ObservableInt_Subscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.

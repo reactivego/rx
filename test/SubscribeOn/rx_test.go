@@ -2,6 +2,8 @@ package SubscribeOn
 
 import (
 	"fmt"
+
+	_ "github.com/reactivego/rx"
 )
 
 // SubscribeOn selects the scheduler to use for running the subscription task.
