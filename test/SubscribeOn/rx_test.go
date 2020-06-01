@@ -2,29 +2,26 @@ package SubscribeOn
 
 import (
 	"fmt"
-
-	_ "github.com/reactivego/rx"
 )
 
 // SubscribeOn selects the scheduler to use for running the subscription task.
-func Example_goroutine() {
+func Example_subscribeOn() {
 	concurrent := GoroutineScheduler()
 
 	source := FromInt(1, 2, 3, 4, 5).SubscribeOn(concurrent)
 
-	observe := func(next int, err error, done bool) {
+	observer := func(next int, err error, done bool) {
 		switch {
+		case !done:
+			fmt.Println(next)
 		case err != nil:
 			fmt.Println(err)
-		case done:
-			fmt.Println("complete")
 		default:
-			fmt.Println(next)
+			fmt.Println("complete")
 		}
 	}
 
-	source.Subscribe(observe).Wait()
-
+	source.Subscribe(observer).Wait()
 	//Output:
 	// 1
 	// 2

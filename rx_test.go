@@ -289,3 +289,60 @@ func ExampleObservableObservable_SwitchAll() {
 	// 8
 	// 9
 }
+
+func ExampleObservable_SubscribeOn_trampoline() {
+	trampoline := rx.MakeTrampolineScheduler()
+	observer := func(next interface{}, err error, done bool) {
+		switch {
+		case !done:
+			fmt.Println(trampoline, "print", next)
+		case err != nil:
+			fmt.Println(trampoline, "print", err)
+		default:
+			fmt.Println(trampoline, "print", "complete")
+		}
+	}
+	fmt.Println(trampoline, "SUBSCRIBING...")
+	subscription := rx.From(1, 2, 3).SubscribeOn(trampoline).Subscribe(observer)
+	fmt.Println(trampoline, "WAITING...")
+	subscription.Wait()
+	fmt.Println(trampoline, "DONE")
+	// Output:
+	// Trampoline{ tasks = 0 } SUBSCRIBING...
+	// Trampoline{ tasks = 1 } WAITING...
+	// Trampoline{ tasks = 1 } print 1
+	// Trampoline{ tasks = 1 } print 2
+	// Trampoline{ tasks = 1 } print 3
+	// Trampoline{ tasks = 1 } print complete
+	// Trampoline{ tasks = 0 } DONE
+}
+
+func ExampleObservable_SubscribeOn_goroutine() {
+	const ms = time.Millisecond
+	goroutine := rx.GoroutineScheduler()
+	observer := func(next interface{}, err error, done bool) {
+		switch {
+		case !done:
+			fmt.Println(goroutine, "print", next)
+		case err != nil:
+			fmt.Println(goroutine, "print", err)
+		default:
+			fmt.Println(goroutine, "print", "complete")
+		}
+	}
+	fmt.Println(goroutine, "SUBSCRIBING...")
+	subscription := rx.From(1, 2, 3).Delay(10 * ms).SubscribeOn(goroutine).Subscribe(observer)
+	// Mpte that without a Delay the next Println lands at a random spot in the output.
+	fmt.Println("WAITING...")
+	subscription.Wait()
+	fmt.Println(goroutine, "DONE")
+	// Output:
+	// Goroutine{ goroutines = 0 } SUBSCRIBING...
+	// WAITING...
+	// Goroutine{ goroutines = 1 } print 1
+	// Goroutine{ goroutines = 1 } print 2
+	// Goroutine{ goroutines = 1 } print 3
+	// Goroutine{ goroutines = 1 } print complete 
+	// Goroutine{ goroutines = 0 } DONE
+}
+

@@ -1,11 +1,66 @@
 # Operators
 
 ## All
-See [All](test/All) in test folder.
+[![](svg/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc#Observable.All)
+[![](svg/godoc.svg)](https://godoc.org/github.com/reactivego/rx#Observable.All)
+[![](svg/rx.svg)](http://reactivex.io/documentation/operators/all.html)
+
+**All** determines whether all items emitted by an Observable meet some
+criteria.
+
+Pass a predicate function to the **All** operator that accepts an item emitted
+by the source Observable and returns a boolean value based on an
+evaluation of that item. **All** returns an ObservableBool that emits a single
+boolean value: true if and only if the source Observable terminates
+normally and every item emitted by the source Observable evaluated as
+true according to the predicate; false if any item emitted by the source
+Observable evaluates as false according to the predicate.
+
+![All](svg/All.svg)
+
+Code:
+```go
+// Setup All to produce true only when all source values are less than 5
+lessthan5 := func(i interface{}) bool {
+	return i.(int) < 5
+}
+
+result, err := rx.From(1, 2, 5, 2, 1).All(lessthan5).ToSingle()
+
+fmt.Println("All values less than 5?", result, err)
+
+result, err = rx.From(4, 1, 0, -1, 2, 3, 4).All(lessthan5).ToSingle()
+
+fmt.Println("All values less than 5?", result, err)
+```
+Output:
+```
+All values less than 5? false <nil>
+All values less than 5? true <nil>
+```
 ## AsObservable
-See [AsObservable](test/AsObservable) in test folder.
+[![](svg/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc#Observable.AsObservable)
+[![](svg/godoc.svg)](https://godoc.org/github.com/reactivego/rx#Observable.AsObservable)
+
+**AsObservable&lt;Bar&gt;** when called on an `Observable` source will type assert the `interface{}` items of the source to &lt;bar&gt; items. E.g. `AsObservableInt`, `AsObservableBool`.
+
+If the assertion is invalid, this will emit a type assertion error
+`ErrTypecastTo<Bar>` at run-time. When `AsObservable<Bar>` is called on an
+`Observable<Foo>`, then a type conversion is generated. This has to be possible,
+because if it is not, your generated code will simply not compile. A special
+case of this is when using AsObservable, as this will convert to interface{},
+so that will always compile and work.
+
+
 ## AuditTime
-See [AuditTime](test/AuditTime) in test folder.
+[![](svg/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc#Observable.AuditTime)
+[![](svg/godoc.svg)](https://godoc.org/github.com/reactivego/rx#Observable.AuditTime)
+[![](svg/rx.svg)](https://rxjs.dev/api/operators/auditTime)
+
+**AuditTime** waits until the source emits and then starts a timer. When the timer
+expires, **AuditTime** will emit the last value received from the source during the
+time period when the timer was active.
+
 ## AutoConnect
 See [AutoConnect](test/AutoConnect) in test folder.
 ## Average
@@ -147,7 +202,77 @@ See [Subject](test/Subject) in test folder.
 ## Subscribe
 See [Subscribe](test/Subscribe) in test folder.
 ## SubscribeOn
-See [SubscribeOn](test/SubscribeOn) in test folder.
+[![](svg/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc#Observable.SubscribeOn)
+[![](svg/godoc.svg)](https://godoc.org/github.com/reactivego/rx#Observable.SubscribeOn)
+[![](svg/rx.svg)](http://reactivex.io/documentation/operators/subscribeon.html)
+
+**SubscribeOn** specifies which [scheduler](https://github.com/reactivego/scheduler) an Observable should use when it is subscribed to.
+
+### Example (SubscribeOn Trampoline)
+Code:
+```go
+trampoline := rx.MakeTrampolineScheduler()
+observer := func(next interface{}, err error, done bool) {
+	switch {
+	case !done:
+		fmt.Println(trampoline, "print", next)
+	case err != nil:
+		fmt.Println(trampoline, "print", err)
+	default:
+		fmt.Println(trampoline, "print", "complete")
+	}
+}
+fmt.Println(trampoline, "SUBSCRIBING...")
+subscription := rx.From(1, 2, 3).SubscribeOn(trampoline).Subscribe(observer)
+fmt.Println(trampoline, "WAITING...")
+subscription.Wait()
+fmt.Println(trampoline, "DONE")
+```
+Output:
+```
+Trampoline{ tasks = 0 } SUBSCRIBING...
+Trampoline{ tasks = 1 } WAITING...
+Trampoline{ tasks = 1 } print 1
+Trampoline{ tasks = 1 } print 2
+Trampoline{ tasks = 1 } print 3
+Trampoline{ tasks = 1 } print complete
+Trampoline{ tasks = 0 } DONE
+```
+
+### Example (SubscribeOn Goroutine)
+Code:
+```go
+const ms = time.Millisecond
+goroutine := rx.GoroutineScheduler()
+observer := func(next interface{}, err error, done bool) {
+	switch {
+	case !done:
+		fmt.Println(goroutine, "print", next)
+	case err != nil:
+		fmt.Println(goroutine, "print", err)
+	default:
+		fmt.Println(goroutine, "print", "complete")
+	}
+}
+fmt.Println(goroutine, "SUBSCRIBING...")
+subscription := rx.From(1, 2, 3).Delay(10 * ms).SubscribeOn(goroutine).Subscribe(observer)
+// Mpte that without a Delay the next Println lands at a random spot in the output.
+fmt.Println("WAITING...")
+subscription.Wait()
+fmt.Println(goroutine, "DONE")
+```
+Output:
+```
+Output:
+Goroutine{ goroutines = 0 } SUBSCRIBING...
+WAITING...
+Goroutine{ goroutines = 1 } print 1
+Goroutine{ goroutines = 1 } print 2
+Goroutine{ goroutines = 1 } print 3
+Goroutine{ goroutines = 1 } print complete
+Goroutine{ goroutines = 0 } DONE
+```
+
 ## Sum
 See [Sum](test/Sum) in test folder.
 ## SwitchAll
