@@ -256,7 +256,7 @@ observer := func(next interface{}, err error, done bool) {
 }
 fmt.Println(goroutine, "SUBSCRIBING...")
 subscription := rx.From(1, 2, 3).Delay(10 * ms).SubscribeOn(goroutine).Subscribe(observer)
-// Mpte that without a Delay the next Println lands at a random spot in the output.
+// Note that without a Delay the next Println lands at a random spot in the output.
 fmt.Println("WAITING...")
 subscription.Wait()
 fmt.Println(goroutine, "DONE")
