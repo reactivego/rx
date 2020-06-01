@@ -1,5 +1,126 @@
 # Operators
 
+| A … C                   | D … L                 | M … P                  | R … S              | T … W          |
+|:------------------------|:----------------------|:-----------------------|:-------------------|:---------------|
+| [All]                   | [DebounceTime] :star: | [Map] :star:           | [Range]            | [Take]         |
+| [AsObservable]          | [Defer]               | [Max]                  | [Reduce]           | [TakeLast]     |
+| [AuditTime]             | [Delay]               | [Merge] :star:         | [RefCount]         | [TakeUntil]    |
+| [AutoConnect]           | [Distinct]            | [MergeAll]             | [Repeat]           | [TakeWhile]    |
+| [Average]               | [Do] :star:           | [MergeDelayError]      | [ReplaySubject]    | [ThrottleTime] |
+| [Catch] :star:          | [DoOnComplete]        | [MergeDelayErrorWith]  | [Retry]            | [Throw]        |
+| [CatchError] :star:     | [DoOnError]           | [MergeMap] :star:      | [Sample]           | [Ticker]       |
+| [CombineLatest] :star:  | [ElementAt]           | [MergeWith] :star:     | [Scan] :star:      | [TimeInterval] |
+| [CombineLatestAll]      | [Empty]               | [Min]                  | [Serialize]        | [Timeout]      |
+| [CombineLatestMap]      | [Filter] :star:       | [Never]                | [Single]           | [Timer]        |
+| [CombineLatestMapTo]    | [Finally]             | [ObserveOn]            | [Skip]             | [Timestamp]    |
+| [CombineLatestWith]     | [First]               | [Of] :star:            | [SkipLast]         | [ToChan]       |
+| [Concat] :star:         | [From] :star:         | [Only]                 | [Start]            | [ToSingle]     |
+| [ConcatAll]             | [FromChan]            | [Passthrough]          | [Subject]          | [ToSlice]      |
+| [ConcatMap] :star:      | [IgnoreCompletion]    | [Println]              | [Subscribe]        | [Wait]         |
+| [ConcatMapTo]           | [IgnoreElements]      | [Publish] :star:       | [SubscribeOn]      |
+| [ConcatWith] :star:     | [Interval]            | [PublishReplay] :star: | [Sum]              |
+| [Connect]               | [Just] :star:         |                        | [SwitchAll]        |
+| [Count]                 | [Last]                |                        | [SwitchMap] :star: |
+| [Create] :star:         |                       |                        |
+| [CreateFutureRecursive] |                       |                        |
+| [CreateRecursive]       |                       |                        |
+|                         |                       |                        |
+
+:star: - commonly used
+
+[All]: #all
+[AsObservable]: #asobservable
+[AuditTime]: #audittime
+[AutoConnect]: #autoconnect
+[Average]: #average
+[Catch]: #catch
+[CatchError]: #catcherror
+[CombineLatest]: #combinelatest
+[CombineLatestAll]: #combinelatestall
+[CombineLatestMap]: #combinelatestmap
+[CombineLatestMapTo]: #combinelatestmapto
+[CombineLatestWith]: #combinelatestwith
+[Concat]: #concat
+[ConcatAll]: #concatall
+[ConcatMap]: #concatmap
+[ConcatMapTo]: #concatmapto
+[ConcatWith]: #concatwith
+[Connect]: #connect
+[Count]: #count
+[Create]: #create
+[CreateFutureRecursive]: #createfuturerecursive
+[CreateRecursive]: #createrecursive
+[DebounceTime]: #debouncetime
+[Defer]: #defer
+[Delay]: #delay
+[Distinct]: #distinct
+[Do]: #do
+[DoOnComplete]: #dooncomplete
+[DoOnError]: #doonerror
+[ElementAt]: #elementat
+[Empty]: #empty
+[Filter]: #filter
+[Finally]: #finally
+[First]: #first
+[From]: #from
+[FromChan]: #fromchan
+[IgnoreCompletion]: #ignorecompletion
+[IgnoreElements]: #ignoreelements
+[Interval]: #interval
+[Just]: #just
+[Last]: #last
+[Map]: #map
+[Max]: #max
+[Merge]: #merge
+[MergeAll]: #mergeall
+[MergeDelayError]: #mergedelayerror
+[MergeDelayErrorWith]: #mergedelayerrorwith
+[MergeMap]: #mergemap
+[MergeWith]: #mergewith
+[Min]: #min
+[Never]: #never
+[ObserveOn]: #observeon
+[Of]: #of
+[Only]: #only
+[Passthrough]: #passthrough
+[Println]: #println
+[Publish]: #publish
+[PublishReplay]: #publishreplay
+[Range]: #range
+[Reduce]: #reduce
+[RefCount]: #refcount
+[Repeat]: #repeat
+[ReplaySubject]: #replaysubject
+[Retry]: #retry
+[Sample]: #sample
+[Scan]: #scan
+[Serialize]: #serialize
+[Single]: #single
+[Skip]: #skip
+[SkipLast]: #skiplast
+[Start]: #start
+[Subject]: #subject
+[Subscribe]: #subscribe
+[SubscribeOn]: #subscribeon
+[Sum]: #sum
+[SwitchAll]: #switchall
+[SwitchMap]: #switchmap
+[Take]: #take
+[TakeLast]: #takelast
+[TakeUntil]: #takeuntil
+[TakeWhile]: #takewhile
+[ThrottleTime]: #throttletime
+[Throw]: #throw
+[Ticker]: #ticker
+[TimeInterval]: #timeinterval
+[Timeout]: #timeout
+[Timer]: #timer
+[Timestamp]: #timestamp
+[ToChan]: #tochan
+[ToSingle]: #tosingle
+[ToSlice]: #toslice
+[Wait]: #wait
+
 ## All
 [![](svg/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc#Observable.All)
 [![](svg/godoc.svg)](https://godoc.org/github.com/reactivego/rx#Observable.All)
@@ -59,11 +180,11 @@ time period when the timer was active.
 See [AutoConnect](test/AutoConnect) in test folder.
 ## Average
 See [Average](test/Average) in test folder.
-## Catch :star:
+## Catch
 See [Catch](test/Catch) in test folder.
-## CatchError :star:
+## CatchError
 See [CatchError](test/CatchError) in test folder.
-## CombineLatest :star:
+## CombineLatest
 See [CombineLatest](test/CombineLatest) in test folder.
 ## CombineLatestAll
 See [CombineLatestAll](test/CombineLatestAll) in test folder.
@@ -73,27 +194,27 @@ See [CombineLatestMap](test/CombineLatestMap) in test folder.
 See [CombineLatestMapTo](test/CombineLatestMapTo) in test folder.
 ## CombineLatestWith
 See [CombineLatestWith](test/CombineLatestWith) in test folder.
-## Concat :star:
+## Concat
 See [Concat](test/Concat) in test folder.
 ## ConcatAll
 See [ConcatAll](test/ConcatAll) in test folder.
-## ConcatMap :star:
+## ConcatMap
 See [ConcatMap](test/ConcatMap) in test folder.
 ## ConcatMapTo
 See [ConcatMapTo](test/ConcatMapTo) in test folder.
-## ConcatWith :star:
+## ConcatWith
 See [ConcatWith](test/ConcatWith) in test folder.
 ## Connect
 See [Connect](test/Connect) in test folder.
 ## Count
 See [Count](test/Count) in test folder.
-## Create :star:
+## Create
 See [Create](test/Create) in test folder.
 ## CreateFutureRecursive
 See [CreateFutureRecursive](test/CreateFutureRecursive) in test folder.
 ## CreateRecursive
 See [CreateRecursive](test/CreateRecursive) in test folder.
-## DebounceTime :star:
+## DebounceTime
 See [DebounceTime](test/DebounceTime) in test folder.
 ## Defer
 See [Defer](test/Defer) in test folder.
@@ -101,7 +222,7 @@ See [Defer](test/Defer) in test folder.
 See [Delay](test/Delay) in test folder.
 ## Distinct
 See [Distinct](test/Distinct) in test folder.
-## Do :star:
+## Do
 See [Do](test/Do) in test folder.
 ## DoOnComplete
 See [DoOnComplete](test/DoOnComplete) in test folder.
@@ -111,13 +232,13 @@ See [DoOnError](test/DoOnError) in test folder.
 See [ElementAt](test/ElementAt) in test folder.
 ## Empty
 See [Empty](test/Empty) in test folder.
-## Filter :star:
+## Filter
 See [Filter](test/Filter) in test folder.
 ## Finally
 See [Finally](test/Finally) in test folder.
 ## First
 See [First](test/First) in test folder.
-## From :star:
+## From
 See [From](test/From) in test folder.
 ## FromChan
 See [FromChan](test/FromChan) in test folder.
@@ -127,15 +248,15 @@ See [IgnoreCompletion](test/IgnoreCompletion) in test folder.
 See [IgnoreElements](test/IgnoreElements) in test folder.
 ## Interval
 See [Interval](test/Interval) in test folder.
-## Just :star:
+## Just
 See [Just](test/Just) in test folder.
 ## Last
 See [Last](test/Last) in test folder.
-## Map :star:
+## Map
 See [Map](test/Map) in test folder.
 ## Max
 See [Max](test/Max) in test folder.
-## Merge :star:
+## Merge
 See [Merge](test/Merge) in test folder.
 ## MergeAll
 See [MergeAll](test/MergeAll) in test folder.
@@ -143,9 +264,9 @@ See [MergeAll](test/MergeAll) in test folder.
 See [MergeDelayError](test/MergeDelayError) in test folder.
 ## MergeDelayErrorWith
 See [MergeDelayErrorWith](test/MergeDelayErrorWith) in test folder.
-## MergeMap :star:
+## MergeMap
 See [MergeMap](test/MergeMap) in test folder.
-## MergeWith :star:
+## MergeWith
 See [MergeWith](test/MergeWith) in test folder.
 ## Min
 See [Min](test/Min) in test folder.
@@ -153,7 +274,7 @@ See [Min](test/Min) in test folder.
 See [Never](test/Never) in test folder.
 ## ObserveOn
 See [ObserveOn](test/ObserveOn) in test folder.
-## Of :star:
+## Of
 See [Of](test/Of) in test folder.
 ## Only
 See [Only](test/Only) in test folder.
@@ -161,9 +282,9 @@ See [Only](test/Only) in test folder.
 See [Passthrough](test/Passthrough) in test folder.
 ## Println
 See [Println](test/Println) in test folder.
-## Publish :star:
+## Publish
 See [Publish](test/Publish) in test folder.
-## PublishReplay :star:
+## PublishReplay
 See [PublishReplay](test/PublishReplay) in test folder.
 ## Range
 See [Range](test/Range) in test folder.
@@ -179,7 +300,7 @@ See [ReplaySubject](test/ReplaySubject) in test folder.
 See [Retry](test/Retry) in test folder.
 ## SampleTime
 See [SampleTime](test/SampleTime) in test folder.
-## Scan :star:
+## Scan
 See [Scan](test/Scan) in test folder.
 ## Serialize
 See [Serialize](test/Serialize) in test folder.
@@ -271,13 +392,13 @@ Goroutine{ goroutines = 0 } DONE
 See [Sum](test/Sum) in test folder.
 ## SwitchAll
 See [SwitchAll](test/SwitchAll) in test folder.
-## SwitchMap :star:
+## SwitchMap
 See [SwitchMap](test/SwitchMap) in test folder.
-## Take :star:
+## Take
 See [Take](test/Take) in test folder.
 ## TakeLast
 See [TakeLast](test/TakeLast) in test folder.
-## TakeUntil :star:
+## TakeUntil
 See [TakeUntil](test/TakeUntil) in test folder.
 ## TakeWhile
 See [TakeWhile](test/TakeWhile) in test folder.
@@ -303,5 +424,3 @@ See [ToSingle](test/ToSingle) in test folder.
 See [ToSlice](test/ToSlice) in test folder.
 ## Wait
 See [Wait](test/Wait) in test folder.
-
- :star: - commonly used
