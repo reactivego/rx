@@ -212,7 +212,7 @@ func ExampleObservable_MergeDelayErrorWith() {
 func ExampleObservable_MergeMap() {
 	source := rx.From(1, 2).
 		MergeMap(func(n interface{}) rx.Observable {
-			return rx.Range(n.(int), 2).AsObservable()
+			return rx.Range(n.(int), 2)
 		})
 	if err := source.Println(); err != nil {
 		panic(err)

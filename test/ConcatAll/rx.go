@@ -44,44 +44,17 @@ type ObservableInt func(IntObserver, Scheduler, Subscriber)
 //jig:name Interval
 
 // Interval creates an ObservableInt that emits a sequence of integers spaced
-// by a particular time interval. First integer is emitted after the first time
-// interval expires.
+// by a particular time interval. First integer is not emitted immediately, but
+// only after the first time interval has passed.
 func Interval(interval time.Duration) ObservableInt {
-	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		i := 0
-		runner := scheduler.ScheduleFutureRecursive(interval, func(self func(time.Duration)) {
-			if subscriber.Canceled() {
-				return
-			}
-			observe(i, nil, false)
-			if subscriber.Canceled() {
-				return
-			}
-			i++
-			self(interval)
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
-}
-
-//jig:name Range
-
-// Range creates an ObservableInt that emits a range of sequential integers.
-func Range(start, count int) ObservableInt {
-	end := start + count
-	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
-		i := start
-		runner := scheduler.ScheduleRecursive(func(self func()) {
+		runner := subscribeOn.ScheduleFutureRecursive(interval, func(self func(time.Duration)) {
 			if subscriber.Subscribed() {
-				if i < end {
-					observe(i, nil, false)
-					if subscriber.Subscribed() {
-						i++
-						self()
-					}
-				} else {
-					observe(0, nil, true)
+				observe(i, nil, false)
+				i++
+				if subscriber.Subscribed() {
+					self(interval)
 				}
 			}
 		})
@@ -90,7 +63,34 @@ func Range(start, count int) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableTake
+//jig:name RangeInt
+
+// RangeInt creates an ObservableInt that emits a range of sequential int values.
+// The generated code will do a type conversion from int to int.
+func RangeInt(start, count int) ObservableInt {
+	end := start + count
+	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
+		i := start
+		runner := scheduler.ScheduleRecursive(func(self func()) {
+			if subscriber.Subscribed() {
+				if i < end {
+					observe(int(i), nil, false)
+					if subscriber.Subscribed() {
+						i++
+						self()
+					}
+				} else {
+					var zero int
+					observe(zero, nil, true)
+				}
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
+}
+
+//jig:name Observable_Take
 
 // Take emits only the first n items emitted by an Observable.
 func (o Observable) Take(n int) Observable {
@@ -112,7 +112,7 @@ func (o Observable) Take(n int) Observable {
 	return observable
 }
 
-//jig:name ObservableIntTake
+//jig:name ObservableInt_Take
 
 // Take emits only the first n items emitted by an ObservableInt.
 func (o ObservableInt) Take(n int) ObservableInt {
@@ -135,7 +135,20 @@ type Observer func(next interface{}, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type Observable func(Observer, Scheduler, Subscriber)
 
-//jig:name ObservableIntMapObservableInt
+//jig:name ObservableInt_AsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableInt_MapObservableInt
 
 // MapObservableInt transforms the items emitted by an ObservableInt by applying a
 // function to each item.
@@ -147,19 +160,6 @@ func (o ObservableInt) MapObservableInt(project func(int) ObservableInt) Observa
 				mapped = project(next)
 			}
 			observe(mapped, err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableIntAsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
 		}
 		o(observer, subscribeOn, subscriber)
 	}
@@ -194,7 +194,7 @@ func (e RxError) Error() string	{ return string(e) }
 // typecast to int.
 const ErrTypecastToInt = RxError("typecast to int failed")
 
-//jig:name ObservableAsObservableInt
+//jig:name Observable_AsObservableInt
 
 // AsObservableInt turns an Observable of interface{} into an ObservableInt.
 // If during observing a typecast fails, the error ErrTypecastToInt will be
@@ -219,7 +219,7 @@ func (o Observable) AsObservableInt() ObservableInt {
 	return observable
 }
 
-//jig:name ObservableObservableIntConcatAll
+//jig:name ObservableObservableInt_ConcatAll
 
 // ConcatAll flattens a higher order observable by concattenating the observables it emits.
 func (o ObservableObservableInt) ConcatAll() ObservableInt {
@@ -261,7 +261,7 @@ func (o ObservableObservableInt) ConcatAll() ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntPrintln
+//jig:name ObservableInt_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil

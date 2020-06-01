@@ -8,7 +8,7 @@ import (
 )
 
 func Example_ignoreComplete() {
-	source := Range(1, 5).IgnoreCompletion()
+	source := RangeInt(1, 5).IgnoreCompletion()
 
 	// NOTE: subscription must run concurrently with main goroutine
 	concurrent := GoroutineScheduler()

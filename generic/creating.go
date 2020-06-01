@@ -341,24 +341,26 @@ func OfFoo(slice ...foo) ObservableFoo {
 	return observable
 }
 
-//jig:template Range
-//jig:needs ObservableInt
+//jig:template Range<Foo>
+//jig:needs Observable<Foo>
 
-// Range creates an ObservableInt that emits a range of sequential integers.
-func Range(start, count int) ObservableInt {
+// RangeFoo creates an ObservableFoo that emits a range of sequential int values.
+// The generated code will do a type conversion from int to foo.
+func RangeFoo(start, count int) ObservableFoo {
 	end := start + count
-	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := start
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Subscribed() {
 				if i < end {
-					observe(i, nil, false)
+					observe(foo(i), nil, false)
 					if subscriber.Subscribed() {
 						i++
 						self()
 					}
 				} else {
-					observe(0, nil, true)
+					var zero foo
+					observe(zero, nil, true)
 				}
 			}
 		})

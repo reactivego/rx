@@ -37,23 +37,25 @@ type IntObserver func(next int, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableInt func(IntObserver, Scheduler, Subscriber)
 
-//jig:name Range
+//jig:name RangeInt
 
-// Range creates an ObservableInt that emits a range of sequential integers.
-func Range(start, count int) ObservableInt {
+// RangeInt creates an ObservableInt that emits a range of sequential int values.
+// The generated code will do a type conversion from int to int.
+func RangeInt(start, count int) ObservableInt {
 	end := start + count
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := start
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Subscribed() {
 				if i < end {
-					observe(i, nil, false)
+					observe(int(i), nil, false)
 					if subscriber.Subscribed() {
 						i++
 						self()
 					}
 				} else {
-					observe(0, nil, true)
+					var zero int
+					observe(zero, nil, true)
 				}
 			}
 		})
@@ -135,7 +137,7 @@ type RxError string
 
 func (e RxError) Error() string	{ return string(e) }
 
-//jig:name ObservableIgnoreCompletion
+//jig:name Observable_IgnoreCompletion
 
 // IgnoreCompletion only emits items and never completes, neither with Error nor with Complete.
 func (o Observable) IgnoreCompletion() Observable {
@@ -150,7 +152,7 @@ func (o Observable) IgnoreCompletion() Observable {
 	return observable
 }
 
-//jig:name ObservableIntIgnoreCompletion
+//jig:name ObservableInt_IgnoreCompletion
 
 // IgnoreCompletion is unknown on the reactivex.io site do we need this?
 func (o ObservableInt) IgnoreCompletion() ObservableInt {
@@ -173,19 +175,7 @@ type Observer func(next interface{}, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type Observable func(Observer, Scheduler, Subscriber)
 
-//jig:name ObservableIntSubscribeOn
-
-// SubscribeOn specifies the scheduler an ObservableInt should use when it is
-// subscribed to.
-func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
-	observable := func(observe IntObserver, _ Scheduler, subscriber Subscriber) {
-		subscriber.OnWait(subscribeOn.Wait)
-		o(observe, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableIntAsObservable
+//jig:name ObservableInt_AsObservable
 
 // AsObservable turns a typed ObservableInt into an Observable of interface{}.
 func (o ObservableInt) AsObservable() Observable {
@@ -198,31 +188,16 @@ func (o ObservableInt) AsObservable() Observable {
 	return observable
 }
 
-//jig:name Subscription
+//jig:name ObservableInt_SubscribeOn
 
-// Subscription is an alias for the subscriber.Subscription interface type.
-type Subscription = subscriber.Subscription
-
-//jig:name ObservableIntSubscribe
-
-// Subscribe operates upon the emissions and notifications from an Observable.
-// This method returns a Subscription.
-// Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber) Subscription {
-	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, err error, done bool) {
-		if !done {
-			observe(next, err, done)
-		} else {
-			var zeroInt int
-			observe(zeroInt, err, true)
-			subscribers[0].Unsubscribe()
-		}
+// SubscribeOn specifies the scheduler an ObservableInt should use when it is
+// subscribed to.
+func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
+	observable := func(observe IntObserver, _ Scheduler, subscriber Subscriber) {
+		subscriber.OnWait(subscribeOn.Wait)
+		o(observe, subscribeOn, subscriber)
 	}
-	subscribers[0].OnWait(scheduler.Wait)
-	o(observer, scheduler, subscribers[0])
-	return subscribers[0]
+	return observable
 }
 
 //jig:name ErrTypecastToInt
@@ -231,7 +206,7 @@ func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber)
 // typecast to int.
 const ErrTypecastToInt = RxError("typecast to int failed")
 
-//jig:name ObservableAsObservableInt
+//jig:name Observable_AsObservableInt
 
 // AsObservableInt turns an Observable of interface{} into an ObservableInt.
 // If during observing a typecast fails, the error ErrTypecastToInt will be
@@ -254,4 +229,31 @@ func (o Observable) AsObservableInt() ObservableInt {
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
+}
+
+//jig:name Subscription
+
+// Subscription is an alias for the subscriber.Subscription interface type.
+type Subscription = subscriber.Subscription
+
+//jig:name ObservableInt_Subscribe
+
+// Subscribe operates upon the emissions and notifications from an Observable.
+// This method returns a Subscription.
+// Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber) Subscription {
+	subscribers = append(subscribers, subscriber.New())
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next int, err error, done bool) {
+		if !done {
+			observe(next, err, done)
+		} else {
+			var zeroInt int
+			observe(zeroInt, err, true)
+			subscribers[0].Unsubscribe()
+		}
+	}
+	subscribers[0].OnWait(scheduler.Wait)
+	o(observer, scheduler, subscribers[0])
+	return subscribers[0]
 }

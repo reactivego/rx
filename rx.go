@@ -431,21 +431,23 @@ func Never() Observable {
 
 //jig:name Range
 
-// Range creates an ObservableInt that emits a range of sequential integers.
-func Range(start, count int) ObservableInt {
+// Range creates an Observable that emits a range of sequential int values.
+// The generated code will do a type conversion from int to interface{}.
+func Range(start, count int) Observable {
 	end := start + count
-	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		i := start
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Subscribed() {
 				if i < end {
-					observe(i, nil, false)
+					observe(interface{}(i), nil, false)
 					if subscriber.Subscribed() {
 						i++
 						self()
 					}
 				} else {
-					observe(0, nil, true)
+					var zero interface{}
+					observe(zero, nil, true)
 				}
 			}
 		})
@@ -750,6 +752,156 @@ type SliceObserver func(next Slice, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableSlice func(SliceObserver, Scheduler, Subscriber)
 
+//jig:name FromObservable
+
+// FromObservable creates an ObservableObservable from multiple Observable values passed in.
+func FromObservable(slice ...Observable) ObservableObservable {
+	var zeroObservable Observable
+	observable := func(observe ObservableObserver, scheduler Scheduler, subscriber Subscriber) {
+		i := 0
+		runner := scheduler.ScheduleRecursive(func(self func()) {
+			if subscriber.Subscribed() {
+				if i < len(slice) {
+					observe(slice[i], nil, false)
+					if subscriber.Subscribed() {
+						i++
+						self()
+					}
+				} else {
+					observe(zeroObservable, nil, true)
+				}
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
+}
+
+//jig:name Observable_ConcatWith
+
+// ConcatWith emits the emissions from two or more Observables without interleaving them.
+func (o Observable) ConcatWith(other ...Observable) Observable {
+	var zero interface{}
+	if len(other) == 0 {
+		return o
+	}
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		var (
+			observables	= append([]Observable{}, other...)
+			observer	Observer
+		)
+		observer = func(next interface{}, err error, done bool) {
+			if !done || err != nil {
+				observe(next, err, done)
+			} else {
+				if len(observables) == 0 {
+					observe(zero, nil, true)
+				} else {
+					o := observables[0]
+					observables = observables[1:]
+					o(observer, subscribeOn, subscriber)
+				}
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name Observable_MergeWith
+
+// MergeWith combines multiple Observables into one by merging their emissions.
+// An error from any of the observables will terminate the merged observables.
+func (o Observable) MergeWith(other ...Observable) Observable {
+	if len(other) == 0 {
+		return o
+	}
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		var observers struct {
+			sync.Mutex
+			done	bool
+			len	int
+		}
+		observer := func(next interface{}, err error, done bool) {
+			observers.Lock()
+			defer observers.Unlock()
+			if !observers.done {
+				switch {
+				case !done:
+					observe(next, nil, false)
+				case err != nil:
+					observers.done = true
+					var zero interface{}
+					observe(zero, err, true)
+				default:
+					if observers.len--; observers.len == 0 {
+						var zero interface{}
+						observe(zero, nil, true)
+					}
+				}
+			}
+		}
+		subscribeOn.Schedule(func() {
+			if !subscriber.Canceled() {
+				observers.len = 1 + len(other)
+				o(observer, subscribeOn, subscriber)
+				for _, o := range other {
+					if subscriber.Canceled() {
+						return
+					}
+					o(observer, subscribeOn, subscriber)
+				}
+			}
+		})
+	}
+	return observable
+}
+
+//jig:name Observable_MergeDelayErrorWith
+
+// MergeDelayError combines multiple Observables into one by merging their emissions.
+// Any error will be deferred until all observables terminate.
+func (o Observable) MergeDelayErrorWith(other ...Observable) Observable {
+	if len(other) == 0 {
+		return o
+	}
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		var observers struct {
+			sync.Mutex
+			len	int
+			err	error
+		}
+		observer := func(next interface{}, err error, done bool) {
+			observers.Lock()
+			defer observers.Unlock()
+			if !done {
+				observe(next, nil, false)
+			} else {
+				if err != nil {
+					observers.err = err
+				}
+				if observers.len--; observers.len == 0 {
+					var zero interface{}
+					observe(zero, observers.err, true)
+				}
+			}
+		}
+		subscribeOn.Schedule(func() {
+			if !subscriber.Canceled() {
+				observers.len = 1 + len(other)
+				o(observer, subscribeOn, subscriber)
+				for _, o := range other {
+					if subscriber.Canceled() {
+						return
+					}
+					o(observer, subscribeOn, subscriber)
+				}
+			}
+		})
+	}
+	return observable
+}
+
 //jig:name Observable_CombineLatestWith
 
 // CombineLatestWith will subscribe to its Observable and all other
@@ -783,37 +935,6 @@ func (o Observable) CombineLatestMap(project func(interface{}) Observable) Obser
 func (o Observable) CombineLatestMapTo(inner Observable) ObservableSlice {
 	project := func(interface{}) Observable { return inner }
 	return o.MapObservable(project).CombineLatestAll()
-}
-
-//jig:name Observable_ConcatWith
-
-// ConcatWith emits the emissions from two or more Observables without interleaving them.
-func (o Observable) ConcatWith(other ...Observable) Observable {
-	var zero interface{}
-	if len(other) == 0 {
-		return o
-	}
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		var (
-			observables	= append([]Observable{}, other...)
-			observer	Observer
-		)
-		observer = func(next interface{}, err error, done bool) {
-			if !done || err != nil {
-				observe(next, err, done)
-			} else {
-				if len(observables) == 0 {
-					observe(zero, nil, true)
-				} else {
-					o := observables[0]
-					observables = observables[1:]
-					o(observer, subscribeOn, subscriber)
-				}
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
 }
 
 //jig:name ObservableObservable_ConcatAll
@@ -1054,55 +1175,6 @@ func (o ObservableObservable) SwitchAll() Observable {
 	return observable
 }
 
-//jig:name Observable_MergeWith
-
-// MergeWith combines multiple Observables into one by merging their emissions.
-// An error from any of the observables will terminate the merged observables.
-func (o Observable) MergeWith(other ...Observable) Observable {
-	if len(other) == 0 {
-		return o
-	}
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		var observers struct {
-			sync.Mutex
-			done	bool
-			len	int
-		}
-		observer := func(next interface{}, err error, done bool) {
-			observers.Lock()
-			defer observers.Unlock()
-			if !observers.done {
-				switch {
-				case !done:
-					observe(next, nil, false)
-				case err != nil:
-					observers.done = true
-					var zero interface{}
-					observe(zero, err, true)
-				default:
-					if observers.len--; observers.len == 0 {
-						var zero interface{}
-						observe(zero, nil, true)
-					}
-				}
-			}
-		}
-		subscribeOn.Schedule(func() {
-			if !subscriber.Canceled() {
-				observers.len = 1 + len(other)
-				o(observer, subscribeOn, subscriber)
-				for _, o := range other {
-					if subscriber.Canceled() {
-						return
-					}
-					o(observer, subscribeOn, subscriber)
-				}
-			}
-		})
-	}
-	return observable
-}
-
 //jig:name Observable_MergeMap
 
 // MergeMap transforms the items emitted by an Observable by applying a
@@ -1154,51 +1226,6 @@ func (o ObservableObservable) MergeAll() Observable {
 			if !subscriber.Canceled() {
 				observers.len = 1
 				o(merger, subscribeOn, subscriber)
-			}
-		})
-	}
-	return observable
-}
-
-//jig:name Observable_MergeDelayErrorWith
-
-// MergeDelayError combines multiple Observables into one by merging their emissions.
-// Any error will be deferred until all observables terminate.
-func (o Observable) MergeDelayErrorWith(other ...Observable) Observable {
-	if len(other) == 0 {
-		return o
-	}
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		var observers struct {
-			sync.Mutex
-			len	int
-			err	error
-		}
-		observer := func(next interface{}, err error, done bool) {
-			observers.Lock()
-			defer observers.Unlock()
-			if !done {
-				observe(next, nil, false)
-			} else {
-				if err != nil {
-					observers.err = err
-				}
-				if observers.len--; observers.len == 0 {
-					var zero interface{}
-					observe(zero, observers.err, true)
-				}
-			}
-		}
-		subscribeOn.Schedule(func() {
-			if !subscriber.Canceled() {
-				observers.len = 1 + len(other)
-				o(observer, subscribeOn, subscriber)
-				for _, o := range other {
-					if subscriber.Canceled() {
-						return
-					}
-					o(observer, subscribeOn, subscriber)
-				}
 			}
 		})
 	}
@@ -3244,31 +3271,6 @@ func (o Observable) PublishReplay(bufferCapacity int, windowDuration time.Durati
 		return NewReplaySubject(bufferCapacity, windowDuration)
 	}
 	return o.Multicast(factory)
-}
-
-//jig:name FromObservable
-
-// FromObservable creates an ObservableObservable from multiple Observable values passed in.
-func FromObservable(slice ...Observable) ObservableObservable {
-	var zeroObservable Observable
-	observable := func(observe ObservableObserver, scheduler Scheduler, subscriber Subscriber) {
-		i := 0
-		runner := scheduler.ScheduleRecursive(func(self func()) {
-			if subscriber.Subscribed() {
-				if i < len(slice) {
-					observe(slice[i], nil, false)
-					if subscriber.Subscribed() {
-						i++
-						self()
-					}
-				} else {
-					observe(zeroObservable, nil, true)
-				}
-			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
 }
 
 //jig:name TimeIntervalObserver

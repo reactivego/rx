@@ -15,7 +15,7 @@ func Example_basic() {
 }
 
 func Example_complex() {
-	Range(1, 12).
+	RangeInt(1, 12).
 		Filter(func(x int) bool { return x%2 == 1 }).
 		MapInt(func(x int) int { return x + x }).
 		DoOnComplete(func() { fmt.Println("done") }).

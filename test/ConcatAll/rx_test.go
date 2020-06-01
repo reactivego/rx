@@ -8,7 +8,7 @@ import (
 
 func Example_concatAll() {
 	Interval(time.Millisecond).Take(3).MapObservableInt(func(next int) ObservableInt {
-		return Range(next, 2)
+		return RangeInt(next, 2)
 	}).ConcatAll().Println()
 
 	// Output:

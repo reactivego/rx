@@ -41,23 +41,25 @@ type IntObserver func(next int, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableInt func(IntObserver, Scheduler, Subscriber)
 
-//jig:name Range
+//jig:name RangeInt
 
-// Range creates an ObservableInt that emits a range of sequential integers.
-func Range(start, count int) ObservableInt {
+// RangeInt creates an ObservableInt that emits a range of sequential int values.
+// The generated code will do a type conversion from int to int.
+func RangeInt(start, count int) ObservableInt {
 	end := start + count
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := start
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Subscribed() {
 				if i < end {
-					observe(i, nil, false)
+					observe(int(i), nil, false)
 					if subscriber.Subscribed() {
 						i++
 						self()
 					}
 				} else {
-					observe(0, nil, true)
+					var zero int
+					observe(zero, nil, true)
 				}
 			}
 		})
@@ -66,7 +68,7 @@ func Range(start, count int) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntMergeMapInt
+//jig:name ObservableInt_MergeMapInt
 
 // MergeMapInt transforms the items emitted by an ObservableInt by applying a
 // function to each item an returning an ObservableInt. The stream of ObservableInt
@@ -75,7 +77,7 @@ func (o ObservableInt) MergeMapInt(project func(int) ObservableInt) ObservableIn
 	return o.MapObservableInt(project).MergeAll()
 }
 
-//jig:name ObservableIntMapObservableInt
+//jig:name ObservableInt_MapObservableInt
 
 // MapObservableInt transforms the items emitted by an ObservableInt by applying a
 // function to each item.
@@ -93,7 +95,7 @@ func (o ObservableInt) MapObservableInt(project func(int) ObservableInt) Observa
 	return observable
 }
 
-//jig:name ObservableIntPrintln
+//jig:name ObservableInt_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
@@ -132,7 +134,7 @@ type ObservableIntObserver func(next ObservableInt, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableObservableInt func(ObservableIntObserver, Scheduler, Subscriber)
 
-//jig:name ObservableObservableIntMergeAll
+//jig:name ObservableObservableInt_MergeAll
 
 // MergeAll flattens a higher order observable by merging the observables it emits.
 func (o ObservableObservableInt) MergeAll() ObservableInt {
