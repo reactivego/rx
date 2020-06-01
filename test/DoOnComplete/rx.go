@@ -84,7 +84,7 @@ func GoroutineScheduler() Scheduler {
 	return scheduler.Goroutine
 }
 
-//jig:name ObservableIntDoOnComplete
+//jig:name ObservableInt_DoOnComplete
 
 // DoOnComplete calls a function when the stream completes.
 func (o ObservableInt) DoOnComplete(f func()) ObservableInt {
@@ -100,7 +100,7 @@ func (o ObservableInt) DoOnComplete(f func()) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntToSlice
+//jig:name ObservableInt_ToSlice
 
 // ToSlice collects all values from the ObservableInt into an slice. The
 // complete slice and any error are returned.
@@ -122,7 +122,7 @@ func (o ObservableInt) ToSlice() (slice []int, err error) {
 	return
 }
 
-//jig:name ObservableIntSubscribeOn
+//jig:name ObservableInt_SubscribeOn
 
 // SubscribeOn specifies the scheduler an ObservableInt should use when it is
 // subscribed to.
@@ -139,7 +139,7 @@ func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
 // Subscription is an alias for the subscriber.Subscription interface type.
 type Subscription = subscriber.Subscription
 
-//jig:name ObservableIntSubscribe
+//jig:name ObservableInt_Subscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.

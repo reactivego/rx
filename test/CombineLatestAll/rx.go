@@ -110,7 +110,7 @@ func FromObservableInt(slice ...ObservableInt) ObservableObservableInt {
 
 type IntSlice = []int
 
-//jig:name ObservableObservableIntCombineLatestAll
+//jig:name ObservableObservableInt_CombineLatestAll
 
 // CombineLatestAll flattens a higher order observable
 // (e.g. ObservableObservableInt) by subscribing to
@@ -200,7 +200,7 @@ type IntSliceObserver func(next IntSlice, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableIntSlice func(IntSliceObserver, Scheduler, Subscriber)
 
-//jig:name ObservableIntSliceMapVector
+//jig:name ObservableIntSlice_MapVector
 
 // MapVector transforms the items emitted by an ObservableIntSlice by applying a
 // function to each item.
@@ -234,7 +234,7 @@ type VectorObserver func(next Vector, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableVector func(VectorObserver, Scheduler, Subscriber)
 
-//jig:name ObservableVectorPrintln
+//jig:name ObservableVector_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil

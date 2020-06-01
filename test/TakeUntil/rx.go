@@ -95,21 +95,19 @@ type ObservableInt func(IntObserver, Scheduler, Subscriber)
 //jig:name Interval
 
 // Interval creates an ObservableInt that emits a sequence of integers spaced
-// by a particular time interval. First integer is emitted after the first time
-// interval expires.
+// by a particular time interval. First integer is not emitted immediately, but
+// only after the first time interval has passed.
 func Interval(interval time.Duration) ObservableInt {
-	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		i := 0
-		runner := scheduler.ScheduleFutureRecursive(interval, func(self func(time.Duration)) {
-			if subscriber.Canceled() {
-				return
+		runner := subscribeOn.ScheduleFutureRecursive(interval, func(self func(time.Duration)) {
+			if subscriber.Subscribed() {
+				observe(i, nil, false)
+				i++
+				if subscriber.Subscribed() {
+					self(interval)
+				}
 			}
-			observe(i, nil, false)
-			if subscriber.Canceled() {
-				return
-			}
-			i++
-			self(interval)
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
 	}
@@ -122,7 +120,7 @@ type RxError string
 
 func (e RxError) Error() string	{ return string(e) }
 
-//jig:name ObservableSerialize
+//jig:name Observable_Serialize
 
 // Serialize forces an Observable to make serialized calls and to be
 // well-behaved.
@@ -145,63 +143,60 @@ func (o Observable) Serialize() Observable {
 	return observable
 }
 
-//jig:name ObservableTimeout
+//jig:name Observable_Timeout
 
 // ErrTimeout is delivered to an observer if the stream times out.
 const ErrTimeout = RxError("timeout")
 
 // Timeout mirrors the source Observable, but issues an error notification if a
 // particular period of time elapses without any emitted items.
-// Timeout schedules tasks on the scheduler passed to this
-func (o Observable) Timeout(timeout time.Duration) Observable {
+// Timeout schedules a task on the scheduler passed to it during subscription.
+func (o Observable) Timeout(due time.Duration) Observable {
 	observable := Observable(func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		if subscriber.Canceled() {
-			return
-		}
-		var last struct {
+		var timeout struct {
 			sync.Mutex
-			at	time.Time
-			done	bool
+			at		time.Time
+			occurred	bool
 		}
-		last.at = subscribeOn.Now()
-		timer := func(self func(time.Duration)) {
-			last.Lock()
-			defer last.Unlock()
-			if last.done || subscriber.Canceled() {
-				return
+		timeout.at = subscribeOn.Now().Add(due)
+		timer := subscribeOn.ScheduleFutureRecursive(due, func(self func(time.Duration)) {
+			if subscriber.Subscribed() {
+				timeout.Lock()
+				if !timeout.occurred {
+					due := timeout.at.Sub(subscribeOn.Now())
+					if due > 0 {
+						self(due)
+					} else {
+						timeout.occurred = true
+						timeout.Unlock()
+						observe(nil, ErrTimeout, true)
+						timeout.Lock()
+					}
+				}
+				timeout.Unlock()
 			}
-			deadline := last.at.Add(timeout)
-			now := subscribeOn.Now()
-			if now.Before(deadline) {
-				self(deadline.Sub(now))
-				return
-			}
-			last.done = true
-			observe(nil, ErrTimeout, true)
-		}
-		runner := subscribeOn.ScheduleFutureRecursive(timeout, timer)
-		subscriber.OnUnsubscribe(runner.Cancel)
+		})
+		subscriber.OnUnsubscribe(timer.Cancel)
 		observer := func(next interface{}, err error, done bool) {
-			last.Lock()
-			defer last.Unlock()
-			if last.done || subscriber.Canceled() {
-				return
+			if subscriber.Subscribed() {
+				timeout.Lock()
+				if !timeout.occurred {
+					now := subscribeOn.Now()
+					if now.Before(timeout.at) {
+						timeout.at = now.Add(due)
+						timeout.occurred = done
+						observe(next, err, done)
+					}
+				}
+				timeout.Unlock()
 			}
-			now := subscribeOn.Now()
-			deadline := last.at.Add(timeout)
-			if !now.Before(deadline) {
-				return
-			}
-			last.done = done
-			last.at = now
-			observe(next, err, done)
 		}
 		o(observer, subscribeOn, subscriber)
 	})
-	return observable.Serialize()
+	return observable
 }
 
-//jig:name ObservableTakeUntil
+//jig:name Observable_TakeUntil
 
 // TakeUntil emits items emitted by an Observable until another Observable emits an item.
 func (o Observable) TakeUntil(other Observable) Observable {
@@ -228,14 +223,27 @@ func (o Observable) TakeUntil(other Observable) Observable {
 	return observable
 }
 
-//jig:name ObservableIntTakeUntil
+//jig:name ObservableInt_TakeUntil
 
 // TakeUntil emits items emitted by an ObservableInt until another Observable emits an item.
 func (o ObservableInt) TakeUntil(other Observable) ObservableInt {
 	return o.AsObservable().TakeUntil(other).AsObservableInt()
 }
 
-//jig:name ObservableCatch
+//jig:name ObservableInt_AsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name Observable_Catch
 
 // Catch recovers from an error notification by continuing the sequence without
 // emitting the error but by switching to the catch Observable to provide
@@ -254,7 +262,7 @@ func (o Observable) Catch(catch Observable) Observable {
 	return observable
 }
 
-//jig:name ObservableIntPrintln
+//jig:name ObservableInt_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
@@ -277,38 +285,13 @@ func (o ObservableInt) Println(a ...interface{}) (err error) {
 	return
 }
 
-//jig:name ObservableIntAsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableSubscribeOn
-
-// SubscribeOn specifies the scheduler an Observable should use when it is
-// subscribed to.
-func (o Observable) SubscribeOn(subscribeOn Scheduler) Observable {
-	observable := func(observe Observer, _ Scheduler, subscriber Subscriber) {
-		subscriber.OnWait(subscribeOn.Wait)
-		o(observe, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name ErrTypecastToInt
 
 // ErrTypecastToInt is delivered to an observer if the generic value cannot be
 // typecast to int.
 const ErrTypecastToInt = RxError("typecast to int failed")
 
-//jig:name ObservableAsObservableInt
+//jig:name Observable_AsObservableInt
 
 // AsObservableInt turns an Observable of interface{} into an ObservableInt.
 // If during observing a typecast fails, the error ErrTypecastToInt will be
@@ -329,6 +312,18 @@ func (o Observable) AsObservableInt() ObservableInt {
 			}
 		}
 		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name Observable_SubscribeOn
+
+// SubscribeOn specifies the scheduler an Observable should use when it is
+// subscribed to.
+func (o Observable) SubscribeOn(subscribeOn Scheduler) Observable {
+	observable := func(observe Observer, _ Scheduler, subscriber Subscriber) {
+		subscriber.OnWait(subscribeOn.Wait)
+		o(observe, subscribeOn, subscriber)
 	}
 	return observable
 }

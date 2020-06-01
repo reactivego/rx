@@ -64,7 +64,7 @@ func FromInt(slice ...int) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntMin
+//jig:name ObservableInt_Min
 
 // Min determines, and emits, the minimum-valued item emitted by an
 // ObservableInt.
@@ -99,7 +99,7 @@ func (o ObservableInt) Min() ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntPrintln
+//jig:name ObservableInt_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil

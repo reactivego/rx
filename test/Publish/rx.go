@@ -108,7 +108,7 @@ func FromChanInt(ch <-chan int) ObservableInt {
 // Subscription is an alias for the subscriber.Subscription interface type.
 type Subscription = subscriber.Subscription
 
-//jig:name ObservableIntSubscribe
+//jig:name ObservableInt_Subscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
@@ -166,7 +166,7 @@ type IntMulticaster struct {
 	Connectable
 }
 
-//jig:name ObservableIntMulticast
+//jig:name ObservableInt_Multicast
 
 // Multicast converts an ordinary observable into a multicasting connectable
 // observable or multicaster for short. A multicaster will only start emitting
@@ -320,7 +320,7 @@ func NewSubjectInt() SubjectInt {
 	return SubjectInt{observer, observable.AsObservableInt()}
 }
 
-//jig:name ObservableIntPublish
+//jig:name ObservableInt_Publish
 
 // Publish uses the Multicast operator to control the subscription of a
 // Subject to a source observable and turns the subject it into a connnectable
@@ -336,7 +336,7 @@ func (o ObservableInt) Publish() IntMulticaster {
 	return o.Multicast(NewSubjectInt)
 }
 
-//jig:name ObservableIntSubscribeOn
+//jig:name ObservableInt_SubscribeOn
 
 // SubscribeOn specifies the scheduler an ObservableInt should use when it is
 // subscribed to.
@@ -352,7 +352,7 @@ func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
 
 const ErrRefCountNeedsConcurrentScheduler = RxError("needs concurrent scheduler")
 
-//jig:name IntMulticasterRefCount
+//jig:name IntMulticaster_RefCount
 
 // RefCount makes a IntMulticaster behave like an ordinary ObservableInt. On
 // first Subscribe it will call Connect on its IntMulticaster and when its last
@@ -461,49 +461,13 @@ func Create(create func(Next, Error, Complete, Canceled)) Observable {
 	return observable
 }
 
-//jig:name ObservableIntMapString
-
-// MapString transforms the items emitted by an ObservableInt by applying a
-// function to each item.
-func (o ObservableInt) MapString(project func(int) string) ObservableString {
-	observable := func(observe StringObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			var mapped string
-			if !done {
-				mapped = project(next)
-			}
-			observe(mapped, err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableIntMapBool
-
-// MapBool transforms the items emitted by an ObservableInt by applying a
-// function to each item.
-func (o ObservableInt) MapBool(project func(int) bool) ObservableBool {
-	observable := func(observe BoolObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			var mapped bool
-			if !done {
-				mapped = project(next)
-			}
-			observe(mapped, err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name ErrTypecastToInt
 
 // ErrTypecastToInt is delivered to an observer if the generic value cannot be
 // typecast to int.
 const ErrTypecastToInt = RxError("typecast to int failed")
 
-//jig:name ObservableAsObservableInt
+//jig:name Observable_AsObservableInt
 
 // AsObservableInt turns an Observable of interface{} into an ObservableInt.
 // If during observing a typecast fails, the error ErrTypecastToInt will be
@@ -522,6 +486,42 @@ func (o Observable) AsObservableInt() ObservableInt {
 				var zeroInt int
 				observe(zeroInt, err, true)
 			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableInt_MapString
+
+// MapString transforms the items emitted by an ObservableInt by applying a
+// function to each item.
+func (o ObservableInt) MapString(project func(int) string) ObservableString {
+	observable := func(observe StringObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			var mapped string
+			if !done {
+				mapped = project(next)
+			}
+			observe(mapped, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableInt_MapBool
+
+// MapBool transforms the items emitted by an ObservableInt by applying a
+// function to each item.
+func (o ObservableInt) MapBool(project func(int) bool) ObservableBool {
+	observable := func(observe BoolObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			var mapped bool
+			if !done {
+				mapped = project(next)
+			}
+			observe(mapped, err, done)
 		}
 		o(observer, subscribeOn, subscriber)
 	}
@@ -560,7 +560,7 @@ type BoolObserver func(next bool, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableBool func(BoolObserver, Scheduler, Subscriber)
 
-//jig:name ObservableStringSubscribe
+//jig:name ObservableString_Subscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
@@ -582,7 +582,7 @@ func (o ObservableString) Subscribe(observe StringObserver, subscribers ...Subsc
 	return subscribers[0]
 }
 
-//jig:name ObservableBoolSubscribe
+//jig:name ObservableBool_Subscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.

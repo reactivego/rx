@@ -69,7 +69,7 @@ func FromInt(slice ...int) ObservableInt {
 
 type IntSlice = []int
 
-//jig:name ObservableObservableIntCombineLatestAll
+//jig:name ObservableObservableInt_CombineLatestAll
 
 // CombineLatestAll flattens a higher order observable
 // (e.g. ObservableObservableInt) by subscribing to
@@ -210,7 +210,7 @@ func FromObservableInt(slice ...ObservableInt) ObservableObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntSlicePrintln
+//jig:name ObservableIntSlice_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil

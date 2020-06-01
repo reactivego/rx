@@ -128,6 +128,29 @@ func (o ObservableInt) AsObservable() Observable {
 	return observable
 }
 
+//jig:name ObservableBool_Println
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableBool) Println(a ...interface{}) (err error) {
+	subscriber := subscriber.New()
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next bool, e error, done bool) {
+		if !done {
+			fmt.Println(append(a, next)...)
+		} else {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
+}
+
 //jig:name Observable_All
 
 // All determines whether all items emitted by an Observable meet some
@@ -159,27 +182,4 @@ func (o Observable) All(predicate func(next interface{}) bool) ObservableBool {
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
-}
-
-//jig:name ObservableBool_Println
-
-// Println subscribes to the Observable and prints every item to os.Stdout
-// while it waits for completion or error. Returns either the error or nil
-// when the Observable completed normally.
-// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableBool) Println(a ...interface{}) (err error) {
-	subscriber := subscriber.New()
-	scheduler := scheduler.MakeTrampoline()
-	observer := func(next bool, e error, done bool) {
-		if !done {
-			fmt.Println(append(a, next)...)
-		} else {
-			err = e
-			subscriber.Unsubscribe()
-		}
-	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
 }

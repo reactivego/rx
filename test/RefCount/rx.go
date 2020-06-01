@@ -51,21 +51,19 @@ type ObservableInt func(IntObserver, Scheduler, Subscriber)
 //jig:name Interval
 
 // Interval creates an ObservableInt that emits a sequence of integers spaced
-// by a particular time interval. First integer is emitted after the first time
-// interval expires.
+// by a particular time interval. First integer is not emitted immediately, but
+// only after the first time interval has passed.
 func Interval(interval time.Duration) ObservableInt {
-	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		i := 0
-		runner := scheduler.ScheduleFutureRecursive(interval, func(self func(time.Duration)) {
-			if subscriber.Canceled() {
-				return
+		runner := subscribeOn.ScheduleFutureRecursive(interval, func(self func(time.Duration)) {
+			if subscriber.Subscribed() {
+				observe(i, nil, false)
+				i++
+				if subscriber.Subscribed() {
+					self(interval)
+				}
 			}
-			observe(i, nil, false)
-			if subscriber.Canceled() {
-				return
-			}
-			i++
-			self(interval)
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
 	}
@@ -103,7 +101,7 @@ func FromChanInt(ch <-chan int) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntDo
+//jig:name ObservableInt_Do
 
 // Do calls a function for each next value passing through the observable.
 func (o ObservableInt) Do(f func(next int)) ObservableInt {
@@ -124,7 +122,7 @@ func (o ObservableInt) Do(f func(next int)) ObservableInt {
 // Subscription is an alias for the subscriber.Subscription interface type.
 type Subscription = subscriber.Subscription
 
-//jig:name ObservableIntSubscribe
+//jig:name ObservableInt_Subscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
@@ -182,7 +180,7 @@ type IntMulticaster struct {
 	Connectable
 }
 
-//jig:name ObservableIntMulticast
+//jig:name ObservableInt_Multicast
 
 // Multicast converts an ordinary observable into a multicasting connectable
 // observable or multicaster for short. A multicaster will only start emitting
@@ -336,7 +334,7 @@ func NewSubjectInt() SubjectInt {
 	return SubjectInt{observer, observable.AsObservableInt()}
 }
 
-//jig:name ObservableIntPublish
+//jig:name ObservableInt_Publish
 
 // Publish uses the Multicast operator to control the subscription of a
 // Subject to a source observable and turns the subject it into a connnectable
@@ -352,7 +350,7 @@ func (o ObservableInt) Publish() IntMulticaster {
 	return o.Multicast(NewSubjectInt)
 }
 
-//jig:name ObservableIntSubscribeOn
+//jig:name ObservableInt_SubscribeOn
 
 // SubscribeOn specifies the scheduler an ObservableInt should use when it is
 // subscribed to.
@@ -360,42 +358,6 @@ func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
 	observable := func(observe IntObserver, _ Scheduler, subscriber Subscriber) {
 		subscriber.OnWait(subscribeOn.Wait)
 		o(observe, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ErrRefCount
-
-const ErrRefCountNeedsConcurrentScheduler = RxError("needs concurrent scheduler")
-
-//jig:name IntMulticasterRefCount
-
-// RefCount makes a IntMulticaster behave like an ordinary ObservableInt. On
-// first Subscribe it will call Connect on its IntMulticaster and when its last
-// subscriber is Unsubscribed it will cancel the connection by calling
-// Unsubscribe on the subscription returned by the call to Connect.
-func (o IntMulticaster) RefCount() ObservableInt {
-	var (
-		refcount	int32
-		subscription	Subscription
-	)
-	observable := func(observe IntObserver, subscribeOn Scheduler, withSubscriber Subscriber) {
-		if !subscribeOn.IsConcurrent() {
-			var zero int
-			observe(zero, ErrRefCountNeedsConcurrentScheduler, true)
-			return
-		}
-		if atomic.AddInt32(&refcount, 1) == 1 {
-			s := subscriber.New()
-			o.Connectable(subscribeOn, s)
-			subscription = s
-		}
-		withSubscriber.OnUnsubscribe(func() {
-			if atomic.AddInt32(&refcount, -1) == 0 {
-				subscription.Unsubscribe()
-			}
-		})
-		o.ObservableInt(observe, subscribeOn, withSubscriber)
 	}
 	return observable
 }
@@ -477,13 +439,49 @@ func Create(create func(Next, Error, Complete, Canceled)) Observable {
 	return observable
 }
 
+//jig:name ErrRefCount
+
+const ErrRefCountNeedsConcurrentScheduler = RxError("needs concurrent scheduler")
+
+//jig:name IntMulticaster_RefCount
+
+// RefCount makes a IntMulticaster behave like an ordinary ObservableInt. On
+// first Subscribe it will call Connect on its IntMulticaster and when its last
+// subscriber is Unsubscribed it will cancel the connection by calling
+// Unsubscribe on the subscription returned by the call to Connect.
+func (o IntMulticaster) RefCount() ObservableInt {
+	var (
+		refcount	int32
+		subscription	Subscription
+	)
+	observable := func(observe IntObserver, subscribeOn Scheduler, withSubscriber Subscriber) {
+		if !subscribeOn.IsConcurrent() {
+			var zero int
+			observe(zero, ErrRefCountNeedsConcurrentScheduler, true)
+			return
+		}
+		if atomic.AddInt32(&refcount, 1) == 1 {
+			s := subscriber.New()
+			o.Connectable(subscribeOn, s)
+			subscription = s
+		}
+		withSubscriber.OnUnsubscribe(func() {
+			if atomic.AddInt32(&refcount, -1) == 0 {
+				subscription.Unsubscribe()
+			}
+		})
+		o.ObservableInt(observe, subscribeOn, withSubscriber)
+	}
+	return observable
+}
+
 //jig:name ErrTypecastToInt
 
 // ErrTypecastToInt is delivered to an observer if the generic value cannot be
 // typecast to int.
 const ErrTypecastToInt = RxError("typecast to int failed")
 
-//jig:name ObservableAsObservableInt
+//jig:name Observable_AsObservableInt
 
 // AsObservableInt turns an Observable of interface{} into an ObservableInt.
 // If during observing a typecast fails, the error ErrTypecastToInt will be

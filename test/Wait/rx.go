@@ -104,7 +104,7 @@ type RxError string
 
 func (e RxError) Error() string	{ return string(e) }
 
-//jig:name ObservableIntWait
+//jig:name ObservableInt_Wait
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.

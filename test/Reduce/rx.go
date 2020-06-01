@@ -64,7 +64,7 @@ func FromInt(slice ...int) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntReduceFloat32
+//jig:name ObservableInt_ReduceFloat32
 
 // ReduceFloat32 applies a reducer function to each item emitted by an ObservableInt
 // and the previous reducer result. The operator accepts a seed argument that
@@ -89,7 +89,7 @@ func (o ObservableInt) ReduceFloat32(reducer func(float32, int) float32, seed fl
 	return observable
 }
 
-//jig:name ObservableIntReduce
+//jig:name ObservableInt_Reduce
 
 // Reduce applies a reducer function to each item emitted by an ObservableInt
 // and the previous reducer result. The operator accepts a seed argument that
@@ -146,7 +146,7 @@ type Observer func(next interface{}, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type Observable func(Observer, Scheduler, Subscriber)
 
-//jig:name ObservableFloat32Println
+//jig:name ObservableFloat32_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
@@ -169,7 +169,7 @@ func (o ObservableFloat32) Println(a ...interface{}) (err error) {
 	return
 }
 
-//jig:name ObservablePrintln
+//jig:name Observable_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil

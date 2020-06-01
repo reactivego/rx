@@ -69,7 +69,7 @@ func From(slice ...interface{}) Observable {
 
 type Slice = []interface{}
 
-//jig:name ObservableObservableCombineLatestAll
+//jig:name ObservableObservable_CombineLatestAll
 
 // CombineLatestAll flattens a higher order observable
 // (e.g. ObservableObservable) by subscribing to
@@ -143,7 +143,7 @@ func (o ObservableObservable) CombineLatestAll() ObservableSlice {
 	return observable
 }
 
-//jig:name ObservableCombineLatestWith
+//jig:name Observable_CombineLatestWith
 
 // CombineLatestWith will subscribe to its Observable and all other
 // Observables passed in. It will then wait for all of the ObservableBars
@@ -211,7 +211,7 @@ func FromObservable(slice ...Observable) ObservableObservable {
 	return observable
 }
 
-//jig:name ObservableSlicePrintln
+//jig:name ObservableSlice_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil

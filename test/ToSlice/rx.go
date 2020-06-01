@@ -21,47 +21,6 @@ type Scheduler = scheduler.Scheduler
 // from a single subscriber at the root of the subscription tree.
 type Subscriber = subscriber.Subscriber
 
-//jig:name IntObserver
-
-// IntObserver is a function that gets called whenever the Observable has
-// something to report. The next argument is the item value that is only
-// valid when the done argument is false. When done is true and the err
-// argument is not nil, then the Observable has terminated with an error.
-// When done is true and the err argument is nil, then the Observable has
-// completed normally.
-type IntObserver func(next int, err error, done bool)
-
-//jig:name ObservableInt
-
-// ObservableInt is a function taking an Observer, Scheduler and Subscriber.
-// Calling it will subscribe the Observer to events from the Observable.
-type ObservableInt func(IntObserver, Scheduler, Subscriber)
-
-//jig:name Range
-
-// Range creates an ObservableInt that emits a range of sequential integers.
-func Range(start, count int) ObservableInt {
-	end := start + count
-	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
-		i := start
-		runner := scheduler.ScheduleRecursive(func(self func()) {
-			if subscriber.Subscribed() {
-				if i < end {
-					observe(i, nil, false)
-					if subscriber.Subscribed() {
-						i++
-						self()
-					}
-				} else {
-					observe(0, nil, true)
-				}
-			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
-}
-
 //jig:name Observer
 
 // Observer is a function that gets called whenever the Observable has
@@ -77,6 +36,33 @@ type Observer func(next interface{}, err error, done bool)
 // Observable is a function taking an Observer, Scheduler and Subscriber.
 // Calling it will subscribe the Observer to events from the Observable.
 type Observable func(Observer, Scheduler, Subscriber)
+
+//jig:name Range
+
+// Range creates an Observable that emits a range of sequential int values.
+// The generated code will do a type conversion from int to interface{}.
+func Range(start, count int) Observable {
+	end := start + count
+	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
+		i := start
+		runner := scheduler.ScheduleRecursive(func(self func()) {
+			if subscriber.Subscribed() {
+				if i < end {
+					observe(interface{}(i), nil, false)
+					if subscriber.Subscribed() {
+						i++
+						self()
+					}
+				} else {
+					var zero interface{}
+					observe(zero, nil, true)
+				}
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
+}
 
 //jig:name Throw
 
@@ -101,29 +87,7 @@ type RxError string
 
 func (e RxError) Error() string	{ return string(e) }
 
-//jig:name ObservableIntToSlice
-
-// ToSlice collects all values from the ObservableInt into an slice. The
-// complete slice and any error are returned.
-// ToSlice uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) ToSlice() (slice []int, err error) {
-	subscriber := subscriber.New()
-	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, e error, done bool) {
-		if !done {
-			slice = append(slice, next)
-		} else {
-			err = e
-			subscriber.Unsubscribe()
-		}
-	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
-}
-
-//jig:name ObservableToSlice
+//jig:name Observable_ToSlice
 
 // ToSlice collects all values from the Observable into an slice. The
 // complete slice and any error are returned.

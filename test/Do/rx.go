@@ -62,7 +62,7 @@ func FromInt(slice ...int) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntDo
+//jig:name ObservableInt_Do
 
 // Do calls a function for each next value passing through the observable.
 func (o ObservableInt) Do(f func(next int)) ObservableInt {
@@ -78,7 +78,7 @@ func (o ObservableInt) Do(f func(next int)) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntWait
+//jig:name ObservableInt_Wait
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.

@@ -74,6 +74,53 @@ func Interval(interval time.Duration) ObservableInt {
 	return observable
 }
 
+//jig:name EmptyInt
+
+// EmptyInt creates an Observable that emits no items but terminates normally.
+func EmptyInt() ObservableInt {
+	var zeroInt int
+	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
+		runner := scheduler.Schedule(func() {
+			if subscriber.Subscribed() {
+				observe(zeroInt, nil, true)
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
+}
+
+//jig:name ObservableInt_ConcatWith
+
+// ConcatWith emits the emissions from two or more ObservableInts without interleaving them.
+func (o ObservableInt) ConcatWith(other ...ObservableInt) ObservableInt {
+	var zeroInt int
+	if len(other) == 0 {
+		return o
+	}
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		var (
+			observables	= append([]ObservableInt{}, other...)
+			observer	IntObserver
+		)
+		observer = func(next int, err error, done bool) {
+			if !done || err != nil {
+				observe(next, err, done)
+			} else {
+				if len(observables) == 0 {
+					observe(zeroInt, nil, true)
+				} else {
+					o := observables[0]
+					observables = observables[1:]
+					o(observer, subscribeOn, subscriber)
+				}
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name Observable_Take
 
 // Take emits only the first n items emitted by an Observable.
@@ -165,53 +212,6 @@ func (o ObservableInt) DebounceTime(duration time.Duration) ObservableInt {
 	return o.AsObservable().DebounceTime(duration).AsObservableInt()
 }
 
-//jig:name EmptyInt
-
-// EmptyInt creates an Observable that emits no items but terminates normally.
-func EmptyInt() ObservableInt {
-	var zeroInt int
-	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
-		runner := scheduler.Schedule(func() {
-			if subscriber.Subscribed() {
-				observe(zeroInt, nil, true)
-			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
-}
-
-//jig:name ObservableInt_ConcatWith
-
-// ConcatWith emits the emissions from two or more ObservableInts without interleaving them.
-func (o ObservableInt) ConcatWith(other ...ObservableInt) ObservableInt {
-	var zeroInt int
-	if len(other) == 0 {
-		return o
-	}
-	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		var (
-			observables	= append([]ObservableInt{}, other...)
-			observer	IntObserver
-		)
-		observer = func(next int, err error, done bool) {
-			if !done || err != nil {
-				observe(next, err, done)
-			} else {
-				if len(observables) == 0 {
-					observe(zeroInt, nil, true)
-				} else {
-					o := observables[0]
-					observables = observables[1:]
-					o(observer, subscribeOn, subscriber)
-				}
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name Observer
 
 // Observer is a function that gets called whenever the Observable has
@@ -227,6 +227,19 @@ type Observer func(next interface{}, err error, done bool)
 // Observable is a function taking an Observer, Scheduler and Subscriber.
 // Calling it will subscribe the Observer to events from the Observable.
 type Observable func(Observer, Scheduler, Subscriber)
+
+//jig:name ObservableInt_AsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
 
 //jig:name ObservableInt_Println
 
@@ -276,19 +289,6 @@ func (o ObservableInt) MapInt(project func(int) int) ObservableInt {
 // items is then merged into a single stream of Int items using the MergeAll operator.
 func (o ObservableInt) MergeMapInt(project func(int) ObservableInt) ObservableInt {
 	return o.MapObservableInt(project).MergeAll()
-}
-
-//jig:name ObservableInt_AsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
 }
 
 //jig:name RxError

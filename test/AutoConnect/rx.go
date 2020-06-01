@@ -169,7 +169,7 @@ func CreateInt(create func(NextInt, Error, Complete, Canceled)) ObservableInt {
 // Subscription is an alias for the subscriber.Subscription interface type.
 type Subscription = subscriber.Subscription
 
-//jig:name ObservableIntSubscribe
+//jig:name ObservableInt_Subscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
@@ -227,7 +227,7 @@ type IntMulticaster struct {
 	Connectable
 }
 
-//jig:name ObservableIntMulticast
+//jig:name ObservableInt_Multicast
 
 // Multicast converts an ordinary observable into a multicasting connectable
 // observable or multicaster for short. A multicaster will only start emitting
@@ -385,7 +385,7 @@ func NewReplaySubjectInt(bufferCapacity int, windowDuration time.Duration) Subje
 	return SubjectInt{observer, observable.AsObservableInt()}
 }
 
-//jig:name ObservableIntPublishReplay
+//jig:name ObservableInt_PublishReplay
 
 // Replay uses the Multicast operator to control the subscription of a
 // ReplaySubject to a source observable and turns the subject into a
@@ -488,7 +488,7 @@ const ErrAutoConnectInvalidCount = RxError("invalid count")
 
 const ErrAutoConnectNeedsConcurrentScheduler = RxError("needs concurrent scheduler")
 
-//jig:name IntMulticasterAutoConnect
+//jig:name IntMulticaster_AutoConnect
 
 // AutoConnect makes a IntMulticaster behave like an ordinary ObservableInt
 // that automatically connects when the specified number of clients have
@@ -513,25 +513,13 @@ func (o IntMulticaster) AutoConnect(count int) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntSubscribeOn
-
-// SubscribeOn specifies the scheduler an ObservableInt should use when it is
-// subscribed to.
-func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
-	observable := func(observe IntObserver, _ Scheduler, subscriber Subscriber) {
-		subscriber.OnWait(subscribeOn.Wait)
-		o(observe, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name ErrTypecastToInt
 
 // ErrTypecastToInt is delivered to an observer if the generic value cannot be
 // typecast to int.
 const ErrTypecastToInt = RxError("typecast to int failed")
 
-//jig:name ObservableAsObservableInt
+//jig:name Observable_AsObservableInt
 
 // AsObservableInt turns an Observable of interface{} into an ObservableInt.
 // If during observing a typecast fails, the error ErrTypecastToInt will be
@@ -552,6 +540,18 @@ func (o Observable) AsObservableInt() ObservableInt {
 			}
 		}
 		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableInt_SubscribeOn
+
+// SubscribeOn specifies the scheduler an ObservableInt should use when it is
+// subscribed to.
+func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
+	observable := func(observe IntObserver, _ Scheduler, subscriber Subscriber) {
+		subscriber.OnWait(subscribeOn.Wait)
+		o(observe, subscribeOn, subscriber)
 	}
 	return observable
 }

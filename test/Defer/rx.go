@@ -75,7 +75,7 @@ func FromInt(slice ...int) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntMapString
+//jig:name ObservableInt_MapString
 
 // MapString transforms the items emitted by an ObservableInt by applying a
 // function to each item.
@@ -109,7 +109,7 @@ type StringObserver func(next string, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableString func(StringObserver, Scheduler, Subscriber)
 
-//jig:name ObservableStringPrintln
+//jig:name ObservableString_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil

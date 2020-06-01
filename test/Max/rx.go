@@ -64,7 +64,7 @@ func FromInt(slice ...int) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntMax
+//jig:name ObservableInt_Max
 
 // Max determines, and emits, the maximum-valued item emitted by an
 // ObservableInt.
@@ -98,7 +98,7 @@ func (o ObservableInt) Max() ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntPrintln
+//jig:name ObservableInt_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil

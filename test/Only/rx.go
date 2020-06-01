@@ -114,7 +114,7 @@ type StringObserver func(next string, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableString func(StringObserver, Scheduler, Subscriber)
 
-//jig:name ObservableOnlyString
+//jig:name Observable_OnlyString
 
 // OnlyString filters the value stream of an Observable of interface{} and outputs only the
 // string typed values.
@@ -151,7 +151,7 @@ type SizeObserver func(next Size, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableSize func(SizeObserver, Scheduler, Subscriber)
 
-//jig:name ObservableOnlySize
+//jig:name Observable_OnlySize
 
 // OnlySize filters the value stream of an Observable of interface{} and outputs only the
 // Size typed values.
@@ -188,7 +188,7 @@ type PointObserver func(next []point, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservablePoint func(PointObserver, Scheduler, Subscriber)
 
-//jig:name ObservableOnlyPoint
+//jig:name Observable_OnlyPoint
 
 // OnlyPoint filters the value stream of an Observable of interface{} and outputs only the
 // []point typed values.
@@ -214,7 +214,7 @@ func (o Observable) OnlyPoint() ObservablePoint {
 // Subscription is an alias for the subscriber.Subscription interface type.
 type Subscription = subscriber.Subscription
 
-//jig:name ObservableStringSubscribe
+//jig:name ObservableString_Subscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
@@ -236,7 +236,7 @@ func (o ObservableString) Subscribe(observe StringObserver, subscribers ...Subsc
 	return subscribers[0]
 }
 
-//jig:name ObservableSizeSubscribe
+//jig:name ObservableSize_Subscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
@@ -258,7 +258,7 @@ func (o ObservableSize) Subscribe(observe SizeObserver, subscribers ...Subscribe
 	return subscribers[0]
 }
 
-//jig:name ObservablePointSubscribe
+//jig:name ObservablePoint_Subscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.

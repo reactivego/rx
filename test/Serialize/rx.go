@@ -106,7 +106,7 @@ func CreateInt(create func(NextInt, Error, Complete, Canceled)) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntSubscribeOn
+//jig:name ObservableInt_SubscribeOn
 
 // SubscribeOn specifies the scheduler an ObservableInt should use when it is
 // subscribed to.
@@ -123,7 +123,7 @@ func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
 // Subscription is an alias for the subscriber.Subscription interface type.
 type Subscription = subscriber.Subscription
 
-//jig:name ObservableIntSubscribe
+//jig:name ObservableInt_Subscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
@@ -145,7 +145,7 @@ func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber)
 	return subscribers[0]
 }
 
-//jig:name ObservableIntSerialize
+//jig:name ObservableInt_Serialize
 
 // Serialize forces an ObservableInt to make serialized calls and to be
 // well-behaved.

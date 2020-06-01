@@ -105,7 +105,7 @@ func FromFloat32(slice ...float32) ObservableFloat32 {
 	return observable
 }
 
-//jig:name ObservableIntAverage
+//jig:name ObservableInt_Average
 
 // Average calculates the average of numbers emitted by an ObservableInt and
 // emits this average.
@@ -129,7 +129,7 @@ func (o ObservableInt) Average() ObservableInt {
 	return observable
 }
 
-//jig:name ObservableFloat32Average
+//jig:name ObservableFloat32_Average
 
 // Average calculates the average of numbers emitted by an ObservableFloat32 and
 // emits this average.
@@ -153,7 +153,7 @@ func (o ObservableFloat32) Average() ObservableFloat32 {
 	return observable
 }
 
-//jig:name ObservableIntPrintln
+//jig:name ObservableInt_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
@@ -176,7 +176,7 @@ func (o ObservableInt) Println(a ...interface{}) (err error) {
 	return
 }
 
-//jig:name ObservableFloat32Println
+//jig:name ObservableFloat32_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil

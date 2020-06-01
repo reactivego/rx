@@ -100,7 +100,7 @@ func JustString(element string) ObservableString {
 	return observable
 }
 
-//jig:name ObservableIntConcatMapString
+//jig:name ObservableInt_ConcatMapString
 
 // ConcatMapString transforms the items emitted by an ObservableInt by applying a
 // function to each item and returning an ObservableString. The stream of
@@ -110,7 +110,25 @@ func (o ObservableInt) ConcatMapString(project func(int) ObservableString) Obser
 	return o.MapObservableString(project).ConcatAll()
 }
 
-//jig:name ObservableStringPrintln
+//jig:name ObservableInt_MapObservableString
+
+// MapObservableString transforms the items emitted by an ObservableInt by applying a
+// function to each item.
+func (o ObservableInt) MapObservableString(project func(int) ObservableString) ObservableObservableString {
+	observable := func(observe ObservableStringObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			var mapped ObservableString
+			if !done {
+				mapped = project(next)
+			}
+			observe(mapped, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableString_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
@@ -133,24 +151,6 @@ func (o ObservableString) Println(a ...interface{}) (err error) {
 	return
 }
 
-//jig:name ObservableIntMapObservableString
-
-// MapObservableString transforms the items emitted by an ObservableInt by applying a
-// function to each item.
-func (o ObservableInt) MapObservableString(project func(int) ObservableString) ObservableObservableString {
-	observable := func(observe ObservableStringObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			var mapped ObservableString
-			if !done {
-				mapped = project(next)
-			}
-			observe(mapped, err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name ObservableStringObserver
 
 // ObservableStringObserver is a function that gets called whenever the Observable has
@@ -167,7 +167,7 @@ type ObservableStringObserver func(next ObservableString, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableObservableString func(ObservableStringObserver, Scheduler, Subscriber)
 
-//jig:name ObservableObservableStringConcatAll
+//jig:name ObservableObservableString_ConcatAll
 
 // ConcatAll flattens a higher order observable by concattenating the observables it emits.
 func (o ObservableObservableString) ConcatAll() ObservableString {

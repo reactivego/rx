@@ -65,7 +65,7 @@ func Of(slice ...interface{}) Observable {
 	return observable
 }
 
-//jig:name ObservablePrintln
+//jig:name Observable_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil

@@ -84,7 +84,7 @@ func JustInt(element int) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntMergeWith
+//jig:name ObservableInt_MergeWith
 
 // MergeWith combines multiple Observables into one by merging their emissions.
 // An error from any of the observables will terminate the merged observables.
@@ -133,7 +133,7 @@ func (o ObservableInt) MergeWith(other ...ObservableInt) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntPrintln
+//jig:name ObservableInt_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
@@ -156,7 +156,7 @@ func (o ObservableInt) Println(a ...interface{}) (err error) {
 	return
 }
 
-//jig:name ObservableIntDoOnComplete
+//jig:name ObservableInt_DoOnComplete
 
 // DoOnComplete calls a function when the stream completes.
 func (o ObservableInt) DoOnComplete(f func()) ObservableInt {

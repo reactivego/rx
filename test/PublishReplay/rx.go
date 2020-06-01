@@ -85,7 +85,7 @@ func GoroutineScheduler() Scheduler {
 // Subscription is an alias for the subscriber.Subscription interface type.
 type Subscription = subscriber.Subscription
 
-//jig:name ObservableIntSubscribe
+//jig:name ObservableInt_Subscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
@@ -143,7 +143,7 @@ type IntMulticaster struct {
 	Connectable
 }
 
-//jig:name ObservableIntMulticast
+//jig:name ObservableInt_Multicast
 
 // Multicast converts an ordinary observable into a multicasting connectable
 // observable or multicaster for short. A multicaster will only start emitting
@@ -301,7 +301,7 @@ func NewReplaySubjectInt(bufferCapacity int, windowDuration time.Duration) Subje
 	return SubjectInt{observer, observable.AsObservableInt()}
 }
 
-//jig:name ObservableIntPublishReplay
+//jig:name ObservableInt_PublishReplay
 
 // Replay uses the Multicast operator to control the subscription of a
 // ReplaySubject to a source observable and turns the subject into a
@@ -317,97 +317,6 @@ func (o ObservableInt) PublishReplay(bufferCapacity int, windowDuration time.Dur
 		return NewReplaySubjectInt(bufferCapacity, windowDuration)
 	}
 	return o.Multicast(factory)
-}
-
-//jig:name ObservableIntPrintln
-
-// Println subscribes to the Observable and prints every item to os.Stdout
-// while it waits for completion or error. Returns either the error or nil
-// when the Observable completed normally.
-// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) Println(a ...interface{}) (err error) {
-	subscriber := subscriber.New()
-	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, e error, done bool) {
-		if !done {
-			fmt.Println(append(a, next)...)
-		} else {
-			err = e
-			subscriber.Unsubscribe()
-		}
-	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
-}
-
-//jig:name ThrowInt
-
-// ThrowInt creates an Observable that emits no items and terminates with an
-// error.
-func ThrowInt(err error) ObservableInt {
-	var zeroInt int
-	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
-		runner := scheduler.Schedule(func() {
-			if subscriber.Subscribed() {
-				observe(zeroInt, err, true)
-			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
-}
-
-//jig:name ErrAutoConnect
-
-const ErrAutoConnectInvalidCount = RxError("invalid count")
-
-const ErrAutoConnectNeedsConcurrentScheduler = RxError("needs concurrent scheduler")
-
-//jig:name IntMulticasterAutoConnect
-
-// AutoConnect makes a IntMulticaster behave like an ordinary ObservableInt
-// that automatically connects when the specified number of clients have
-// subscribed to it. AutoConnect values should be larger or equal to 1.
-// AutoConnect will throw an ErrInvalidCount if the count is out of range.
-func (o IntMulticaster) AutoConnect(count int) ObservableInt {
-	if count < 1 {
-		return ThrowInt(ErrAutoConnectInvalidCount)
-	}
-	var refcount int32
-	observable := func(observe IntObserver, subscribeOn Scheduler, withSubscriber Subscriber) {
-		if !subscribeOn.IsConcurrent() {
-			var zero int
-			observe(zero, ErrAutoConnectNeedsConcurrentScheduler, true)
-			return
-		}
-		if atomic.AddInt32(&refcount, 1) == int32(count) {
-			o.Connectable(subscribeOn, subscriber.New())
-		}
-		o.ObservableInt(observe, subscribeOn, withSubscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableIntWait
-
-// Wait subscribes to the Observable and waits for completion or error.
-// Returns either the error or nil when the Observable completed normally.
-// Wait uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) Wait() (err error) {
-	subscriber := subscriber.New()
-	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, e error, done bool) {
-		if done {
-			err = e
-			subscriber.Unsubscribe()
-		}
-	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
 }
 
 //jig:name Observer
@@ -487,13 +396,104 @@ func Create(create func(Next, Error, Complete, Canceled)) Observable {
 	return observable
 }
 
+//jig:name ObservableInt_Println
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableInt) Println(a ...interface{}) (err error) {
+	subscriber := subscriber.New()
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next int, e error, done bool) {
+		if !done {
+			fmt.Println(append(a, next)...)
+		} else {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
+}
+
+//jig:name ThrowInt
+
+// ThrowInt creates an Observable that emits no items and terminates with an
+// error.
+func ThrowInt(err error) ObservableInt {
+	var zeroInt int
+	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
+		runner := scheduler.Schedule(func() {
+			if subscriber.Subscribed() {
+				observe(zeroInt, err, true)
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
+}
+
+//jig:name ErrAutoConnect
+
+const ErrAutoConnectInvalidCount = RxError("invalid count")
+
+const ErrAutoConnectNeedsConcurrentScheduler = RxError("needs concurrent scheduler")
+
+//jig:name IntMulticaster_AutoConnect
+
+// AutoConnect makes a IntMulticaster behave like an ordinary ObservableInt
+// that automatically connects when the specified number of clients have
+// subscribed to it. AutoConnect values should be larger or equal to 1.
+// AutoConnect will throw an ErrInvalidCount if the count is out of range.
+func (o IntMulticaster) AutoConnect(count int) ObservableInt {
+	if count < 1 {
+		return ThrowInt(ErrAutoConnectInvalidCount)
+	}
+	var refcount int32
+	observable := func(observe IntObserver, subscribeOn Scheduler, withSubscriber Subscriber) {
+		if !subscribeOn.IsConcurrent() {
+			var zero int
+			observe(zero, ErrAutoConnectNeedsConcurrentScheduler, true)
+			return
+		}
+		if atomic.AddInt32(&refcount, 1) == int32(count) {
+			o.Connectable(subscribeOn, subscriber.New())
+		}
+		o.ObservableInt(observe, subscribeOn, withSubscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableInt_Wait
+
+// Wait subscribes to the Observable and waits for completion or error.
+// Returns either the error or nil when the Observable completed normally.
+// Wait uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableInt) Wait() (err error) {
+	subscriber := subscriber.New()
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next int, e error, done bool) {
+		if done {
+			err = e
+			subscriber.Unsubscribe()
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
+}
+
 //jig:name ErrTypecastToInt
 
 // ErrTypecastToInt is delivered to an observer if the generic value cannot be
 // typecast to int.
 const ErrTypecastToInt = RxError("typecast to int failed")
 
-//jig:name ObservableAsObservableInt
+//jig:name Observable_AsObservableInt
 
 // AsObservableInt turns an Observable of interface{} into an ObservableInt.
 // If during observing a typecast fails, the error ErrTypecastToInt will be
@@ -518,7 +518,7 @@ func (o Observable) AsObservableInt() ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntSubscribeOn
+//jig:name ObservableInt_SubscribeOn
 
 // SubscribeOn specifies the scheduler an ObservableInt should use when it is
 // subscribed to.

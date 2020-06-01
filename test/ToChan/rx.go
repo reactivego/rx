@@ -71,39 +71,25 @@ func NewSubscriber() Subscriber {
 	return subscriber.New()
 }
 
-//jig:name IntObserver
-
-// IntObserver is a function that gets called whenever the Observable has
-// something to report. The next argument is the item value that is only
-// valid when the done argument is false. When done is true and the err
-// argument is not nil, then the Observable has terminated with an error.
-// When done is true and the err argument is nil, then the Observable has
-// completed normally.
-type IntObserver func(next int, err error, done bool)
-
-//jig:name ObservableInt
-
-// ObservableInt is a function taking an Observer, Scheduler and Subscriber.
-// Calling it will subscribe the Observer to events from the Observable.
-type ObservableInt func(IntObserver, Scheduler, Subscriber)
-
 //jig:name Range
 
-// Range creates an ObservableInt that emits a range of sequential integers.
-func Range(start, count int) ObservableInt {
+// Range creates an Observable that emits a range of sequential int values.
+// The generated code will do a type conversion from int to interface{}.
+func Range(start, count int) Observable {
 	end := start + count
-	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		i := start
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Subscribed() {
 				if i < end {
-					observe(i, nil, false)
+					observe(interface{}(i), nil, false)
 					if subscriber.Subscribed() {
 						i++
 						self()
 					}
 				} else {
-					observe(0, nil, true)
+					var zero interface{}
+					observe(zero, nil, true)
 				}
 			}
 		})
@@ -179,7 +165,7 @@ type RxError string
 
 func (e RxError) Error() string	{ return string(e) }
 
-//jig:name ObservableToChan
+//jig:name Observable_ToChan
 
 // ToChan returns a channel that emits interface{} values. If the source
 // observable does not emit values but emits an error or complete, then the
@@ -219,63 +205,6 @@ func (o Observable) ToChan(subscribers ...Subscriber) <-chan interface{} {
 				}
 			}
 			if done {
-				atomic.StoreInt32(&state, closed)
-				subscribers[0].Unsubscribe()
-			}
-			if !atomic.CompareAndSwapInt32(&state, busy, idle) {
-				close(nextch)
-			}
-		}
-	}
-	subscribers[0].OnUnsubscribe(func() {
-		close(donech)
-		if atomic.CompareAndSwapInt32(&state, busy, closed) {
-			return
-		}
-		if atomic.CompareAndSwapInt32(&state, idle, closed) {
-			close(nextch)
-			return
-		}
-	})
-	o(observer, scheduler, subscribers[0])
-	return nextch
-}
-
-//jig:name ObservableIntToChan
-
-// ToChan returns a channel that emits int values. If the source observable does
-// not emit values but emits an error or complete, then the returned channel
-// will close without emitting any values.
-//
-// ToChan uses the public scheduler.Goroutine variable for scheduling, because
-// it needs the concurrency so the returned channel can be used by used
-// by the calling code directly. To cancel ToChan you will need to supply a
-// subscriber that you hold on to.
-func (o ObservableInt) ToChan(subscribers ...Subscriber) <-chan int {
-	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.Goroutine
-	donech := make(chan struct{})
-	nextch := make(chan int)
-	const (
-		idle	= iota
-		busy
-		closed
-	)
-	state := int32(idle)
-	observer := func(next int, err error, done bool) {
-		if atomic.CompareAndSwapInt32(&state, idle, busy) {
-			if !done {
-				select {
-				case <-donech:
-					atomic.StoreInt32(&state, closed)
-				default:
-					select {
-					case <-donech:
-						atomic.StoreInt32(&state, closed)
-					case nextch <- next:
-					}
-				}
-			} else {
 				atomic.StoreInt32(&state, closed)
 				subscribers[0].Unsubscribe()
 			}

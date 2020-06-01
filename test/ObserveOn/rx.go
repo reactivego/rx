@@ -62,7 +62,7 @@ func FromInt(slice ...int) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntObserveOn
+//jig:name ObservableInt_ObserveOn
 
 // ObserveOn specifies a dispatch function to use for delivering values to the observer.
 func (o ObservableInt) ObserveOn(dispatch func(task func())) ObservableInt {
@@ -83,7 +83,7 @@ func (o ObservableInt) ObserveOn(dispatch func(task func())) ObservableInt {
 // Subscription is an alias for the subscriber.Subscription interface type.
 type Subscription = subscriber.Subscription
 
-//jig:name ObservableIntSubscribe
+//jig:name ObservableInt_Subscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.

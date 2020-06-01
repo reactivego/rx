@@ -78,7 +78,7 @@ func EmptyInt() ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntToSingle
+//jig:name ObservableInt_ToSingle
 
 // ToSingle blocks until the ObservableInt emits exactly one value or an error.
 // The value and any error are returned.
@@ -101,7 +101,7 @@ func (o ObservableInt) ToSingle() (entry int, err error) {
 	return
 }
 
-//jig:name ObservableIntSingle
+//jig:name ObservableInt_Single
 
 // Single enforces that the observableInt sends exactly one data item and then
 // completes. If the observable sends no data before completing or sends more
@@ -126,7 +126,7 @@ type Observer func(next interface{}, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type Observable func(Observer, Scheduler, Subscriber)
 
-//jig:name ObservableIntAsObservable
+//jig:name ObservableInt_AsObservable
 
 // AsObservable turns a typed ObservableInt into an Observable of interface{}.
 func (o ObservableInt) AsObservable() Observable {
@@ -145,7 +145,7 @@ type RxError string
 
 func (e RxError) Error() string	{ return string(e) }
 
-//jig:name ObservableSingle
+//jig:name Observable_Single
 
 // Single enforces that the observable sends exactly one data item and then
 // completes. If the observable sends no data before completing or sends more
@@ -190,7 +190,7 @@ func (o Observable) Single() Observable {
 // typecast to int.
 const ErrTypecastToInt = RxError("typecast to int failed")
 
-//jig:name ObservableAsObservableInt
+//jig:name Observable_AsObservableInt
 
 // AsObservableInt turns an Observable of interface{} into an ObservableInt.
 // If during observing a typecast fails, the error ErrTypecastToInt will be

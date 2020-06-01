@@ -54,8 +54,8 @@ type ObservableTime func(TimeObserver, Scheduler, Subscriber)
 //jig:name Ticker
 
 // Ticker creates an ObservableTime that emits a sequence of timestamps after
-//an initialDelay has passed. Subsequent timestamps are emitted using a
-// schedule of intervals passed in. If only the initialDelay is given, Tichker
+// an initialDelay has passed. Subsequent timestamps are emitted using a
+// schedule of intervals passed in. If only the initialDelay is given, Ticker
 // will emit only once.
 func Ticker(initialDelay time.Duration, intervals ...time.Duration) ObservableTime {
 	observable := func(observe TimeObserver, subscribeOn Scheduler, subscriber Subscriber) {
@@ -76,7 +76,7 @@ func Ticker(initialDelay time.Duration, intervals ...time.Duration) ObservableTi
 	return observable
 }
 
-//jig:name ObservableTimeTimestamp
+//jig:name ObservableTime_Timestamp
 
 // Timestamp attaches a timestamp to each item emitted by an observable
 // indicating when it was emitted.
@@ -113,7 +113,7 @@ type TimestampTimeObserver func(next TimestampTime, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableTimestampTime func(TimestampTimeObserver, Scheduler, Subscriber)
 
-//jig:name ObservableTake
+//jig:name Observable_Take
 
 // Take emits only the first n items emitted by an Observable.
 func (o Observable) Take(n int) Observable {
@@ -135,7 +135,7 @@ func (o Observable) Take(n int) Observable {
 	return observable
 }
 
-//jig:name ObservableTimestampTimeTake
+//jig:name ObservableTimestampTime_Take
 
 // Take emits only the first n items emitted by an ObservableTimestampTime.
 func (o ObservableTimestampTime) Take(n int) ObservableTimestampTime {
@@ -158,7 +158,20 @@ type Observer func(next interface{}, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type Observable func(Observer, Scheduler, Subscriber)
 
-//jig:name ObservableTimestampTimeAll
+//jig:name ObservableTimestampTime_AsObservable
+
+// AsObservable turns a typed ObservableTimestampTime into an Observable of interface{}.
+func (o ObservableTimestampTime) AsObservable() Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next TimestampTime, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableTimestampTime_All
 
 // All determines whether all items emitted by an ObservableTimestampTime meet some
 // criteria.
@@ -175,19 +188,6 @@ func (o ObservableTimestampTime) All(predicate func(next TimestampTime) bool) Ob
 		return predicate(next.(TimestampTime))
 	}
 	return o.AsObservable().All(condition)
-}
-
-//jig:name ObservableTimestampTimeAsObservable
-
-// AsObservable turns a typed ObservableTimestampTime into an Observable of interface{}.
-func (o ObservableTimestampTime) AsObservable() Observable {
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next TimestampTime, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
 }
 
 //jig:name BoolObserver
@@ -218,7 +218,7 @@ func (e RxError) Error() string	{ return string(e) }
 // typecast to TimestampTime.
 const ErrTypecastToTimestampTime = RxError("typecast to TimestampTime failed")
 
-//jig:name ObservableAsObservableTimestampTime
+//jig:name Observable_AsObservableTimestampTime
 
 // AsObservableTimestampTime turns an Observable of interface{} into an ObservableTimestampTime.
 // If during observing a typecast fails, the error ErrTypecastToTimestampTime will be
@@ -243,7 +243,7 @@ func (o Observable) AsObservableTimestampTime() ObservableTimestampTime {
 	return observable
 }
 
-//jig:name ObservableAll
+//jig:name Observable_All
 
 // All determines whether all items emitted by an Observable meet some
 // criteria.
@@ -276,7 +276,7 @@ func (o Observable) All(predicate func(next interface{}) bool) ObservableBool {
 	return observable
 }
 
-//jig:name ObservableBoolPrintln
+//jig:name ObservableBool_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil

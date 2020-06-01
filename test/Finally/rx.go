@@ -76,7 +76,7 @@ func EmptyInt() ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntFinally
+//jig:name ObservableInt_Finally
 
 // Finally applies a function for any error or completion on the stream.
 // This doesn't expose whether this was an error or a completion.
@@ -93,7 +93,7 @@ func (o ObservableInt) Finally(f func()) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntWait
+//jig:name ObservableInt_Wait
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.

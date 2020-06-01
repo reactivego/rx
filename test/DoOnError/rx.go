@@ -60,7 +60,7 @@ type RxError string
 
 func (e RxError) Error() string	{ return string(e) }
 
-//jig:name ObservableDoOnError
+//jig:name Observable_DoOnError
 
 // DoOnError calls a function for any error on the stream.
 func (o Observable) DoOnError(f func(err error)) Observable {
@@ -76,7 +76,7 @@ func (o Observable) DoOnError(f func(err error)) Observable {
 	return observable
 }
 
-//jig:name ObservableWait
+//jig:name Observable_Wait
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.

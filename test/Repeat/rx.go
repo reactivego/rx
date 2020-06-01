@@ -129,7 +129,7 @@ func GoroutineScheduler() Scheduler {
 	return scheduler.Goroutine
 }
 
-//jig:name ObservableRepeat
+//jig:name Observable_Repeat
 
 // Repeat creates an Observable that emits a sequence of items repeatedly.
 func (o Observable) Repeat(count int) Observable {
@@ -156,7 +156,7 @@ func (o Observable) Repeat(count int) Observable {
 	return observable
 }
 
-//jig:name ObservableIntRepeat
+//jig:name ObservableInt_Repeat
 
 // Repeat creates an ObservableInt that emits a sequence of items repeatedly.
 func (o ObservableInt) Repeat(count int) ObservableInt {
@@ -179,7 +179,36 @@ type Observer func(next interface{}, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type Observable func(Observer, Scheduler, Subscriber)
 
-//jig:name ObservableIntToSlice
+//jig:name Empty
+
+// Empty creates an Observable that emits no items but terminates normally.
+func Empty() Observable {
+	var zero interface{}
+	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
+		runner := scheduler.Schedule(func() {
+			if subscriber.Subscribed() {
+				observe(zero, nil, true)
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
+}
+
+//jig:name ObservableInt_AsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableInt_ToSlice
 
 // ToSlice collects all values from the ObservableInt into an slice. The
 // complete slice and any error are returned.
@@ -201,7 +230,7 @@ func (o ObservableInt) ToSlice() (slice []int, err error) {
 	return
 }
 
-//jig:name ObservableTakeLast
+//jig:name Observable_TakeLast
 
 // TakeLast emits only the last n items emitted by an Observable.
 func (o Observable) TakeLast(n int) Observable {
@@ -230,52 +259,11 @@ func (o Observable) TakeLast(n int) Observable {
 	return observable
 }
 
-//jig:name ObservableIntTakeLast
+//jig:name ObservableInt_TakeLast
 
 // TakeLast emits only the last n items emitted by an ObservableInt.
 func (o ObservableInt) TakeLast(n int) ObservableInt {
 	return o.AsObservable().TakeLast(n).AsObservableInt()
-}
-
-//jig:name Empty
-
-// Empty creates an Observable that emits no items but terminates normally.
-func Empty() Observable {
-	var zero interface{}
-	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
-		runner := scheduler.Schedule(func() {
-			if subscriber.Subscribed() {
-				observe(zero, nil, true)
-			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
-}
-
-//jig:name ObservableIntAsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableIntSubscribeOn
-
-// SubscribeOn specifies the scheduler an ObservableInt should use when it is
-// subscribed to.
-func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
-	observable := func(observe IntObserver, _ Scheduler, subscriber Subscriber) {
-		subscriber.OnWait(subscribeOn.Wait)
-		o(observe, subscribeOn, subscriber)
-	}
-	return observable
 }
 
 //jig:name RxError
@@ -290,7 +278,7 @@ func (e RxError) Error() string	{ return string(e) }
 // typecast to int.
 const ErrTypecastToInt = RxError("typecast to int failed")
 
-//jig:name ObservableAsObservableInt
+//jig:name Observable_AsObservableInt
 
 // AsObservableInt turns an Observable of interface{} into an ObservableInt.
 // If during observing a typecast fails, the error ErrTypecastToInt will be
@@ -311,6 +299,18 @@ func (o Observable) AsObservableInt() ObservableInt {
 			}
 		}
 		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableInt_SubscribeOn
+
+// SubscribeOn specifies the scheduler an ObservableInt should use when it is
+// subscribed to.
+func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
+	observable := func(observe IntObserver, _ Scheduler, subscriber Subscriber) {
+		subscriber.OnWait(subscribeOn.Wait)
+		o(observe, subscribeOn, subscriber)
 	}
 	return observable
 }

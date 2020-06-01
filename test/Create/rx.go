@@ -100,7 +100,7 @@ func CreateString(create func(NextString, Error, Complete, Canceled)) Observable
 	return observable
 }
 
-//jig:name ObservableStringPrintln
+//jig:name ObservableString_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil

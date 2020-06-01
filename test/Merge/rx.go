@@ -76,7 +76,7 @@ func MergeInt(observables ...ObservableInt) ObservableInt {
 	return observables[0].MergeWith(observables[1:]...)
 }
 
-//jig:name ObservableIntPrintln
+//jig:name ObservableInt_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
@@ -115,7 +115,7 @@ func EmptyInt() ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntMergeWith
+//jig:name ObservableInt_MergeWith
 
 // MergeWith combines multiple Observables into one by merging their emissions.
 // An error from any of the observables will terminate the merged observables.

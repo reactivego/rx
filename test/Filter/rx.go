@@ -64,7 +64,7 @@ func FromInt(slice ...int) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntFilter
+//jig:name ObservableInt_Filter
 
 // Filter emits only those items from an ObservableInt that pass a predicate test.
 func (o ObservableInt) Filter(predicate func(next int) bool) ObservableInt {
@@ -79,7 +79,7 @@ func (o ObservableInt) Filter(predicate func(next int) bool) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntPrintln
+//jig:name ObservableInt_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil

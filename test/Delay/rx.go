@@ -65,7 +65,7 @@ func FromInt(slice ...int) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableDelay
+//jig:name Observable_Delay
 
 // Delay shifts an emission from an Observable forward in time by a particular
 // amount of time. The relative time intervals between emissions are preserved.
@@ -113,7 +113,7 @@ func (o Observable) Delay(duration time.Duration) Observable {
 	return observable
 }
 
-//jig:name ObservableIntDelay
+//jig:name ObservableInt_Delay
 
 // Delay shifts an emission from an Observable forward in time by a particular
 // amount of time. The relative time intervals between emissions are preserved.
@@ -137,20 +137,7 @@ type Observer func(next interface{}, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type Observable func(Observer, Scheduler, Subscriber)
 
-//jig:name ObservableIntAsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableIntToSlice
+//jig:name ObservableInt_ToSlice
 
 // ToSlice collects all values from the ObservableInt into an slice. The
 // complete slice and any error are returned.
@@ -172,6 +159,19 @@ func (o ObservableInt) ToSlice() (slice []int, err error) {
 	return
 }
 
+//jig:name ObservableInt_AsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name RxError
 
 type RxError string
@@ -184,7 +184,7 @@ func (e RxError) Error() string	{ return string(e) }
 // typecast to int.
 const ErrTypecastToInt = RxError("typecast to int failed")
 
-//jig:name ObservableAsObservableInt
+//jig:name Observable_AsObservableInt
 
 // AsObservableInt turns an Observable of interface{} into an ObservableInt.
 // If during observing a typecast fails, the error ErrTypecastToInt will be

@@ -64,7 +64,7 @@ func FromInt(slice ...int) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntConcatWith
+//jig:name ObservableInt_ConcatWith
 
 // ConcatWith emits the emissions from two or more ObservableInts without interleaving them.
 func (o ObservableInt) ConcatWith(other ...ObservableInt) ObservableInt {
@@ -95,7 +95,7 @@ func (o ObservableInt) ConcatWith(other ...ObservableInt) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntPrintln
+//jig:name ObservableInt_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil

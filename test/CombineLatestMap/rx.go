@@ -111,7 +111,7 @@ func FromInt(slice ...int) ObservableInt {
 
 type StringSlice = []string
 
-//jig:name ObservableObservableStringCombineLatestAll
+//jig:name ObservableObservableString_CombineLatestAll
 
 // CombineLatestAll flattens a higher order observable
 // (e.g. ObservableObservableString) by subscribing to
@@ -185,7 +185,7 @@ func (o ObservableObservableString) CombineLatestAll() ObservableStringSlice {
 	return observable
 }
 
-//jig:name ObservableIntCombineLatestMapString
+//jig:name ObservableInt_CombineLatestMapString
 
 // CombinesLatestMap maps every entry emitted by the ObservableInt into an
 // ObservableString, and then subscribe to it, until the source observable
@@ -228,7 +228,7 @@ type StringSliceObserver func(next StringSlice, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableStringSlice func(StringSliceObserver, Scheduler, Subscriber)
 
-//jig:name ObservableIntMapObservableString
+//jig:name ObservableInt_MapObservableString
 
 // MapObservableString transforms the items emitted by an ObservableInt by applying a
 // function to each item.
@@ -246,7 +246,7 @@ func (o ObservableInt) MapObservableString(project func(int) ObservableString) O
 	return observable
 }
 
-//jig:name ObservableStringSlicePrintln
+//jig:name ObservableStringSlice_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil

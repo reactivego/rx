@@ -64,7 +64,7 @@ func FromInt(slice ...int) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntScanInt
+//jig:name ObservableInt_ScanInt
 
 // ScanInt applies a accumulator function to each item emitted by an
 // ObservableInt and the previous accumulator result. The operator accepts a
@@ -87,7 +87,7 @@ func (o ObservableInt) ScanInt(accumulator func(int, int) int, seed int) Observa
 	return observable
 }
 
-//jig:name ObservableIntPrintln
+//jig:name ObservableInt_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil

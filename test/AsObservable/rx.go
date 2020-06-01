@@ -23,47 +23,6 @@ type Scheduler = scheduler.Scheduler
 // from a single subscriber at the root of the subscription tree.
 type Subscriber = subscriber.Subscriber
 
-//jig:name Observer
-
-// Observer is a function that gets called whenever the Observable has
-// something to report. The next argument is the item value that is only
-// valid when the done argument is false. When done is true and the err
-// argument is not nil, then the Observable has terminated with an error.
-// When done is true and the err argument is nil, then the Observable has
-// completed normally.
-type Observer func(next interface{}, err error, done bool)
-
-//jig:name Observable
-
-// Observable is a function taking an Observer, Scheduler and Subscriber.
-// Calling it will subscribe the Observer to events from the Observable.
-type Observable func(Observer, Scheduler, Subscriber)
-
-//jig:name From
-
-// From creates an Observable from multiple interface{} values passed in.
-func From(slice ...interface{}) Observable {
-	var zero interface{}
-	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
-		i := 0
-		runner := scheduler.ScheduleRecursive(func(self func()) {
-			if subscriber.Subscribed() {
-				if i < len(slice) {
-					observe(slice[i], nil, false)
-					if subscriber.Subscribed() {
-						i++
-						self()
-					}
-				} else {
-					observe(zero, nil, true)
-				}
-			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
-}
-
 //jig:name StringObserver
 
 // StringObserver is a function that gets called whenever the Observable has
@@ -105,6 +64,60 @@ func FromString(slice ...string) ObservableString {
 	return observable
 }
 
+//jig:name Observer
+
+// Observer is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
+// completed normally.
+type Observer func(next interface{}, err error, done bool)
+
+//jig:name Observable
+
+// Observable is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type Observable func(Observer, Scheduler, Subscriber)
+
+//jig:name From
+
+// From creates an Observable from multiple interface{} values passed in.
+func From(slice ...interface{}) Observable {
+	var zero interface{}
+	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
+		i := 0
+		runner := scheduler.ScheduleRecursive(func(self func()) {
+			if subscriber.Subscribed() {
+				if i < len(slice) {
+					observe(slice[i], nil, false)
+					if subscriber.Subscribed() {
+						i++
+						self()
+					}
+				} else {
+					observe(zero, nil, true)
+				}
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
+}
+
+//jig:name ObservableString_AsObservable
+
+// AsObservable turns a typed ObservableString into an Observable of interface{}.
+func (o ObservableString) AsObservable() Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next string, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name Float64Observer
 
 // Float64Observer is a function that gets called whenever the Observable has
@@ -133,7 +146,7 @@ func (e RxError) Error() string	{ return string(e) }
 // typecast to float64.
 const ErrTypecastToFloat64 = RxError("typecast to float64 failed")
 
-//jig:name ObservableAsObservableFloat64
+//jig:name Observable_AsObservableFloat64
 
 // AsObservableFloat64 turns an Observable of interface{} into an ObservableFloat64.
 // If during observing a typecast fails, the error ErrTypecastToFloat64 will be
@@ -158,20 +171,30 @@ func (o Observable) AsObservableFloat64() ObservableFloat64 {
 	return observable
 }
 
-//jig:name ObservableStringAsObservable
+//jig:name Observable_Println
 
-// AsObservable turns a typed ObservableString into an Observable of interface{}.
-func (o ObservableString) AsObservable() Observable {
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next string, err error, done bool) {
-			observe(interface{}(next), err, done)
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o Observable) Println(a ...interface{}) (err error) {
+	subscriber := subscriber.New()
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next interface{}, e error, done bool) {
+		if !done {
+			fmt.Println(append(a, next)...)
+		} else {
+			err = e
+			subscriber.Unsubscribe()
 		}
-		o(observer, subscribeOn, subscriber)
 	}
-	return observable
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	subscriber.Wait()
+	return
 }
 
-//jig:name ObservableFloat64Println
+//jig:name ObservableFloat64_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
@@ -194,7 +217,7 @@ func (o ObservableFloat64) Println(a ...interface{}) (err error) {
 	return
 }
 
-//jig:name ObservableFloat64Wait
+//jig:name ObservableFloat64_Wait
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
@@ -204,29 +227,6 @@ func (o ObservableFloat64) Wait() (err error) {
 	scheduler := scheduler.MakeTrampoline()
 	observer := func(next float64, e error, done bool) {
 		if done {
-			err = e
-			subscriber.Unsubscribe()
-		}
-	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
-}
-
-//jig:name ObservablePrintln
-
-// Println subscribes to the Observable and prints every item to os.Stdout
-// while it waits for completion or error. Returns either the error or nil
-// when the Observable completed normally.
-// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o Observable) Println(a ...interface{}) (err error) {
-	subscriber := subscriber.New()
-	scheduler := scheduler.MakeTrampoline()
-	observer := func(next interface{}, e error, done bool) {
-		if !done {
-			fmt.Println(append(a, next)...)
-		} else {
 			err = e
 			subscriber.Unsubscribe()
 		}

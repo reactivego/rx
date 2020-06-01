@@ -64,7 +64,7 @@ func FromInt(slice ...int) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableElementAt
+//jig:name Observable_ElementAt
 
 // ElementAt emit only item n emitted by an Observable
 func (o Observable) ElementAt(n int) Observable {
@@ -81,7 +81,7 @@ func (o Observable) ElementAt(n int) Observable {
 	return observable
 }
 
-//jig:name ObservableIntElementAt
+//jig:name ObservableInt_ElementAt
 
 // ElementAt emit only item n emitted by an Observable
 func (o ObservableInt) ElementAt(n int) ObservableInt {
@@ -104,7 +104,7 @@ type Observer func(next interface{}, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type Observable func(Observer, Scheduler, Subscriber)
 
-//jig:name ObservableIntPrintln
+//jig:name ObservableInt_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
@@ -127,7 +127,7 @@ func (o ObservableInt) Println(a ...interface{}) (err error) {
 	return
 }
 
-//jig:name ObservableIntAsObservable
+//jig:name ObservableInt_AsObservable
 
 // AsObservable turns a typed ObservableInt into an Observable of interface{}.
 func (o ObservableInt) AsObservable() Observable {
@@ -152,7 +152,7 @@ func (e RxError) Error() string	{ return string(e) }
 // typecast to int.
 const ErrTypecastToInt = RxError("typecast to int failed")
 
-//jig:name ObservableAsObservableInt
+//jig:name Observable_AsObservableInt
 
 // AsObservableInt turns an Observable of interface{} into an ObservableInt.
 // If during observing a typecast fails, the error ErrTypecastToInt will be

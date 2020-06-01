@@ -112,7 +112,7 @@ func GoroutineScheduler() Scheduler {
 	return scheduler.Goroutine
 }
 
-//jig:name ObservableIntRetry
+//jig:name ObservableInt_Retry
 
 // Retry if a source ObservableInt sends an error notification, resubscribe to
 // it in the hopes that it will complete without error.
@@ -131,7 +131,7 @@ func (o ObservableInt) Retry() ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntSubscribeOn
+//jig:name ObservableInt_SubscribeOn
 
 // SubscribeOn specifies the scheduler an ObservableInt should use when it is
 // subscribed to.
@@ -143,7 +143,7 @@ func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
 	return observable
 }
 
-//jig:name ObservableIntPrintln
+//jig:name ObservableInt_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
