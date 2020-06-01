@@ -42,14 +42,8 @@ All values less than 5? true <nil>
 [![](svg/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc#Observable.AsObservable)
 [![](svg/godoc.svg)](https://godoc.org/github.com/reactivego/rx#Observable.AsObservable)
 
-**AsObservable&lt;Bar&gt;** when called on an `Observable` source will type assert the `interface{}` items of the source to &lt;bar&gt; items. E.g. `AsObservableInt`, `AsObservableBool`.
-
-If the assertion is invalid, this will emit a type assertion error
-`ErrTypecastTo<Bar>` at run-time. When `AsObservable<Bar>` is called on an
-`Observable<Foo>`, then a type conversion is generated. This has to be possible,
-because if it is not, your generated code will simply not compile. A special
-case of this is when using AsObservable, as this will convert to interface{},
-so that will always compile and work.
+`AsObservableInt` or `AsObservableBool` type asserts an `Observable` to an observable of type `int` or `bool`.
+Also `AsObservable` can be called on an `ObservableInt` and `ObservableBool` to convert to an observable of type `interface{}`.
 
 
 ## AuditTime
