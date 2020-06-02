@@ -107,29 +107,35 @@ func NewReplaySubjectInt(bufferCapacity int, windowDuration time.Duration) Subje
 			}
 		}
 	}
-	observable := Observable(func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		ep, err := ch.NewEndpoint(multicast.ReplayAll)
 		if err != nil {
-			observe(nil, err, true)
+			var zero int
+			observe(zero, err, true)
 			return
 		}
-		observable := Create(func(Next Next, Error Error, Complete Complete, Canceled Canceled) {
+		receiver := subscribeOn.Schedule(func() {
 			receive := func(next interface{}, err error, closed bool) bool {
-				switch {
-				case !closed:
-					Next(next)
-				case err != nil:
-					Error(err)
-				default:
-					Complete()
+				if subscriber.Subscribed() {
+					switch {
+					case !closed:
+						observe(next.(int), nil, false)
+					case err != nil:
+						var zero int
+						observe(zero, err, true)
+					default:
+						var zero int
+						observe(zero, nil, true)
+					}
 				}
-				return !Canceled()
+				return subscriber.Subscribed()
 			}
 			ep.Range(receive, windowDuration)
 		})
-		observable(observe, subscribeOn, subscriber.Add(ep.Cancel))
-	})
-	return SubjectInt{observer, observable.AsObservableInt()}
+		subscriber.OnUnsubscribe(receiver.Cancel)
+		subscriber.OnUnsubscribe(ep.Cancel)
+	}
+	return SubjectInt{observer, observable}
 }
 
 //jig:name StringObserver
@@ -210,29 +216,35 @@ func NewReplaySubjectString(bufferCapacity int, windowDuration time.Duration) Su
 			}
 		}
 	}
-	observable := Observable(func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe StringObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		ep, err := ch.NewEndpoint(multicast.ReplayAll)
 		if err != nil {
-			observe(nil, err, true)
+			var zero string
+			observe(zero, err, true)
 			return
 		}
-		observable := Create(func(Next Next, Error Error, Complete Complete, Canceled Canceled) {
+		receiver := subscribeOn.Schedule(func() {
 			receive := func(next interface{}, err error, closed bool) bool {
-				switch {
-				case !closed:
-					Next(next)
-				case err != nil:
-					Error(err)
-				default:
-					Complete()
+				if subscriber.Subscribed() {
+					switch {
+					case !closed:
+						observe(next.(string), nil, false)
+					case err != nil:
+						var zero string
+						observe(zero, err, true)
+					default:
+						var zero string
+						observe(zero, nil, true)
+					}
 				}
-				return !Canceled()
+				return subscriber.Subscribed()
 			}
 			ep.Range(receive, windowDuration)
 		})
-		observable(observe, subscribeOn, subscriber.Add(ep.Cancel))
-	})
-	return SubjectString{observer, observable.AsObservableString()}
+		subscriber.OnUnsubscribe(receiver.Cancel)
+		subscriber.OnUnsubscribe(ep.Cancel)
+	}
+	return SubjectString{observer, observable}
 }
 
 //jig:name GoroutineScheduler
@@ -276,151 +288,6 @@ func (o ObservableString) SubscribeOn(subscribeOn Scheduler) ObservableString {
 	observable := func(observe StringObserver, _ Scheduler, subscriber Subscriber) {
 		subscriber.OnWait(subscribeOn.Wait)
 		o(observe, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name Observer
-
-// Observer is a function that gets called whenever the Observable has
-// something to report. The next argument is the item value that is only
-// valid when the done argument is false. When done is true and the err
-// argument is not nil, then the Observable has terminated with an error.
-// When done is true and the err argument is nil, then the Observable has
-// completed normally.
-type Observer func(next interface{}, err error, done bool)
-
-//jig:name Observable
-
-// Observable is a function taking an Observer, Scheduler and Subscriber.
-// Calling it will subscribe the Observer to events from the Observable.
-type Observable func(Observer, Scheduler, Subscriber)
-
-//jig:name Error
-
-// Error signals an error condition.
-type Error func(error)
-
-//jig:name Complete
-
-// Complete signals that no more data is to be expected.
-type Complete func()
-
-//jig:name Canceled
-
-// Canceled returns true when the observer has unsubscribed.
-type Canceled func() bool
-
-//jig:name Next
-
-// Next can be called to emit the next value to the IntObserver.
-type Next func(interface{})
-
-//jig:name Create
-
-// Create provides a way of creating an Observable from
-// scratch by calling observer methods programmatically.
-//
-// The create function provided to Create will be called once
-// to implement the observable. It is provided with a Next, Error,
-// Complete and Canceled function that can be called by the code that
-// implements the Observable.
-func Create(create func(Next, Error, Complete, Canceled)) Observable {
-	var zero interface{}
-	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
-		runner := scheduler.Schedule(func() {
-			if subscriber.Canceled() {
-				return
-			}
-			n := func(next interface{}) {
-				if subscriber.Subscribed() {
-					observe(next, nil, false)
-				}
-			}
-			e := func(err error) {
-				if subscriber.Subscribed() {
-					observe(zero, err, true)
-				}
-			}
-			c := func() {
-				if subscriber.Subscribed() {
-					observe(zero, nil, true)
-				}
-			}
-			x := func() bool {
-				return subscriber.Canceled()
-			}
-			create(n, e, c, x)
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
-}
-
-//jig:name RxError
-
-type RxError string
-
-func (e RxError) Error() string	{ return string(e) }
-
-//jig:name ErrTypecastToInt
-
-// ErrTypecastToInt is delivered to an observer if the generic value cannot be
-// typecast to int.
-const ErrTypecastToInt = RxError("typecast to int failed")
-
-//jig:name Observable_AsObservableInt
-
-// AsObservableInt turns an Observable of interface{} into an ObservableInt.
-// If during observing a typecast fails, the error ErrTypecastToInt will be
-// emitted.
-func (o Observable) AsObservableInt() ObservableInt {
-	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				if nextInt, ok := next.(int); ok {
-					observe(nextInt, err, done)
-				} else {
-					var zeroInt int
-					observe(zeroInt, ErrTypecastToInt, true)
-				}
-			} else {
-				var zeroInt int
-				observe(zeroInt, err, true)
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ErrTypecastToString
-
-// ErrTypecastToString is delivered to an observer if the generic value cannot be
-// typecast to string.
-const ErrTypecastToString = RxError("typecast to string failed")
-
-//jig:name Observable_AsObservableString
-
-// AsObservableString turns an Observable of interface{} into an ObservableString.
-// If during observing a typecast fails, the error ErrTypecastToString will be
-// emitted.
-func (o Observable) AsObservableString() ObservableString {
-	observable := func(observe StringObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				if nextString, ok := next.(string); ok {
-					observe(nextString, err, done)
-				} else {
-					var zeroString string
-					observe(zeroString, ErrTypecastToString, true)
-				}
-			} else {
-				var zeroString string
-				observe(zeroString, err, true)
-			}
-		}
-		o(observer, subscribeOn, subscriber)
 	}
 	return observable
 }

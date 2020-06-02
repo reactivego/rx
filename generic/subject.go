@@ -71,29 +71,35 @@ func NewSubjectFoo() SubjectFoo {
 			}
 		}
 	}
-	observable := Observable(func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		ep, err := ch.NewEndpoint(0)
 		if err != nil {
-			observe(nil, err, true)
+			var zero foo
+			observe(zero, err, true)
 			return
 		}
-		observable := Create(func(Next Next, Error Error, Complete Complete, Canceled Canceled) {
+		receiver := subscribeOn.Schedule(func() {
 			receive := func(next interface{}, err error, closed bool) bool {
-				switch {
-				case !closed:
-					Next(next)
-				case err != nil:
-					Error(err)
-				default:
-					Complete()
+				if subscriber.Subscribed() {
+					switch {
+					case !closed:
+						observe(next.(foo), nil, false)
+					case err != nil:
+						var zero foo
+						observe(zero, err, true)
+					default:
+						var zero foo
+						observe(zero, nil, true)
+					}
 				}
-				return !Canceled()
+				return subscriber.Subscribed()
 			}
 			ep.Range(receive, 0)
 		})
-		observable(observe, subscribeOn, subscriber.Add(ep.Cancel))
-	})
-	return SubjectFoo{observer, observable.AsObservableFoo()}
+		subscriber.OnUnsubscribe(receiver.Cancel)
+		subscriber.OnUnsubscribe(ep.Cancel)
+	}
+	return SubjectFoo{observer, observable}
 }
 
 //jig:template MaxReplayCapacity
@@ -123,27 +129,33 @@ func NewReplaySubjectFoo(bufferCapacity int, windowDuration time.Duration) Subje
 			}
 		}
 	}
-	observable := Observable(func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		ep, err := ch.NewEndpoint(multicast.ReplayAll)
 		if err != nil {
-			observe(nil, err, true)
+			var zero foo
+			observe(zero, err, true)
 			return
 		}
-		observable := Create(func(Next Next, Error Error, Complete Complete, Canceled Canceled) {
+		receiver := subscribeOn.Schedule(func() {
 			receive := func(next interface{}, err error, closed bool) bool {
-				switch {
-				case !closed:
-					Next(next)
-				case err != nil:
-					Error(err)
-				default:
-					Complete()
+				if subscriber.Subscribed() {
+					switch {
+					case !closed:
+						observe(next.(foo), nil, false)
+					case err != nil:
+						var zero foo
+						observe(zero, err, true)
+					default:
+						var zero foo
+						observe(zero, nil, true)
+					}
 				}
-				return !Canceled()
+				return subscriber.Subscribed()
 			}
 			ep.Range(receive, windowDuration)
 		})
-		observable(observe, subscribeOn, subscriber.Add(ep.Cancel))
-	})
-	return SubjectFoo{observer, observable.AsObservableFoo()}
+		subscriber.OnUnsubscribe(receiver.Cancel)
+		subscriber.OnUnsubscribe(ep.Cancel)
+	}
+	return SubjectFoo{observer, observable}
 }

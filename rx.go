@@ -3163,29 +3163,35 @@ func NewSubject() Subject {
 			}
 		}
 	}
-	observable := Observable(func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		ep, err := ch.NewEndpoint(0)
 		if err != nil {
-			observe(nil, err, true)
+			var zero interface{}
+			observe(zero, err, true)
 			return
 		}
-		observable := Create(func(Next Next, Error Error, Complete Complete, Canceled Canceled) {
+		receiver := subscribeOn.Schedule(func() {
 			receive := func(next interface{}, err error, closed bool) bool {
-				switch {
-				case !closed:
-					Next(next)
-				case err != nil:
-					Error(err)
-				default:
-					Complete()
+				if subscriber.Subscribed() {
+					switch {
+					case !closed:
+						observe(next.(interface{}), nil, false)
+					case err != nil:
+						var zero interface{}
+						observe(zero, err, true)
+					default:
+						var zero interface{}
+						observe(zero, nil, true)
+					}
 				}
-				return !Canceled()
+				return subscriber.Subscribed()
 			}
 			ep.Range(receive, 0)
 		})
-		observable(observe, subscribeOn, subscriber.Add(ep.Cancel))
-	})
-	return Subject{observer, observable.AsObservable()}
+		subscriber.OnUnsubscribe(receiver.Cancel)
+		subscriber.OnUnsubscribe(ep.Cancel)
+	}
+	return Subject{observer, observable}
 }
 
 //jig:name Observable_Publish
@@ -3230,29 +3236,35 @@ func NewReplaySubject(bufferCapacity int, windowDuration time.Duration) Subject 
 			}
 		}
 	}
-	observable := Observable(func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		ep, err := ch.NewEndpoint(multicast.ReplayAll)
 		if err != nil {
-			observe(nil, err, true)
+			var zero interface{}
+			observe(zero, err, true)
 			return
 		}
-		observable := Create(func(Next Next, Error Error, Complete Complete, Canceled Canceled) {
+		receiver := subscribeOn.Schedule(func() {
 			receive := func(next interface{}, err error, closed bool) bool {
-				switch {
-				case !closed:
-					Next(next)
-				case err != nil:
-					Error(err)
-				default:
-					Complete()
+				if subscriber.Subscribed() {
+					switch {
+					case !closed:
+						observe(next.(interface{}), nil, false)
+					case err != nil:
+						var zero interface{}
+						observe(zero, err, true)
+					default:
+						var zero interface{}
+						observe(zero, nil, true)
+					}
 				}
-				return !Canceled()
+				return subscriber.Subscribed()
 			}
 			ep.Range(receive, windowDuration)
 		})
-		observable(observe, subscribeOn, subscriber.Add(ep.Cancel))
-	})
-	return Subject{observer, observable.AsObservable()}
+		subscriber.OnUnsubscribe(receiver.Cancel)
+		subscriber.OnUnsubscribe(ep.Cancel)
+	}
+	return Subject{observer, observable}
 }
 
 //jig:name Observable_PublishReplay
@@ -3339,12 +3351,4 @@ func (o ObservableBool) Single() ObservableBool {
 // than 1 item before completing  this reported as an error to the observer.
 func (o ObservableInt) Single() ObservableInt {
 	return o.AsObservable().Single().AsObservableInt()
-}
-
-//jig:name Observable_AsObservable
-
-// AsObservable returns the source Observable unchanged.
-// This is a special case needed for internal plumbing.
-func (o Observable) AsObservable() Observable {
-	return o
 }
