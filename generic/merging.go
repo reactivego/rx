@@ -51,11 +51,11 @@ func (o ObservableFoo) MergeWith(other ...ObservableFoo) ObservableFoo {
 			}
 		}
 		subscribeOn.Schedule(func() {
-			if !subscriber.Canceled() {
+			if subscriber.Subscribed() {
 				observers.len = 1 + len(other)
 				o(observer, subscribeOn, subscriber)
 				for _, o := range other {
-					if subscriber.Canceled() {
+					if !subscriber.Subscribed() {
 						return
 					}
 					o(observer, subscribeOn, subscriber)
@@ -114,7 +114,7 @@ func (o ObservableObservableFoo) MergeAll() ObservableFoo {
 			}
 		}
 		subscribeOn.Schedule(func() {
-			if !subscriber.Canceled() {
+			if subscriber.Subscribed() {
 				observers.len = 1
 				o(merger, subscribeOn, subscriber)
 			}
@@ -165,11 +165,11 @@ func (o ObservableFoo) MergeDelayErrorWith(other ...ObservableFoo) ObservableFoo
 			}
 		}
 		subscribeOn.Schedule(func() {
-			if !subscriber.Canceled() {
+			if subscriber.Subscribed() {
 				observers.len = 1 + len(other)
 				o(observer, subscribeOn, subscriber)
 				for _, o := range other {
-					if subscriber.Canceled() {
+					if !subscriber.Subscribed() {
 						return
 					}
 					o(observer, subscribeOn, subscriber)

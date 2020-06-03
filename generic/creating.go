@@ -36,7 +36,7 @@ func CreateFoo(create func(NextFoo, Error, Complete, Canceled)) ObservableFoo {
 	var zeroFoo foo
 	observable := func(observe FooObserver, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
-			if subscriber.Canceled() {
+			if !subscriber.Subscribed() {
 				return
 			}
 			n := func(next foo) {
@@ -55,7 +55,7 @@ func CreateFoo(create func(NextFoo, Error, Complete, Canceled)) ObservableFoo {
 				}
 			}
 			x := func() bool {
-				return subscriber.Canceled()
+				return !subscriber.Subscribed()
 			}
 			create(n, e, c, x)
 		})
@@ -79,7 +79,7 @@ func CreateRecursiveFoo(create func(NextFoo, Error, Complete)) ObservableFoo {
 	observable := func(observe FooObserver, scheduler Scheduler, subscriber Subscriber) {
 		done := false
 		runner := scheduler.ScheduleRecursive(func(self func()) {
-			if subscriber.Canceled() {
+			if !subscriber.Subscribed() {
 				return
 			}
 			n := func(next foo) {
@@ -129,7 +129,7 @@ func CreateFutureRecursiveFoo(timeout time.Duration, create func(NextFoo, Error,
 	observable := func(observe FooObserver, scheduler Scheduler, subscriber Subscriber) {
 		done := false
 		runner := scheduler.ScheduleFutureRecursive(timeout, func(self func(time.Duration)) {
-			if subscriber.Canceled() {
+			if !subscriber.Subscribed() {
 				return
 			}
 			n := func(next foo) {
@@ -199,11 +199,11 @@ func FromChanFoo(ch <-chan foo) ObservableFoo {
 	var zeroFoo foo
 	observable := func(observe FooObserver, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.ScheduleRecursive(func(self func()) {
-			if subscriber.Canceled() {
+			if !subscriber.Subscribed() {
 				return
 			}
 			next, ok := <-ch
-			if subscriber.Canceled() {
+			if !subscriber.Subscribed() {
 				return
 			}
 			if ok {
@@ -232,11 +232,11 @@ func FromChanFoo(ch <-chan foo) ObservableFoo {
 func FromChan(ch <-chan interface{}) Observable {
 	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.ScheduleRecursive(func(self func()) {
-			if subscriber.Canceled() {
+			if !subscriber.Subscribed() {
 				return
 			}
 			next, ok := <-ch
-			if subscriber.Canceled() {
+			if !subscriber.Subscribed() {
 				return
 			}
 			if ok {

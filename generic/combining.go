@@ -114,12 +114,12 @@ func (o ObservableObservableFoo) CombineLatestAll() ObservableFooSlice {
 				observe(zeroFooSlice, err, true)
 			default:
 				subscribeOn.Schedule(func() {
-					if !subscriber.Canceled() {
+					if subscriber.Subscribed() {
 						numObservables := len(observables)
 						observers.values = make([]foo, numObservables)
 						observers.active = numObservables
 						for i, v := range observables {
-							if subscriber.Canceled() {
+							if !subscriber.Subscribed() {
 								return
 							}
 							v(makeObserver(i), subscribeOn, subscriber)

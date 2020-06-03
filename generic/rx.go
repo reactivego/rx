@@ -332,12 +332,12 @@ func (o ObservableObservableBar) CombineLatestAll() ObservableBarSlice {
 				observe(zeroBarSlice, err, true)
 			default:
 				subscribeOn.Schedule(func() {
-					if !subscriber.Canceled() {
+					if subscriber.Subscribed() {
 						numObservables := len(observables)
 						observers.values = make([]bar, numObservables)
 						observers.active = numObservables
 						for i, v := range observables {
-							if subscriber.Canceled() {
+							if !subscriber.Subscribed() {
 								return
 							}
 							v(makeObserver(i), subscribeOn, subscriber)
@@ -590,7 +590,7 @@ func (o ObservableObservableBar) MergeAll() ObservableBar {
 			}
 		}
 		subscribeOn.Schedule(func() {
-			if !subscriber.Canceled() {
+			if subscriber.Subscribed() {
 				observers.len = 1
 				o(merger, subscribeOn, subscriber)
 			}

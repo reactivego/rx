@@ -161,7 +161,7 @@ func (o Observable) Delay(duration time.Duration) Observable {
 						return
 					}
 					observe(entry.next, entry.err, entry.done)
-					if entry.done || subscriber.Canceled() {
+					if entry.done || !subscriber.Subscribed() {
 						return
 					}
 					delay.Lock()
