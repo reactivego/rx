@@ -68,40 +68,62 @@ func (o ObservableFoo) ConcatMapToBar(inner ObservableBar) ObservableBar {
 
 // ConcatAll flattens a higher order observable by concattenating the observables it emits.
 func (o ObservableObservableFoo) ConcatAll() ObservableFoo {
-	var zeroFoo foo
 	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		var (
-			mutex       sync.Mutex
+		var concat struct {
+			sync.Mutex
 			observables []ObservableFoo
 			observer    FooObserver
-		)
-		observer = func(next foo, err error, done bool) {
-			mutex.Lock()
-			defer mutex.Unlock()
+			subscriber  Subscriber
+		}
+
+		var source struct {
+			observer   ObservableFooObserver
+			subscriber Subscriber
+		}
+
+		concat.observer = func(next foo, err error, done bool) {
+			concat.Lock()
 			if !done || err != nil {
 				observe(next, err, done)
 			} else {
-				if len(observables) == 0 {
-					observe(zeroFoo, nil, true)
+				if len(concat.observables) == 0 {
+					if !source.subscriber.Subscribed() {
+						var zero foo
+						observe(zero, nil, true)
+					}
+					concat.observables = nil
 				} else {
-					o := observables[0]
-					observables = observables[1:]
-					o(observer, subscribeOn, subscriber)
+					observable := concat.observables[0]
+					concat.observables = concat.observables[1:]
+					observable(concat.observer, subscribeOn, subscriber)
+				}
+			}
+			concat.Unlock()
+		}
+
+		source.observer = func(next ObservableFoo, err error, done bool) {
+			if !done {
+				concat.Lock()
+				initial := concat.observables == nil
+				concat.observables = append(concat.observables, next)
+				concat.Unlock()
+				if initial {
+					var zero foo
+					concat.observer(zero, nil, true)
+				}
+			} else {
+				concat.Lock()
+				initial := concat.observables == nil
+				source.subscriber.Done(err)
+				concat.Unlock()
+				if initial || err != nil {
+					var zero foo
+					concat.observer(zero, err, true)
 				}
 			}
 		}
-		sourceSubscriber := subscriber.Add()
-		concatenator := func(next ObservableFoo, err error, done bool) {
-			if !done {
-				mutex.Lock()
-				defer mutex.Unlock()
-				observables = append(observables, next)
-			} else {
-				observer(zeroFoo, err, done)
-				sourceSubscriber.Unsubscribe()
-			}
-		}
-		o(concatenator, subscribeOn, sourceSubscriber)
+		source.subscriber = subscriber.Add()
+		o(source.observer, subscribeOn, source.subscriber)
 	}
 	return observable
 }

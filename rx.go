@@ -143,7 +143,7 @@ func Create(create func(Next, Error, Complete, Canceled)) Observable {
 	var zero interface{}
 	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
-			if subscriber.Canceled() {
+			if !subscriber.Subscribed() {
 				return
 			}
 			n := func(next interface{}) {
@@ -162,7 +162,7 @@ func Create(create func(Next, Error, Complete, Canceled)) Observable {
 				}
 			}
 			x := func() bool {
-				return subscriber.Canceled()
+				return !subscriber.Subscribed()
 			}
 			create(n, e, c, x)
 		})
@@ -185,7 +185,7 @@ func CreateRecursive(create func(Next, Error, Complete)) Observable {
 	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		done := false
 		runner := scheduler.ScheduleRecursive(func(self func()) {
-			if subscriber.Canceled() {
+			if !subscriber.Subscribed() {
 				return
 			}
 			n := func(next interface{}) {
@@ -234,7 +234,7 @@ func CreateFutureRecursive(timeout time.Duration, create func(Next, Error, Compl
 	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		done := false
 		runner := scheduler.ScheduleFutureRecursive(timeout, func(self func(time.Duration)) {
-			if subscriber.Canceled() {
+			if !subscriber.Subscribed() {
 				return
 			}
 			n := func(next interface{}) {
@@ -327,11 +327,11 @@ func From(slice ...interface{}) Observable {
 func FromChan(ch <-chan interface{}) Observable {
 	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.ScheduleRecursive(func(self func()) {
-			if subscriber.Canceled() {
+			if !subscriber.Subscribed() {
 				return
 			}
 			next, ok := <-ch
-			if subscriber.Canceled() {
+			if !subscriber.Subscribed() {
 				return
 			}
 			if ok {
@@ -640,12 +640,12 @@ func (o ObservableObservable) CombineLatestAll() ObservableSlice {
 				observe(zeroSlice, err, true)
 			default:
 				subscribeOn.Schedule(func() {
-					if !subscriber.Canceled() {
+					if subscriber.Subscribed() {
 						numObservables := len(observables)
 						observers.values = make([]interface{}, numObservables)
 						observers.active = numObservables
 						for i, v := range observables {
-							if subscriber.Canceled() {
+							if !subscriber.Subscribed() {
 								return
 							}
 							v(makeObserver(i), subscribeOn, subscriber)
@@ -707,10 +707,6 @@ func MergeDelayError(observables ...Observable) Observable {
 type Subscription = subscriber.Subscription
 
 //jig:name Connectable
-
-// ErrDisconnect is sent to all subscribed observers when the subscription
-// returned by Connect is cancelled by calling its Unsubscribe method.
-const ErrDisconnect = RxError("disconnect")
 
 // Connectable provides the Connect method for a Multicaster.
 type Connectable func(Scheduler, Subscriber)
@@ -842,11 +838,11 @@ func (o Observable) MergeWith(other ...Observable) Observable {
 			}
 		}
 		subscribeOn.Schedule(func() {
-			if !subscriber.Canceled() {
+			if subscriber.Subscribed() {
 				observers.len = 1 + len(other)
 				o(observer, subscribeOn, subscriber)
 				for _, o := range other {
-					if subscriber.Canceled() {
+					if !subscriber.Subscribed() {
 						return
 					}
 					o(observer, subscribeOn, subscriber)
@@ -887,11 +883,11 @@ func (o Observable) MergeDelayErrorWith(other ...Observable) Observable {
 			}
 		}
 		subscribeOn.Schedule(func() {
-			if !subscriber.Canceled() {
+			if subscriber.Subscribed() {
 				observers.len = 1 + len(other)
 				o(observer, subscribeOn, subscriber)
 				for _, o := range other {
-					if subscriber.Canceled() {
+					if !subscriber.Subscribed() {
 						return
 					}
 					o(observer, subscribeOn, subscriber)
@@ -941,40 +937,62 @@ func (o Observable) CombineLatestMapTo(inner Observable) ObservableSlice {
 
 // ConcatAll flattens a higher order observable by concattenating the observables it emits.
 func (o ObservableObservable) ConcatAll() Observable {
-	var zero interface{}
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		var (
-			mutex		sync.Mutex
+		var concat struct {
+			sync.Mutex
 			observables	[]Observable
 			observer	Observer
-		)
-		observer = func(next interface{}, err error, done bool) {
-			mutex.Lock()
-			defer mutex.Unlock()
+			subscriber	Subscriber
+		}
+
+		var source struct {
+			observer	ObservableObserver
+			subscriber	Subscriber
+		}
+
+		concat.observer = func(next interface{}, err error, done bool) {
+			concat.Lock()
 			if !done || err != nil {
 				observe(next, err, done)
 			} else {
-				if len(observables) == 0 {
-					observe(zero, nil, true)
+				if len(concat.observables) == 0 {
+					if !source.subscriber.Subscribed() {
+						var zero interface{}
+						observe(zero, nil, true)
+					}
+					concat.observables = nil
 				} else {
-					o := observables[0]
-					observables = observables[1:]
-					o(observer, subscribeOn, subscriber)
+					observable := concat.observables[0]
+					concat.observables = concat.observables[1:]
+					observable(concat.observer, subscribeOn, subscriber)
+				}
+			}
+			concat.Unlock()
+		}
+
+		source.observer = func(next Observable, err error, done bool) {
+			if !done {
+				concat.Lock()
+				initial := concat.observables == nil
+				concat.observables = append(concat.observables, next)
+				concat.Unlock()
+				if initial {
+					var zero interface{}
+					concat.observer(zero, nil, true)
+				}
+			} else {
+				concat.Lock()
+				initial := concat.observables == nil
+				source.subscriber.Done(err)
+				concat.Unlock()
+				if initial || err != nil {
+					var zero interface{}
+					concat.observer(zero, err, true)
 				}
 			}
 		}
-		sourceSubscriber := subscriber.Add()
-		concatenator := func(next Observable, err error, done bool) {
-			if !done {
-				mutex.Lock()
-				defer mutex.Unlock()
-				observables = append(observables, next)
-			} else {
-				observer(zero, err, done)
-				sourceSubscriber.Unsubscribe()
-			}
-		}
-		o(concatenator, subscribeOn, sourceSubscriber)
+		source.subscriber = subscriber.Add()
+		o(source.observer, subscribeOn, source.subscriber)
 	}
 	return observable
 }
@@ -1223,7 +1241,7 @@ func (o ObservableObservable) MergeAll() Observable {
 			}
 		}
 		subscribeOn.Schedule(func() {
-			if !subscriber.Canceled() {
+			if subscriber.Subscribed() {
 				observers.len = 1
 				o(merger, subscribeOn, subscriber)
 			}
@@ -1573,7 +1591,7 @@ func (o Observable) Delay(duration time.Duration) Observable {
 						return
 					}
 					observe(entry.next, entry.err, entry.done)
-					if entry.done || subscriber.Canceled() {
+					if entry.done || !subscriber.Subscribed() {
 						return
 					}
 					delay.Lock()
@@ -2467,21 +2485,19 @@ func (o Observable) Timestamp() ObservableTimestamp {
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
 // Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o Observable) Println(a ...interface{}) (err error) {
+func (o Observable) Println(a ...interface{}) error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next interface{}, e error, done bool) {
+	observer := func(next interface{}, err error, done bool) {
 		if !done {
 			fmt.Println(append(a, next)...)
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
+	return subscriber.Wait()
 }
 
 //jig:name ObservableBool_Println
@@ -2490,21 +2506,19 @@ func (o Observable) Println(a ...interface{}) (err error) {
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
 // Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableBool) Println(a ...interface{}) (err error) {
+func (o ObservableBool) Println(a ...interface{}) error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next bool, e error, done bool) {
+	observer := func(next bool, err error, done bool) {
 		if !done {
 			fmt.Println(append(a, next)...)
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
+	return subscriber.Wait()
 }
 
 //jig:name ObservableInt_Println
@@ -2513,21 +2527,19 @@ func (o ObservableBool) Println(a ...interface{}) (err error) {
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
 // Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) Println(a ...interface{}) (err error) {
+func (o ObservableInt) Println(a ...interface{}) error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, e error, done bool) {
+	observer := func(next int, err error, done bool) {
 		if !done {
 			fmt.Println(append(a, next)...)
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
+	return subscriber.Wait()
 }
 
 //jig:name Observable_Subscribe
@@ -2544,7 +2556,7 @@ func (o Observable) Subscribe(observe Observer, subscribers ...Subscriber) Subsc
 		} else {
 			var zero interface{}
 			observe(zero, err, true)
-			subscribers[0].Unsubscribe()
+			subscribers[0].Done(err)
 		}
 	}
 	subscribers[0].OnWait(scheduler.Wait)
@@ -2566,7 +2578,7 @@ func (o ObservableBool) Subscribe(observe BoolObserver, subscribers ...Subscribe
 		} else {
 			var zeroBool bool
 			observe(zeroBool, err, true)
-			subscribers[0].Unsubscribe()
+			subscribers[0].Done(err)
 		}
 	}
 	subscribers[0].OnWait(scheduler.Wait)
@@ -2588,7 +2600,7 @@ func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber)
 		} else {
 			var zeroInt int
 			observe(zeroInt, err, true)
-			subscribers[0].Unsubscribe()
+			subscribers[0].Done(err)
 		}
 	}
 	subscribers[0].OnWait(scheduler.Wait)
@@ -2605,8 +2617,8 @@ func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber)
 //
 // ToChan uses the public scheduler.Goroutine variable for scheduling, because
 // it needs the concurrency so the returned channel can be used by used
-// by the calling code directly. To cancel ToChan you will need to supply a
-// subscriber that you hold on to.
+// by the calling code directly. To be able to cancel ToChan, you will need to
+// create a subscriber yourself and pass it to ToChan as an argument.
 func (o Observable) ToChan(subscribers ...Subscriber) <-chan interface{} {
 	subscribers = append(subscribers, subscriber.New())
 	scheduler := scheduler.Goroutine
@@ -2637,7 +2649,7 @@ func (o Observable) ToChan(subscribers ...Subscriber) <-chan interface{} {
 			}
 			if done {
 				atomic.StoreInt32(&state, closed)
-				subscribers[0].Unsubscribe()
+				subscribers[0].Done(err)
 			}
 			if !atomic.CompareAndSwapInt32(&state, busy, idle) {
 				close(nextch)
@@ -2666,8 +2678,8 @@ func (o Observable) ToChan(subscribers ...Subscriber) <-chan interface{} {
 //
 // ToChan uses the public scheduler.Goroutine variable for scheduling, because
 // it needs the concurrency so the returned channel can be used by used
-// by the calling code directly. To cancel ToChan you will need to supply a
-// subscriber that you hold on to.
+// by the calling code directly. To be able to cancel ToChan, you will need to
+// create a subscriber yourself and pass it to ToChan as an argument.
 func (o ObservableBool) ToChan(subscribers ...Subscriber) <-chan bool {
 	subscribers = append(subscribers, subscriber.New())
 	scheduler := scheduler.Goroutine
@@ -2694,7 +2706,7 @@ func (o ObservableBool) ToChan(subscribers ...Subscriber) <-chan bool {
 				}
 			} else {
 				atomic.StoreInt32(&state, closed)
-				subscribers[0].Unsubscribe()
+				subscribers[0].Done(err)
 			}
 			if !atomic.CompareAndSwapInt32(&state, busy, idle) {
 				close(nextch)
@@ -2723,8 +2735,8 @@ func (o ObservableBool) ToChan(subscribers ...Subscriber) <-chan bool {
 //
 // ToChan uses the public scheduler.Goroutine variable for scheduling, because
 // it needs the concurrency so the returned channel can be used by used
-// by the calling code directly. To cancel ToChan you will need to supply a
-// subscriber that you hold on to.
+// by the calling code directly. To be able to cancel ToChan, you will need to
+// create a subscriber yourself and pass it to ToChan as an argument.
 func (o ObservableInt) ToChan(subscribers ...Subscriber) <-chan int {
 	subscribers = append(subscribers, subscriber.New())
 	scheduler := scheduler.Goroutine
@@ -2751,7 +2763,7 @@ func (o ObservableInt) ToChan(subscribers ...Subscriber) <-chan int {
 				}
 			} else {
 				atomic.StoreInt32(&state, closed)
-				subscribers[0].Unsubscribe()
+				subscribers[0].Done(err)
 			}
 			if !atomic.CompareAndSwapInt32(&state, busy, idle) {
 				close(nextch)
@@ -2781,17 +2793,16 @@ func (o Observable) ToSingle() (entry interface{}, err error) {
 	o = o.Single()
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next interface{}, e error, done bool) {
+	observer := func(next interface{}, err error, done bool) {
 		if !done {
 			entry = next
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
+	err = subscriber.Wait()
 	return
 }
 
@@ -2804,17 +2815,16 @@ func (o ObservableBool) ToSingle() (entry bool, err error) {
 	o = o.Single()
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next bool, e error, done bool) {
+	observer := func(next bool, err error, done bool) {
 		if !done {
 			entry = next
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
+	err = subscriber.Wait()
 	return
 }
 
@@ -2827,17 +2837,16 @@ func (o ObservableInt) ToSingle() (entry int, err error) {
 	o = o.Single()
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, e error, done bool) {
+	observer := func(next int, err error, done bool) {
 		if !done {
 			entry = next
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
+	err = subscriber.Wait()
 	return
 }
 
@@ -2849,17 +2858,16 @@ func (o ObservableInt) ToSingle() (entry int, err error) {
 func (o Observable) ToSlice() (slice []interface{}, err error) {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next interface{}, e error, done bool) {
+	observer := func(next interface{}, err error, done bool) {
 		if !done {
 			slice = append(slice, next)
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
+	err = subscriber.Wait()
 	return
 }
 
@@ -2871,17 +2879,16 @@ func (o Observable) ToSlice() (slice []interface{}, err error) {
 func (o ObservableBool) ToSlice() (slice []bool, err error) {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next bool, e error, done bool) {
+	observer := func(next bool, err error, done bool) {
 		if !done {
 			slice = append(slice, next)
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
+	err = subscriber.Wait()
 	return
 }
 
@@ -2893,17 +2900,16 @@ func (o ObservableBool) ToSlice() (slice []bool, err error) {
 func (o ObservableInt) ToSlice() (slice []int, err error) {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, e error, done bool) {
+	observer := func(next int, err error, done bool) {
 		if !done {
 			slice = append(slice, next)
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
+	err = subscriber.Wait()
 	return
 }
 
@@ -2912,19 +2918,17 @@ func (o ObservableInt) ToSlice() (slice []int, err error) {
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
 // Wait uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o Observable) Wait() (err error) {
+func (o Observable) Wait() error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next interface{}, e error, done bool) {
+	observer := func(next interface{}, err error, done bool) {
 		if done {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
+	return subscriber.Wait()
 }
 
 //jig:name ObservableBool_Wait
@@ -2932,19 +2936,17 @@ func (o Observable) Wait() (err error) {
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
 // Wait uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableBool) Wait() (err error) {
+func (o ObservableBool) Wait() error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next bool, e error, done bool) {
+	observer := func(next bool, err error, done bool) {
 		if done {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
+	return subscriber.Wait()
 }
 
 //jig:name ObservableInt_Wait
@@ -2952,19 +2954,17 @@ func (o ObservableBool) Wait() (err error) {
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
 // Wait uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) Wait() (err error) {
+func (o ObservableInt) Wait() error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, e error, done bool) {
+	observer := func(next int, err error, done bool) {
 		if done {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
+	return subscriber.Wait()
 }
 
 //jig:name ErrAutoConnect
@@ -2976,9 +2976,14 @@ const ErrAutoConnectNeedsConcurrentScheduler = RxError("needs concurrent schedul
 //jig:name Multicaster_AutoConnect
 
 // AutoConnect makes a Multicaster behave like an ordinary Observable
-// that automatically connects when the specified number of clients have
-// subscribed to it. AutoConnect values should be larger or equal to 1.
-// AutoConnect will throw an ErrInvalidCount if the count is out of range.
+// that automatically connects the multicaster to its source when the specified
+// number of clients have subscribed to it. If the count is less than 1 it will
+// return a Throw(ErrInvalidCount). After connecting, when the number of
+// subscribed clients drops to 0, AutoConnect will cancel the source connection
+// when it is still emitting values and has not terminated. Subsequently, when
+// the next client subscribes, AutoConnect will connect to the source only when
+// it did not complete successfully. So, only in case the connection to the source
+// was still active, terminated with an error or canceled.
 func (o Multicaster) AutoConnect(count int) Observable {
 	if count < 1 {
 		return Throw(ErrAutoConnectInvalidCount)
@@ -3006,27 +3011,27 @@ const ErrRefCountNeedsConcurrentScheduler = RxError("needs concurrent scheduler"
 
 // RefCount makes a Multicaster behave like an ordinary Observable. On
 // first Subscribe it will call Connect on its Multicaster and when its last
-// subscriber is Unsubscribed it will cancel the connection by calling
+// subscriber is Unsubscribed it will cancel the source connection by calling
 // Unsubscribe on the subscription returned by the call to Connect.
 func (o Multicaster) RefCount() Observable {
-	var (
+	var source struct {
 		refcount	int32
 		subscription	Subscription
-	)
+	}
 	observable := func(observe Observer, subscribeOn Scheduler, withSubscriber Subscriber) {
 		if !subscribeOn.IsConcurrent() {
 			var zero interface{}
 			observe(zero, ErrRefCountNeedsConcurrentScheduler, true)
 			return
 		}
-		if atomic.AddInt32(&refcount, 1) == 1 {
+		if atomic.AddInt32(&source.refcount, 1) == 1 {
 			s := subscriber.New()
 			o.Connectable(subscribeOn, s)
-			subscription = s
+			source.subscription = s
 		}
 		withSubscriber.OnUnsubscribe(func() {
-			if atomic.AddInt32(&refcount, -1) == 0 {
-				subscription.Unsubscribe()
+			if atomic.AddInt32(&source.refcount, -1) == 0 {
+				source.subscription.Unsubscribe()
 			}
 		})
 		o.Observable(observe, subscribeOn, withSubscriber)
@@ -3047,55 +3052,59 @@ func (o Observable) Multicast(factory func() Subject) Multicaster {
 		notifying
 		terminated
 	)
-	var subjectValue struct {
+	var subject struct {
 		state	int32
 		atomic.Value
 	}
-	subjectValue.Store(factory())
-	observer := func(next interface{}, err error, done bool) {
-		if atomic.CompareAndSwapInt32(&subjectValue.state, active, notifying) {
-			if s, ok := subjectValue.Load().(Subject); ok {
-				s.Observer(next, err, done)
-			}
-			if !done {
-				atomic.CompareAndSwapInt32(&subjectValue.state, notifying, active)
-			} else {
-				atomic.CompareAndSwapInt32(&subjectValue.state, notifying, terminated)
-			}
-		}
-	}
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		if s, ok := subjectValue.Load().(Subject); ok {
-			s.Observable(observe, subscribeOn, subscriber)
-		}
-	}
+	subject.Store(factory())
 	const (
 		unsubscribed	int32	= iota
 		subscribed
 	)
-	var connection struct {
+	var source struct {
 		sync.Mutex
 		state		int32
 		subscriber	Subscriber
 	}
-	connectable := func(subscribeOn Scheduler, subscriber Subscriber) {
-		connection.Lock()
-		if atomic.CompareAndSwapInt32(&subjectValue.state, terminated, active) {
-			subjectValue.Store(factory())
+	observer := func(next interface{}, err error, done bool) {
+		if atomic.CompareAndSwapInt32(&subject.state, active, notifying) {
+			if s, ok := subject.Load().(Subject); ok {
+				s.Observer(next, err, done)
+			}
+			if !done {
+				atomic.CompareAndSwapInt32(&subject.state, notifying, active)
+			} else {
+				if atomic.CompareAndSwapInt32(&subject.state, notifying, terminated) {
+					source.Lock()
+					source.subscriber.Unsubscribe()
+					source.Unlock()
+				}
+			}
 		}
-		if atomic.CompareAndSwapInt32(&connection.state, unsubscribed, subscribed) {
+	}
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		if s, ok := subject.Load().(Subject); ok {
+			s.Observable(observe, subscribeOn, subscriber)
+		}
+	}
+	connectable := func(subscribeOn Scheduler, subscriber Subscriber) {
+		source.Lock()
+		if atomic.CompareAndSwapInt32(&subject.state, terminated, active) {
+			subject.Store(factory())
+		}
+		if atomic.CompareAndSwapInt32(&source.state, unsubscribed, subscribed) {
+			source.subscriber = subscriber
+			source.Unlock()
 			o(observer, subscribeOn, subscriber)
-			connection.subscriber = subscriber
+			source.Lock()
 			subscriber.OnUnsubscribe(func() {
-				atomic.CompareAndSwapInt32(&connection.state, subscribed, unsubscribed)
-				var zero interface{}
-				observer(zero, ErrDisconnect, true)
+				atomic.CompareAndSwapInt32(&source.state, subscribed, unsubscribed)
 			})
 		} else {
-			connection.subscriber.OnUnsubscribe(subscriber.Unsubscribe)
-			subscriber.OnUnsubscribe(connection.subscriber.Unsubscribe)
+			source.subscriber.OnUnsubscribe(subscriber.Unsubscribe)
+			subscriber.OnUnsubscribe(source.subscriber.Unsubscribe)
 		}
-		connection.Unlock()
+		source.Unlock()
 	}
 	return Multicaster{Observable: observable, Connectable: connectable}
 }
@@ -3207,7 +3216,10 @@ func NewSubject() Subject {
 // isn't. To simulate the RxJS 5 behavior use Publish().AutoConnect(1) this will
 // connect on the first subscription but will never re-connect.
 func (o Observable) Publish() Multicaster {
-	return o.Multicast(NewSubject)
+	factory := func() Subject {
+		return NewSubject()
+	}
+	return o.Multicast(factory)
 }
 
 //jig:name MaxReplayCapacity

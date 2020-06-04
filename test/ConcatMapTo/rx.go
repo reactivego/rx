@@ -141,21 +141,19 @@ func (o ObservableInt) MapObservableString(project func(int) ObservableString) O
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
 // Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableString) Println(a ...interface{}) (err error) {
+func (o ObservableString) Println(a ...interface{}) error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next string, e error, done bool) {
+	observer := func(next string, err error, done bool) {
 		if !done {
 			fmt.Println(append(a, next)...)
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
+	return subscriber.Wait()
 }
 
 //jig:name ObservableStringObserver
@@ -178,40 +176,62 @@ type ObservableObservableString func(ObservableStringObserver, Scheduler, Subscr
 
 // ConcatAll flattens a higher order observable by concattenating the observables it emits.
 func (o ObservableObservableString) ConcatAll() ObservableString {
-	var zeroString string
 	observable := func(observe StringObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		var (
-			mutex		sync.Mutex
+		var concat struct {
+			sync.Mutex
 			observables	[]ObservableString
 			observer	StringObserver
-		)
-		observer = func(next string, err error, done bool) {
-			mutex.Lock()
-			defer mutex.Unlock()
+			subscriber	Subscriber
+		}
+
+		var source struct {
+			observer	ObservableStringObserver
+			subscriber	Subscriber
+		}
+
+		concat.observer = func(next string, err error, done bool) {
+			concat.Lock()
 			if !done || err != nil {
 				observe(next, err, done)
 			} else {
-				if len(observables) == 0 {
-					observe(zeroString, nil, true)
+				if len(concat.observables) == 0 {
+					if !source.subscriber.Subscribed() {
+						var zero string
+						observe(zero, nil, true)
+					}
+					concat.observables = nil
 				} else {
-					o := observables[0]
-					observables = observables[1:]
-					o(observer, subscribeOn, subscriber)
+					observable := concat.observables[0]
+					concat.observables = concat.observables[1:]
+					observable(concat.observer, subscribeOn, subscriber)
+				}
+			}
+			concat.Unlock()
+		}
+
+		source.observer = func(next ObservableString, err error, done bool) {
+			if !done {
+				concat.Lock()
+				initial := concat.observables == nil
+				concat.observables = append(concat.observables, next)
+				concat.Unlock()
+				if initial {
+					var zero string
+					concat.observer(zero, nil, true)
+				}
+			} else {
+				concat.Lock()
+				initial := concat.observables == nil
+				source.subscriber.Done(err)
+				concat.Unlock()
+				if initial || err != nil {
+					var zero string
+					concat.observer(zero, err, true)
 				}
 			}
 		}
-		sourceSubscriber := subscriber.Add()
-		concatenator := func(next ObservableString, err error, done bool) {
-			if !done {
-				mutex.Lock()
-				defer mutex.Unlock()
-				observables = append(observables, next)
-			} else {
-				observer(zeroString, err, done)
-				sourceSubscriber.Unsubscribe()
-			}
-		}
-		o(concatenator, subscribeOn, sourceSubscriber)
+		source.subscriber = subscriber.Add()
+		o(source.observer, subscribeOn, source.subscriber)
 	}
 	return observable
 }

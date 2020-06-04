@@ -90,6 +90,50 @@ func RangeInt(start, count int) ObservableInt {
 	return observable
 }
 
+//jig:name JustInt
+
+// JustInt creates an ObservableInt that emits a particular item.
+func JustInt(element int) ObservableInt {
+	var zeroInt int
+	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
+		runner := scheduler.Schedule(func() {
+			if subscriber.Subscribed() {
+				observe(element, nil, false)
+			}
+			if subscriber.Subscribed() {
+				observe(zeroInt, nil, true)
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
+}
+
+//jig:name FromInt
+
+// FromInt creates an ObservableInt from multiple int values passed in.
+func FromInt(slice ...int) ObservableInt {
+	var zeroInt int
+	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
+		i := 0
+		runner := scheduler.ScheduleRecursive(func(self func()) {
+			if subscriber.Subscribed() {
+				if i < len(slice) {
+					observe(slice[i], nil, false)
+					if subscriber.Subscribed() {
+						i++
+						self()
+					}
+				} else {
+					observe(zeroInt, nil, true)
+				}
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
+}
+
 //jig:name Observable_Take
 
 // Take emits only the first n items emitted by an Observable.
@@ -119,29 +163,72 @@ func (o ObservableInt) Take(n int) ObservableInt {
 	return o.AsObservable().Take(n).AsObservableInt()
 }
 
-//jig:name Observer
+//jig:name Observable_Delay
 
-// Observer is a function that gets called whenever the Observable has
-// something to report. The next argument is the item value that is only
-// valid when the done argument is false. When done is true and the err
-// argument is not nil, then the Observable has terminated with an error.
-// When done is true and the err argument is nil, then the Observable has
-// completed normally.
-type Observer func(next interface{}, err error, done bool)
-
-//jig:name Observable
-
-// Observable is a function taking an Observer, Scheduler and Subscriber.
-// Calling it will subscribe the Observer to events from the Observable.
-type Observable func(Observer, Scheduler, Subscriber)
-
-//jig:name ObservableInt_AsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
+// Delay shifts an emission from an Observable forward in time by a particular
+// amount of time. The relative time intervals between emissions are preserved.
+func (o Observable) Delay(duration time.Duration) Observable {
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		type emission struct {
+			at	time.Time
+			next	interface{}
+			err	error
+			done	bool
+		}
+		var delay struct {
+			sync.Mutex
+			emissions	[]emission
+		}
+		delayer := subscribeOn.ScheduleFutureRecursive(duration, func(self func(time.Duration)) {
+			if subscriber.Subscribed() {
+				delay.Lock()
+				for _, entry := range delay.emissions {
+					delay.Unlock()
+					due := entry.at.Sub(subscribeOn.Now())
+					if due > 0 {
+						self(due)
+						return
+					}
+					observe(entry.next, entry.err, entry.done)
+					if entry.done || !subscriber.Subscribed() {
+						return
+					}
+					delay.Lock()
+					delay.emissions = delay.emissions[1:]
+				}
+				delay.Unlock()
+				self(duration)
+			}
+		})
+		subscriber.OnUnsubscribe(delayer.Cancel)
+		observer := func(next interface{}, err error, done bool) {
+			delay.Lock()
+			delay.emissions = append(delay.emissions, emission{subscribeOn.Now().Add(duration), next, err, done})
+			delay.Unlock()
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableInt_Delay
+
+// Delay shifts an emission from an Observable forward in time by a particular
+// amount of time. The relative time intervals between emissions are preserved.
+func (o ObservableInt) Delay(duration time.Duration) ObservableInt {
+	return o.AsObservable().Delay(duration).AsObservableInt()
+}
+
+//jig:name ObservableInt_DoOnComplete
+
+// DoOnComplete calls a function when the stream completes.
+func (o ObservableInt) DoOnComplete(f func()) ObservableInt {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
+			if err == nil && done {
+				f()
+			}
+			observe(next, err, done)
 		}
 		o(observer, subscribeOn, subscriber)
 	}
@@ -166,6 +253,22 @@ func (o ObservableInt) MapObservableInt(project func(int) ObservableInt) Observa
 	return observable
 }
 
+//jig:name Observer
+
+// Observer is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
+// completed normally.
+type Observer func(next interface{}, err error, done bool)
+
+//jig:name Observable
+
+// Observable is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type Observable func(Observer, Scheduler, Subscriber)
+
 //jig:name ObservableIntObserver
 
 // ObservableIntObserver is a function that gets called whenever the Observable has
@@ -181,6 +284,19 @@ type ObservableIntObserver func(next ObservableInt, err error, done bool)
 // ObservableObservableInt is a function taking an Observer, Scheduler and Subscriber.
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableObservableInt func(ObservableIntObserver, Scheduler, Subscriber)
+
+//jig:name ObservableInt_AsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
 
 //jig:name RxError
 
@@ -223,40 +339,62 @@ func (o Observable) AsObservableInt() ObservableInt {
 
 // ConcatAll flattens a higher order observable by concattenating the observables it emits.
 func (o ObservableObservableInt) ConcatAll() ObservableInt {
-	var zeroInt int
 	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		var (
-			mutex		sync.Mutex
+		var concat struct {
+			sync.Mutex
 			observables	[]ObservableInt
 			observer	IntObserver
-		)
-		observer = func(next int, err error, done bool) {
-			mutex.Lock()
-			defer mutex.Unlock()
+			subscriber	Subscriber
+		}
+
+		var source struct {
+			observer	ObservableIntObserver
+			subscriber	Subscriber
+		}
+
+		concat.observer = func(next int, err error, done bool) {
+			concat.Lock()
 			if !done || err != nil {
 				observe(next, err, done)
 			} else {
-				if len(observables) == 0 {
-					observe(zeroInt, nil, true)
+				if len(concat.observables) == 0 {
+					if !source.subscriber.Subscribed() {
+						var zero int
+						observe(zero, nil, true)
+					}
+					concat.observables = nil
 				} else {
-					o := observables[0]
-					observables = observables[1:]
-					o(observer, subscribeOn, subscriber)
+					observable := concat.observables[0]
+					concat.observables = concat.observables[1:]
+					observable(concat.observer, subscribeOn, subscriber)
+				}
+			}
+			concat.Unlock()
+		}
+
+		source.observer = func(next ObservableInt, err error, done bool) {
+			if !done {
+				concat.Lock()
+				initial := concat.observables == nil
+				concat.observables = append(concat.observables, next)
+				concat.Unlock()
+				if initial {
+					var zero int
+					concat.observer(zero, nil, true)
+				}
+			} else {
+				concat.Lock()
+				initial := concat.observables == nil
+				source.subscriber.Done(err)
+				concat.Unlock()
+				if initial || err != nil {
+					var zero int
+					concat.observer(zero, err, true)
 				}
 			}
 		}
-		sourceSubscriber := subscriber.Add()
-		concatenator := func(next ObservableInt, err error, done bool) {
-			if !done {
-				mutex.Lock()
-				defer mutex.Unlock()
-				observables = append(observables, next)
-			} else {
-				observer(zeroInt, err, done)
-				sourceSubscriber.Unsubscribe()
-			}
-		}
-		o(concatenator, subscribeOn, sourceSubscriber)
+		source.subscriber = subscriber.Add()
+		o(source.observer, subscribeOn, source.subscriber)
 	}
 	return observable
 }
@@ -267,19 +405,72 @@ func (o ObservableObservableInt) ConcatAll() ObservableInt {
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
 // Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) Println(a ...interface{}) (err error) {
+func (o ObservableInt) Println(a ...interface{}) error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, e error, done bool) {
+	observer := func(next int, err error, done bool) {
 		if !done {
 			fmt.Println(append(a, next)...)
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
+	return subscriber.Wait()
+}
+
+//jig:name ObservableInt_Do
+
+// Do calls a function for each next value passing through the observable.
+func (o ObservableInt) Do(f func(next int)) ObservableInt {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			if !done {
+				f(next)
+			}
+			observe(next, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableInt_ToSlice
+
+// ToSlice collects all values from the ObservableInt into an slice. The
+// complete slice and any error are returned.
+// ToSlice uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableInt) ToSlice() (slice []int, err error) {
+	subscriber := subscriber.New()
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next int, err error, done bool) {
+		if !done {
+			slice = append(slice, next)
+		} else {
+			subscriber.Done(err)
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	err = subscriber.Wait()
 	return
+}
+
+//jig:name ObservableInt_Wait
+
+// Wait subscribes to the Observable and waits for completion or error.
+// Returns either the error or nil when the Observable completed normally.
+// Wait uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableInt) Wait() error {
+	subscriber := subscriber.New()
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next int, err error, done bool) {
+		if done {
+			subscriber.Done(err)
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	return subscriber.Wait()
 }
