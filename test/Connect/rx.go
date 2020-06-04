@@ -91,7 +91,7 @@ func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber)
 		} else {
 			var zeroInt int
 			observe(zeroInt, err, true)
-			subscribers[0].Unsubscribe()
+			subscribers[0].Done(err)
 		}
 	}
 	subscribers[0].OnWait(scheduler.Wait)
@@ -402,7 +402,7 @@ func (o ObservableString) Subscribe(observe StringObserver, subscribers ...Subsc
 		} else {
 			var zeroString string
 			observe(zeroString, err, true)
-			subscribers[0].Unsubscribe()
+			subscribers[0].Done(err)
 		}
 	}
 	subscribers[0].OnWait(scheduler.Wait)
@@ -424,7 +424,7 @@ func (o ObservableBool) Subscribe(observe BoolObserver, subscribers ...Subscribe
 		} else {
 			var zeroBool bool
 			observe(zeroBool, err, true)
-			subscribers[0].Unsubscribe()
+			subscribers[0].Done(err)
 		}
 	}
 	subscribers[0].OnWait(scheduler.Wait)

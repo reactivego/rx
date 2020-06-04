@@ -35,21 +35,19 @@ func NewSubscriber() Subscriber {
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
 // Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableFoo) Println(a ...interface{}) (err error) {
+func (o ObservableFoo) Println(a ...interface{}) error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next foo, e error, done bool) {
+	observer := func(next foo, err error, done bool) {
 		if !done {
 			fmt.Println(append(a, next)...)
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
+	return subscriber.Wait()
 }
 
 //jig:template Observable<Foo> Wait
@@ -57,19 +55,17 @@ func (o ObservableFoo) Println(a ...interface{}) (err error) {
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
 // Wait uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableFoo) Wait() (err error) {
+func (o ObservableFoo) Wait() error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next foo, e error, done bool) {
+	observer := func(next foo, err error, done bool) {
 		if done {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
+	return subscriber.Wait()
 }
 
 //jig:template Observable<Foo> ToSlice
@@ -80,17 +76,16 @@ func (o ObservableFoo) Wait() (err error) {
 func (o ObservableFoo) ToSlice() (slice []foo, err error) {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next foo, e error, done bool) {
+	observer := func(next foo, err error, done bool) {
 		if !done {
 			slice = append(slice, next)
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
+	err = subscriber.Wait()
 	return
 }
 
@@ -103,17 +98,16 @@ func (o ObservableFoo) ToSingle() (entry foo, err error) {
 	o = o.Single()
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next foo, e error, done bool) {
+	observer := func(next foo, err error, done bool) {
 		if !done {
 			entry = next
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
+	err = subscriber.Wait()
 	return
 }
 
@@ -126,8 +120,8 @@ func (o ObservableFoo) ToSingle() (entry foo, err error) {
 //
 // ToChan uses the public scheduler.Goroutine variable for scheduling, because
 // it needs the concurrency so the returned channel can be used by used
-// by the calling code directly. To cancel ToChan you will need to supply a
-// subscriber that you hold on to.
+// by the calling code directly. To be able to cancel ToChan, you will need to
+// create a subscriber yourself and pass it to ToChan as an argument.
 func (o Observable) ToChan(subscribers ...Subscriber) <-chan interface{} {
 	subscribers = append(subscribers, subscriber.New())
 	scheduler := scheduler.Goroutine
@@ -158,7 +152,7 @@ func (o Observable) ToChan(subscribers ...Subscriber) <-chan interface{} {
 			}
 			if done {
 				atomic.StoreInt32(&state, closed)
-				subscribers[0].Unsubscribe()
+				subscribers[0].Done(err)
 			}
 			if !atomic.CompareAndSwapInt32(&state, busy, idle) {
 				close(nextch)
@@ -188,8 +182,8 @@ func (o Observable) ToChan(subscribers ...Subscriber) <-chan interface{} {
 //
 // ToChan uses the public scheduler.Goroutine variable for scheduling, because
 // it needs the concurrency so the returned channel can be used by used
-// by the calling code directly. To cancel ToChan you will need to supply a
-// subscriber that you hold on to.
+// by the calling code directly. To be able to cancel ToChan, you will need to
+// create a subscriber yourself and pass it to ToChan as an argument.
 func (o ObservableFoo) ToChan(subscribers ...Subscriber) <-chan foo {
 	subscribers = append(subscribers, subscriber.New())
 	scheduler := scheduler.Goroutine
@@ -216,7 +210,7 @@ func (o ObservableFoo) ToChan(subscribers ...Subscriber) <-chan foo {
 				}
 			} else {
 				atomic.StoreInt32(&state, closed)
-				subscribers[0].Unsubscribe()
+				subscribers[0].Done(err)
 			}
 			if !atomic.CompareAndSwapInt32(&state, busy, idle) {
 				close(nextch)
@@ -252,7 +246,7 @@ func (o ObservableFoo) Subscribe(observe FooObserver, subscribers ...Subscriber)
 		} else {
 			var zeroFoo foo
 			observe(zeroFoo, err, true)
-			subscribers[0].Unsubscribe()
+			subscribers[0].Done(err)
 		}
 	}
 	subscribers[0].OnWait(scheduler.Wait)
