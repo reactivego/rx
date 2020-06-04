@@ -5,36 +5,49 @@ import (
 	"sync/atomic"
 )
 
+// Error type to allow constant error declarations.
+type Error string
+
+// Error method implements Error interface.
+func (e Error) Error() string {
+	return string(e)
+}
+
+// Unsubscribed is the error returned by wait when the Unsubscribe method
+// is called on the subscription.
+const ErrUnsubscribed = Error("subscriber unsubscribed")
+
 // Subscription is an interface that allows code to monitor and control a
 // subscription it received.
 type Subscription interface {
-	// Subscribed returns true when the subscription is currently valid.
+	// Subscribed returns true when the subscription is currently active.
 	Subscribed() bool
 
-	// Unsubscribe will cancel the subscription (when one is active).
-	// Subsequently it will then call Unsubscribe on all child subscriptions
-	// added through Add. After a call to Unsubscribe returns, calling
-	// Canceled() on the same interface or any of its child subscriptions
-	// will return true. Unsubscribe can be safely called on a closed
-	// subscription and performs no operation.
+	// Unsubscribe will cancel the subscription when it is still active.
+	// Subsequently, it will call Unsubscribe on all child subscriptions added
+	// via Add along with all methods added through OnUnsubscribe. Unsubscribe
+	// can be safely called on a subscription that is no longer active and
+	// performs no operation in that case. There is no need to check if the
+	// subscription is still active before calling Unsubscribe. When the
+	// subscription is canceled by calling Unsubscribe a call to the Wait
+	// method will return the error ErrUnsubscribed.
 	Unsubscribe()
 
-	// Canceled returns true when the subscription has been canceled. There
-	// is not need to check if the subscription is canceled before calling
-	// Unsubscribe.
+	// Canceled returns true when the subscription state is canceled.
 	Canceled() bool
 
-	// Wait will block the calling goroutine and wait for the Unsubscribe
-	// method to be called on this subscription. Calling Wait on a
-	// subscription that has already been closed will return immediately.
-	Wait()
+	// Wait will by default block the calling goroutine and wait for the
+	// Unsubscribe method to be called on this subscription.
+	// However, when OnWait was called with a callback wait function it will
+	// call that instead. Calling Wait on a subscription that has already been
+	// canceled will return immediately. If the subscriber was canceled by
+	// calling Unsubscribe, then the error returned is ErrUnsubscribed.
+	// If the subscriber was terminated by calling Done, then the error
+	// returned here is the one passed to Done.
+	Wait() error
 }
 
-// Subscriber embeds a Subscription interface. Additionally the Add method
-// allows for creating a child subscription. Calling Unsubscribe will close
-// the current subscription but will not propagate up to the parent.
-// It will traverse recursively all child subcriptions and call Unsubscribe
-// on them before settings the subscription state to lifeless.
+// Subscriber is a Subscription with management functionality.
 type Subscriber interface {
 	// A Subscriber is also a Subscription.
 	Subscription
@@ -56,11 +69,15 @@ type Subscriber interface {
 
 	// OnWait will register a callback to  call when subscription Wait is called.
 	OnWait(callback func())
+
+	// Done will set the error internally and then cancel the subscription by 
+	// calling the Unsubscribe method. A nil value for error indicates success.
+	Done(err error)
 }
 
 // New will create and return a new Subscriber.
 func New() Subscriber {
-	return &subscriber{}
+	return &subscriber{err: ErrUnsubscribed}
 }
 
 const (
@@ -74,6 +91,7 @@ type subscriber struct {
 	sync.Mutex
 	callbacks []func()
 	onWait    func()
+	err       error
 }
 
 func (s *subscriber) Subscribed() bool {
@@ -95,7 +113,7 @@ func (s *subscriber) Canceled() bool {
 	return atomic.LoadInt32(&s.state) != subscribed
 }
 
-func (s *subscriber) Wait() {
+func (s *subscriber) Wait() error {
 	s.Lock()
 	wait := s.onWait
 	s.Unlock()
@@ -104,9 +122,13 @@ func (s *subscriber) Wait() {
 	} else {
 		var wg sync.WaitGroup
 		wg.Add(1)
-		s.Add(wg.Done)
-		wg.Wait()		
+		s.OnUnsubscribe(wg.Done)
+		wg.Wait()
 	}
+	s.Lock()
+	err := s.err
+	s.Unlock()
+	return err
 }
 
 func (s *subscriber) Add(callbacks ...func()) Subscriber {
@@ -138,4 +160,11 @@ func (s *subscriber) OnWait(callback func()) {
 	s.Lock()
 	s.onWait = callback
 	s.Unlock()
+}
+
+func (s *subscriber) Done(err error) {
+	s.Lock()
+	s.err = err
+	s.Unlock()
+	s.Unsubscribe()
 }
