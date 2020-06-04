@@ -276,7 +276,7 @@ The only operator that uses the *goroutine* scheduler by default is the `ToChan`
 To change the scheduler on which subscribing needs to occur, use the [SubscribeOn](OPERATORS.md#subscribeon) operator
 
 ## Regenerating this Package
-This package is generated from generics in the sub-folder generic by the [jig](http://github.com/reactivego/jig) tool.
+This package is generated from generics in the sub-folder `generic` by the [jig](http://github.com/reactivego/jig) tool.
 You don't need to regenerate this package in order to use it. However, if you are
 interested in regenerating it, then read on.
 
