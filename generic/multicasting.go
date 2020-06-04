@@ -10,11 +10,7 @@ import (
 )
 
 //jig:template Connectable
-//jig:needs RxError, Subscription
-
-// ErrDisconnect is sent to all subscribed observers when the subscription
-// returned by Connect is cancelled by calling its Unsubscribe method.
-const ErrDisconnect = RxError("disconnect")
+//jig:needs Scheduler, Subscriber, Subscription
 
 // Connectable provides the Connect method for a Multicaster.
 type Connectable func(Scheduler, Subscriber)
@@ -55,55 +51,59 @@ func (o ObservableFoo) Multicast(factory func() SubjectFoo) FooMulticaster {
 		notifying
 		terminated
 	)
-	var subjectValue struct {
+	var subject struct {
 		state int32
 		atomic.Value
 	}
-	subjectValue.Store(factory())
-	observer := func(next foo, err error, done bool) {
-		if atomic.CompareAndSwapInt32(&subjectValue.state, active, notifying) {
-			if s, ok := subjectValue.Load().(SubjectFoo); ok {
-				s.FooObserver(next, err, done)
-			}
-			if !done {
-				atomic.CompareAndSwapInt32(&subjectValue.state, notifying, active)
-			} else {
-				atomic.CompareAndSwapInt32(&subjectValue.state, notifying, terminated)
-			}
-		}
-	}
-	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		if s, ok := subjectValue.Load().(SubjectFoo); ok {
-			s.ObservableFoo(observe, subscribeOn, subscriber)
-		}
-	}
+	subject.Store(factory())
 	const (
 		unsubscribed int32 = iota
 		subscribed
 	)
-	var connection struct {
+	var source struct {
 		sync.Mutex
 		state      int32
 		subscriber Subscriber
 	}
-	connectable := func(subscribeOn Scheduler, subscriber Subscriber) {
-		connection.Lock()
-		if atomic.CompareAndSwapInt32(&subjectValue.state, terminated, active) {
-			subjectValue.Store(factory())
+	observer := func(next foo, err error, done bool) {
+		if atomic.CompareAndSwapInt32(&subject.state, active, notifying) {
+			if s, ok := subject.Load().(SubjectFoo); ok {
+				s.FooObserver(next, err, done)
+			}
+			if !done {
+				atomic.CompareAndSwapInt32(&subject.state, notifying, active)
+			} else {
+				if atomic.CompareAndSwapInt32(&subject.state, notifying, terminated) {
+					source.Lock()
+					source.subscriber.Unsubscribe()
+					source.Unlock()
+				}
+			}
 		}
-		if atomic.CompareAndSwapInt32(&connection.state, unsubscribed, subscribed) {
+	}
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		if s, ok := subject.Load().(SubjectFoo); ok {
+			s.ObservableFoo(observe, subscribeOn, subscriber)
+		}
+	}
+	connectable := func(subscribeOn Scheduler, subscriber Subscriber) {
+		source.Lock()
+		if atomic.CompareAndSwapInt32(&subject.state, terminated, active) {
+			subject.Store(factory())
+		}
+		if atomic.CompareAndSwapInt32(&source.state, unsubscribed, subscribed) {
+			source.subscriber = subscriber
+			source.Unlock()
 			o(observer, subscribeOn, subscriber)
-			connection.subscriber = subscriber
+			source.Lock()
 			subscriber.OnUnsubscribe(func() {
-				atomic.CompareAndSwapInt32(&connection.state, subscribed, unsubscribed)
-				var zero foo
-				observer(zero, ErrDisconnect, true)
+				atomic.CompareAndSwapInt32(&source.state, subscribed, unsubscribed)
 			})
 		} else {
-			connection.subscriber.OnUnsubscribe(subscriber.Unsubscribe)
-			subscriber.OnUnsubscribe(connection.subscriber.Unsubscribe)
+			source.subscriber.OnUnsubscribe(subscriber.Unsubscribe)
+			subscriber.OnUnsubscribe(source.subscriber.Unsubscribe)
 		}
-		connection.Unlock()
+		source.Unlock()
 	}
 	return FooMulticaster{ObservableFoo: observable, Connectable: connectable}
 }
@@ -144,7 +144,6 @@ func (o ObservableFoo) PublishReplay(bufferCapacity int, windowDuration time.Dur
 	return o.Multicast(factory)
 }
 
-
 //jig:template ErrRefCount
 //jig:needs RxError
 
@@ -155,27 +154,27 @@ const ErrRefCountNeedsConcurrentScheduler = RxError("needs concurrent scheduler"
 
 // RefCount makes a FooMulticaster behave like an ordinary ObservableFoo. On
 // first Subscribe it will call Connect on its FooMulticaster and when its last
-// subscriber is Unsubscribed it will cancel the connection by calling
+// subscriber is Unsubscribed it will cancel the source connection by calling
 // Unsubscribe on the subscription returned by the call to Connect.
 func (o FooMulticaster) RefCount() ObservableFoo {
-	var (
+	var source struct {
 		refcount     int32
 		subscription Subscription
-	)
+	}
 	observable := func(observe FooObserver, subscribeOn Scheduler, withSubscriber Subscriber) {
 		if !subscribeOn.IsConcurrent() {
 			var zero foo
 			observe(zero, ErrRefCountNeedsConcurrentScheduler, true)
 			return
 		}
-		if atomic.AddInt32(&refcount, 1) == 1 {
+		if atomic.AddInt32(&source.refcount, 1) == 1 {
 			s := subscriber.New()
 			o.Connectable(subscribeOn, s)
-			subscription = s
+			source.subscription = s
 		}
 		withSubscriber.OnUnsubscribe(func() {
-			if atomic.AddInt32(&refcount, -1) == 0 {
-				subscription.Unsubscribe()
+			if atomic.AddInt32(&source.refcount, -1) == 0 {
+				source.subscription.Unsubscribe()
 			}
 		})
 		o.ObservableFoo(observe, subscribeOn, withSubscriber)

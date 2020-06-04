@@ -10,14 +10,14 @@ func Example_connect() {
 	// source is an ObservableInt
 	source := FromInt(1, 2)
 
-	// pub is a ConnectableInt
-	pub := source.Publish()
+	// publish is an IntMulticaster
+	publish := source.Publish()
 
-	// scheduler will run a task asynchronously on a new goroutine.
-	scheduler := GoroutineScheduler()
+	// concurrent will run a task concurrently on a new goroutine.
+	concurrent := GoroutineScheduler()
 
-	// First subscriber (asynchronous)
-	sub1 := pub.SubscribeOn(scheduler).
+	// First subscriber (concurrent)
+	sub1 := publish.SubscribeOn(concurrent).
 		MapString(func(v int) string {
 			return fmt.Sprintf("value is %d", v)
 		}).
@@ -27,8 +27,8 @@ func Example_connect() {
 			}
 		})
 
-	// Second subscriber (asynchronous)
-	sub2 := pub.SubscribeOn(scheduler).
+	// Second subscriber (concurrent)
+	sub2 := publish.SubscribeOn(concurrent).
 		MapBool(func(v int) bool {
 			return v > 1
 		}).
@@ -38,8 +38,8 @@ func Example_connect() {
 			}
 		})
 
-	// Third subscriber (asynchronous)
-	sub3 := pub.SubscribeOn(scheduler).
+	// Third subscriber (concurrent)
+	sub3 := publish.SubscribeOn(concurrent).
 		Subscribe(func(next int, err error, done bool) {
 			if !done {
 				fmt.Println("sub3", next)
@@ -47,8 +47,12 @@ func Example_connect() {
 		})
 
 	// Connect will cause the publisher to subscribe to the source
-	pub.Connect().Wait()
+	// Wait will actually cause the trampoline scheduler hooked into the
+	// subscription to perform the connect to the source. And feed the
+	// source into the Publish
+	publish.Connect().Wait()
 
+	// Wait for all subscriptions (running concurrently) to finish.
 	sub1.Wait()
 	sub2.Wait()
 	sub3.Wait()

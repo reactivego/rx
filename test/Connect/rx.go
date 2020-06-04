@@ -99,17 +99,7 @@ func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber)
 	return subscribers[0]
 }
 
-//jig:name RxError
-
-type RxError string
-
-func (e RxError) Error() string	{ return string(e) }
-
 //jig:name Connectable
-
-// ErrDisconnect is sent to all subscribed observers when the subscription
-// returned by Connect is cancelled by calling its Unsubscribe method.
-const ErrDisconnect = RxError("disconnect")
 
 // Connectable provides the Connect method for a Multicaster.
 type Connectable func(Scheduler, Subscriber)
@@ -148,55 +138,59 @@ func (o ObservableInt) Multicast(factory func() SubjectInt) IntMulticaster {
 		notifying
 		terminated
 	)
-	var subjectValue struct {
+	var subject struct {
 		state	int32
 		atomic.Value
 	}
-	subjectValue.Store(factory())
-	observer := func(next int, err error, done bool) {
-		if atomic.CompareAndSwapInt32(&subjectValue.state, active, notifying) {
-			if s, ok := subjectValue.Load().(SubjectInt); ok {
-				s.IntObserver(next, err, done)
-			}
-			if !done {
-				atomic.CompareAndSwapInt32(&subjectValue.state, notifying, active)
-			} else {
-				atomic.CompareAndSwapInt32(&subjectValue.state, notifying, terminated)
-			}
-		}
-	}
-	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		if s, ok := subjectValue.Load().(SubjectInt); ok {
-			s.ObservableInt(observe, subscribeOn, subscriber)
-		}
-	}
+	subject.Store(factory())
 	const (
 		unsubscribed	int32	= iota
 		subscribed
 	)
-	var connection struct {
+	var source struct {
 		sync.Mutex
 		state		int32
 		subscriber	Subscriber
 	}
-	connectable := func(subscribeOn Scheduler, subscriber Subscriber) {
-		connection.Lock()
-		if atomic.CompareAndSwapInt32(&subjectValue.state, terminated, active) {
-			subjectValue.Store(factory())
+	observer := func(next int, err error, done bool) {
+		if atomic.CompareAndSwapInt32(&subject.state, active, notifying) {
+			if s, ok := subject.Load().(SubjectInt); ok {
+				s.IntObserver(next, err, done)
+			}
+			if !done {
+				atomic.CompareAndSwapInt32(&subject.state, notifying, active)
+			} else {
+				if atomic.CompareAndSwapInt32(&subject.state, notifying, terminated) {
+					source.Lock()
+					source.subscriber.Unsubscribe()
+					source.Unlock()
+				}
+			}
 		}
-		if atomic.CompareAndSwapInt32(&connection.state, unsubscribed, subscribed) {
+	}
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		if s, ok := subject.Load().(SubjectInt); ok {
+			s.ObservableInt(observe, subscribeOn, subscriber)
+		}
+	}
+	connectable := func(subscribeOn Scheduler, subscriber Subscriber) {
+		source.Lock()
+		if atomic.CompareAndSwapInt32(&subject.state, terminated, active) {
+			subject.Store(factory())
+		}
+		if atomic.CompareAndSwapInt32(&source.state, unsubscribed, subscribed) {
+			source.subscriber = subscriber
+			source.Unlock()
 			o(observer, subscribeOn, subscriber)
-			connection.subscriber = subscriber
+			source.Lock()
 			subscriber.OnUnsubscribe(func() {
-				atomic.CompareAndSwapInt32(&connection.state, subscribed, unsubscribed)
-				var zero int
-				observer(zero, ErrDisconnect, true)
+				atomic.CompareAndSwapInt32(&source.state, subscribed, unsubscribed)
 			})
 		} else {
-			connection.subscriber.OnUnsubscribe(subscriber.Unsubscribe)
-			subscriber.OnUnsubscribe(connection.subscriber.Unsubscribe)
+			source.subscriber.OnUnsubscribe(subscriber.Unsubscribe)
+			subscriber.OnUnsubscribe(source.subscriber.Unsubscribe)
 		}
-		connection.Unlock()
+		source.Unlock()
 	}
 	return IntMulticaster{ObservableInt: observable, Connectable: connectable}
 }
@@ -264,29 +258,35 @@ func NewSubjectInt() SubjectInt {
 			}
 		}
 	}
-	observable := Observable(func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		ep, err := ch.NewEndpoint(0)
 		if err != nil {
-			observe(nil, err, true)
+			var zero int
+			observe(zero, err, true)
 			return
 		}
-		observable := Create(func(Next Next, Error Error, Complete Complete, Canceled Canceled) {
+		receiver := subscribeOn.Schedule(func() {
 			receive := func(next interface{}, err error, closed bool) bool {
-				switch {
-				case !closed:
-					Next(next)
-				case err != nil:
-					Error(err)
-				default:
-					Complete()
+				if subscriber.Subscribed() {
+					switch {
+					case !closed:
+						observe(next.(int), nil, false)
+					case err != nil:
+						var zero int
+						observe(zero, err, true)
+					default:
+						var zero int
+						observe(zero, nil, true)
+					}
 				}
-				return !Canceled()
+				return subscriber.Subscribed()
 			}
 			ep.Range(receive, 0)
 		})
-		observable(observe, subscribeOn, subscriber.Add(ep.Cancel))
-	})
-	return SubjectInt{observer, observable.AsObservableInt()}
+		subscriber.OnUnsubscribe(receiver.Cancel)
+		subscriber.OnUnsubscribe(ep.Cancel)
+	}
+	return SubjectInt{observer, observable}
 }
 
 //jig:name ObservableInt_Publish
@@ -302,84 +302,10 @@ func NewSubjectInt() SubjectInt {
 // isn't. To simulate the RxJS 5 behavior use Publish().AutoConnect(1) this will
 // connect on the first subscription but will never re-connect.
 func (o ObservableInt) Publish() IntMulticaster {
-	return o.Multicast(NewSubjectInt)
-}
-
-//jig:name Observer
-
-// Observer is a function that gets called whenever the Observable has
-// something to report. The next argument is the item value that is only
-// valid when the done argument is false. When done is true and the err
-// argument is not nil, then the Observable has terminated with an error.
-// When done is true and the err argument is nil, then the Observable has
-// completed normally.
-type Observer func(next interface{}, err error, done bool)
-
-//jig:name Observable
-
-// Observable is a function taking an Observer, Scheduler and Subscriber.
-// Calling it will subscribe the Observer to events from the Observable.
-type Observable func(Observer, Scheduler, Subscriber)
-
-//jig:name Error
-
-// Error signals an error condition.
-type Error func(error)
-
-//jig:name Complete
-
-// Complete signals that no more data is to be expected.
-type Complete func()
-
-//jig:name Canceled
-
-// Canceled returns true when the observer has unsubscribed.
-type Canceled func() bool
-
-//jig:name Next
-
-// Next can be called to emit the next value to the IntObserver.
-type Next func(interface{})
-
-//jig:name Create
-
-// Create provides a way of creating an Observable from
-// scratch by calling observer methods programmatically.
-//
-// The create function provided to Create will be called once
-// to implement the observable. It is provided with a Next, Error,
-// Complete and Canceled function that can be called by the code that
-// implements the Observable.
-func Create(create func(Next, Error, Complete, Canceled)) Observable {
-	var zero interface{}
-	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
-		runner := scheduler.Schedule(func() {
-			if subscriber.Canceled() {
-				return
-			}
-			n := func(next interface{}) {
-				if subscriber.Subscribed() {
-					observe(next, nil, false)
-				}
-			}
-			e := func(err error) {
-				if subscriber.Subscribed() {
-					observe(zero, err, true)
-				}
-			}
-			c := func() {
-				if subscriber.Subscribed() {
-					observe(zero, nil, true)
-				}
-			}
-			x := func() bool {
-				return subscriber.Canceled()
-			}
-			create(n, e, c, x)
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
+	factory := func() SubjectInt {
+		return NewSubjectInt()
 	}
-	return observable
+	return o.Multicast(factory)
 }
 
 //jig:name ObservableInt_SubscribeOn
@@ -390,37 +316,6 @@ func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
 	observable := func(observe IntObserver, _ Scheduler, subscriber Subscriber) {
 		subscriber.OnWait(subscribeOn.Wait)
 		o(observe, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ErrTypecastToInt
-
-// ErrTypecastToInt is delivered to an observer if the generic value cannot be
-// typecast to int.
-const ErrTypecastToInt = RxError("typecast to int failed")
-
-//jig:name Observable_AsObservableInt
-
-// AsObservableInt turns an Observable of interface{} into an ObservableInt.
-// If during observing a typecast fails, the error ErrTypecastToInt will be
-// emitted.
-func (o Observable) AsObservableInt() ObservableInt {
-	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				if nextInt, ok := next.(int); ok {
-					observe(nextInt, err, done)
-				} else {
-					var zeroInt int
-					observe(zeroInt, ErrTypecastToInt, true)
-				}
-			} else {
-				var zeroInt int
-				observe(zeroInt, err, true)
-			}
-		}
-		o(observer, subscribeOn, subscriber)
 	}
 	return observable
 }
