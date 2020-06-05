@@ -73,6 +73,9 @@ type Subscriber interface {
 	// Done will set the error internally and then cancel the subscription by 
 	// calling the Unsubscribe method. A nil value for error indicates success.
 	Done(err error)
+
+	// Error returns the error set by calling the Done(err) method.
+	Error() error
 }
 
 // New will create and return a new Subscriber.
@@ -167,4 +170,10 @@ func (s *subscriber) Done(err error) {
 	s.err = err
 	s.Unlock()
 	s.Unsubscribe()
+}
+
+func (s * subscriber) Error() error {
+	s.Lock()
+	defer s.Unlock()
+	return s.err
 }
