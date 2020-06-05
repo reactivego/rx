@@ -76,8 +76,8 @@ type Subscriber interface {
 }
 
 // New will create and return a new Subscriber.
-func New() Subscriber {
-	return &subscriber{err: ErrUnsubscribed}
+func New(callbacks ...func()) Subscriber {
+	return &subscriber{callbacks: callbacks, err: ErrUnsubscribed}
 }
 
 const (
@@ -132,7 +132,7 @@ func (s *subscriber) Wait() error {
 }
 
 func (s *subscriber) Add(callbacks ...func()) Subscriber {
-	child := &subscriber{callbacks: callbacks}
+	child := New(callbacks...)
 	s.Lock()
 	if atomic.LoadInt32(&s.state) != subscribed {
 		child.Unsubscribe()
