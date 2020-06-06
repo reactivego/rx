@@ -41,8 +41,9 @@ type ObservableInt func(IntObserver, Scheduler, Subscriber)
 
 //jig:name DeferInt
 
-// DeferInt does not create the ObservableInt until the observer subscribes,
-// and creates a fresh ObservableInt for each observer.
+// DeferInt does not create the ObservableInt until the observer subscribes.
+// It creates a fresh ObservableInt for each subscribing observer. Use it to
+// create observables that maintain separate state per subscription.
 func DeferInt(factory func() ObservableInt) ObservableInt {
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		factory()(observe, scheduler, subscriber)
@@ -115,19 +116,17 @@ type ObservableString func(StringObserver, Scheduler, Subscriber)
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
 // Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableString) Println(a ...interface{}) (err error) {
+func (o ObservableString) Println(a ...interface{}) error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next string, e error, done bool) {
+	observer := func(next string, err error, done bool) {
 		if !done {
 			fmt.Println(append(a, next)...)
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
+	return subscriber.Wait()
 }

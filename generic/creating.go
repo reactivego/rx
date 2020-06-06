@@ -162,8 +162,9 @@ func CreateFutureRecursiveFoo(timeout time.Duration, create func(NextFoo, Error,
 //jig:template Defer<Foo>
 //jig:needs Observable<Foo>
 
-// DeferFoo does not create the ObservableFoo until the observer subscribes,
-// and creates a fresh ObservableFoo for each observer.
+// DeferFoo does not create the ObservableFoo until the observer subscribes.
+// It creates a fresh ObservableFoo for each subscribing observer. Use it to
+// create observables that maintain separate state per subscription.
 func DeferFoo(factory func() ObservableFoo) ObservableFoo {
 	observable := func(observe FooObserver, scheduler Scheduler, subscriber Subscriber) {
 		factory()(observe, scheduler, subscriber)
