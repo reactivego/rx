@@ -2,6 +2,7 @@ package subscriber
 
 import (
 	"sync"
+
 	"sync/atomic"
 )
 
@@ -70,11 +71,12 @@ type Subscriber interface {
 	// OnWait will register a callback to  call when subscription Wait is called.
 	OnWait(callback func())
 
-	// Done will set the error internally and then cancel the subscription by 
+	// Done will set the error internally and then cancel the subscription by
 	// calling the Unsubscribe method. A nil value for error indicates success.
 	Done(err error)
 
-	// Error returns the error set by calling the Done(err) method.
+	// Error returns the error set by calling the Done(err) method. As long as
+	// the subscriber is still subscribed Error will return nil.
 	Error() error
 }
 
@@ -172,8 +174,14 @@ func (s *subscriber) Done(err error) {
 	s.Unsubscribe()
 }
 
-func (s * subscriber) Error() error {
+func (s *subscriber) Error() error {
 	s.Lock()
-	defer s.Unlock()
-	return s.err
+	err := s.err
+	if atomic.LoadInt32(&s.state) == subscribed {
+		err = nil
+	}
+	s.Unlock()
+	return err
 }
+
+//
