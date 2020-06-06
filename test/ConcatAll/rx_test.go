@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
+	_ "github.com/reactivego/rx/generic"
 	. "github.com/reactivego/rx/test"
-	_ "github.com/reactivego/rx"
 )
 
 func Example_concatAll() {
