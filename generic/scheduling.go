@@ -43,7 +43,11 @@ func (o ObservableFoo) ObserveOn(dispatch func(task func())) ObservableFoo {
 // subscribed to.
 func (o ObservableFoo) SubscribeOn(subscribeOn Scheduler) ObservableFoo {
 	observable := func(observe FooObserver, _ Scheduler, subscriber Subscriber) {
-		subscriber.OnWait(subscribeOn.Wait)
+		if subscribeOn.IsConcurrent() {
+			subscriber.OnWait(nil)
+		} else {
+			subscriber.OnWait(subscribeOn.Wait)
+		}
 		o(observe, subscribeOn, subscriber)
 	}
 	return observable
