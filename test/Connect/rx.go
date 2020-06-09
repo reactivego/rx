@@ -18,6 +18,12 @@ import (
 // Scheduler is used to schedule tasks to support subscribing and observing.
 type Scheduler = scheduler.Scheduler
 
+//jig:name GoroutineScheduler
+
+func GoroutineScheduler() Scheduler {
+	return scheduler.Goroutine
+}
+
 //jig:name Subscriber
 
 // Subscriber is an interface that can be passed in when subscribing to an
@@ -66,12 +72,6 @@ func FromInt(slice ...int) ObservableInt {
 	return observable
 }
 
-//jig:name GoroutineScheduler
-
-func GoroutineScheduler() Scheduler {
-	return scheduler.Goroutine
-}
-
 //jig:name Subscription
 
 // Subscription is an alias for the subscriber.Subscription interface type.
@@ -105,13 +105,16 @@ func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber)
 type Connectable func(Scheduler, Subscriber)
 
 // Connect instructs a multicaster to subscribe to its source and begin
-// multicasting items to its subscribers.
-func (c Connectable) Connect(subscribers ...Subscriber) Subscription {
-	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.MakeTrampoline()
-	subscribers[0].OnWait(scheduler.Wait)
-	c(scheduler, subscribers[0])
-	return subscribers[0]
+// multicasting items to its subscribers. Connect accepts an optional
+// scheduler argument.
+func (c Connectable) Connect(schedulers ...Scheduler) Subscription {
+	subscriber := subscriber.New()
+	schedulers = append(schedulers, scheduler.MakeTrampoline())
+	if !schedulers[0].IsConcurrent() {
+		subscriber.OnWait(schedulers[0].Wait)
+	}
+	c(schedulers[0], subscriber)
+	return subscriber
 }
 
 //jig:name IntMulticaster

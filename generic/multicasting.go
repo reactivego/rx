@@ -16,13 +16,16 @@ import (
 type Connectable func(Scheduler, Subscriber)
 
 // Connect instructs a multicaster to subscribe to its source and begin
-// multicasting items to its subscribers.
-func (c Connectable) Connect(subscribers ...Subscriber) Subscription {
-	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.MakeTrampoline()
-	subscribers[0].OnWait(scheduler.Wait)
-	c(scheduler, subscribers[0])
-	return subscribers[0]
+// multicasting items to its subscribers. Connect accepts an optional
+// scheduler argument.
+func (c Connectable) Connect(schedulers ...Scheduler) Subscription {
+	subscriber := subscriber.New()
+	schedulers = append(schedulers, scheduler.MakeTrampoline())
+	if !schedulers[0].IsConcurrent() {
+		subscriber.OnWait(schedulers[0].Wait)
+	}
+	c(schedulers[0], subscriber)
+	return subscriber
 }
 
 //jig:template <Foo>Multicaster
