@@ -307,6 +307,7 @@ func ExampleObservable_SubscribeOn_trampoline() {
 	fmt.Println(trampoline, "WAITING...")
 	subscription.Wait()
 	fmt.Println(trampoline, "DONE")
+	
 	// Output:
 	// Trampoline{ tasks = 0 } SUBSCRIBING...
 	// Trampoline{ tasks = 1 } WAITING...
@@ -337,12 +338,12 @@ func ExampleObservable_SubscribeOn_goroutine() {
 	subscription.Wait()
 	fmt.Println(goroutine, "DONE")
 	// Output:
-	// Goroutine{ goroutines = 0 } SUBSCRIBING...
+	// Goroutine{ tasks = 0 } SUBSCRIBING...
 	// WAITING...
-	// Goroutine{ goroutines = 1 } print 1
-	// Goroutine{ goroutines = 1 } print 2
-	// Goroutine{ goroutines = 1 } print 3
-	// Goroutine{ goroutines = 1 } print complete 
-	// Goroutine{ goroutines = 0 } DONE
+	// Goroutine{ tasks = 1 } print 1
+	// Goroutine{ tasks = 1 } print 2
+	// Goroutine{ tasks = 1 } print 3
+	// Goroutine{ tasks = 1 } print complete 
+	// Goroutine{ tasks = 0 } DONE
 }
 

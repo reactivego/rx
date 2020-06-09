@@ -68,7 +68,7 @@ func Example_goroutine() {
 	fmt.Println(slice)
 	fmt.Println(err)
 	// Output:
-	// Goroutine{ goroutines = 0 }
+	// Goroutine{ tasks = 0 }
 	// [1 2 3 1 2 3 1 2 3]
 	// <nil>
 }
