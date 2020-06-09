@@ -48,3 +48,24 @@ func Example_timeout() {
 	// timeout
 	// elapsed time is be between 250 and 500 ms
 }
+
+func Example_timeoutTwice() {
+	const ms = time.Millisecond
+
+	subscription := 0
+	source := DeferInt(func() ObservableInt {
+		if subscription == 0 {
+			subscription++
+			return NeverInt()
+		}
+		return FromInt(1)
+	})
+
+	fmt.Println(source.Timeout(10 * ms).Println())
+	fmt.Println(source.Timeout(10 * ms).Println())
+
+	// Output:
+	// timeout
+	// 1
+	// <nil>
+}
