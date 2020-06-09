@@ -49,13 +49,14 @@ func (o ObservableFoo) Multicast(factory func() SubjectFoo) FooMulticaster {
 	const (
 		active int32 = iota
 		notifying
-		terminated
+		erred
+		completed
 	)
 	var subject struct {
 		state int32
 		atomic.Value
+		count int32
 	}
-	subject.Store(factory())
 	const (
 		unsubscribed int32 = iota
 		subscribed
@@ -65,37 +66,44 @@ func (o ObservableFoo) Multicast(factory func() SubjectFoo) FooMulticaster {
 		state      int32
 		subscriber Subscriber
 	}
+	subject.Store(factory())
 	observer := func(next foo, err error, done bool) {
 		if atomic.CompareAndSwapInt32(&subject.state, active, notifying) {
 			if s, ok := subject.Load().(SubjectFoo); ok {
 				s.FooObserver(next, err, done)
 			}
-			if !done {
+			switch {
+			case !done:
 				atomic.CompareAndSwapInt32(&subject.state, notifying, active)
-			} else {
-				if atomic.CompareAndSwapInt32(&subject.state, notifying, terminated) {
-					source.Lock()
-					source.subscriber.Unsubscribe()
-					source.Unlock()
+			case err != nil:
+				if atomic.CompareAndSwapInt32(&subject.state, notifying, erred) {
+					source.subscriber.Done(err)
+				}
+			default:
+				if atomic.CompareAndSwapInt32(&subject.state, notifying, completed) {
+					source.subscriber.Done(nil)
 				}
 			}
 		}
 	}
 	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		if atomic.AddInt32(&subject.count, 1) == 1 {
+			if atomic.CompareAndSwapInt32(&subject.state, erred, active) {
+				subject.Store(factory())
+			}
+		}
 		if s, ok := subject.Load().(SubjectFoo); ok {
 			s.ObservableFoo(observe, subscribeOn, subscriber)
 		}
+		subscriber.OnUnsubscribe(func() {
+			atomic.AddInt32(&subject.count, -1)
+		})
 	}
 	connectable := func(subscribeOn Scheduler, subscriber Subscriber) {
 		source.Lock()
-		if atomic.CompareAndSwapInt32(&subject.state, terminated, active) {
-			subject.Store(factory())
-		}
 		if atomic.CompareAndSwapInt32(&source.state, unsubscribed, subscribed) {
 			source.subscriber = subscriber
-			source.Unlock()
 			o(observer, subscribeOn, subscriber)
-			source.Lock()
 			subscriber.OnUnsubscribe(func() {
 				atomic.CompareAndSwapInt32(&source.state, subscribed, unsubscribed)
 			})
@@ -122,7 +130,10 @@ func (o ObservableFoo) Multicast(factory func() SubjectFoo) FooMulticaster {
 // isn't. To simulate the RxJS 5 behavior use Publish().AutoConnect(1) this will
 // connect on the first subscription but will never re-connect.
 func (o ObservableFoo) Publish() FooMulticaster {
-	return o.Multicast(NewSubjectFoo)
+	factory := func() SubjectFoo {
+		return NewSubjectFoo()
+	}
+	return o.Multicast(factory)
 }
 
 //jig:template Observable<Foo> PublishReplay
@@ -158,8 +169,9 @@ const ErrRefCountNeedsConcurrentScheduler = RxError("needs concurrent scheduler"
 // Unsubscribe on the subscription returned by the call to Connect.
 func (o FooMulticaster) RefCount() ObservableFoo {
 	var source struct {
-		refcount     int32
-		subscription Subscription
+		sync.Mutex
+		refcount   int32
+		subscriber Subscriber
 	}
 	observable := func(observe FooObserver, subscribeOn Scheduler, withSubscriber Subscriber) {
 		if !subscribeOn.IsConcurrent() {
@@ -167,17 +179,22 @@ func (o FooMulticaster) RefCount() ObservableFoo {
 			observe(zero, ErrRefCountNeedsConcurrentScheduler, true)
 			return
 		}
-		if atomic.AddInt32(&source.refcount, 1) == 1 {
-			s := subscriber.New()
-			o.Connectable(subscribeOn, s)
-			source.subscription = s
-		}
 		withSubscriber.OnUnsubscribe(func() {
+			source.Lock()
 			if atomic.AddInt32(&source.refcount, -1) == 0 {
-				source.subscription.Unsubscribe()
+				source.subscriber.Unsubscribe()
 			}
+			source.Unlock()
 		})
 		o.ObservableFoo(observe, subscribeOn, withSubscriber)
+		source.Lock()
+		if atomic.AddInt32(&source.refcount, 1) == 1 {
+			source.subscriber = subscriber.New()
+			source.Unlock()
+			o.Connectable(subscribeOn, source.subscriber)
+			source.Lock()
+		}
+		source.Unlock()
 	}
 	return observable
 }
@@ -192,24 +209,54 @@ const ErrAutoConnectNeedsConcurrentScheduler = RxError("needs concurrent schedul
 //jig:needs Observable<Foo>, Throw<Foo>, ErrAutoConnect
 
 // AutoConnect makes a FooMulticaster behave like an ordinary ObservableFoo
-// that automatically connects when the specified number of clients have
-// subscribed to it. AutoConnect values should be larger or equal to 1.
-// AutoConnect will throw an ErrInvalidCount if the count is out of range.
+// that automatically connects the multicaster to its source when the
+// specified number of observers have subscribed to it. If the count is less
+// than 1 it will return a ThrowFoo(ErrAutoConnectInvalidCount). After
+// connecting, when the number of subscribed observers eventually drops to 0,
+// AutoConnect will cancel the source connection if it hasn't terminated yet.
+// When subsequently the next observer subscribes, AutoConnect will connect to
+// the source only when it was previously canceled or because the source
+// terminated with an error. So it will not reconnect when the source
+// completed succesfully. This specific behavior allows for implementing a
+// caching observable that can be retried until it succeeds. Another thing to
+// notice is that AutoConnect will disconnect an active connection when the
+// number of observers drops to zero. The reason for this is that not doing so
+// would leak a task and leave it hanging in the scheduler.
 func (o FooMulticaster) AutoConnect(count int) ObservableFoo {
 	if count < 1 {
 		return ThrowFoo(ErrAutoConnectInvalidCount)
 	}
-	var refcount int32
+	var source struct {
+		sync.Mutex
+		refcount   int32
+		subscriber Subscriber
+	}
 	observable := func(observe FooObserver, subscribeOn Scheduler, withSubscriber Subscriber) {
 		if !subscribeOn.IsConcurrent() {
 			var zero foo
 			observe(zero, ErrAutoConnectNeedsConcurrentScheduler, true)
 			return
 		}
-		if atomic.AddInt32(&refcount, 1) == int32(count) {
-			o.Connectable(subscribeOn, subscriber.New())
-		}
+		withSubscriber.OnUnsubscribe(func() {
+			source.Lock()
+			if atomic.AddInt32(&source.refcount, -1) == 0 {
+				if source.subscriber != nil {
+					source.subscriber.Unsubscribe()
+				}
+			}
+			source.Unlock()
+		})
 		o.ObservableFoo(observe, subscribeOn, withSubscriber)
+		source.Lock()
+		if atomic.AddInt32(&source.refcount, 1) == int32(count) {
+			if source.subscriber == nil || source.subscriber.Error() != nil {
+				source.subscriber = subscriber.New()
+				source.Unlock()
+				o.Connectable(subscribeOn, source.subscriber)
+				source.Lock()
+			}
+		}
+		source.Unlock()
 	}
 	return observable
 }
