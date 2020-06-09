@@ -133,10 +133,7 @@ func (o ObservableFoo) Multicast(factory func() SubjectFoo) FooMulticaster {
 // isn't. To simulate the RxJS 5 behavior use Publish().AutoConnect(1) this will
 // connect on the first subscription but will never re-connect.
 func (o ObservableFoo) Publish() FooMulticaster {
-	factory := func() SubjectFoo {
-		return NewSubjectFoo()
-	}
-	return o.Multicast(factory)
+	return o.Multicast(NewSubjectFoo)
 }
 
 //jig:template Observable<Foo> PublishReplay
@@ -158,13 +155,8 @@ func (o ObservableFoo) PublishReplay(bufferCapacity int, windowDuration time.Dur
 	return o.Multicast(factory)
 }
 
-//jig:template ErrRefCount
-//jig:needs RxError
-
-const ErrRefCountNeedsConcurrentScheduler = RxError("needs concurrent scheduler")
-
 //jig:template <Foo>Multicaster RefCount
-//jig:needs Observable<Foo>, ErrRefCount
+//jig:needs Observable<Foo>
 
 // RefCount makes a FooMulticaster behave like an ordinary ObservableFoo. On
 // first Subscribe it will call Connect on its FooMulticaster and when its last
@@ -177,11 +169,6 @@ func (o FooMulticaster) RefCount() ObservableFoo {
 		subscriber Subscriber
 	}
 	observable := func(observe FooObserver, subscribeOn Scheduler, withSubscriber Subscriber) {
-		if !subscribeOn.IsConcurrent() {
-			var zero foo
-			observe(zero, ErrRefCountNeedsConcurrentScheduler, true)
-			return
-		}
 		withSubscriber.OnUnsubscribe(func() {
 			source.Lock()
 			if atomic.AddInt32(&source.refcount, -1) == 0 {
@@ -206,7 +193,6 @@ func (o FooMulticaster) RefCount() ObservableFoo {
 //jig:needs RxError
 
 const ErrAutoConnectInvalidCount = RxError("invalid count")
-const ErrAutoConnectNeedsConcurrentScheduler = RxError("needs concurrent scheduler")
 
 //jig:template <Foo>Multicaster AutoConnect
 //jig:needs Observable<Foo>, Throw<Foo>, ErrAutoConnect
@@ -235,11 +221,6 @@ func (o FooMulticaster) AutoConnect(count int) ObservableFoo {
 		subscriber Subscriber
 	}
 	observable := func(observe FooObserver, subscribeOn Scheduler, withSubscriber Subscriber) {
-		if !subscribeOn.IsConcurrent() {
-			var zero foo
-			observe(zero, ErrAutoConnectNeedsConcurrentScheduler, true)
-			return
-		}
 		withSubscriber.OnUnsubscribe(func() {
 			source.Lock()
 			if atomic.AddInt32(&source.refcount, -1) == 0 {

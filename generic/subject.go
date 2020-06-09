@@ -6,8 +6,13 @@ import (
 	"github.com/reactivego/multicast"
 )
 
+//jig:template ErrSubject
+//jig:needs RxError
+
+const ErrSubjectNeedsConcurrentScheduler = RxError("subject needs concurrent scheduler")
+
 //jig:template Subject<Foo>
-//jig:embeds <Foo>Observer, Observable<Foo>
+//jig:embeds <Foo>Observer, Observable<Foo>, ErrSubject
 
 // SubjectFoo is a combination of an FooObserver and ObservableFoo.
 // Subjects are special because they are the only reactive constructs that
@@ -72,6 +77,11 @@ func NewSubjectFoo() SubjectFoo {
 		}
 	}
 	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		if !subscribeOn.IsConcurrent() {
+			var zero foo
+			observe(zero, ErrSubjectNeedsConcurrentScheduler, true)
+			return
+		}
 		ep, err := ch.NewEndpoint(0)
 		if err != nil {
 			var zero foo
@@ -130,6 +140,11 @@ func NewReplaySubjectFoo(bufferCapacity int, windowDuration time.Duration) Subje
 		}
 	}
 	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		if !subscribeOn.IsConcurrent() {
+			var zero foo
+			observe(zero, ErrSubjectNeedsConcurrentScheduler, true)
+			return
+		}
 		ep, err := ch.NewEndpoint(multicast.ReplayAll)
 		if err != nil {
 			var zero foo

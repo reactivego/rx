@@ -302,13 +302,16 @@ func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber)
 type Connectable func(Scheduler, Subscriber)
 
 // Connect instructs a multicaster to subscribe to its source and begin
-// multicasting items to its subscribers.
-func (c Connectable) Connect(subscribers ...Subscriber) Subscription {
-	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.MakeTrampoline()
-	subscribers[0].OnWait(scheduler.Wait)
-	c(scheduler, subscribers[0])
-	return subscribers[0]
+// multicasting items to its subscribers. Connect accepts an optional
+// scheduler argument.
+func (c Connectable) Connect(schedulers ...Scheduler) Subscription {
+	subscriber := subscriber.New()
+	schedulers = append(schedulers, scheduler.MakeTrampoline())
+	if !schedulers[0].IsConcurrent() {
+		subscriber.OnWait(schedulers[0].Wait)
+	}
+	c(schedulers[0], subscriber)
+	return subscriber
 }
 
 //jig:name IntMulticaster
@@ -400,6 +403,10 @@ func (o ObservableInt) Multicast(factory func() SubjectInt) IntMulticaster {
 	return IntMulticaster{ObservableInt: observable, Connectable: connectable}
 }
 
+//jig:name ErrSubject
+
+const ErrSubjectNeedsConcurrentScheduler = RxError("subject needs concurrent scheduler")
+
 //jig:name SubjectInt
 
 // SubjectInt is a combination of an IntObserver and ObservableInt.
@@ -468,6 +475,11 @@ func NewReplaySubjectInt(bufferCapacity int, windowDuration time.Duration) Subje
 		}
 	}
 	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		if !subscribeOn.IsConcurrent() {
+			var zero int
+			observe(zero, ErrSubjectNeedsConcurrentScheduler, true)
+			return
+		}
 		ep, err := ch.NewEndpoint(multicast.ReplayAll)
 		if err != nil {
 			var zero int
@@ -539,6 +551,11 @@ func NewSubjectInt() SubjectInt {
 		}
 	}
 	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		if !subscribeOn.IsConcurrent() {
+			var zero int
+			observe(zero, ErrSubjectNeedsConcurrentScheduler, true)
+			return
+		}
 		ep, err := ch.NewEndpoint(0)
 		if err != nil {
 			var zero int
@@ -582,10 +599,7 @@ func NewSubjectInt() SubjectInt {
 // isn't. To simulate the RxJS 5 behavior use Publish().AutoConnect(1) this will
 // connect on the first subscription but will never re-connect.
 func (o ObservableInt) Publish() IntMulticaster {
-	factory := func() SubjectInt {
-		return NewSubjectInt()
-	}
-	return o.Multicast(factory)
+	return o.Multicast(NewSubjectInt)
 }
 
 //jig:name Observable_Serialize
@@ -689,11 +703,22 @@ type Observer func(next interface{}, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type Observable func(Observer, Scheduler, Subscriber)
 
+//jig:name ObservableInt_AsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name ErrAutoConnect
 
 const ErrAutoConnectInvalidCount = RxError("invalid count")
-
-const ErrAutoConnectNeedsConcurrentScheduler = RxError("needs concurrent scheduler")
 
 //jig:name IntMulticaster_AutoConnect
 
@@ -721,11 +746,6 @@ func (o IntMulticaster) AutoConnect(count int) ObservableInt {
 		subscriber	Subscriber
 	}
 	observable := func(observe IntObserver, subscribeOn Scheduler, withSubscriber Subscriber) {
-		if !subscribeOn.IsConcurrent() {
-			var zero int
-			observe(zero, ErrAutoConnectNeedsConcurrentScheduler, true)
-			return
-		}
 		withSubscriber.OnUnsubscribe(func() {
 			source.Lock()
 			if atomic.AddInt32(&source.refcount, -1) == 0 {
@@ -746,19 +766,6 @@ func (o IntMulticaster) AutoConnect(count int) ObservableInt {
 			}
 		}
 		source.Unlock()
-	}
-	return observable
-}
-
-//jig:name ObservableInt_AsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
 	}
 	return observable
 }

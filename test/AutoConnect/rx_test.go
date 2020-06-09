@@ -130,7 +130,7 @@ func TestObservable(e *testing.T) {
 			I(t, "should report error on subscribe", func(t T) {
 				err := Interval(10 * ms).Publish().AutoConnect(1).Wait()
 				Asser(t).Error(err)
-				Asser(t).Equal(err, ErrAutoConnectNeedsConcurrentScheduler)
+				Asser(t).Equal(err, ErrSubjectNeedsConcurrentScheduler)
 			})
 
 		})
