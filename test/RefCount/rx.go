@@ -181,13 +181,14 @@ func (o ObservableInt) Multicast(factory func() SubjectInt) IntMulticaster {
 	const (
 		active	int32	= iota
 		notifying
-		terminated
+		erred
+		completed
 	)
 	var subject struct {
 		state	int32
 		atomic.Value
+		count	int32
 	}
-	subject.Store(factory())
 	const (
 		unsubscribed	int32	= iota
 		subscribed
@@ -197,37 +198,44 @@ func (o ObservableInt) Multicast(factory func() SubjectInt) IntMulticaster {
 		state		int32
 		subscriber	Subscriber
 	}
+	subject.Store(factory())
 	observer := func(next int, err error, done bool) {
 		if atomic.CompareAndSwapInt32(&subject.state, active, notifying) {
 			if s, ok := subject.Load().(SubjectInt); ok {
 				s.IntObserver(next, err, done)
 			}
-			if !done {
+			switch {
+			case !done:
 				atomic.CompareAndSwapInt32(&subject.state, notifying, active)
-			} else {
-				if atomic.CompareAndSwapInt32(&subject.state, notifying, terminated) {
-					source.Lock()
-					source.subscriber.Unsubscribe()
-					source.Unlock()
+			case err != nil:
+				if atomic.CompareAndSwapInt32(&subject.state, notifying, erred) {
+					source.subscriber.Done(err)
+				}
+			default:
+				if atomic.CompareAndSwapInt32(&subject.state, notifying, completed) {
+					source.subscriber.Done(nil)
 				}
 			}
 		}
 	}
 	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		if atomic.AddInt32(&subject.count, 1) == 1 {
+			if atomic.CompareAndSwapInt32(&subject.state, erred, active) {
+				subject.Store(factory())
+			}
+		}
 		if s, ok := subject.Load().(SubjectInt); ok {
 			s.ObservableInt(observe, subscribeOn, subscriber)
 		}
+		subscriber.OnUnsubscribe(func() {
+			atomic.AddInt32(&subject.count, -1)
+		})
 	}
 	connectable := func(subscribeOn Scheduler, subscriber Subscriber) {
 		source.Lock()
-		if atomic.CompareAndSwapInt32(&subject.state, terminated, active) {
-			subject.Store(factory())
-		}
 		if atomic.CompareAndSwapInt32(&source.state, unsubscribed, subscribed) {
 			source.subscriber = subscriber
-			source.Unlock()
 			o(observer, subscribeOn, subscriber)
-			source.Lock()
 			subscriber.OnUnsubscribe(func() {
 				atomic.CompareAndSwapInt32(&source.state, subscribed, unsubscribed)
 			})
@@ -359,7 +367,11 @@ func (o ObservableInt) Publish() IntMulticaster {
 // subscribed to.
 func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
 	observable := func(observe IntObserver, _ Scheduler, subscriber Subscriber) {
-		subscriber.OnWait(subscribeOn.Wait)
+		if subscribeOn.IsConcurrent() {
+			subscriber.OnWait(nil)
+		} else {
+			subscriber.OnWait(subscribeOn.Wait)
+		}
 		o(observe, subscribeOn, subscriber)
 	}
 	return observable
@@ -383,6 +395,7 @@ const ErrRefCountNeedsConcurrentScheduler = RxError("needs concurrent scheduler"
 // Unsubscribe on the subscription returned by the call to Connect.
 func (o IntMulticaster) RefCount() ObservableInt {
 	var source struct {
+		sync.Mutex
 		refcount	int32
 		subscriber	Subscriber
 	}
@@ -392,16 +405,22 @@ func (o IntMulticaster) RefCount() ObservableInt {
 			observe(zero, ErrRefCountNeedsConcurrentScheduler, true)
 			return
 		}
-		if atomic.AddInt32(&source.refcount, 1) == 1 {
-			source.subscriber = subscriber.New()
-			o.Connectable(subscribeOn, source.subscriber)
-		}
 		withSubscriber.OnUnsubscribe(func() {
+			source.Lock()
 			if atomic.AddInt32(&source.refcount, -1) == 0 {
 				source.subscriber.Unsubscribe()
 			}
+			source.Unlock()
 		})
 		o.ObservableInt(observe, subscribeOn, withSubscriber)
+		source.Lock()
+		if atomic.AddInt32(&source.refcount, 1) == 1 {
+			source.subscriber = subscriber.New()
+			source.Unlock()
+			o.Connectable(subscribeOn, source.subscriber)
+			source.Lock()
+		}
+		source.Unlock()
 	}
 	return observable
 }

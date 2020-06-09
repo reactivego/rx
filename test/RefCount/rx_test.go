@@ -12,10 +12,11 @@ import (
 // This example is a variant of the example in the book "Introduction to Rx"
 // about using RefCount.
 func Example_introToRx() {
-	// Subscribe on concurrent scheduler
-	scheduler := GoroutineScheduler()
+	const ms = time.Millisecond
 
-	observable := Interval(50 * time.Millisecond)
+	concurrent := GoroutineScheduler()
+
+	observable := Interval(50 * ms)
 
 	// Print when a value is published.
 	observable = observable.Do(func(next int) { fmt.Printf("published: %d\n", next) })
@@ -23,7 +24,7 @@ func Example_introToRx() {
 	observable = observable.Publish().RefCount()
 
 	// Make all subscriptions to observable concurrent
-	observable = observable.SubscribeOn(scheduler)
+	observable = observable.SubscribeOn(concurrent)
 
 	fmt.Println(">> Subscribing")
 	subscription := observable.Subscribe(func(next int, err error, done bool) {
@@ -34,11 +35,14 @@ func Example_introToRx() {
 
 	// The observable is hot for the next 100 milliseconds. It then will go
 	// cold, unless another observer subscribes in that period.
-	time.Sleep(175 * time.Millisecond)
+	time.Sleep(175 * ms)
 
 	fmt.Println(">> Unsubscribing")
 	subscription.Unsubscribe()
 	fmt.Println(">> Finished")
+
+	// Wait for all scheduled tasks to terminate.
+	concurrent.Wait()
 	// Output:
 	// >> Subscribing
 	// published: 0
@@ -55,11 +59,11 @@ func Example_introToRx() {
 // Connectable who's Connect is controlled by a RefCount operator.
 func Example_refCountMultipleSubscriptions() {
 	// Subscribe on concurrent scheduler
-	scheduler := GoroutineScheduler()
+	concurrent := GoroutineScheduler()
 
 	var wg sync.WaitGroup
 	channel := make(chan int, 30)
-	source := FromChanInt(channel).Publish().RefCount().SubscribeOn(scheduler)
+	source := FromChanInt(channel).Publish().RefCount().SubscribeOn(concurrent)
 
 	sub1 := source.Subscribe(func(n int, err error, done bool) {
 		if !done {
