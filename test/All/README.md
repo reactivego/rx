@@ -16,6 +16,7 @@ true according to the predicate; false if any item emitted by the source
 Observable evaluates as false according to the predicate.
 
 ![All](../../svg/All.svg)
+
 ## Example
 ```go
 import _ "github.com/reactivego/rx"
