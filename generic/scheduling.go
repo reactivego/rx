@@ -41,14 +41,14 @@ func (o ObservableFoo) ObserveOn(dispatch func(task func())) ObservableFoo {
 
 // SubscribeOn specifies the scheduler an ObservableFoo should use when it is
 // subscribed to.
-func (o ObservableFoo) SubscribeOn(subscribeOn Scheduler) ObservableFoo {
+func (o ObservableFoo) SubscribeOn(scheduler Scheduler) ObservableFoo {
 	observable := func(observe FooObserver, _ Scheduler, subscriber Subscriber) {
-		if subscribeOn.IsConcurrent() {
+		if scheduler.IsConcurrent() {
 			subscriber.OnWait(nil)
 		} else {
-			subscriber.OnWait(subscribeOn.Wait)
+			subscriber.OnWait(scheduler.Wait)
 		}
-		o(observe, subscribeOn, subscriber)
+		o(observe, scheduler, subscriber)
 	}
 	return observable
 }
