@@ -1,4 +1,4 @@
-// go test -run=XXX -bench=1xN -cpu=1,2,3,4,5,6,7,8 -timeout=1h -count=10
+// go test -run=XXX -bench=rx -cpu=1,2,3,4,5,6,7,8 -timeout=1h -count=10
 package ObserverObservable
 
 import (

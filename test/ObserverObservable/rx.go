@@ -168,13 +168,13 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 						slowest = cursor
 					}
 				}
-				if atomic.LoadUint64(&buf.begin) < slowest && slowest <= atomic.LoadUint64(&buf.end) {
-					atomic.StoreUint64(&buf.begin, slowest)
-					atomic.StoreUint64(&buf.end, slowest+buf.mod+1)
-				} else {
-					slowest = parked
-				}
 			})
+			if atomic.LoadUint64(&buf.begin) < slowest && slowest <= atomic.LoadUint64(&buf.end) {
+				atomic.StoreUint64(&buf.begin, slowest)
+				atomic.StoreUint64(&buf.end, slowest+buf.mod+1)
+			} else {
+				slowest = parked
+			}
 			if slowest == parked {
 
 				if !spun {

@@ -134,13 +134,13 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 						slowest = cursor
 					}
 				}
-				if atomic.LoadUint64(&buf.begin) < slowest && slowest <= atomic.LoadUint64(&buf.end) {
-					atomic.StoreUint64(&buf.begin, slowest)
-					atomic.StoreUint64(&buf.end, slowest+buf.mod+1)
-				} else {
-					slowest = parked
-				}
 			})
+			if atomic.LoadUint64(&buf.begin) < slowest && slowest <= atomic.LoadUint64(&buf.end) {
+				atomic.StoreUint64(&buf.begin, slowest)
+				atomic.StoreUint64(&buf.end, slowest+buf.mod+1)
+			} else {
+				slowest = parked
+			}
 			if slowest == parked {
 				// no subscriptions present...
 				if !spun {
@@ -345,7 +345,7 @@ func (o FooObserver) Complete() {
 // subsequent subscriptions to the observable side will be terminated
 // immediately with either an Error or Complete notification send to the
 // subscribing client
-// 
+//
 // Note that this implementation is blocking. When there are subscribers, the
 // observable goroutine is blocked until all subscribers have processed the
 // next, error or complete notification.
@@ -374,5 +374,3 @@ func NewReplaySubjectFoo(bufferCapacity int, windowDuration time.Duration) Subje
 	observer, observable := MakeObserverObservable(windowDuration, bufferCapacity)
 	return SubjectFoo{observer.AsFooObserver(), observable.AsObservableFoo()}
 }
-
-//
