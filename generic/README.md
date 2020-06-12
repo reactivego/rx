@@ -72,8 +72,7 @@ Go to the command-line now and run the [jig](https://github.com/reactivego/jig) 
 Use the verbose flag `-v` to see what [jig](https://github.com/reactivego/jig) is doing:
 ```bash
 $ jig -v
-found 133 templates in package "rx" (github.com/reactivego/rx/generic)
-found 16 templates in package "multicast" (github.com/reactivego/multicast/generic)
+found 149 templates in package "rx" (github.com/reactivego/rx/generic)
 generating "FromString"
   Scheduler
   Subscriber

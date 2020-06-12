@@ -6,11 +6,12 @@ package rx
 
 import (
 	"fmt"
+	"math"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/reactivego/multicast"
 	"github.com/reactivego/scheduler"
 	"github.com/reactivego/subscriber"
 )
@@ -266,8 +267,9 @@ func CreateFutureRecursive(timeout time.Duration, create func(Next, Error, Compl
 
 //jig:name Defer
 
-// Defer does not create the Observable until the observer subscribes,
-// and creates a fresh Observable for each observer.
+// Defer does not create the Observable until the observer subscribes.
+// It creates a fresh Observable for each subscribing observer. Use it to
+// create observables that maintain separate state per subscription.
 func Defer(factory func() Observable) Observable {
 	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		factory()(observe, scheduler, subscriber)
@@ -712,13 +714,16 @@ type Subscription = subscriber.Subscription
 type Connectable func(Scheduler, Subscriber)
 
 // Connect instructs a multicaster to subscribe to its source and begin
-// multicasting items to its subscribers.
-func (c Connectable) Connect(subscribers ...Subscriber) Subscription {
-	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.MakeTrampoline()
-	subscribers[0].OnWait(scheduler.Wait)
-	c(scheduler, subscribers[0])
-	return subscribers[0]
+// multicasting items to its subscribers. Connect accepts an optional
+// scheduler argument.
+func (c Connectable) Connect(schedulers ...Scheduler) Subscription {
+	subscriber := subscriber.New()
+	schedulers = append(schedulers, scheduler.MakeTrampoline())
+	if !schedulers[0].IsConcurrent() {
+		subscriber.OnWait(schedulers[0].Wait)
+	}
+	c(schedulers[0], subscriber)
+	return subscriber
 }
 
 //jig:name Multicaster
@@ -2123,6 +2128,12 @@ func (o Observable) Serialize() Observable {
 	return observable
 }
 
+//jig:name ErrSingle
+
+const ErrSingleNoValue = RxError("expected one value, got none")
+
+const ErrSingleMultiValue = RxError("expected one value, got multiple")
+
 //jig:name Observable_Single
 
 // Single enforces that the observable sends exactly one data item and then
@@ -2144,7 +2155,7 @@ func (o Observable) Single() Observable {
 							observe(latest, nil, false)
 							observe(nil, nil, true)
 						} else {
-							observe(nil, RxError("expected one value, got none"), true)
+							observe(nil, ErrSingleNoValue, true)
 						}
 					}
 				} else {
@@ -2152,7 +2163,7 @@ func (o Observable) Single() Observable {
 					if count == 1 {
 						latest = next
 					} else {
-						observe(nil, RxError("expected one value, got multiple"), true)
+						observe(nil, ErrSingleMultiValue, true)
 					}
 				}
 			}
@@ -2209,10 +2220,14 @@ func (o Observable) SkipLast(n int) Observable {
 
 // SubscribeOn specifies the scheduler an Observable should use when it is
 // subscribed to.
-func (o Observable) SubscribeOn(subscribeOn Scheduler) Observable {
+func (o Observable) SubscribeOn(scheduler Scheduler) Observable {
 	observable := func(observe Observer, _ Scheduler, subscriber Subscriber) {
-		subscriber.OnWait(subscribeOn.Wait)
-		o(observe, subscribeOn, subscriber)
+		if scheduler.IsConcurrent() {
+			subscriber.OnWait(nil)
+		} else {
+			subscriber.OnWait(scheduler.Wait)
+		}
+		o(observe, scheduler, subscriber)
 	}
 	return observable
 }
@@ -2971,41 +2986,55 @@ func (o ObservableInt) Wait() error {
 
 const ErrAutoConnectInvalidCount = RxError("invalid count")
 
-const ErrAutoConnectNeedsConcurrentScheduler = RxError("needs concurrent scheduler")
-
 //jig:name Multicaster_AutoConnect
 
 // AutoConnect makes a Multicaster behave like an ordinary Observable
-// that automatically connects the multicaster to its source when the specified
-// number of clients have subscribed to it. If the count is less than 1 it will
-// return a Throw(ErrInvalidCount). After connecting, when the number of
-// subscribed clients drops to 0, AutoConnect will cancel the source connection
-// when it is still emitting values and has not terminated. Subsequently, when
-// the next client subscribes, AutoConnect will connect to the source only when
-// it did not complete successfully. So, only in case the connection to the source
-// was still active, terminated with an error or canceled.
+// that automatically connects the multicaster to its source when the
+// specified number of observers have subscribed to it. If the count is less
+// than 1 it will return a Throw(ErrAutoConnectInvalidCount). After
+// connecting, when the number of subscribed observers eventually drops to 0,
+// AutoConnect will cancel the source connection if it hasn't terminated yet.
+// When subsequently the next observer subscribes, AutoConnect will connect to
+// the source only when it was previously canceled or because the source
+// terminated with an error. So it will not reconnect when the source
+// completed succesfully. This specific behavior allows for implementing a
+// caching observable that can be retried until it succeeds. Another thing to
+// notice is that AutoConnect will disconnect an active connection when the
+// number of observers drops to zero. The reason for this is that not doing so
+// would leak a task and leave it hanging in the scheduler.
 func (o Multicaster) AutoConnect(count int) Observable {
 	if count < 1 {
 		return Throw(ErrAutoConnectInvalidCount)
 	}
-	var refcount int32
+	var source struct {
+		sync.Mutex
+		refcount	int32
+		subscriber	Subscriber
+	}
 	observable := func(observe Observer, subscribeOn Scheduler, withSubscriber Subscriber) {
-		if !subscribeOn.IsConcurrent() {
-			var zero interface{}
-			observe(zero, ErrAutoConnectNeedsConcurrentScheduler, true)
-			return
-		}
-		if atomic.AddInt32(&refcount, 1) == int32(count) {
-			o.Connectable(subscribeOn, subscriber.New())
-		}
+		withSubscriber.OnUnsubscribe(func() {
+			source.Lock()
+			if atomic.AddInt32(&source.refcount, -1) == 0 {
+				if source.subscriber != nil {
+					source.subscriber.Unsubscribe()
+				}
+			}
+			source.Unlock()
+		})
 		o.Observable(observe, subscribeOn, withSubscriber)
+		source.Lock()
+		if atomic.AddInt32(&source.refcount, 1) == int32(count) {
+			if source.subscriber == nil || source.subscriber.Error() != nil {
+				source.subscriber = subscriber.New()
+				source.Unlock()
+				o.Connectable(subscribeOn, source.subscriber)
+				source.Lock()
+			}
+		}
+		source.Unlock()
 	}
 	return observable
 }
-
-//jig:name ErrRefCount
-
-const ErrRefCountNeedsConcurrentScheduler = RxError("needs concurrent scheduler")
 
 //jig:name Multicaster_RefCount
 
@@ -3015,26 +3044,27 @@ const ErrRefCountNeedsConcurrentScheduler = RxError("needs concurrent scheduler"
 // Unsubscribe on the subscription returned by the call to Connect.
 func (o Multicaster) RefCount() Observable {
 	var source struct {
+		sync.Mutex
 		refcount	int32
-		subscription	Subscription
+		subscriber	Subscriber
 	}
 	observable := func(observe Observer, subscribeOn Scheduler, withSubscriber Subscriber) {
-		if !subscribeOn.IsConcurrent() {
-			var zero interface{}
-			observe(zero, ErrRefCountNeedsConcurrentScheduler, true)
-			return
-		}
-		if atomic.AddInt32(&source.refcount, 1) == 1 {
-			s := subscriber.New()
-			o.Connectable(subscribeOn, s)
-			source.subscription = s
-		}
 		withSubscriber.OnUnsubscribe(func() {
+			source.Lock()
 			if atomic.AddInt32(&source.refcount, -1) == 0 {
-				source.subscription.Unsubscribe()
+				source.subscriber.Unsubscribe()
 			}
+			source.Unlock()
 		})
 		o.Observable(observe, subscribeOn, withSubscriber)
+		source.Lock()
+		if atomic.AddInt32(&source.refcount, 1) == 1 {
+			source.subscriber = subscriber.New()
+			source.Unlock()
+			o.Connectable(subscribeOn, source.subscriber)
+			source.Lock()
+		}
+		source.Unlock()
 	}
 	return observable
 }
@@ -3050,13 +3080,14 @@ func (o Observable) Multicast(factory func() Subject) Multicaster {
 	const (
 		active	int32	= iota
 		notifying
-		terminated
+		erred
+		completed
 	)
 	var subject struct {
 		state	int32
 		atomic.Value
+		count	int32
 	}
-	subject.Store(factory())
 	const (
 		unsubscribed	int32	= iota
 		subscribed
@@ -3066,37 +3097,44 @@ func (o Observable) Multicast(factory func() Subject) Multicaster {
 		state		int32
 		subscriber	Subscriber
 	}
+	subject.Store(factory())
 	observer := func(next interface{}, err error, done bool) {
 		if atomic.CompareAndSwapInt32(&subject.state, active, notifying) {
 			if s, ok := subject.Load().(Subject); ok {
 				s.Observer(next, err, done)
 			}
-			if !done {
+			switch {
+			case !done:
 				atomic.CompareAndSwapInt32(&subject.state, notifying, active)
-			} else {
-				if atomic.CompareAndSwapInt32(&subject.state, notifying, terminated) {
-					source.Lock()
-					source.subscriber.Unsubscribe()
-					source.Unlock()
+			case err != nil:
+				if atomic.CompareAndSwapInt32(&subject.state, notifying, erred) {
+					source.subscriber.Done(err)
+				}
+			default:
+				if atomic.CompareAndSwapInt32(&subject.state, notifying, completed) {
+					source.subscriber.Done(nil)
 				}
 			}
 		}
 	}
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		if atomic.AddInt32(&subject.count, 1) == 1 {
+			if atomic.CompareAndSwapInt32(&subject.state, erred, active) {
+				subject.Store(factory())
+			}
+		}
 		if s, ok := subject.Load().(Subject); ok {
 			s.Observable(observe, subscribeOn, subscriber)
 		}
+		subscriber.OnUnsubscribe(func() {
+			atomic.AddInt32(&subject.count, -1)
+		})
 	}
 	connectable := func(subscribeOn Scheduler, subscriber Subscriber) {
 		source.Lock()
-		if atomic.CompareAndSwapInt32(&subject.state, terminated, active) {
-			subject.Store(factory())
-		}
 		if atomic.CompareAndSwapInt32(&source.state, unsubscribed, subscribed) {
 			source.subscriber = subscriber
-			source.Unlock()
 			o(observer, subscribeOn, subscriber)
-			source.Lock()
 			subscriber.OnUnsubscribe(func() {
 				atomic.CompareAndSwapInt32(&source.state, subscribed, unsubscribed)
 			})
@@ -3107,6 +3145,287 @@ func (o Observable) Multicast(factory func() Subject) Multicaster {
 		source.Unlock()
 	}
 	return Multicaster{Observable: observable, Connectable: connectable}
+}
+
+//jig:name NewBuffer
+
+const ErrOutOfEndpoints = RxError("out of endpoints")
+
+// NewBuffer creates a buffer to be used as the core of any Subject
+// implementation. It returns both an Observer as well as an Observable. Items
+// are placed in the buffer through the returned Observer. The buffer then
+// multicasts the item to every subscriber of the returned Observable.
+//
+//	age     age below which items are kept to replay to a new subscriber.
+//	length  length of the item buffer, number of items kept to replay to a new subscriber.
+//	[cap]   Capacity of the item buffer, number of items that can be observed before blocking.
+//	[ecap]  Capacity of the endpoints slice.
+func NewBuffer(age time.Duration, length int, capacity ...int) (Observer, Observable) {
+	const (
+		ms	= time.Millisecond
+		us	= time.Microsecond
+	)
+
+	// Access to endpoints
+	const (
+		idle	uint32	= iota
+		busy
+	)
+
+	// State of endpoint and Chan
+	const (
+		active	uint64	= iota
+		canceled
+		closing
+		closed
+	)
+
+	const (
+		// Cursor is parked so it does not influence advancing the commit index.
+		parked uint64 = math.MaxUint64
+	)
+
+	type endpoint struct {
+		Cursor		uint64
+		State		uint64		// active, canceled, closed
+		LastActive	time.Time	// track activity to deterime backoff
+	}
+
+	type endpoints struct {
+		sync.Mutex
+		*sync.Cond
+		entries	[]endpoint
+		access	uint32	// idle, busy
+	}
+
+	type item struct {
+		Value	interface{}
+		At	time.Time
+	}
+
+	type buffer struct {
+		age	time.Duration
+		len	uint64
+		cap	uint64
+
+		mod	uint64
+		items	[]item
+		begin	uint64
+		end	uint64
+		commit	uint64
+		state	uint64	// active, closed
+
+		endpoints	endpoints
+
+		err	error
+	}
+
+	make := func(age time.Duration, length int, capacity ...int) *buffer {
+		cap, ecap := uint64(length), uint64(32)
+		switch {
+		case len(capacity) >= 2:
+			cap, ecap = uint64(capacity[0]), uint64(capacity[1])
+		case len(capacity) == 1:
+			cap = uint64(capacity[0])
+		}
+		len := uint64(length)
+		if cap < len {
+			cap = len
+		}
+		cap = uint64(1) << uint(math.Ceil(math.Log2(float64(cap))))
+		ch := &buffer{
+			len:	len,
+			cap:	cap,
+			age:	age,
+			items:	make([]item, cap),
+			mod:	cap - 1,
+			end:	cap,
+			endpoints: endpoints{
+				entries: make([]endpoint, 0, ecap),
+			},
+		}
+		ch.endpoints.Cond = sync.NewCond(&ch.endpoints.Mutex)
+		return ch
+	}
+	ch := make(age, length, capacity...)
+
+	accessEndpoints := func(access func([]endpoint)) bool {
+		spun := false
+		for !atomic.CompareAndSwapUint32(&ch.endpoints.access, idle, busy) {
+			runtime.Gosched()
+			spun = true
+		}
+		access(ch.endpoints.entries)
+		atomic.StoreUint32(&ch.endpoints.access, idle)
+		return spun
+	}
+
+	send := func(value interface{}) {
+		for ch.commit == ch.end {
+			slowest := parked
+			spun := accessEndpoints(func(endpoints []endpoint) {
+				for i := range endpoints {
+					cursor := atomic.LoadUint64(&endpoints[i].Cursor)
+					if cursor < slowest {
+						slowest = cursor
+					}
+				}
+				if atomic.LoadUint64(&ch.begin) < slowest && slowest <= atomic.LoadUint64(&ch.end) {
+					atomic.StoreUint64(&ch.begin, slowest)
+					atomic.StoreUint64(&ch.end, slowest+ch.mod+1)
+				} else {
+					slowest = parked
+				}
+			})
+			if slowest == parked {
+
+				if !spun {
+
+					runtime.Gosched()
+				}
+				if atomic.LoadUint64(&ch.state) != active {
+					return
+				}
+			}
+		}
+		ch.items[ch.commit&ch.mod] = item{Value: value, At: time.Now()}
+		atomic.AddUint64(&ch.commit, 1)
+		ch.endpoints.Broadcast()
+	}
+
+	close := func(err error) {
+		if atomic.CompareAndSwapUint64(&ch.state, active, closing) {
+			ch.err = err
+			if atomic.CompareAndSwapUint64(&ch.state, closing, closed) {
+				accessEndpoints(func(endpoints []endpoint) {
+					for i := range endpoints {
+						atomic.CompareAndSwapUint64(&endpoints[i].State, active, closed)
+					}
+				})
+			}
+		}
+		ch.endpoints.Broadcast()
+	}
+
+	observer := func(next interface{}, err error, done bool) {
+		if atomic.LoadUint64(&ch.state) == active {
+			if !done {
+				send(next)
+			} else {
+				close(err)
+			}
+		}
+	}
+
+	appendEndpoint := func(cursor uint64) (ep *endpoint, err error) {
+		accessEndpoints(func([]endpoint) {
+			e := &ch.endpoints
+			if len(e.entries) < cap(e.entries) {
+				e.entries = append(e.entries, endpoint{Cursor: cursor})
+				ep = &e.entries[len(e.entries)-1]
+				return
+			}
+			for i := range e.entries {
+				ep = &e.entries[i]
+				if atomic.CompareAndSwapUint64(&ep.Cursor, parked, cursor) {
+					return
+				}
+			}
+			err = ErrOutOfEndpoints
+			return
+		})
+		return
+	}
+
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		cursor := atomic.LoadUint64(&ch.begin)
+		ep, err := appendEndpoint(cursor)
+		if err != nil {
+			runner := subscribeOn.Schedule(func() {
+				if subscriber.Subscribed() {
+					observe(nil, err, true)
+				}
+			})
+			subscriber.OnUnsubscribe(runner.Cancel)
+			return
+		}
+		commit := atomic.LoadUint64(&ch.commit)
+		begin := atomic.LoadUint64(&ch.begin)
+		if begin+ch.len < commit {
+			atomic.StoreUint64(&ep.Cursor, commit-ch.len)
+		}
+		atomic.StoreUint64(&ep.State, atomic.LoadUint64(&ch.state))
+		ep.LastActive = time.Now()
+
+		receiver := subscribeOn.ScheduleFutureRecursive(0, func(self func(time.Duration)) {
+			commit := atomic.LoadUint64(&ch.commit)
+
+			if ep.Cursor == commit {
+				if atomic.CompareAndSwapUint64(&ep.State, canceled, canceled) {
+
+					atomic.StoreUint64(&ep.Cursor, parked)
+					return
+				} else {
+
+					now := time.Now()
+					if now.Before(ep.LastActive.Add(1 * ms)) {
+
+						self(50 * us)
+						return
+					} else if now.Before(ep.LastActive.Add(250 * ms)) {
+						if atomic.CompareAndSwapUint64(&ep.State, closed, closed) {
+
+							observe(nil, ch.err, true)
+							atomic.StoreUint64(&ep.Cursor, parked)
+							return
+						}
+
+						self(500 * us)
+						return
+					} else {
+						if subscribeOn.IsConcurrent() {
+
+							ch.endpoints.Lock()
+							ch.endpoints.Wait()
+							ch.endpoints.Unlock()
+							ep.LastActive = time.Now()
+							self(0)
+							return
+						} else {
+
+							self(5 * ms)
+							return
+						}
+					}
+				}
+			}
+
+			if atomic.LoadUint64(&ep.State) == canceled {
+				atomic.StoreUint64(&ep.Cursor, parked)
+				return
+			}
+			for ; ep.Cursor != commit; atomic.AddUint64(&ep.Cursor, 1) {
+				item := &ch.items[ep.Cursor&ch.mod]
+				if ch.age == 0 || item.At.IsZero() || time.Since(item.At) < ch.age {
+					observe(item.Value, nil, false)
+				}
+				if atomic.LoadUint64(&ep.State) == canceled {
+					atomic.StoreUint64(&ep.Cursor, parked)
+					return
+				}
+			}
+
+			ep.LastActive = time.Now()
+			self(0)
+		})
+		subscriber.OnUnsubscribe(receiver.Cancel)
+
+		subscriber.OnUnsubscribe(func() {
+			atomic.CompareAndSwapUint64(&ep.State, active, canceled)
+			ch.endpoints.Broadcast()
+		})
+	}
+	return observer, observable
 }
 
 //jig:name Subject
@@ -3133,74 +3452,47 @@ type Subject struct {
 
 // Next is called by an Observable to emit the next interface{} value to the
 // Observer.
-func (f Observer) Next(next interface{}) {
-	f(next, nil, false)
+func (o Observer) Next(next interface{}) {
+	o(next, nil, false)
 }
 
 // Error is called by an Observable to report an error to the Observer.
-func (f Observer) Error(err error) {
+func (o Observer) Error(err error) {
 	var zero interface{}
-	f(zero, err, true)
+	o(zero, err, true)
 }
 
 // Complete is called by an Observable to signal that no more data is
 // forthcoming to the Observer.
-func (f Observer) Complete() {
+func (o Observer) Complete() {
 	var zero interface{}
-	f(zero, nil, true)
+	o(zero, nil, true)
+}
+
+//jig:name Observer_AsObserver
+
+// AsObserver converts an observer of interface{} items to an observer of
+// interface{} items.
+func (o Observer) AsObserver() Observer {
+	observer := func(next interface{}, err error, done bool) {
+		o(next, err, done)
+	}
+	return observer
 }
 
 //jig:name NewSubject
 
-// NewSubject creates a new Subject. After the subject is
-// terminated, all subsequent subscriptions to the observable side will be
-// terminated immediately with either an Error or Complete notification send to
-// the subscribing client
+// NewSubject creates a new Subject. After the subject is terminated, all
+// subsequent subscriptions to the observable side will be terminated
+// immediately with either an Error or Complete notification send to the
+// subscribing client
 //
-// Note that this implementation is blocking. When no subcribers are present
-// then the data can flow freely. But when there are subscribers, the observable
-// goroutine is blocked until all subscribers have processed the next, error or
-// complete notification.
+// Note that this implementation is blocking. When there are subscribers, the
+// observable goroutine is blocked until all subscribers have processed the
+// next, error or complete notification.
 func NewSubject() Subject {
-	ch := multicast.NewChan(1, 16)
-	observer := func(next interface{}, err error, done bool) {
-		if !ch.Closed() {
-			if !done {
-				ch.FastSend(next)
-			} else {
-				ch.Close(err)
-			}
-		}
-	}
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		ep, err := ch.NewEndpoint(0)
-		if err != nil {
-			var zero interface{}
-			observe(zero, err, true)
-			return
-		}
-		receiver := subscribeOn.Schedule(func() {
-			receive := func(next interface{}, err error, closed bool) bool {
-				if subscriber.Subscribed() {
-					switch {
-					case !closed:
-						observe(next.(interface{}), nil, false)
-					case err != nil:
-						var zero interface{}
-						observe(zero, err, true)
-					default:
-						var zero interface{}
-						observe(zero, nil, true)
-					}
-				}
-				return subscriber.Subscribed()
-			}
-			ep.Range(receive, 0)
-		})
-		subscriber.OnUnsubscribe(receiver.Cancel)
-		subscriber.OnUnsubscribe(ep.Cancel)
-	}
-	return Subject{observer, observable}
+	observer, observable := NewBuffer(0, 0, 1, 16)
+	return Subject{observer.AsObserver(), observable.AsObservable()}
 }
 
 //jig:name Observable_Publish
@@ -3216,10 +3508,7 @@ func NewSubject() Subject {
 // isn't. To simulate the RxJS 5 behavior use Publish().AutoConnect(1) this will
 // connect on the first subscription but will never re-connect.
 func (o Observable) Publish() Multicaster {
-	factory := func() Subject {
-		return NewSubject()
-	}
-	return o.Multicast(factory)
+	return o.Multicast(NewSubject)
 }
 
 //jig:name MaxReplayCapacity
@@ -3238,45 +3527,8 @@ func NewReplaySubject(bufferCapacity int, windowDuration time.Duration) Subject 
 	if bufferCapacity == 0 {
 		bufferCapacity = MaxReplayCapacity
 	}
-	ch := multicast.NewChan(bufferCapacity, 16)
-	observer := func(next interface{}, err error, done bool) {
-		if !ch.Closed() {
-			if !done {
-				ch.Send(next)
-			} else {
-				ch.Close(err)
-			}
-		}
-	}
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		ep, err := ch.NewEndpoint(multicast.ReplayAll)
-		if err != nil {
-			var zero interface{}
-			observe(zero, err, true)
-			return
-		}
-		receiver := subscribeOn.Schedule(func() {
-			receive := func(next interface{}, err error, closed bool) bool {
-				if subscriber.Subscribed() {
-					switch {
-					case !closed:
-						observe(next.(interface{}), nil, false)
-					case err != nil:
-						var zero interface{}
-						observe(zero, err, true)
-					default:
-						var zero interface{}
-						observe(zero, nil, true)
-					}
-				}
-				return subscriber.Subscribed()
-			}
-			ep.Range(receive, windowDuration)
-		})
-		subscriber.OnUnsubscribe(receiver.Cancel)
-		subscriber.OnUnsubscribe(ep.Cancel)
-	}
-	return Subject{observer, observable}
+	observer, observable := NewBuffer(windowDuration, bufferCapacity)
+	return Subject{observer.AsObserver(), observable.AsObservable()}
 }
 
 //jig:name Observable_PublishReplay
@@ -3363,4 +3615,12 @@ func (o ObservableBool) Single() ObservableBool {
 // than 1 item before completing  this reported as an error to the observer.
 func (o ObservableInt) Single() ObservableInt {
 	return o.AsObservable().Single().AsObservableInt()
+}
+
+//jig:name Observable_AsObservable
+
+// AsObservable returns the source Observable unchanged.
+// This is a special case needed for internal plumbing.
+func (o Observable) AsObservable() Observable {
+	return o
 }

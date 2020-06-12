@@ -127,10 +127,14 @@ func TestObservable(e *testing.T) {
 	})
 	Describ(e, "AutoConnect(1)", func(t T) {
 		Contex(t, "trampoline scheduler", func(t T) {
-			I(t, "should report error on subscribe", func(t T) {
-				err := Interval(10 * ms).Publish().AutoConnect(1).Wait()
-				Asser(t).Error(err)
-				Asser(t).Equal(err, ErrSubjectNeedsConcurrentScheduler)
+			I(t, "makes a multicaster behave like an observable", func(t T) {
+				// AutoConnect makes a FooMulticaster behave like an ordinary
+				// ObservableFoo that automatically connects the multicaster to its
+				// source when the specified number of observers have subscribed to it.
+				value, err := FromInt(42).Publish().AutoConnect(1).ToSingle()
+
+				Asser(t).NoError(err)
+				Asser(t).Equal(value, 42, "= value")
 			})
 
 		})
