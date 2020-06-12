@@ -1,5 +1,17 @@
 package rx
 
+//jig:template Observer As<Foo>Observer
+//jig:needs <Foo>Observer
+
+// AsFooObserver converts an observer of interface{} items to an observer of
+// foo items.
+func (o Observer) AsFooObserver() FooObserver {
+	observer := func(next foo, err error, done bool) {
+		o(next, err, done)
+	}
+	return observer
+}
+
 //jig:template Observable<Foo> AsObservable<Bar>
 //jig:needs Observable<Bar>
 //jig:required-vars Foo
