@@ -4,9 +4,10 @@ special because they are the only reactive constructs that support
 multicasting. The items sent to it through its observer side are
 multicasted to multiple clients subscribed to its observable side.
 
-A Subject embeds Observable and ObserveFunc. This exposes the methods and
-fields of both types on Subject. Use the Observable methods to subscribe to it.
-Use the ObserveFunc Next, Error and Complete methods to feed data to it.
+A Subject embeds both an Observer and an Observable. This exposes the methods
+and fields of both types on Subject. Use the Observable methods to subscribe
+to it. Use the ObserveFunc Next, Error and Complete methods to feed data to
+it.
 
 After a subject has been terminated by calling either Error or Complete, it
 goes into terminated state. All subsequent calls to its observer side will be

@@ -3147,32 +3147,34 @@ func (o Observable) Multicast(factory func() Subject) Multicaster {
 	return Multicaster{Observable: observable, Connectable: connectable}
 }
 
-//jig:name NewBuffer
+//jig:name MakeObserverObservable
 
-const ErrOutOfEndpoints = RxError("out of endpoints")
+const ErrOutOfSubscriptions = RxError("out of subscriptions")
 
-// NewBuffer creates a buffer to be used as the core of any Subject
-// implementation. It returns both an Observer as well as an Observable. Items
-// are placed in the buffer through the returned Observer. The buffer then
-// multicasts the item to every subscriber of the returned Observable.
+// MakeObserverObservable actually does make an observer observable. It
+// creates a buffering multicaster and returns both the Observer and the
+// Observable side of it. These are then used as the core of any Subject
+// implementation. The Observer side is used to pass items into the buffering
+// multicaster. This then multicasts the items to every Observer that
+// subscribes to the returned Observable.
 //
 //	age     age below which items are kept to replay to a new subscriber.
 //	length  length of the item buffer, number of items kept to replay to a new subscriber.
 //	[cap]   Capacity of the item buffer, number of items that can be observed before blocking.
-//	[ecap]  Capacity of the endpoints slice.
-func NewBuffer(age time.Duration, length int, capacity ...int) (Observer, Observable) {
+//	[scap]  Capacity of the subscription list, max number of simultaneous subscribers.
+func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Observer, Observable) {
 	const (
 		ms	= time.Millisecond
 		us	= time.Microsecond
 	)
 
-	// Access to endpoints
+	// Access to subscriptions
 	const (
 		idle	uint32	= iota
 		busy
 	)
 
-	// State of endpoint and Chan
+	// State of subscription and buffer
 	const (
 		active	uint64	= iota
 		canceled
@@ -3185,16 +3187,16 @@ func NewBuffer(age time.Duration, length int, capacity ...int) (Observer, Observ
 		parked uint64 = math.MaxUint64
 	)
 
-	type endpoint struct {
+	type subscription struct {
 		Cursor		uint64
 		State		uint64		// active, canceled, closed
 		LastActive	time.Time	// track activity to deterime backoff
 	}
 
-	type endpoints struct {
+	type subscriptions struct {
 		sync.Mutex
 		*sync.Cond
-		entries	[]endpoint
+		entries	[]subscription
 		access	uint32	// idle, busy
 	}
 
@@ -3215,16 +3217,16 @@ func NewBuffer(age time.Duration, length int, capacity ...int) (Observer, Observ
 		commit	uint64
 		state	uint64	// active, closed
 
-		endpoints	endpoints
+		subscriptions	subscriptions
 
 		err	error
 	}
 
 	make := func(age time.Duration, length int, capacity ...int) *buffer {
-		cap, ecap := uint64(length), uint64(32)
+		cap, scap := uint64(length), uint64(32)
 		switch {
 		case len(capacity) >= 2:
-			cap, ecap = uint64(capacity[0]), uint64(capacity[1])
+			cap, scap = uint64(capacity[0]), uint64(capacity[1])
 		case len(capacity) == 1:
 			cap = uint64(capacity[0])
 		}
@@ -3233,46 +3235,46 @@ func NewBuffer(age time.Duration, length int, capacity ...int) (Observer, Observ
 			cap = len
 		}
 		cap = uint64(1) << uint(math.Ceil(math.Log2(float64(cap))))
-		ch := &buffer{
+		buf := &buffer{
 			len:	len,
 			cap:	cap,
 			age:	age,
 			items:	make([]item, cap),
 			mod:	cap - 1,
 			end:	cap,
-			endpoints: endpoints{
-				entries: make([]endpoint, 0, ecap),
+			subscriptions: subscriptions{
+				entries: make([]subscription, 0, scap),
 			},
 		}
-		ch.endpoints.Cond = sync.NewCond(&ch.endpoints.Mutex)
-		return ch
+		buf.subscriptions.Cond = sync.NewCond(&buf.subscriptions.Mutex)
+		return buf
 	}
-	ch := make(age, length, capacity...)
+	buf := make(age, length, capacity...)
 
-	accessEndpoints := func(access func([]endpoint)) bool {
+	accessSubscriptions := func(access func([]subscription)) bool {
 		spun := false
-		for !atomic.CompareAndSwapUint32(&ch.endpoints.access, idle, busy) {
+		for !atomic.CompareAndSwapUint32(&buf.subscriptions.access, idle, busy) {
 			runtime.Gosched()
 			spun = true
 		}
-		access(ch.endpoints.entries)
-		atomic.StoreUint32(&ch.endpoints.access, idle)
+		access(buf.subscriptions.entries)
+		atomic.StoreUint32(&buf.subscriptions.access, idle)
 		return spun
 	}
 
 	send := func(value interface{}) {
-		for ch.commit == ch.end {
+		for buf.commit == buf.end {
 			slowest := parked
-			spun := accessEndpoints(func(endpoints []endpoint) {
-				for i := range endpoints {
-					cursor := atomic.LoadUint64(&endpoints[i].Cursor)
+			spun := accessSubscriptions(func(subscriptions []subscription) {
+				for i := range subscriptions {
+					cursor := atomic.LoadUint64(&subscriptions[i].Cursor)
 					if cursor < slowest {
 						slowest = cursor
 					}
 				}
-				if atomic.LoadUint64(&ch.begin) < slowest && slowest <= atomic.LoadUint64(&ch.end) {
-					atomic.StoreUint64(&ch.begin, slowest)
-					atomic.StoreUint64(&ch.end, slowest+ch.mod+1)
+				if atomic.LoadUint64(&buf.begin) < slowest && slowest <= atomic.LoadUint64(&buf.end) {
+					atomic.StoreUint64(&buf.begin, slowest)
+					atomic.StoreUint64(&buf.end, slowest+buf.mod+1)
 				} else {
 					slowest = parked
 				}
@@ -3283,32 +3285,32 @@ func NewBuffer(age time.Duration, length int, capacity ...int) (Observer, Observ
 
 					runtime.Gosched()
 				}
-				if atomic.LoadUint64(&ch.state) != active {
+				if atomic.LoadUint64(&buf.state) != active {
 					return
 				}
 			}
 		}
-		ch.items[ch.commit&ch.mod] = item{Value: value, At: time.Now()}
-		atomic.AddUint64(&ch.commit, 1)
-		ch.endpoints.Broadcast()
+		buf.items[buf.commit&buf.mod] = item{Value: value, At: time.Now()}
+		atomic.AddUint64(&buf.commit, 1)
+		buf.subscriptions.Broadcast()
 	}
 
 	close := func(err error) {
-		if atomic.CompareAndSwapUint64(&ch.state, active, closing) {
-			ch.err = err
-			if atomic.CompareAndSwapUint64(&ch.state, closing, closed) {
-				accessEndpoints(func(endpoints []endpoint) {
-					for i := range endpoints {
-						atomic.CompareAndSwapUint64(&endpoints[i].State, active, closed)
+		if atomic.CompareAndSwapUint64(&buf.state, active, closing) {
+			buf.err = err
+			if atomic.CompareAndSwapUint64(&buf.state, closing, closed) {
+				accessSubscriptions(func(subscriptions []subscription) {
+					for i := range subscriptions {
+						atomic.CompareAndSwapUint64(&subscriptions[i].State, active, closed)
 					}
 				})
 			}
 		}
-		ch.endpoints.Broadcast()
+		buf.subscriptions.Broadcast()
 	}
 
 	observer := func(next interface{}, err error, done bool) {
-		if atomic.LoadUint64(&ch.state) == active {
+		if atomic.LoadUint64(&buf.state) == active {
 			if !done {
 				send(next)
 			} else {
@@ -3317,29 +3319,29 @@ func NewBuffer(age time.Duration, length int, capacity ...int) (Observer, Observ
 		}
 	}
 
-	appendEndpoint := func(cursor uint64) (ep *endpoint, err error) {
-		accessEndpoints(func([]endpoint) {
-			e := &ch.endpoints
-			if len(e.entries) < cap(e.entries) {
-				e.entries = append(e.entries, endpoint{Cursor: cursor})
-				ep = &e.entries[len(e.entries)-1]
+	appendSubscription := func(cursor uint64) (sub *subscription, err error) {
+		accessSubscriptions(func([]subscription) {
+			s := &buf.subscriptions
+			if len(s.entries) < cap(s.entries) {
+				s.entries = append(s.entries, subscription{Cursor: cursor})
+				sub = &s.entries[len(s.entries)-1]
 				return
 			}
-			for i := range e.entries {
-				ep = &e.entries[i]
-				if atomic.CompareAndSwapUint64(&ep.Cursor, parked, cursor) {
+			for i := range s.entries {
+				sub = &s.entries[i]
+				if atomic.CompareAndSwapUint64(&sub.Cursor, parked, cursor) {
 					return
 				}
 			}
-			err = ErrOutOfEndpoints
+			err = ErrOutOfSubscriptions
 			return
 		})
 		return
 	}
 
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		cursor := atomic.LoadUint64(&ch.begin)
-		ep, err := appendEndpoint(cursor)
+		begin := atomic.LoadUint64(&buf.begin)
+		sub, err := appendSubscription(begin)
 		if err != nil {
 			runner := subscribeOn.Schedule(func() {
 				if subscriber.Subscribed() {
@@ -3349,34 +3351,33 @@ func NewBuffer(age time.Duration, length int, capacity ...int) (Observer, Observ
 			subscriber.OnUnsubscribe(runner.Cancel)
 			return
 		}
-		commit := atomic.LoadUint64(&ch.commit)
-		begin := atomic.LoadUint64(&ch.begin)
-		if begin+ch.len < commit {
-			atomic.StoreUint64(&ep.Cursor, commit-ch.len)
+		commit := atomic.LoadUint64(&buf.commit)
+		if begin+buf.len < commit {
+			atomic.StoreUint64(&sub.Cursor, commit-buf.len)
 		}
-		atomic.StoreUint64(&ep.State, atomic.LoadUint64(&ch.state))
-		ep.LastActive = time.Now()
+		atomic.StoreUint64(&sub.State, atomic.LoadUint64(&buf.state))
+		sub.LastActive = time.Now()
 
 		receiver := subscribeOn.ScheduleFutureRecursive(0, func(self func(time.Duration)) {
-			commit := atomic.LoadUint64(&ch.commit)
+			commit := atomic.LoadUint64(&buf.commit)
 
-			if ep.Cursor == commit {
-				if atomic.CompareAndSwapUint64(&ep.State, canceled, canceled) {
+			if sub.Cursor == commit {
+				if atomic.CompareAndSwapUint64(&sub.State, canceled, canceled) {
 
-					atomic.StoreUint64(&ep.Cursor, parked)
+					atomic.StoreUint64(&sub.Cursor, parked)
 					return
 				} else {
 
 					now := time.Now()
-					if now.Before(ep.LastActive.Add(1 * ms)) {
+					if now.Before(sub.LastActive.Add(1 * ms)) {
 
 						self(50 * us)
 						return
-					} else if now.Before(ep.LastActive.Add(250 * ms)) {
-						if atomic.CompareAndSwapUint64(&ep.State, closed, closed) {
+					} else if now.Before(sub.LastActive.Add(250 * ms)) {
+						if atomic.CompareAndSwapUint64(&sub.State, closed, closed) {
 
-							observe(nil, ch.err, true)
-							atomic.StoreUint64(&ep.Cursor, parked)
+							observe(nil, buf.err, true)
+							atomic.StoreUint64(&sub.Cursor, parked)
 							return
 						}
 
@@ -3385,10 +3386,10 @@ func NewBuffer(age time.Duration, length int, capacity ...int) (Observer, Observ
 					} else {
 						if subscribeOn.IsConcurrent() {
 
-							ch.endpoints.Lock()
-							ch.endpoints.Wait()
-							ch.endpoints.Unlock()
-							ep.LastActive = time.Now()
+							buf.subscriptions.Lock()
+							buf.subscriptions.Wait()
+							buf.subscriptions.Unlock()
+							sub.LastActive = time.Now()
 							self(0)
 							return
 						} else {
@@ -3400,29 +3401,29 @@ func NewBuffer(age time.Duration, length int, capacity ...int) (Observer, Observ
 				}
 			}
 
-			if atomic.LoadUint64(&ep.State) == canceled {
-				atomic.StoreUint64(&ep.Cursor, parked)
+			if atomic.LoadUint64(&sub.State) == canceled {
+				atomic.StoreUint64(&sub.Cursor, parked)
 				return
 			}
-			for ; ep.Cursor != commit; atomic.AddUint64(&ep.Cursor, 1) {
-				item := &ch.items[ep.Cursor&ch.mod]
-				if ch.age == 0 || item.At.IsZero() || time.Since(item.At) < ch.age {
+			for ; sub.Cursor != commit; atomic.AddUint64(&sub.Cursor, 1) {
+				item := &buf.items[sub.Cursor&buf.mod]
+				if buf.age == 0 || item.At.IsZero() || time.Since(item.At) < buf.age {
 					observe(item.Value, nil, false)
 				}
-				if atomic.LoadUint64(&ep.State) == canceled {
-					atomic.StoreUint64(&ep.Cursor, parked)
+				if atomic.LoadUint64(&sub.State) == canceled {
+					atomic.StoreUint64(&sub.Cursor, parked)
 					return
 				}
 			}
 
-			ep.LastActive = time.Now()
+			sub.LastActive = time.Now()
 			self(0)
 		})
 		subscriber.OnUnsubscribe(receiver.Cancel)
 
 		subscriber.OnUnsubscribe(func() {
-			atomic.CompareAndSwapUint64(&ep.State, active, canceled)
-			ch.endpoints.Broadcast()
+			atomic.CompareAndSwapUint64(&sub.State, active, canceled)
+			buf.subscriptions.Broadcast()
 		})
 	}
 	return observer, observable
@@ -3491,7 +3492,7 @@ func (o Observer) AsObserver() Observer {
 // observable goroutine is blocked until all subscribers have processed the
 // next, error or complete notification.
 func NewSubject() Subject {
-	observer, observable := NewBuffer(0, 0, 1, 16)
+	observer, observable := MakeObserverObservable(0, 0, 1, 16)
 	return Subject{observer.AsObserver(), observable.AsObservable()}
 }
 
@@ -3527,7 +3528,7 @@ func NewReplaySubject(bufferCapacity int, windowDuration time.Duration) Subject 
 	if bufferCapacity == 0 {
 		bufferCapacity = MaxReplayCapacity
 	}
-	observer, observable := NewBuffer(windowDuration, bufferCapacity)
+	observer, observable := MakeObserverObservable(windowDuration, bufferCapacity)
 	return Subject{observer.AsObserver(), observable.AsObservable()}
 }
 
