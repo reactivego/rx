@@ -187,8 +187,8 @@ func (o ObservableFoo) Validated(onViolation func(err error)) ObservableFoo {
 				mu.Lock()
 				if atomic.CompareAndSwapInt32(&state, operational, violation) {
 					err = ErrObservableContractViolationConcurrentNotifications
-					var zeroFoo foo
-					observe(zeroFoo, err, true)
+					var zero foo
+					observe(zero, err, true)
 					onViolation(err)
 				} else if atomic.CompareAndSwapInt32(&state, terminated, violation) {
 					onViolation(ErrObservableContractViolationConcurrentNotifications)

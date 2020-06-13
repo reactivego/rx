@@ -33,7 +33,6 @@ type NextFoo func(foo)
 // Complete and Canceled function that can be called by the code that
 // implements the Observable.
 func CreateFoo(create func(NextFoo, Error, Complete, Canceled)) ObservableFoo {
-	var zeroFoo foo
 	observable := func(observe FooObserver, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
 			if !subscriber.Subscribed() {
@@ -46,12 +45,14 @@ func CreateFoo(create func(NextFoo, Error, Complete, Canceled)) ObservableFoo {
 			}
 			e := func(err error) {
 				if subscriber.Subscribed() {
-					observe(zeroFoo, err, true)
+					var zero foo
+					observe(zero, err, true)
 				}
 			}
 			c := func() {
 				if subscriber.Subscribed() {
-					observe(zeroFoo, nil, true)
+					var zero foo
+					observe(zero, nil, true)
 				}
 			}
 			x := func() bool {
@@ -75,7 +76,6 @@ func CreateFoo(create func(NextFoo, Error, Complete, Canceled)) ObservableFoo {
 // and Complete function that can be called by the code that implements the
 // Observable.
 func CreateRecursiveFoo(create func(NextFoo, Error, Complete)) ObservableFoo {
-	var zeroFoo foo
 	observable := func(observe FooObserver, scheduler Scheduler, subscriber Subscriber) {
 		done := false
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -90,13 +90,15 @@ func CreateRecursiveFoo(create func(NextFoo, Error, Complete)) ObservableFoo {
 			e := func(err error) {
 				done = true
 				if subscriber.Subscribed() {
-					observe(zeroFoo, err, true)
+					var zero foo
+					observe(zero, err, true)
 				}
 			}
 			c := func() {
 				done = true
 				if subscriber.Subscribed() {
-					observe(zeroFoo, nil, true)
+					var zero foo
+					observe(zero, nil, true)
 				}
 			}
 			create(n, e, c)
@@ -125,7 +127,6 @@ func CreateRecursiveFoo(create func(NextFoo, Error, Complete)) ObservableFoo {
 // long CreateFutureRecursiveFoo has to wait before calling the create function
 // again.
 func CreateFutureRecursiveFoo(timeout time.Duration, create func(NextFoo, Error, Complete) time.Duration) ObservableFoo {
-	var zeroFoo foo
 	observable := func(observe FooObserver, scheduler Scheduler, subscriber Subscriber) {
 		done := false
 		runner := scheduler.ScheduleFutureRecursive(timeout, func(self func(time.Duration)) {
@@ -140,13 +141,15 @@ func CreateFutureRecursiveFoo(timeout time.Duration, create func(NextFoo, Error,
 			e := func(err error) {
 				done = true
 				if subscriber.Subscribed() {
-					observe(zeroFoo, err, true)
+					var zero foo
+					observe(zero, err, true)
 				}
 			}
 			c := func() {
 				done = true
 				if subscriber.Subscribed() {
-					observe(zeroFoo, nil, true)
+					var zero foo
+					observe(zero, nil, true)
 				}
 			}
 			timeout = create(n, e, c)
@@ -177,11 +180,11 @@ func DeferFoo(factory func() ObservableFoo) ObservableFoo {
 
 // EmptyFoo creates an Observable that emits no items but terminates normally.
 func EmptyFoo() ObservableFoo {
-	var zeroFoo foo
 	observable := func(observe FooObserver, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
 			if subscriber.Subscribed() {
-				observe(zeroFoo, nil, true)
+				var zero foo
+				observe(zero, nil, true)
 			}
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
@@ -197,7 +200,6 @@ func EmptyFoo() ObservableFoo {
 // The feeding code can send nil or more foo items and then closing the
 // channel will be seen as completion.
 func FromChanFoo(ch <-chan foo) ObservableFoo {
-	var zeroFoo foo
 	observable := func(observe FooObserver, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if !subscriber.Subscribed() {
@@ -213,7 +215,8 @@ func FromChanFoo(ch <-chan foo) ObservableFoo {
 					self()
 				}
 			} else {
-				observe(zeroFoo, nil, true)
+				var zero foo
+				observe(zero, nil, true)
 			}
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
@@ -264,7 +267,6 @@ func FromChan(ch <-chan interface{}) Observable {
 
 // FromFoo creates an ObservableFoo from multiple foo values passed in.
 func FromFoo(slice ...foo) ObservableFoo {
-	var zeroFoo foo
 	observable := func(observe FooObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -276,7 +278,8 @@ func FromFoo(slice ...foo) ObservableFoo {
 						self()
 					}
 				} else {
-					observe(zeroFoo, nil, true)
+					var zero foo
+					observe(zero, nil, true)
 				}
 			}
 		})
@@ -290,14 +293,14 @@ func FromFoo(slice ...foo) ObservableFoo {
 
 // JustFoo creates an ObservableFoo that emits a particular item.
 func JustFoo(element foo) ObservableFoo {
-	var zeroFoo foo
 	observable := func(observe FooObserver, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
 			if subscriber.Subscribed() {
 				observe(element, nil, false)
 			}
 			if subscriber.Subscribed() {
-				observe(zeroFoo, nil, true)
+				var zero foo
+				observe(zero, nil, true)
 			}
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
@@ -321,7 +324,6 @@ func NeverFoo() ObservableFoo {
 // OfFoo emits a variable amount of values in a sequence and then emits a
 // complete notification.
 func OfFoo(slice ...foo) ObservableFoo {
-	var zeroFoo foo
 	observable := func(observe FooObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -333,7 +335,8 @@ func OfFoo(slice ...foo) ObservableFoo {
 						self()
 					}
 				} else {
-					observe(zeroFoo, nil, true)
+					var zero foo
+					observe(zero, nil, true)
 				}
 			}
 		})
@@ -378,7 +381,6 @@ func RangeFoo(start, count int) ObservableFoo {
 // If the error is non-nil the returned ObservableFoo will be an Observable that
 // emits and error, otherwise it will be a single-value ObservableFoo of the value.
 func StartFoo(f func() (foo, error)) ObservableFoo {
-	var zeroFoo foo
 	observable := func(observe FooObserver, scheduler Scheduler, subscriber Subscriber) {
 		done := false
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -391,10 +393,12 @@ func StartFoo(f func() (foo, error)) ObservableFoo {
 							self()
 						}
 					} else {
-						observe(zeroFoo, err, true)
+						var zero foo
+						observe(zero, err, true)
 					}
 				} else {
-					observe(zeroFoo, nil, true)
+					var zero foo
+					observe(zero, nil, true)
 				}
 			}
 		})
@@ -409,11 +413,11 @@ func StartFoo(f func() (foo, error)) ObservableFoo {
 // ThrowFoo creates an Observable that emits no items and terminates with an
 // error.
 func ThrowFoo(err error) ObservableFoo {
-	var zeroFoo foo
 	observable := func(observe FooObserver, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
 			if subscriber.Subscribed() {
-				observe(zeroFoo, err, true)
+				var zero foo
+				observe(zero, err, true)
 			}
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)

@@ -188,14 +188,14 @@ func (o ObservableObservableFoo) SwitchAll() ObservableFoo {
 				})
 			case err != nil:
 				currentLink.Cancel(func() {
-					var zeroFoo foo
-					observe(zeroFoo, err, true)
+					var zero foo
+					observe(zero, err, true)
 				})
 				switcherSubscriber.Unsubscribe()
 			default:
 				currentLink.OnComplete(func() {
-					var zeroFoo foo
-					observe(zeroFoo, nil, true)
+					var zero foo
+					observe(zero, nil, true)
 				})
 				switcherSubscriber.Unsubscribe()
 			}

@@ -48,12 +48,12 @@ func (o Observable) AsObservableFoo() ObservableFoo {
 				if nextFoo, ok := next.(foo); ok {
 					observe(nextFoo, err, done)
 				} else {
-					var zeroFoo foo
-					observe(zeroFoo, ErrTypecastToFoo, true)
+					var zero foo
+					observe(zero, ErrTypecastToFoo, true)
 				}
 			} else {
-				var zeroFoo foo
-				observe(zeroFoo, err, true)
+				var zero foo
+				observe(zero, err, true)
 			}
 		}
 		o(observer, subscribeOn, subscriber)
@@ -84,8 +84,8 @@ func (o Observable) OnlyFoo() ObservableFoo {
 					observe(nextFoo, err, done)
 				}
 			} else {
-				var zeroFoo foo
-				observe(zeroFoo, err, true)
+				var zero foo
+				observe(zero, err, true)
 			}
 		}
 		o(observer, subscribeOn, subscriber)

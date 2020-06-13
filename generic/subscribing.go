@@ -244,8 +244,8 @@ func (o ObservableFoo) Subscribe(observe FooObserver, subscribers ...Subscriber)
 		if !done {
 			observe(next, err, done)
 		} else {
-			var zeroFoo foo
-			observe(zeroFoo, err, true)
+			var zero foo
+			observe(zero, err, true)
 			subscribers[0].Done(err)
 		}
 	}

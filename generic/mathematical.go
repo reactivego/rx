@@ -15,8 +15,8 @@ func (o ObservableFoo) Average() ObservableFoo {
 				if count > 0 {
 					observe(sum/count, nil, false)
 				}
-				var zeroFoo foo
-				observe(zeroFoo, err, done)
+				var zero foo
+				observe(zero, err, done)
 			}
 		}
 		o(observer, subscribeOn, subscriber)
@@ -61,16 +61,16 @@ func (o ObservableFoo) Max() ObservableFoo {
 					}
 				} else {
 					observe(max, nil, false)
-					var zeroFoo foo
-					observe(zeroFoo, err, done)
+					var zero foo
+					observe(zero, err, done)
 				}
 			} else {
 				if !done {
 					max = next
 					started = true
 				} else {
-					var zeroFoo foo
-					observe(zeroFoo, err, done)
+					var zero foo
+					observe(zero, err, done)
 				}
 			}
 		}
@@ -95,16 +95,16 @@ func (o ObservableFoo) Min() ObservableFoo {
 					}
 				} else {
 					observe(min, nil, false)
-					var zeroFoo foo
-					observe(zeroFoo, err, done)
+					var zero foo
+					observe(zero, err, done)
 				}
 			} else {
 				if !done {
 					min = next
 					started = true
 				} else {
-					var zeroFoo foo
-					observe(zeroFoo, err, done)
+					var zero foo
+					observe(zero, err, done)
 				}
 
 			}
@@ -150,8 +150,8 @@ func (o ObservableFoo) Sum() ObservableFoo {
 				sum += next
 			} else {
 				observe(sum, nil, false)
-				var zeroFoo foo
-				observe(zeroFoo, err, done)
+				var zero foo
+				observe(zero, err, done)
 			}
 		}
 		o(observer, subscribeOn, subscriber)

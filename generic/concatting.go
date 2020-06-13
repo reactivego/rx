@@ -17,7 +17,6 @@ func ConcatFoo(observables ...ObservableFoo) ObservableFoo {
 
 // ConcatWith emits the emissions from two or more ObservableFoos without interleaving them.
 func (o ObservableFoo) ConcatWith(other ...ObservableFoo) ObservableFoo {
-	var zeroFoo foo
 	if len(other) == 0 {
 		return o
 	}
@@ -31,7 +30,8 @@ func (o ObservableFoo) ConcatWith(other ...ObservableFoo) ObservableFoo {
 				observe(next, err, done)
 			} else {
 				if len(observables) == 0 {
-					observe(zeroFoo, nil, true)
+					var zero foo
+					observe(zero, nil, true)
 				} else {
 					o := observables[0]
 					observables = observables[1:]

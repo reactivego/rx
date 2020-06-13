@@ -69,8 +69,6 @@ type FooSlice = []foo
 // observables emits, a new slice will be emitted containing all the latest
 // value.
 func (o ObservableObservableFoo) CombineLatestAll() ObservableFooSlice {
-	var zeroFoo foo
-	var zeroFooSlice []foo
 	observable := func(observe FooSliceObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observables := []ObservableFoo(nil)
 		var observers struct {
@@ -86,7 +84,8 @@ func (o ObservableObservableFoo) CombineLatestAll() ObservableFooSlice {
 				if observers.active > 0 {
 					switch {
 					case !done:
-						if observers.values[index] == zeroFoo {
+						var zero foo
+						if observers.values[index] == zero {
 							observers.initialized++
 						}
 						observers.values[index] = next
@@ -95,10 +94,12 @@ func (o ObservableObservableFoo) CombineLatestAll() ObservableFooSlice {
 						}
 					case err != nil:
 						observers.active = 0
-						observe(zeroFooSlice, err, true)
+						var zero []foo
+						observe(zero, err, true)
 					default:
 						if observers.active--; observers.active == 0 {
-							observe(zeroFooSlice, nil, true)
+							var zero []foo
+							observe(zero, nil, true)
 						}
 					}
 				}
@@ -111,7 +112,8 @@ func (o ObservableObservableFoo) CombineLatestAll() ObservableFooSlice {
 			case !done:
 				observables = append(observables, next)
 			case err != nil:
-				observe(zeroFooSlice, err, true)
+				var zero []foo
+				observe(zero, err, true)
 			default:
 				subscribeOn.Schedule(func() {
 					if subscriber.Subscribed() {

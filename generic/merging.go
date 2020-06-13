@@ -40,12 +40,12 @@ func (o ObservableFoo) MergeWith(other ...ObservableFoo) ObservableFoo {
 					observe(next, nil, false)
 				case err != nil:
 					observers.done = true
-					var zeroFoo foo
-					observe(zeroFoo, err, true)
+					var zero foo
+					observe(zero, err, true)
 				default:
 					if observers.len--; observers.len == 0 {
-						var zeroFoo foo
-						observe(zeroFoo, nil, true)
+						var zero foo
+						observe(zero, nil, true)
 					}
 				}
 			}
@@ -94,12 +94,12 @@ func (o ObservableObservableFoo) MergeAll() ObservableFoo {
 					observe(next, nil, false)
 				case err != nil:
 					observers.done = true
-					var zeroFoo foo
-					observe(zeroFoo, err, true)
+					var zero foo
+					observe(zero, err, true)
 				default:
 					if atomic.AddInt32(&observers.len, -1) == 0 {
-						var zeroFoo foo
-						observe(zeroFoo, nil, true)
+						var zero foo
+						observe(zero, nil, true)
 					}
 				}
 			}
@@ -109,8 +109,8 @@ func (o ObservableObservableFoo) MergeAll() ObservableFoo {
 				atomic.AddInt32(&observers.len, 1)
 				next(observer, subscribeOn, subscriber)
 			} else {
-				var zeroFoo foo
-				observer(zeroFoo, err, true)
+				var zero foo
+				observer(zero, err, true)
 			}
 		}
 		subscribeOn.Schedule(func() {
@@ -159,8 +159,8 @@ func (o ObservableFoo) MergeDelayErrorWith(other ...ObservableFoo) ObservableFoo
 					observers.err = err
 				}
 				if observers.len--; observers.len == 0 {
-					var zeroFoo foo
-					observe(zeroFoo, observers.err, true)
+					var zero foo
+					observe(zero, observers.err, true)
 				}
 			}
 		}
