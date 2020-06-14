@@ -354,22 +354,23 @@ func NewSubjectFoo() SubjectFoo {
 	return SubjectFoo{observer.AsFooObserver(), observable.AsObservableFoo()}
 }
 
-//jig:template MaxReplayCapacity
+//jig:template DefaultReplayCapacity
 
-// MaxReplayCapacity is the maximum size of a replay buffer. Can be modified.
-var MaxReplayCapacity = 16383
+// DefaultReplayCapacity is the default capacity of a replay buffer when
+// a bufferCapacity of 0 is passed to the NewReplaySubject function.
+const DefaultReplayCapacity = 16380
 
 //jig:template NewReplaySubject<Foo>
-//jig:needs MakeObserverObservable, Subject<Foo>, Observer As<Foo>Observer, MaxReplayCapacity
+//jig:needs MakeObserverObservable, Subject<Foo>, Observer As<Foo>Observer, DefaultReplayCapacity
 
 // NewReplaySubjectFoo creates a new ReplaySubject. ReplaySubject ensures that
 // all observers see the same sequence of emitted items, even if they
-// subscribe after. When bufferCapacity argument is 0, then MaxReplayCapacity is
-// used (currently 16383). When windowDuration argument is 0, then entries added
+// subscribe after. When bufferCapacity argument is 0, then DefaultReplayCapacity is
+// used (currently 16380). When windowDuration argument is 0, then entries added
 // to the buffer will remain fresh forever.
 func NewReplaySubjectFoo(bufferCapacity int, windowDuration time.Duration) SubjectFoo {
 	if bufferCapacity == 0 {
-		bufferCapacity = MaxReplayCapacity
+		bufferCapacity = DefaultReplayCapacity
 	}
 	observer, observable := MakeObserverObservable(windowDuration, bufferCapacity)
 	return SubjectFoo{observer.AsFooObserver(), observable.AsObservableFoo()}
