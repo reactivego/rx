@@ -10,33 +10,34 @@ Package `test` provides tests for the generic rx package.
 
 Every operator / data type has its own subdirectory named after it containing one or more tests that exercise its functionality.
 
-Currently 92 operators have been implemented:
+Currently 94 operators have been implemented:
     
 | A … C                   | D … L                 | M … P                  | R … S              | T … W          |
 |:------------------------|:----------------------|:-----------------------|:-------------------|:---------------|
 | [All]                   | [DebounceTime] :star: | [Map] :star:           | [Range]            | [Take]         |
 | [AsObservable]          | [Defer]               | [Max]                  | [Reduce]           | [TakeLast]     |
-| [AuditTime]             | [Delay]               | [Merge] :star:         | [RefCount]         | [TakeUntil]    |
-| [AutoConnect]           | [Distinct]            | [MergeAll]             | [Repeat]           | [TakeWhile]    |
-| [Average]               | [Do] :star:           | [MergeDelayError]      | [ReplaySubject]    | [ThrottleTime] |
-| [Catch] :star:          | [DoOnComplete]        | [MergeDelayErrorWith]  | [Retry]            | [Throw]        |
-| [CatchError] :star:     | [DoOnError]           | [MergeMap] :star:      | [Sample]           | [Ticker]       |
-| [CombineLatest] :star:  | [ElementAt]           | [MergeWith] :star:     | [Scan] :star:      | [TimeInterval] |
-| [CombineLatestAll]      | [Empty]               | [Min]                  | [Serialize]        | [Timeout]      |
-| [CombineLatestMap]      | [Filter] :star:       | [Never]                | [Single]           | [Timer]        |
-| [CombineLatestMapTo]    | [Finally]             | [ObserveOn]            | [Skip]             | [Timestamp]    |
-| [CombineLatestWith]     | [First]               | [Of] :star:            | [SkipLast]         | [ToChan]       |
-| [Concat] :star:         | [From] :star:         | [Only]                 | [Start]            | [ToSingle]     |
-| [ConcatAll]             | [FromChan]            | [Passthrough]          | [Subject]          | [ToSlice]      |
-| [ConcatMap] :star:      | [IgnoreCompletion]    | [Println]              | [Subscribe]        | [Wait]         |
-| [ConcatMapTo]           | [IgnoreElements]      | [Publish] :star:       | [SubscribeOn]      |
-| [ConcatWith] :star:     | [Interval]            | [PublishReplay] :star: | [Sum]              |
-| [Connect]               | [Just] :star:         |                        | [SwitchAll]        |
-| [Count]                 | [Last]                |                        | [SwitchMap] :star: |
-| [Create] :star:         |                       |                        |
-| [CreateFutureRecursive] |                       |                        |
-| [CreateRecursive]       |                       |                        |
-|                         |                       |                        |
+| [AsyncSubject]          | [Delay]               | [Merge] :star:         | [RefCount]         | [TakeUntil]    |
+| [AuditTime]             | [Distinct]            | [MergeAll]             | [Repeat]           | [TakeWhile]    |
+| [AutoConnect]           | [Do] :star:           | [MergeDelayError]      | [ReplaySubject]    | [ThrottleTime] |
+| [Average]               | [DoOnComplete]        | [MergeDelayErrorWith]  | [Retry]            | [Throw]        |
+| [BehaviorSubject]       | [DoOnError]           | [MergeMap] :star:      | [Sample]           | [Ticker]       |
+| [Catch] :star:          | [ElementAt]           | [MergeWith] :star:     | [Scan] :star:      | [TimeInterval] |
+| [CatchError] :star:     | [Empty]               | [Min]                  | [Serialize]        | [Timeout]      |
+| [CombineLatest] :star:  | [Filter] :star:       | [Never]                | [Single]           | [Timer]        |
+| [CombineLatestAll]      | [Finally]             | [ObserveOn]            | [Skip]             | [Timestamp]    |
+| [CombineLatestMap]      | [First]               | [Of] :star:            | [SkipLast]         | [ToChan]       |
+| [CombineLatestMapTo]    | [From] :star:         | [Only]                 | [Start]            | [ToSingle]     |
+| [CombineLatestWith]     | [FromChan]            | [Passthrough]          | [Subject]          | [ToSlice]      |
+| [Concat] :star:         | [IgnoreCompletion]    | [Println]              | [Subscribe]        | [Wait]         |
+| [ConcatAll]             | [IgnoreElements]      | [Publish] :star:       | [SubscribeOn]      |
+| [ConcatMap] :star:      | [Interval]            | [PublishReplay] :star: | [Sum]              |
+| [ConcatMapTo]           | [Just] :star:         |                        | [SwitchAll]        |
+| [ConcatWith] :star:     | [Last]                |                        | [SwitchMap] :star: |
+| [Connect]               |
+| [Count]                 |
+| [Create] :star:         |
+| [CreateFutureRecursive] |
+| [CreateRecursive]       |
 
 :star: - commonly used
 
@@ -44,8 +45,10 @@ Currently 92 operators have been implemented:
 [All]: All
 [AsObservable]: AsObservable
 [AuditTime]: AuditTime
+[AsyncSubject]: AsyncSubject
 [AutoConnect]: AutoConnect
 [Average]: Average
+[BehaviorSubject]: BehaviorSubject
 [Catch]: Catch
 [CatchError]: CatchError
 [CombineLatest]: CombineLatest

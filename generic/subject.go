@@ -381,7 +381,7 @@ func NewSubjectFoo() SubjectFoo {
 const DefaultReplayCapacity = 16383
 
 //jig:template NewReplaySubject<Foo>
-//jig:needs MakeObserverObservable, Subject<Foo>, Observer As<Foo>Observer, DefaultReplayCapacity
+//jig:needs MakeObserverObservable, Subject<Foo>, Observer As<Foo>Observer, Observable AsObservable<Foo>, DefaultReplayCapacity
 
 // NewReplaySubjectFoo creates a new ReplaySubject. ReplaySubject ensures that
 // all observers see the same sequence of emitted items, even if they
@@ -433,4 +433,36 @@ func NewBehaviorSubjectFoo(a foo) SubjectFoo {
 		}
 	}
 	return SubjectFoo{observerFoo, behaviorFoo}
+}
+
+//jig:template NewAsyncSubject<Foo>
+//jig:needs MakeObserverObservable, Subject<Foo>, Observer As<Foo>Observer, Observable AsObservable<Foo>
+
+// NewAsyncSubjectFoo creates a a subject that emits the last value (and only
+// the last value) emitted by the Observable part, and only after that
+// Observable part completes. (If the Observable part does not emit any
+// values, the AsyncSubject also completes without emitting any values.)
+//
+// It will also emit this same final value to any subsequent observers.
+// However, if the Observable part terminates with an error, the AsyncSubject
+// will not emit any items, but will simply pass along the error notification
+// from the Observable part.
+func NewAsyncSubjectFoo() SubjectFoo {
+	observer, observable := MakeObserverObservable(0, 1)
+	var async struct {
+		set bool
+		last foo
+	}
+	observerFoo := func(next foo, err error, done bool) {
+		if !done {
+			async.set = true
+			async.last = next
+		} else {
+			if async.set && err == nil{
+				observer(async.last, nil, false)
+			}
+			observer(next, err, true)
+		}
+	}
+	return SubjectFoo{observerFoo, observable.AsObservableFoo()}
 }
