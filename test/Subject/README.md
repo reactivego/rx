@@ -1,5 +1,10 @@
-/*
-Subject is a combination of an observer and observable. Subjects are
+# Subject
+
+[![](../../svg/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx/test/Subject?tab=doc)
+[![](../../svg/godoc.svg)](https://godoc.org/github.com/reactivego/rx/test/Subject)
+[![](../../svg/rx.svg)](http://reactivex.io/documentation/subject.html)
+
+**Subject** is a combination of an observer and observable. Subjects are
 special because they are the only reactive constructs that support
 multicasting. The items sent to it through its observer side are
 multicasted to multiple clients subscribed to its observable side.
@@ -16,5 +21,3 @@ handled according to the specific behavior of the subject. There are different
 types of subjects, see the NewReplaySubject function for more info about a 
 subject that is capable of replaying a sequence of emissions. The standard
 subject will not buffer any emissions but will just multicast them.
-*/
-package Subject

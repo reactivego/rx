@@ -13,12 +13,11 @@ import (
 
 const OutOfSubscriptions = RxError("out of subscriptions")
 
-// MakeObserverObservable actually does make an observer observable. It
-// creates a buffering multicaster and returns both the Observer and the
-// Observable side of it. These are then used as the core of any Subject
-// implementation. The Observer side is used to pass items into the buffering
-// multicaster. This then multicasts the items to every Observer that
-// subscribes to the returned Observable.
+// MakeObserverObservable turns an observer into a multicasting and buffering
+// observable. Both the observer and the obeservable are returned. These are
+// then used as the core of any Subject implementation. The Observer side is
+// used to pass items into the buffering multicaster. This then multicasts the
+// items to every Observer that subscribes to the returned Observable.
 //
 //	age     age below which items are kept to replay to a new subscriber.
 //	length  length of the item buffer, number of items kept to replay to a new subscriber.
@@ -379,7 +378,7 @@ func NewSubjectFoo() SubjectFoo {
 
 // DefaultReplayCapacity is the default capacity of a replay buffer when
 // a bufferCapacity of 0 is passed to the NewReplaySubject function.
-const DefaultReplayCapacity = 16380
+const DefaultReplayCapacity = 16383
 
 //jig:template NewReplaySubject<Foo>
 //jig:needs MakeObserverObservable, Subject<Foo>, Observer As<Foo>Observer, DefaultReplayCapacity
