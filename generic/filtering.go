@@ -173,8 +173,8 @@ func (o ObservableFoo) Last() ObservableFoo {
 //jig:template ErrSingle
 //jig:needs RxError
 
-const ErrSingleNoValue = RxError("expected one value, got none")
-const ErrSingleMultiValue =  RxError("expected one value, got multiple")
+const DidNotEmitValue = RxError("expected one value, got none")
+const EmittedMultipleValues =  RxError("expected one value, got multiple")
 
 //jig:template Observable Single
 //jig:needs ErrSingle
@@ -198,7 +198,7 @@ func (o Observable) Single() Observable {
 							observe(latest, nil, false)
 							observe(nil, nil, true)
 						} else {
-							observe(nil, ErrSingleNoValue, true)
+							observe(nil, DidNotEmitValue, true)
 						}
 					}
 				} else {
@@ -206,7 +206,7 @@ func (o Observable) Single() Observable {
 					if count == 1 {
 						latest = next
 					} else {
-						observe(nil, ErrSingleMultiValue, true)
+						observe(nil, EmittedMultipleValues, true)
 					}
 				}
 			}

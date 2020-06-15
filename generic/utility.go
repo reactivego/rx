@@ -147,10 +147,12 @@ func (o ObservableFoo) Serialize() ObservableFoo {
 //jig:template ErrObservableContractViolation
 //jig:needs RxError
 
-const ErrObservableContractViolationConcurrentNotifications = RxError("observable contract violation: concurrent notifications")
-const ErrObservableContractViolationNextAfterTermination = RxError("observable contract violation: next after termination")
-const ErrObservableContractViolationErrorAfterTermination = RxError("observable contract violation: error after termination")
-const ErrObservableContractViolationCompleteAfterTermination = RxError("observable contract violation: complete after termination")
+const (
+	ConcurrentNotifications = RxError("concurrent notifications")
+	NextAfterTermination = RxError("next after termination")
+	ErrorAfterTermination = RxError("error after termination")
+	CompleteAfterTermination = RxError("complete after termination")
+)
 
 //jig:template Observable<Foo> Validated
 //jig:needs ErrObservableContractViolation
@@ -186,24 +188,24 @@ func (o ObservableFoo) Validated(onViolation func(err error)) ObservableFoo {
 			if atomic.AddInt32(&concurrent, 1) > 1 {
 				mu.Lock()
 				if atomic.CompareAndSwapInt32(&state, operational, violation) {
-					err = ErrObservableContractViolationConcurrentNotifications
+					err = ConcurrentNotifications
 					var zero foo
 					observe(zero, err, true)
 					onViolation(err)
 				} else if atomic.CompareAndSwapInt32(&state, terminated, violation) {
-					onViolation(ErrObservableContractViolationConcurrentNotifications)
+					onViolation(ConcurrentNotifications)
 				}
 				mu.Unlock()
 			} else {
 				mu.Lock()
 				if atomic.CompareAndSwapInt32(&state, terminated, violation) {
 					if !done {
-						onViolation(ErrObservableContractViolationNextAfterTermination)
+						onViolation(NextAfterTermination)
 					} else {
 						if err != nil {
-							onViolation(ErrObservableContractViolationErrorAfterTermination)
+							onViolation(ErrorAfterTermination)
 						} else {
-							onViolation(ErrObservableContractViolationCompleteAfterTermination)
+							onViolation(CompleteAfterTermination)
 						}
 					}
 				} else if atomic.CompareAndSwapInt32(&state, operational, nextstate(done)) {

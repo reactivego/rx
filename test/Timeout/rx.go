@@ -188,8 +188,8 @@ func (o Observable) Serialize() Observable {
 
 //jig:name Observable_Timeout
 
-// ErrTimeout is delivered to an observer if the stream times out.
-const ErrTimeout = RxError("timeout")
+// TimeoutOccured is delivered to an observer if the stream times out.
+const TimeoutOccured = RxError("timeout")
 
 // Timeout mirrors the source Observable, but issues an error notification if a
 // particular period of time elapses without any emitted items.
@@ -212,7 +212,7 @@ func (o Observable) Timeout(due time.Duration) Observable {
 					} else {
 						timeout.occurred = true
 						timeout.Unlock()
-						observe(nil, ErrTimeout, true)
+						observe(nil, TimeoutOccured, true)
 						timeout.Lock()
 					}
 				}

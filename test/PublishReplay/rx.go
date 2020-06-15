@@ -649,14 +649,14 @@ func ThrowInt(err error) ObservableInt {
 
 //jig:name ErrAutoConnect
 
-const ErrAutoConnectInvalidCount = RxError("invalid count")
+const InvalidCount = RxError("invalid count")
 
 //jig:name IntMulticaster_AutoConnect
 
 // AutoConnect makes a IntMulticaster behave like an ordinary ObservableInt
 // that automatically connects the multicaster to its source when the
 // specified number of observers have subscribed to it. If the count is less
-// than 1 it will return a ThrowInt(ErrAutoConnectInvalidCount). After
+// than 1 it will return a ThrowInt(InvalidCount). After
 // connecting, when the number of subscribed observers eventually drops to 0,
 // AutoConnect will cancel the source connection if it hasn't terminated yet.
 // When subsequently the next observer subscribes, AutoConnect will connect to
@@ -669,7 +669,7 @@ const ErrAutoConnectInvalidCount = RxError("invalid count")
 // would leak a task and leave it hanging in the scheduler.
 func (o IntMulticaster) AutoConnect(count int) ObservableInt {
 	if count < 1 {
-		return ThrowInt(ErrAutoConnectInvalidCount)
+		return ThrowInt(InvalidCount)
 	}
 	var source struct {
 		sync.Mutex

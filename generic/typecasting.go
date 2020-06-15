@@ -27,15 +27,15 @@ func (o ObservableFoo) AsObservableBar() ObservableBar {
 	return observable
 }
 
-//jig:template ErrTypecastTo<Foo>
+//jig:template TypecastFailed
 //jig:needs RxError
 
-// ErrTypecastToFoo is delivered to an observer if the generic value cannot be
-// typecast to foo.
-const ErrTypecastToFoo = RxError("typecast to foo failed")
+// ErrTypecast is delivered to an observer if the generic value cannot be
+// typecast to a specific type.
+const TypecastFailed = RxError("typecast failed")
 
 //jig:template Observable AsObservable<Foo>
-//jig:needs Observable<Foo>, ErrTypecastTo<Foo>
+//jig:needs Observable<Foo>, TypecastFailed
 //jig:required-vars Foo
 
 // AsObservableFoo turns an Observable of interface{} into an ObservableFoo.
@@ -49,7 +49,7 @@ func (o Observable) AsObservableFoo() ObservableFoo {
 					observe(nextFoo, err, done)
 				} else {
 					var zero foo
-					observe(zero, ErrTypecastToFoo, true)
+					observe(zero, TypecastFailed, true)
 				}
 			} else {
 				var zero foo

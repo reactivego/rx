@@ -11,7 +11,7 @@ import (
 //jig:template MakeObserverObservable
 //jig:needs Observer, Observable
 
-const ErrOutOfSubscriptions = RxError("out of subscriptions")
+const OutOfSubscriptions = RxError("out of subscriptions")
 
 // MakeObserverObservable actually does make an observer observable. It
 // creates a buffering multicaster and returns both the Observer and the

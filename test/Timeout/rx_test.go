@@ -31,8 +31,8 @@ func Example_timeout() {
 
 	timed := source.Timeout(_250ms).SubscribeOn(scheduler)
 
-	if err := timed.Println(); err == ErrTimeout {
-		fmt.Println(ErrTimeout.Error())
+	if err := timed.Println(); err == TimeoutOccured {
+		fmt.Println(TimeoutOccured.Error())
 	}
 
 	elapsed := scheduler.Since(start)

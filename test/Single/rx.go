@@ -41,7 +41,6 @@ type ObservableInt func(IntObserver, Scheduler, Subscriber)
 
 // FromInt creates an ObservableInt from multiple int values passed in.
 func FromInt(slice ...int) ObservableInt {
-	var zeroInt int
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -53,7 +52,8 @@ func FromInt(slice ...int) ObservableInt {
 						self()
 					}
 				} else {
-					observe(zeroInt, nil, true)
+					var zero int
+					observe(zero, nil, true)
 				}
 			}
 		})
@@ -69,33 +69,6 @@ func FromInt(slice ...int) ObservableInt {
 // than 1 item before completing  this reported as an error to the observer.
 func (o ObservableInt) Single() ObservableInt {
 	return o.AsObservable().Single().AsObservableInt()
-}
-
-//jig:name Subscription
-
-// Subscription is an alias for the subscriber.Subscription interface type.
-type Subscription = subscriber.Subscription
-
-//jig:name ObservableInt_Subscribe
-
-// Subscribe operates upon the emissions and notifications from an Observable.
-// This method returns a Subscription.
-// Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber) Subscription {
-	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, err error, done bool) {
-		if !done {
-			observe(next, err, done)
-		} else {
-			var zeroInt int
-			observe(zeroInt, err, true)
-			subscribers[0].Unsubscribe()
-		}
-	}
-	subscribers[0].OnWait(scheduler.Wait)
-	o(observer, scheduler, subscribers[0])
-	return subscribers[0]
 }
 
 //jig:name Observer
@@ -127,11 +100,44 @@ func (o ObservableInt) AsObservable() Observable {
 	return observable
 }
 
+//jig:name Subscription
+
+// Subscription is an alias for the subscriber.Subscription interface type.
+type Subscription = subscriber.Subscription
+
+//jig:name ObservableInt_Subscribe
+
+// Subscribe operates upon the emissions and notifications from an Observable.
+// This method returns a Subscription.
+// Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber) Subscription {
+	subscribers = append(subscribers, subscriber.New())
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next int, err error, done bool) {
+		if !done {
+			observe(next, err, done)
+		} else {
+			var zero int
+			observe(zero, err, true)
+			subscribers[0].Done(err)
+		}
+	}
+	subscribers[0].OnWait(scheduler.Wait)
+	o(observer, scheduler, subscribers[0])
+	return subscribers[0]
+}
+
 //jig:name RxError
 
 type RxError string
 
 func (e RxError) Error() string	{ return string(e) }
+
+//jig:name ErrSingle
+
+const DidNotEmitValue = RxError("expected one value, got none")
+
+const EmittedMultipleValues = RxError("expected one value, got multiple")
 
 //jig:name Observable_Single
 
@@ -154,7 +160,7 @@ func (o Observable) Single() Observable {
 							observe(latest, nil, false)
 							observe(nil, nil, true)
 						} else {
-							observe(nil, RxError("expected one value, got none"), true)
+							observe(nil, DidNotEmitValue, true)
 						}
 					}
 				} else {
@@ -162,7 +168,7 @@ func (o Observable) Single() Observable {
 					if count == 1 {
 						latest = next
 					} else {
-						observe(nil, RxError("expected one value, got multiple"), true)
+						observe(nil, EmittedMultipleValues, true)
 					}
 				}
 			}
@@ -172,11 +178,11 @@ func (o Observable) Single() Observable {
 	return observable
 }
 
-//jig:name ErrTypecastToInt
+//jig:name TypecastFailed
 
-// ErrTypecastToInt is delivered to an observer if the generic value cannot be
-// typecast to int.
-const ErrTypecastToInt = RxError("typecast to int failed")
+// ErrTypecast is delivered to an observer if the generic value cannot be
+// typecast to a specific type.
+const TypecastFailed = RxError("typecast failed")
 
 //jig:name Observable_AsObservableInt
 
@@ -190,12 +196,12 @@ func (o Observable) AsObservableInt() ObservableInt {
 				if nextInt, ok := next.(int); ok {
 					observe(nextInt, err, done)
 				} else {
-					var zeroInt int
-					observe(zeroInt, ErrTypecastToInt, true)
+					var zero int
+					observe(zero, TypecastFailed, true)
 				}
 			} else {
-				var zeroInt int
-				observe(zeroInt, err, true)
+				var zero int
+				observe(zero, err, true)
 			}
 		}
 		o(observer, subscribeOn, subscriber)

@@ -18,6 +18,16 @@ func (o ObservableFoo) SwitchMapBar(project func(foo) ObservableBar) ObservableB
 	return o.MapObservableBar(project).SwitchAll()
 }
 
+//jig:template LinkErrors
+
+const (
+	AlreadyDone = RxError("already done")
+	AlreadySubscribed = RxError("already subscribed")
+	AlreadyWaiting = RxError("already waiting")
+	RecursionNotAllowed = RxError("recursion not allowed")
+	StateTransitionFailed = RxError("state transition faled")
+)
+
 //jig:template LinkEnums
 
 // state
@@ -46,7 +56,7 @@ const (
 )
 
 //jig:template link<Foo>
-//jig:needs RxError, LinkEnums
+//jig:needs LinkErrors, LinkEnums
 
 type linkFooObserver func(*linkFoo, foo, error, bool)
 
@@ -73,24 +83,24 @@ func newLinkFoo(observe linkFooObserver, subscriber Subscriber) *linkFoo {
 func (o *linkFoo) Observe(next foo, err error, done bool) error {
 	if !atomic.CompareAndSwapInt32(&o.state, linkIdle, linkBusy) {
 		if atomic.LoadInt32(&o.state) > linkBusy {
-			return RxError("Already Done")
+			return AlreadyDone
 		}
-		return RxError("Recursion Error")
+		return RecursionNotAllowed
 	}
 	o.observe(o, next, err, done)
 	if done {
 		if err != nil {
 			if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkError) {
-				return RxError("Internal Error: 'busy' -> 'error'")
+				return StateTransitionFailed
 			}
 		} else {
 			if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkCompleting) {
-				return RxError("Internal Error: 'busy' -> 'completing'")
+				return StateTransitionFailed
 			}
 		}
 	} else {
 		if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkIdle) {
-			return RxError("Internal Error: 'busy' -> 'idle'")
+			return StateTransitionFailed
 		}
 	}
 	if atomic.LoadInt32(&o.callbackState) != callbackSet {
@@ -109,26 +119,26 @@ func (o *linkFoo) Observe(next foo, err error, done bool) error {
 
 func (o *linkFoo) SubscribeTo(observable ObservableFoo, scheduler Scheduler) error {
 	if !atomic.CompareAndSwapInt32(&o.state, linkUnsubscribed, linkSubscribing) {
-		return RxError("Already Subscribed")
+		return AlreadySubscribed
 	}
 	observer := func(next foo, err error, done bool) {
 		o.Observe(next, err, done)
 	}
 	observable(observer, scheduler, o.subscriber)
 	if !atomic.CompareAndSwapInt32(&o.state, linkSubscribing, linkIdle) {
-		return RxError("Internal Error")
+		return StateTransitionFailed
 	}
 	return nil
 }
 
 func (o *linkFoo) Cancel(callback func()) error {
 	if !atomic.CompareAndSwapInt32(&o.callbackState, callbackNil, settingCallback) {
-		return RxError("Already Waiting")
+		return AlreadyWaiting
 	}
 	o.callbackKind = linkCancelOrCompleted
 	o.callback = callback
 	if !atomic.CompareAndSwapInt32(&o.callbackState, settingCallback, callbackSet) {
-		return RxError("Internal Error")
+		return StateTransitionFailed
 	}
 	o.subscriber.Unsubscribe()
 	if atomic.CompareAndSwapInt32(&o.state, linkCompleting, linkComplete) {
@@ -142,12 +152,12 @@ func (o *linkFoo) Cancel(callback func()) error {
 
 func (o *linkFoo) OnComplete(callback func()) error {
 	if !atomic.CompareAndSwapInt32(&o.callbackState, callbackNil, settingCallback) {
-		return RxError("Already Waiting")
+		return AlreadyWaiting
 	}
 	o.callbackKind = linkCallbackOnComplete
 	o.callback = callback
 	if !atomic.CompareAndSwapInt32(&o.callbackState, settingCallback, callbackSet) {
-		return RxError("Internal Error")
+		return StateTransitionFailed
 	}
 	if atomic.CompareAndSwapInt32(&o.state, linkCompleting, linkComplete) {
 		o.callback()

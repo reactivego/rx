@@ -189,31 +189,31 @@ func (o FooMulticaster) RefCount() ObservableFoo {
 	return observable
 }
 
-//jig:template ErrAutoConnect
+//jig:template InvalidCount
 //jig:needs RxError
 
-const ErrAutoConnectInvalidCount = RxError("invalid count")
+const InvalidCount = RxError("invalid count")
 
 //jig:template <Foo>Multicaster AutoConnect
-//jig:needs Observable<Foo>, Throw<Foo>, ErrAutoConnect
+//jig:needs Observable<Foo>, Throw<Foo>, InvalidCount
 
 // AutoConnect makes a FooMulticaster behave like an ordinary ObservableFoo
 // that automatically connects the multicaster to its source when the
 // specified number of observers have subscribed to it. If the count is less
-// than 1 it will return a ThrowFoo(ErrAutoConnectInvalidCount). After
-// connecting, when the number of subscribed observers eventually drops to 0,
-// AutoConnect will cancel the source connection if it hasn't terminated yet.
-// When subsequently the next observer subscribes, AutoConnect will connect to
-// the source only when it was previously canceled or because the source
-// terminated with an error. So it will not reconnect when the source
-// completed succesfully. This specific behavior allows for implementing a
-// caching observable that can be retried until it succeeds. Another thing to
-// notice is that AutoConnect will disconnect an active connection when the
-// number of observers drops to zero. The reason for this is that not doing so
-// would leak a task and leave it hanging in the scheduler.
+// than 1 it will return a ThrowFoo(InvalidCount). After connecting, when the
+// number of subscribed observers eventually drops to 0, AutoConnect will
+// cancel the source connection if it hasn't terminated yet. When subsequently
+// the next observer subscribes, AutoConnect will connect to the source only
+// when it was previously canceled or because the source terminated with an
+// error. So it will not reconnect when the source completed succesfully. This
+// specific behavior allows for implementing a caching observable that can be
+// retried until it succeeds. Another thing to notice is that AutoConnect will
+// disconnect an active connection when the number of observers drops to zero.
+// The reason for this is that not doing so would leak a task and leave it
+// hanging in the scheduler.
 func (o FooMulticaster) AutoConnect(count int) ObservableFoo {
 	if count < 1 {
-		return ThrowFoo(ErrAutoConnectInvalidCount)
+		return ThrowFoo(InvalidCount)
 	}
 	var source struct {
 		sync.Mutex
