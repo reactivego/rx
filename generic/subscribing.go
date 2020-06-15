@@ -253,3 +253,15 @@ func (o ObservableFoo) Subscribe(observe FooObserver, subscribers ...Subscriber)
 	o(observer, scheduler, subscribers[0])
 	return subscribers[0]
 }
+
+//jig:template Println<Foo>
+//jig:needs <Foo>Observer
+
+func PrintlnFoo(a ...interface{}) FooObserver {
+	observer := func(next foo, err error, done bool) {
+		if !done {
+			fmt.Println(append(a, next)...)
+		}
+	}
+	return observer
+}

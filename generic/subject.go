@@ -396,3 +396,42 @@ func NewReplaySubjectFoo(bufferCapacity int, windowDuration time.Duration) Subje
 	observer, observable := MakeObserverObservable(windowDuration, bufferCapacity)
 	return SubjectFoo{observer.AsFooObserver(), observable.AsObservableFoo()}
 }
+
+//jig:template NewBehaviorSubject<Foo>
+//jig:needs MakeObserverObservable, Subject<Foo>, Observer As<Foo>Observer, Observable AsObservable<Foo>
+
+// NewBehaviorSubjectFoo returns a new BehaviorSubjectFoo. When an observer
+// subscribes to a BehaviorSubject, it begins by emitting the item most
+// recently emitted by the Observable part of the subject (or a seed/default
+// value if none has yet been emitted) and then continues to emit any other
+// items emitted later by the Observable part.
+func NewBehaviorSubjectFoo(a foo) SubjectFoo {
+	observer, observable := MakeObserverObservable(0, 1)
+	observableFoo := observable.AsObservableFoo()
+	var behavior struct {
+		sync.Mutex
+		err  error
+		done bool
+	}
+	observer(a, nil, false)
+	observerFoo := func(next foo, err error, done bool) {
+		if done {
+			behavior.Lock()
+			behavior.err = err
+			behavior.done = true
+			behavior.Unlock()
+		}
+		observer(next, err, done)
+	}
+	behaviorFoo := func(observe FooObserver, subscribeOn Scheduler, subscribe Subscriber) {
+		behavior.Lock()
+		completed := behavior.done && behavior.err == nil
+		behavior.Unlock()
+		if !completed {
+			observableFoo(observe, subscribeOn, subscribe)
+		} else {
+			EmptyFoo()(observe, subscribeOn, subscribe)
+		}
+	}
+	return SubjectFoo{observerFoo, behaviorFoo}
+}
