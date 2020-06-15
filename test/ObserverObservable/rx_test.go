@@ -214,7 +214,7 @@ func Test_1xN(t *testing.T) {
 }
 
 func Benchmark_1xN_rx(b *testing.B) {
-	const BUFSIZE = 512
+	const BUFSIZE = 500
 	CPU := runtime.GOMAXPROCS(0)
 	// fmt.Fprintln(os.Stderr, "NUM =", b.N, "; CPU =", CPU)
 
@@ -300,7 +300,7 @@ func Benchmark_1xN_rx(b *testing.B) {
 }
 
 func Benchmark_1xN_go(b *testing.B) {
-	const BUFSIZE = 512
+	const BUFSIZE = 500
 	CPU := runtime.GOMAXPROCS(0)
 	// fmt.Fprintln(os.Stderr, "N =", b.N, "; CPU =", CPU)
 

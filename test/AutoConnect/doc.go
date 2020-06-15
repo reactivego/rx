@@ -3,7 +3,7 @@ AutoConnect makes a Multicaster behave like an ordinary Observable that
 automatically connects the multicaster to its source when the specified number
 of observers have subscribed to it.
 
-If the count is less than 1 it will emit ErrAutoConnectInvalidCount when
+If the count is less than 1 it will emit InvalidCount when
 subscribed to.
 
 After connecting, when the number of subscribed observers eventually drops to

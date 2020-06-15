@@ -122,7 +122,7 @@ func TestObservable(e *testing.T) {
 		I(t, "should report error because count is less than 1", func(t T) {
 			err := FromInt(1, 2, 3).Publish().AutoConnect(0).Wait()
 			Asser(t).Error(err)
-			Asser(t).Equal(err, ErrAutoConnectInvalidCount)
+			Asser(t).Equal(err, InvalidCount)
 		})
 	})
 	Describ(e, "AutoConnect(1)", func(t T) {
@@ -208,7 +208,7 @@ func TestObservable(e *testing.T) {
 						value, err = autopub.ToSingle()
 						Asser(t).Equal(subscriptions, 1, "= subscriptions")
 						Asser(t).Error(err)
-						Asser(t).Equal(err, ErrSingleNoValue)
+						Asser(t).Equal(err, DidNotEmitValue)
 						Asser(t).Equal(value, 0, "= value")
 
 						//Asser(t).Equal(concurrent.Count(), 0, "= concurrent.Count()")
@@ -347,8 +347,8 @@ func TestObservable(e *testing.T) {
 			Asser(t).Error(err1)
 			Asser(t).Error(err2)
 
-			Asser(t).Equal(err1, ErrTimeout)
-			Asser(t).Equal(err2, ErrTimeout)
+			Asser(t).Equal(err1, TimeoutOccured)
+			Asser(t).Equal(err2, TimeoutOccured)
 
 			Asser(t).Equal(fmt.Sprint(concurrent), "Goroutine{ tasks = 0 }")
 

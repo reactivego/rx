@@ -826,8 +826,8 @@ func (o Observable) Serialize() Observable {
 
 //jig:name Observable_Timeout
 
-// ErrTimeout is delivered to an observer if the stream times out.
-const ErrTimeout = RxError("timeout")
+// TimeoutOccured is delivered to an observer if the stream times out.
+const TimeoutOccured = RxError("timeout")
 
 // Timeout mirrors the source Observable, but issues an error notification if a
 // particular period of time elapses without any emitted items.
@@ -850,7 +850,7 @@ func (o Observable) Timeout(due time.Duration) Observable {
 					} else {
 						timeout.occurred = true
 						timeout.Unlock()
-						observe(nil, ErrTimeout, true)
+						observe(nil, TimeoutOccured, true)
 						timeout.Lock()
 					}
 				}
@@ -932,14 +932,14 @@ func (o ObservableInt) AsObservable() Observable {
 
 //jig:name ErrAutoConnect
 
-const ErrAutoConnectInvalidCount = RxError("invalid count")
+const InvalidCount = RxError("invalid count")
 
 //jig:name IntMulticaster_AutoConnect
 
 // AutoConnect makes a IntMulticaster behave like an ordinary ObservableInt
 // that automatically connects the multicaster to its source when the
 // specified number of observers have subscribed to it. If the count is less
-// than 1 it will return a ThrowInt(ErrAutoConnectInvalidCount). After
+// than 1 it will return a ThrowInt(InvalidCount). After
 // connecting, when the number of subscribed observers eventually drops to 0,
 // AutoConnect will cancel the source connection if it hasn't terminated yet.
 // When subsequently the next observer subscribes, AutoConnect will connect to
@@ -952,7 +952,7 @@ const ErrAutoConnectInvalidCount = RxError("invalid count")
 // would leak a task and leave it hanging in the scheduler.
 func (o IntMulticaster) AutoConnect(count int) ObservableInt {
 	if count < 1 {
-		return ThrowInt(ErrAutoConnectInvalidCount)
+		return ThrowInt(InvalidCount)
 	}
 	var source struct {
 		sync.Mutex
@@ -1051,9 +1051,9 @@ func (o ObservableInt) Single() ObservableInt {
 
 //jig:name ErrSingle
 
-const ErrSingleNoValue = RxError("expected one value, got none")
+const DidNotEmitValue = RxError("expected one value, got none")
 
-const ErrSingleMultiValue = RxError("expected one value, got multiple")
+const EmittedMultipleValues = RxError("expected one value, got multiple")
 
 //jig:name Observable_Single
 
@@ -1076,7 +1076,7 @@ func (o Observable) Single() Observable {
 							observe(latest, nil, false)
 							observe(nil, nil, true)
 						} else {
-							observe(nil, ErrSingleNoValue, true)
+							observe(nil, DidNotEmitValue, true)
 						}
 					}
 				} else {
@@ -1084,7 +1084,7 @@ func (o Observable) Single() Observable {
 					if count == 1 {
 						latest = next
 					} else {
-						observe(nil, ErrSingleMultiValue, true)
+						observe(nil, EmittedMultipleValues, true)
 					}
 				}
 			}
