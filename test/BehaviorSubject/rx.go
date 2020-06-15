@@ -48,12 +48,11 @@ type Observable func(Observer, Scheduler, Subscriber)
 
 const OutOfSubscriptions = RxError("out of subscriptions")
 
-// MakeObserverObservable actually does make an observer observable. It
-// creates a buffering multicaster and returns both the Observer and the
-// Observable side of it. These are then used as the core of any Subject
-// implementation. The Observer side is used to pass items into the buffering
-// multicaster. This then multicasts the items to every Observer that
-// subscribes to the returned Observable.
+// MakeObserverObservable turns an observer into a multicasting and buffering
+// observable. Both the observer and the obeservable are returned. These are
+// then used as the core of any Subject implementation. The Observer side is
+// used to pass items into the buffering multicaster. This then multicasts the
+// items to every Observer that subscribes to the returned Observable.
 //
 //	age     age below which items are kept to replay to a new subscriber.
 //	length  length of the item buffer, number of items kept to replay to a new subscriber.
@@ -629,6 +628,19 @@ func (o ObservableString) Println(a ...interface{}) error {
 	return subscriber.Wait()
 }
 
+//jig:name ObservableString_AsObservable
+
+// AsObservable turns a typed ObservableString into an Observable of interface{}.
+func (o ObservableString) AsObservable() Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next string, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name ObservableString_SubscribeOn
 
 // SubscribeOn specifies the scheduler an ObservableString should use when it is
@@ -641,19 +653,6 @@ func (o ObservableString) SubscribeOn(scheduler Scheduler) ObservableString {
 			subscriber.OnWait(scheduler.Wait)
 		}
 		o(observe, scheduler, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableString_AsObservable
-
-// AsObservable turns a typed ObservableString into an Observable of interface{}.
-func (o ObservableString) AsObservable() Observable {
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next string, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
 	}
 	return observable
 }
