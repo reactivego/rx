@@ -68,6 +68,7 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 		cursor		uint64
 		state		uint64		// active, canceled, closed
 		activated	time.Time	// track activity to deterime backoff
+		subscribeOn	Scheduler
 	}
 
 	// cursor
@@ -173,12 +174,14 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 	send := func(value interface{}) {
 		for buf.commit == buf.end {
 			full := false
+			subscribeOn := Scheduler(nil)
 			gosched := accessSubscriptions(func(subscriptions []subscription) {
 				slowest := maxuint64
 				for i := range subscriptions {
 					current := atomic.LoadUint64(&subscriptions[i].cursor)
 					if current < slowest {
 						slowest = current
+						subscribeOn = subscriptions[i].subscribeOn
 					}
 				}
 				end := atomic.LoadUint64(&buf.end)
@@ -199,7 +202,11 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 			})
 			if full {
 				if !gosched {
-					runtime.Gosched()
+					if subscribeOn != nil {
+						subscribeOn.Gosched()
+					} else {
+						runtime.Gosched()
+					}
 				}
 				if atomic.LoadUint64(&buf.state) != active {
 					return
@@ -235,18 +242,19 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 		}
 	}
 
-	appendSubscription := func() (sub *subscription, err error) {
+	appendSubscription := func(subscribeOn Scheduler) (sub *subscription, err error) {
 		accessSubscriptions(func([]subscription) {
 			cursor := atomic.LoadUint64(&buf.begin)
 			s := &buf.subscriptions
 			if len(s.entries) < cap(s.entries) {
-				s.entries = append(s.entries, subscription{cursor: cursor})
+				s.entries = append(s.entries, subscription{cursor: cursor, subscribeOn: subscribeOn})
 				sub = &s.entries[len(s.entries)-1]
 				return
 			}
 			for i := range s.entries {
 				sub = &s.entries[i]
 				if atomic.CompareAndSwapUint64(&sub.cursor, maxuint64, cursor) {
+					sub.subscribeOn = subscribeOn
 					return
 				}
 			}
@@ -258,7 +266,7 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 	}
 
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		sub, err := appendSubscription()
+		sub, err := appendSubscription(subscribeOn)
 		if err != nil {
 			runner := subscribeOn.Schedule(func() {
 				if subscriber.Subscribed() {
@@ -460,33 +468,27 @@ func (o Observable) AsObservableString() ObservableString {
 // items emitted later by the Observable part.
 func NewBehaviorSubjectString(a string) SubjectString {
 	observer, observable := MakeObserverObservable(0, 1)
-	observableString := observable.AsObservableString()
 	var behavior struct {
-		sync.Mutex
-		err	error
-		done	bool
+		subject		SubjectString
+		completed	uint32
 	}
 	observer(a, nil, false)
-	observerString := func(next string, err error, done bool) {
-		if done {
-			behavior.Lock()
-			behavior.err = err
-			behavior.done = true
-			behavior.Unlock()
+	behavior.subject.StringObserver = func(next string, err error, done bool) {
+		if done && err == nil {
+			atomic.StoreUint32(&behavior.completed, 1)
 		}
 		observer(next, err, done)
 	}
-	behaviorString := func(observe StringObserver, subscribeOn Scheduler, subscribe Subscriber) {
-		behavior.Lock()
-		completed := behavior.done && behavior.err == nil
-		behavior.Unlock()
-		if !completed {
-			observableString(observe, subscribeOn, subscribe)
+	behavior.subject.ObservableString = func(observe StringObserver, subscribeOn Scheduler, subscribe Subscriber) {
+		if atomic.LoadUint32(&behavior.completed) != 1 {
+			o := observable.AsObservableString()
+			o(observe, subscribeOn, subscribe)
 		} else {
-			EmptyString()(observe, subscribeOn, subscribe)
+			o := EmptyString()
+			o(observe, subscribeOn, subscribe)
 		}
 	}
-	return SubjectString{observerString, behaviorString}
+	return behavior.subject
 }
 
 //jig:name GoroutineScheduler

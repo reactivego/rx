@@ -414,33 +414,27 @@ func NewReplaySubjectFoo(bufferCapacity int, windowDuration time.Duration) Subje
 // items emitted later by the Observable part.
 func NewBehaviorSubjectFoo(a foo) SubjectFoo {
 	observer, observable := MakeObserverObservable(0, 1)
-	observableFoo := observable.AsObservableFoo()
 	var behavior struct {
-		sync.Mutex
-		err  error
-		done bool
+		subject   SubjectFoo
+		completed uint32
 	}
 	observer(a, nil, false)
-	observerFoo := func(next foo, err error, done bool) {
-		if done {
-			behavior.Lock()
-			behavior.err = err
-			behavior.done = true
-			behavior.Unlock()
+	behavior.subject.FooObserver = func(next foo, err error, done bool) {
+		if done && err == nil {
+			atomic.StoreUint32(&behavior.completed, 1)
 		}
 		observer(next, err, done)
 	}
-	behaviorFoo := func(observe FooObserver, subscribeOn Scheduler, subscribe Subscriber) {
-		behavior.Lock()
-		completed := behavior.done && behavior.err == nil
-		behavior.Unlock()
-		if !completed {
-			observableFoo(observe, subscribeOn, subscribe)
+	behavior.subject.ObservableFoo = func(observe FooObserver, subscribeOn Scheduler, subscribe Subscriber) {
+		if atomic.LoadUint32(&behavior.completed) != 1 {
+			o := observable.AsObservableFoo()
+			o(observe, subscribeOn, subscribe)
 		} else {
-			EmptyFoo()(observe, subscribeOn, subscribe)
+			o := EmptyFoo()
+			o(observe, subscribeOn, subscribe)
 		}
 	}
-	return SubjectFoo{observerFoo, behaviorFoo}
+	return behavior.subject
 }
 
 //jig:template NewAsyncSubject<Foo>
@@ -458,7 +452,7 @@ func NewBehaviorSubjectFoo(a foo) SubjectFoo {
 func NewAsyncSubjectFoo() SubjectFoo {
 	observer, observable := MakeObserverObservable(0, 1)
 	var async struct {
-		set bool
+		set  bool
 		last foo
 	}
 	observerFoo := func(next foo, err error, done bool) {
