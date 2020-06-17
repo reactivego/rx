@@ -42,7 +42,6 @@ func (o ObservableFoo) CombineLatestMapBar(project func(foo) ObservableBar) Obse
 //jig:template Observable<Foo> CombineLatestMapTo<Bar>
 //jig:needs Observable<Foo> MapObservable<Bar>, ObservableObservable<Bar> CombineLatestAll
 
-
 // CombinesLatestMapTo maps every entry emitted by the ObservableFoo into a
 // single ObservableBar, and then subscribe to it, until the source
 // observable completes. It will then wait for all of the ObservableBars
@@ -73,6 +72,7 @@ func (o ObservableObservableFoo) CombineLatestAll() ObservableFooSlice {
 		observables := []ObservableFoo(nil)
 		var observers struct {
 			sync.Mutex
+			assigned    []bool
 			values      []foo
 			initialized int
 			active      int
@@ -84,8 +84,8 @@ func (o ObservableObservableFoo) CombineLatestAll() ObservableFooSlice {
 				if observers.active > 0 {
 					switch {
 					case !done:
-						var zero foo
-						if observers.values[index] == zero {
+						if !observers.assigned[index] {
+							observers.assigned[index] = true
 							observers.initialized++
 						}
 						observers.values[index] = next
@@ -118,6 +118,7 @@ func (o ObservableObservableFoo) CombineLatestAll() ObservableFooSlice {
 				subscribeOn.Schedule(func() {
 					if subscriber.Subscribed() {
 						numObservables := len(observables)
+						observers.assigned = make([]bool, numObservables)
 						observers.values = make([]foo, numObservables)
 						observers.active = numObservables
 						for i, v := range observables {

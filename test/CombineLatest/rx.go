@@ -44,7 +44,6 @@ type ObservableInt func(IntObserver, Scheduler, Subscriber)
 
 // FromInt creates an ObservableInt from multiple int values passed in.
 func FromInt(slice ...int) ObservableInt {
-	var zeroInt int
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -56,7 +55,8 @@ func FromInt(slice ...int) ObservableInt {
 						self()
 					}
 				} else {
-					observe(zeroInt, nil, true)
+					var zero int
+					observe(zero, nil, true)
 				}
 			}
 		})
@@ -79,12 +79,11 @@ type IntSlice = []int
 // observables emits, a new slice will be emitted containing all the latest
 // value.
 func (o ObservableObservableInt) CombineLatestAll() ObservableIntSlice {
-	var zeroInt int
-	var zeroIntSlice []int
 	observable := func(observe IntSliceObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observables := []ObservableInt(nil)
 		var observers struct {
 			sync.Mutex
+			assigned	[]bool
 			values		[]int
 			initialized	int
 			active		int
@@ -96,7 +95,8 @@ func (o ObservableObservableInt) CombineLatestAll() ObservableIntSlice {
 				if observers.active > 0 {
 					switch {
 					case !done:
-						if observers.values[index] == zeroInt {
+						if !observers.assigned[index] {
+							observers.assigned[index] = true
 							observers.initialized++
 						}
 						observers.values[index] = next
@@ -105,10 +105,12 @@ func (o ObservableObservableInt) CombineLatestAll() ObservableIntSlice {
 						}
 					case err != nil:
 						observers.active = 0
-						observe(zeroIntSlice, err, true)
+						var zero []int
+						observe(zero, err, true)
 					default:
 						if observers.active--; observers.active == 0 {
-							observe(zeroIntSlice, nil, true)
+							var zero []int
+							observe(zero, nil, true)
 						}
 					}
 				}
@@ -121,15 +123,17 @@ func (o ObservableObservableInt) CombineLatestAll() ObservableIntSlice {
 			case !done:
 				observables = append(observables, next)
 			case err != nil:
-				observe(zeroIntSlice, err, true)
+				var zero []int
+				observe(zero, err, true)
 			default:
 				subscribeOn.Schedule(func() {
-					if !subscriber.Canceled() {
+					if subscriber.Subscribed() {
 						numObservables := len(observables)
+						observers.assigned = make([]bool, numObservables)
 						observers.values = make([]int, numObservables)
 						observers.active = numObservables
 						for i, v := range observables {
-							if subscriber.Canceled() {
+							if !subscriber.Subscribed() {
 								return
 							}
 							v(makeObserver(i), subscribeOn, subscriber)
@@ -189,7 +193,6 @@ type ObservableIntSlice func(IntSliceObserver, Scheduler, Subscriber)
 
 // FromObservableInt creates an ObservableObservableInt from multiple ObservableInt values passed in.
 func FromObservableInt(slice ...ObservableInt) ObservableObservableInt {
-	var zeroObservableInt ObservableInt
 	observable := func(observe ObservableIntObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -201,7 +204,8 @@ func FromObservableInt(slice ...ObservableInt) ObservableObservableInt {
 						self()
 					}
 				} else {
-					observe(zeroObservableInt, nil, true)
+					var zero ObservableInt
+					observe(zero, nil, true)
 				}
 			}
 		})
@@ -216,19 +220,17 @@ func FromObservableInt(slice ...ObservableInt) ObservableObservableInt {
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
 // Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableIntSlice) Println(a ...interface{}) (err error) {
+func (o ObservableIntSlice) Println(a ...interface{}) error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next IntSlice, e error, done bool) {
+	observer := func(next IntSlice, err error, done bool) {
 		if !done {
 			fmt.Println(append(a, next)...)
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
+	return subscriber.Wait()
 }
