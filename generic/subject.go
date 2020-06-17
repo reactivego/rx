@@ -33,6 +33,7 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 		cursor    uint64
 		state     uint64    // active, canceled, closed
 		activated time.Time // track activity to deterime backoff
+		subscribeOn Scheduler
 	}
 
 	// cursor
@@ -97,7 +98,7 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 			cap = capacity[0]
 		}
 		if cap < length {
-		 	cap = length
+			cap = length
 		}
 		if cap == 0 {
 			cap = 1
@@ -105,7 +106,7 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 		size := uint64(1) << uint(math.Ceil(math.Log2(float64(cap)))) // MUST(keep < size)
 
 		if scap < 1 {
-		 	scap = 1
+			scap = 1
 		}
 		buf := &buffer{
 			age:  age,
@@ -138,12 +139,14 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 	send := func(value interface{}) {
 		for buf.commit == buf.end {
 			full := false
+			subscribeOn := Scheduler(nil)
 			gosched := accessSubscriptions(func(subscriptions []subscription) {
 				slowest := maxuint64
 				for i := range subscriptions {
 					current := atomic.LoadUint64(&subscriptions[i].cursor)
 					if current < slowest {
 						slowest = current
+						subscribeOn = subscriptions[i].subscribeOn
 					}
 				}
 				end := atomic.LoadUint64(&buf.end)
@@ -164,7 +167,11 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 			})
 			if full {
 				if !gosched {
-					runtime.Gosched() // spinlock while full
+					if subscribeOn != nil {
+						subscribeOn.Gosched()
+					} else {
+						runtime.Gosched()
+					}
 				}
 				if atomic.LoadUint64(&buf.state) != active {
 					return // buffer no longer active
@@ -200,18 +207,19 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 		}
 	}
 
-	appendSubscription := func() (sub *subscription, err error) {
+	appendSubscription := func(subscribeOn Scheduler) (sub *subscription, err error) {
 		accessSubscriptions(func([]subscription) {
 			cursor := atomic.LoadUint64(&buf.begin)
 			s := &buf.subscriptions
 			if len(s.entries) < cap(s.entries) {
-				s.entries = append(s.entries, subscription{cursor: cursor})
+				s.entries = append(s.entries, subscription{cursor: cursor, subscribeOn: subscribeOn})
 				sub = &s.entries[len(s.entries)-1]
 				return
 			}
 			for i := range s.entries {
 				sub = &s.entries[i]
 				if atomic.CompareAndSwapUint64(&sub.cursor, maxuint64, cursor) {
+					sub.subscribeOn = subscribeOn
 					return
 				}
 			}
@@ -223,7 +231,7 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 	}
 
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		sub, err := appendSubscription()
+		sub, err := appendSubscription(subscribeOn)
 		if err != nil {
 			runner := subscribeOn.Schedule(func() {
 				if subscriber.Subscribed() {
@@ -458,7 +466,7 @@ func NewAsyncSubjectFoo() SubjectFoo {
 			async.set = true
 			async.last = next
 		} else {
-			if async.set && err == nil{
+			if async.set && err == nil {
 				observer(async.last, nil, false)
 			}
 			observer(next, err, true)
