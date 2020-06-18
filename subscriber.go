@@ -130,10 +130,7 @@ func (s *subscriber) Wait() error {
 		s.OnUnsubscribe(wg.Done)
 		wg.Wait()
 	}
-	s.Lock()
-	err := s.err
-	s.Unlock()
-	return err
+	return s.Error()
 }
 
 func (s *subscriber) Add(callbacks ...func()) Subscriber {
@@ -177,11 +174,9 @@ func (s *subscriber) Done(err error) {
 func (s *subscriber) Error() error {
 	s.Lock()
 	err := s.err
+	s.Unlock()
 	if atomic.LoadInt32(&s.state) == subscribed {
 		err = nil
 	}
-	s.Unlock()
 	return err
 }
-
-//
