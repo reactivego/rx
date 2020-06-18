@@ -86,7 +86,6 @@ type NextInt func(int)
 // and Complete function that can be called by the code that implements the
 // Observable.
 func CreateRecursiveInt(create func(NextInt, Error, Complete)) ObservableInt {
-	var zeroInt int
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		done := false
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -101,13 +100,15 @@ func CreateRecursiveInt(create func(NextInt, Error, Complete)) ObservableInt {
 			e := func(err error) {
 				done = true
 				if subscriber.Subscribed() {
-					observe(zeroInt, err, true)
+					var zero int
+					observe(zero, err, true)
 				}
 			}
 			c := func() {
 				done = true
 				if subscriber.Subscribed() {
-					observe(zeroInt, nil, true)
+					var zero int
+					observe(zero, nil, true)
 				}
 			}
 			create(n, e, c)
@@ -135,7 +136,6 @@ type Canceled func() bool
 // Complete and Canceled function that can be called by the code that
 // implements the Observable.
 func CreateInt(create func(NextInt, Error, Complete, Canceled)) ObservableInt {
-	var zeroInt int
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
 			if !subscriber.Subscribed() {
@@ -148,12 +148,14 @@ func CreateInt(create func(NextInt, Error, Complete, Canceled)) ObservableInt {
 			}
 			e := func(err error) {
 				if subscriber.Subscribed() {
-					observe(zeroInt, err, true)
+					var zero int
+					observe(zero, err, true)
 				}
 			}
 			c := func() {
 				if subscriber.Subscribed() {
-					observe(zeroInt, nil, true)
+					var zero int
+					observe(zero, nil, true)
 				}
 			}
 			x := func() bool {
@@ -170,7 +172,6 @@ func CreateInt(create func(NextInt, Error, Complete, Canceled)) ObservableInt {
 
 // FromInt creates an ObservableInt from multiple int values passed in.
 func FromInt(slice ...int) ObservableInt {
-	var zeroInt int
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -182,25 +183,9 @@ func FromInt(slice ...int) ObservableInt {
 						self()
 					}
 				} else {
-					observe(zeroInt, nil, true)
+					var zero int
+					observe(zero, nil, true)
 				}
-			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
-}
-
-//jig:name ThrowInt
-
-// ThrowInt creates an Observable that emits no items and terminates with an
-// error.
-func ThrowInt(err error) ObservableInt {
-	var zeroInt int
-	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
-		runner := scheduler.Schedule(func() {
-			if subscriber.Subscribed() {
-				observe(zeroInt, err, true)
 			}
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
@@ -214,6 +199,27 @@ type RxError string
 
 func (e RxError) Error() string	{ return string(e) }
 
+//jig:name InvalidCount
+
+const InvalidCount = RxError("invalid count")
+
+//jig:name ThrowInt
+
+// ThrowInt creates an Observable that emits no items and terminates with an
+// error.
+func ThrowInt(err error) ObservableInt {
+	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
+		runner := scheduler.Schedule(func() {
+			if subscriber.Subscribed() {
+				var zero int
+				observe(zero, err, true)
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
+}
+
 //jig:name NeverInt
 
 // NeverInt creates an ObservableInt that emits no items and does't terminate.
@@ -223,18 +229,34 @@ func NeverInt() ObservableInt {
 	return observable
 }
 
+//jig:name Observer
+
+// Observer is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
+// completed normally.
+type Observer func(next interface{}, err error, done bool)
+
+//jig:name Observable
+
+// Observable is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type Observable func(Observer, Scheduler, Subscriber)
+
 //jig:name Timer
 
-// Timer creates an ObservableInt that emits a sequence of integers (starting
-// at zero) after an initialDelay has passed. Subsequent values are emitted
-// using  a schedule of intervals passed in. If only the initialDelay is
-// given, Timer will emit only once.
-func Timer(initialDelay time.Duration, intervals ...time.Duration) ObservableInt {
-	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
+// Timer creates an Observable that emits a sequence of integers
+// (starting at zero) after an initialDelay has passed. Subsequent values are
+// emitted using  a schedule of intervals passed in. If only the initialDelay
+// is given, Timer will emit only once.
+func Timer(initialDelay time.Duration, intervals ...time.Duration) Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := subscribeOn.ScheduleFutureRecursive(initialDelay, func(self func(time.Duration)) {
 			if subscriber.Subscribed() {
-				observe(i, nil, false)
+				observe(interface{}(i), nil, false)
 				if subscriber.Subscribed() {
 					if len(intervals) > 0 {
 						self(intervals[i%len(intervals)])
@@ -265,8 +287,8 @@ func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber)
 		if !done {
 			observe(next, err, done)
 		} else {
-			var zeroInt int
-			observe(zeroInt, err, true)
+			var zero int
+			observe(zero, err, true)
 			subscribers[0].Done(err)
 		}
 	}
@@ -382,32 +404,15 @@ func (o ObservableInt) Multicast(factory func() SubjectInt) IntMulticaster {
 	return IntMulticaster{ObservableInt: observable, Connectable: connectable}
 }
 
-//jig:name Observer
-
-// Observer is a function that gets called whenever the Observable has
-// something to report. The next argument is the item value that is only
-// valid when the done argument is false. When done is true and the err
-// argument is not nil, then the Observable has terminated with an error.
-// When done is true and the err argument is nil, then the Observable has
-// completed normally.
-type Observer func(next interface{}, err error, done bool)
-
-//jig:name Observable
-
-// Observable is a function taking an Observer, Scheduler and Subscriber.
-// Calling it will subscribe the Observer to events from the Observable.
-type Observable func(Observer, Scheduler, Subscriber)
-
 //jig:name MakeObserverObservable
 
-const ErrOutOfSubscriptions = RxError("out of subscriptions")
+const OutOfSubscriptions = RxError("out of subscriptions")
 
-// MakeObserverObservable actually does make an observer observable. It
-// creates a buffering multicaster and returns both the Observer and the
-// Observable side of it. These are then used as the core of any Subject
-// implementation. The Observer side is used to pass items into the buffering
-// multicaster. This then multicasts the items to every Observer that
-// subscribes to the returned Observable.
+// MakeObserverObservable turns an observer into a multicasting and buffering
+// observable. Both the observer and the obeservable are returned. These are
+// then used as the core of any Subject implementation. The Observer side is
+// used to pass items into the buffering multicaster. This then multicasts the
+// items to every Observer that subscribes to the returned Observable.
 //
 //	age     age below which items are kept to replay to a new subscriber.
 //	length  length of the item buffer, number of items kept to replay to a new subscriber.
@@ -419,13 +424,19 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 		us	= time.Microsecond
 	)
 
-	// Access to subscriptions
+	type subscription struct {
+		cursor		uint64
+		state		uint64		// active, canceled, closed
+		activated	time.Time	// track activity to deterime backoff
+		subscribeOn	Scheduler
+	}
+
+	// cursor
 	const (
-		idle	uint32	= iota
-		busy
+		maxuint64 uint64 = math.MaxUint64	// park unused cursor at maxuint64
 	)
 
-	// State of subscription and buffer
+	// state
 	const (
 		active	uint64	= iota
 		canceled
@@ -433,23 +444,18 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 		closed
 	)
 
-	const (
-		// Cursor is parked so it does not influence advancing the commit index.
-		parked uint64 = math.MaxUint64
-	)
-
-	type subscription struct {
-		Cursor		uint64
-		State		uint64		// active, canceled, closed
-		LastActive	time.Time	// track activity to deterime backoff
-	}
-
 	type subscriptions struct {
 		sync.Mutex
 		*sync.Cond
 		entries	[]subscription
-		access	uint32	// idle, busy
+		access	uint32	// unlocked, locked
 	}
+
+	// access
+	const (
+		unlocked	uint32	= iota
+		locked
+	)
 
 	type item struct {
 		Value	interface{}
@@ -458,10 +464,10 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 
 	type buffer struct {
 		age	time.Duration
-		len	uint64
-		cap	uint64
-
+		keep	uint64
 		mod	uint64
+		size	uint64
+
 		items	[]item
 		begin	uint64
 		end	uint64
@@ -474,25 +480,37 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 	}
 
 	make := func(age time.Duration, length int, capacity ...int) *buffer {
-		cap, scap := uint64(length), uint64(32)
+		if length < 0 {
+			length = 0
+		}
+		keep := uint64(length)
+
+		cap, scap := length, 32
 		switch {
 		case len(capacity) >= 2:
-			cap, scap = uint64(capacity[0]), uint64(capacity[1])
+			cap, scap = capacity[0], capacity[1]
 		case len(capacity) == 1:
-			cap = uint64(capacity[0])
+			cap = capacity[0]
 		}
-		len := uint64(length)
-		if cap < len {
-			cap = len
+		if cap < length {
+			cap = length
 		}
-		cap = uint64(1) << uint(math.Ceil(math.Log2(float64(cap))))
+		if cap == 0 {
+			cap = 1
+		}
+		size := uint64(1) << uint(math.Ceil(math.Log2(float64(cap))))
+
+		if scap < 1 {
+			scap = 1
+		}
 		buf := &buffer{
-			len:	len,
-			cap:	cap,
 			age:	age,
-			items:	make([]item, cap),
-			mod:	cap - 1,
-			end:	cap,
+			keep:	keep,
+			mod:	size - 1,
+			size:	size,
+
+			items:	make([]item, size),
+			end:	size,
 			subscriptions: subscriptions{
 				entries: make([]subscription, 0, scap),
 			},
@@ -503,38 +521,52 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 	buf := make(age, length, capacity...)
 
 	accessSubscriptions := func(access func([]subscription)) bool {
-		spun := false
-		for !atomic.CompareAndSwapUint32(&buf.subscriptions.access, idle, busy) {
+		gosched := false
+		for !atomic.CompareAndSwapUint32(&buf.subscriptions.access, unlocked, locked) {
 			runtime.Gosched()
-			spun = true
+			gosched = true
 		}
 		access(buf.subscriptions.entries)
-		atomic.StoreUint32(&buf.subscriptions.access, idle)
-		return spun
+		atomic.StoreUint32(&buf.subscriptions.access, unlocked)
+		return gosched
 	}
 
 	send := func(value interface{}) {
 		for buf.commit == buf.end {
-			slowest := parked
-			spun := accessSubscriptions(func(subscriptions []subscription) {
+			full := false
+			subscribeOn := Scheduler(nil)
+			gosched := accessSubscriptions(func(subscriptions []subscription) {
+				slowest := maxuint64
 				for i := range subscriptions {
-					cursor := atomic.LoadUint64(&subscriptions[i].Cursor)
-					if cursor < slowest {
-						slowest = cursor
+					current := atomic.LoadUint64(&subscriptions[i].cursor)
+					if current < slowest {
+						slowest = current
+						subscribeOn = subscriptions[i].subscribeOn
 					}
 				}
-				if atomic.LoadUint64(&buf.begin) < slowest && slowest <= atomic.LoadUint64(&buf.end) {
+				end := atomic.LoadUint64(&buf.end)
+				if atomic.LoadUint64(&buf.begin) < slowest && slowest <= end {
+					if slowest+buf.keep > end {
+						slowest = end - buf.keep + 1
+					}
 					atomic.StoreUint64(&buf.begin, slowest)
-					atomic.StoreUint64(&buf.end, slowest+buf.mod+1)
+					atomic.StoreUint64(&buf.end, slowest+buf.size)
 				} else {
-					slowest = parked
+					if slowest == maxuint64 {
+						atomic.AddUint64(&buf.begin, 1)
+						atomic.AddUint64(&buf.end, 1)
+					} else {
+						full = true
+					}
 				}
 			})
-			if slowest == parked {
-
-				if !spun {
-
-					runtime.Gosched()
+			if full {
+				if !gosched {
+					if subscribeOn != nil {
+						subscribeOn.Gosched()
+					} else {
+						runtime.Gosched()
+					}
 				}
 				if atomic.LoadUint64(&buf.state) != active {
 					return
@@ -552,7 +584,7 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 			if atomic.CompareAndSwapUint64(&buf.state, closing, closed) {
 				accessSubscriptions(func(subscriptions []subscription) {
 					for i := range subscriptions {
-						atomic.CompareAndSwapUint64(&subscriptions[i].State, active, closed)
+						atomic.CompareAndSwapUint64(&subscriptions[i].state, active, closed)
 					}
 				})
 			}
@@ -570,29 +602,31 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 		}
 	}
 
-	appendSubscription := func(cursor uint64) (sub *subscription, err error) {
+	appendSubscription := func(subscribeOn Scheduler) (sub *subscription, err error) {
 		accessSubscriptions(func([]subscription) {
+			cursor := atomic.LoadUint64(&buf.begin)
 			s := &buf.subscriptions
 			if len(s.entries) < cap(s.entries) {
-				s.entries = append(s.entries, subscription{Cursor: cursor})
+				s.entries = append(s.entries, subscription{cursor: cursor, subscribeOn: subscribeOn})
 				sub = &s.entries[len(s.entries)-1]
 				return
 			}
 			for i := range s.entries {
 				sub = &s.entries[i]
-				if atomic.CompareAndSwapUint64(&sub.Cursor, parked, cursor) {
+				if atomic.CompareAndSwapUint64(&sub.cursor, maxuint64, cursor) {
+					sub.subscribeOn = subscribeOn
 					return
 				}
 			}
-			err = ErrOutOfSubscriptions
+			sub = nil
+			err = OutOfSubscriptions
 			return
 		})
 		return
 	}
 
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		begin := atomic.LoadUint64(&buf.begin)
-		sub, err := appendSubscription(begin)
+		sub, err := appendSubscription(subscribeOn)
 		if err != nil {
 			runner := subscribeOn.Schedule(func() {
 				if subscriber.Subscribed() {
@@ -603,32 +637,32 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 			return
 		}
 		commit := atomic.LoadUint64(&buf.commit)
-		if begin+buf.len < commit {
-			atomic.StoreUint64(&sub.Cursor, commit-buf.len)
+		if atomic.LoadUint64(&buf.begin)+buf.keep < commit {
+			atomic.StoreUint64(&sub.cursor, commit-buf.keep)
 		}
-		atomic.StoreUint64(&sub.State, atomic.LoadUint64(&buf.state))
-		sub.LastActive = time.Now()
+		atomic.StoreUint64(&sub.state, atomic.LoadUint64(&buf.state))
+		sub.activated = time.Now()
 
 		receiver := subscribeOn.ScheduleFutureRecursive(0, func(self func(time.Duration)) {
 			commit := atomic.LoadUint64(&buf.commit)
 
-			if sub.Cursor == commit {
-				if atomic.CompareAndSwapUint64(&sub.State, canceled, canceled) {
+			if sub.cursor == commit {
+				if atomic.CompareAndSwapUint64(&sub.state, canceled, canceled) {
 
-					atomic.StoreUint64(&sub.Cursor, parked)
+					atomic.StoreUint64(&sub.cursor, maxuint64)
 					return
 				} else {
 
 					now := time.Now()
-					if now.Before(sub.LastActive.Add(1 * ms)) {
+					if now.Before(sub.activated.Add(1 * ms)) {
 
 						self(50 * us)
 						return
-					} else if now.Before(sub.LastActive.Add(250 * ms)) {
-						if atomic.CompareAndSwapUint64(&sub.State, closed, closed) {
+					} else if now.Before(sub.activated.Add(250 * ms)) {
+						if atomic.CompareAndSwapUint64(&sub.state, closed, closed) {
 
 							observe(nil, buf.err, true)
-							atomic.StoreUint64(&sub.Cursor, parked)
+							atomic.StoreUint64(&sub.cursor, maxuint64)
 							return
 						}
 
@@ -640,7 +674,7 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 							buf.subscriptions.Lock()
 							buf.subscriptions.Wait()
 							buf.subscriptions.Unlock()
-							sub.LastActive = time.Now()
+							sub.activated = time.Now()
 							self(0)
 							return
 						} else {
@@ -652,28 +686,28 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 				}
 			}
 
-			if atomic.LoadUint64(&sub.State) == canceled {
-				atomic.StoreUint64(&sub.Cursor, parked)
+			if atomic.LoadUint64(&sub.state) == canceled {
+				atomic.StoreUint64(&sub.cursor, maxuint64)
 				return
 			}
-			for ; sub.Cursor != commit; atomic.AddUint64(&sub.Cursor, 1) {
-				item := &buf.items[sub.Cursor&buf.mod]
+			for ; sub.cursor != commit; atomic.AddUint64(&sub.cursor, 1) {
+				item := &buf.items[sub.cursor&buf.mod]
 				if buf.age == 0 || item.At.IsZero() || time.Since(item.At) < buf.age {
 					observe(item.Value, nil, false)
 				}
-				if atomic.LoadUint64(&sub.State) == canceled {
-					atomic.StoreUint64(&sub.Cursor, parked)
+				if atomic.LoadUint64(&sub.state) == canceled {
+					atomic.StoreUint64(&sub.cursor, maxuint64)
 					return
 				}
 			}
 
-			sub.LastActive = time.Now()
+			sub.activated = time.Now()
 			self(0)
 		})
 		subscriber.OnUnsubscribe(receiver.Cancel)
 
 		subscriber.OnUnsubscribe(func() {
-			atomic.CompareAndSwapUint64(&sub.State, active, canceled)
+			atomic.CompareAndSwapUint64(&sub.state, active, canceled)
 			buf.subscriptions.Broadcast()
 		})
 	}
@@ -732,21 +766,53 @@ func (o Observer) AsIntObserver() IntObserver {
 	return observer
 }
 
-//jig:name MaxReplayCapacity
+//jig:name TypecastFailed
 
-// MaxReplayCapacity is the maximum size of a replay buffer. Can be modified.
-var MaxReplayCapacity = 16383
+// ErrTypecast is delivered to an observer if the generic value cannot be
+// typecast to a specific type.
+const TypecastFailed = RxError("typecast failed")
+
+//jig:name Observable_AsObservableInt
+
+// AsObservableInt turns an Observable of interface{} into an ObservableInt.
+// If during observing a typecast fails, the error ErrTypecastToInt will be
+// emitted.
+func (o Observable) AsObservableInt() ObservableInt {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				if nextInt, ok := next.(int); ok {
+					observe(nextInt, err, done)
+				} else {
+					var zero int
+					observe(zero, TypecastFailed, true)
+				}
+			} else {
+				var zero int
+				observe(zero, err, true)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name DefaultReplayCapacity
+
+// DefaultReplayCapacity is the default capacity of a replay buffer when
+// a bufferCapacity of 0 is passed to the NewReplaySubject function.
+const DefaultReplayCapacity = 16383
 
 //jig:name NewReplaySubjectInt
 
 // NewReplaySubjectInt creates a new ReplaySubject. ReplaySubject ensures that
 // all observers see the same sequence of emitted items, even if they
-// subscribe after. When bufferCapacity argument is 0, then MaxReplayCapacity is
-// used (currently 16383). When windowDuration argument is 0, then entries added
+// subscribe after. When bufferCapacity argument is 0, then DefaultReplayCapacity is
+// used (currently 16380). When windowDuration argument is 0, then entries added
 // to the buffer will remain fresh forever.
 func NewReplaySubjectInt(bufferCapacity int, windowDuration time.Duration) SubjectInt {
 	if bufferCapacity == 0 {
-		bufferCapacity = MaxReplayCapacity
+		bufferCapacity = DefaultReplayCapacity
 	}
 	observer, observable := MakeObserverObservable(windowDuration, bufferCapacity)
 	return SubjectInt{observer.AsIntObserver(), observable.AsObservableInt()}
@@ -781,7 +847,7 @@ func (o ObservableInt) PublishReplay(bufferCapacity int, windowDuration time.Dur
 // observable goroutine is blocked until all subscribers have processed the
 // next, error or complete notification.
 func NewSubjectInt() SubjectInt {
-	observer, observable := MakeObserverObservable(0, 0, 1, 16)
+	observer, observable := MakeObserverObservable(0, 0)
 	return SubjectInt{observer.AsIntObserver(), observable.AsObservableInt()}
 }
 
@@ -827,7 +893,7 @@ func (o Observable) Serialize() Observable {
 //jig:name Observable_Timeout
 
 // TimeoutOccured is delivered to an observer if the stream times out.
-const TimeoutOccured = RxError("timeout")
+const TimeoutOccured = RxError("timeout occured")
 
 // Timeout mirrors the source Observable, but issues an error notification if a
 // particular period of time elapses without any emitted items.
@@ -886,35 +952,206 @@ func (o ObservableInt) Timeout(timeout time.Duration) ObservableInt {
 	return o.AsObservable().Timeout(timeout).AsObservableInt()
 }
 
-//jig:name ErrTypecastToInt
+//jig:name Observable_Subscribe
 
-// ErrTypecastToInt is delivered to an observer if the generic value cannot be
-// typecast to int.
-const ErrTypecastToInt = RxError("typecast to int failed")
+// Subscribe operates upon the emissions and notifications from an Observable.
+// This method returns a Subscription.
+// Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o Observable) Subscribe(observe Observer, subscribers ...Subscriber) Subscription {
+	subscribers = append(subscribers, subscriber.New())
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next interface{}, err error, done bool) {
+		if !done {
+			observe(next, err, done)
+		} else {
+			var zero interface{}
+			observe(zero, err, true)
+			subscribers[0].Done(err)
+		}
+	}
+	subscribers[0].OnWait(scheduler.Wait)
+	o(observer, scheduler, subscribers[0])
+	return subscribers[0]
+}
 
-//jig:name Observable_AsObservableInt
+//jig:name Multicaster
 
-// AsObservableInt turns an Observable of interface{} into an ObservableInt.
-// If during observing a typecast fails, the error ErrTypecastToInt will be
-// emitted.
-func (o Observable) AsObservableInt() ObservableInt {
-	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				if nextInt, ok := next.(int); ok {
-					observe(nextInt, err, done)
-				} else {
-					var zeroInt int
-					observe(zeroInt, ErrTypecastToInt, true)
+// Multicaster is a multicasting connectable observable. One or more
+// Observers can subscribe to it simultaneously. It will subscribe to the
+// source Observable when Connect is called. After that, every emission
+// from the source is multcast to all subscribed Observers.
+type Multicaster struct {
+	Observable
+	Connectable
+}
+
+//jig:name Observable_Multicast
+
+// Multicast converts an ordinary observable into a multicasting connectable
+// observable or multicaster for short. A multicaster will only start emitting
+// values after its Connect method has been called. The factory method passed
+// in should return a new Subject that implements the actual multicasting
+// behavior.
+func (o Observable) Multicast(factory func() Subject) Multicaster {
+	const (
+		active	int32	= iota
+		notifying
+		erred
+		completed
+	)
+	var subject struct {
+		state	int32
+		atomic.Value
+		count	int32
+	}
+	const (
+		unsubscribed	int32	= iota
+		subscribed
+	)
+	var source struct {
+		sync.Mutex
+		state		int32
+		subscriber	Subscriber
+	}
+	subject.Store(factory())
+	observer := func(next interface{}, err error, done bool) {
+		if atomic.CompareAndSwapInt32(&subject.state, active, notifying) {
+			if s, ok := subject.Load().(Subject); ok {
+				s.Observer(next, err, done)
+			}
+			switch {
+			case !done:
+				atomic.CompareAndSwapInt32(&subject.state, notifying, active)
+			case err != nil:
+				if atomic.CompareAndSwapInt32(&subject.state, notifying, erred) {
+					source.subscriber.Done(err)
 				}
-			} else {
-				var zeroInt int
-				observe(zeroInt, err, true)
+			default:
+				if atomic.CompareAndSwapInt32(&subject.state, notifying, completed) {
+					source.subscriber.Done(nil)
+				}
 			}
 		}
-		o(observer, subscribeOn, subscriber)
 	}
-	return observable
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		if atomic.AddInt32(&subject.count, 1) == 1 {
+			if atomic.CompareAndSwapInt32(&subject.state, erred, active) {
+				subject.Store(factory())
+			}
+		}
+		if s, ok := subject.Load().(Subject); ok {
+			s.Observable(observe, subscribeOn, subscriber)
+		}
+		subscriber.OnUnsubscribe(func() {
+			atomic.AddInt32(&subject.count, -1)
+		})
+	}
+	connectable := func(subscribeOn Scheduler, subscriber Subscriber) {
+		source.Lock()
+		if atomic.CompareAndSwapInt32(&source.state, unsubscribed, subscribed) {
+			source.subscriber = subscriber
+			o(observer, subscribeOn, subscriber)
+			subscriber.OnUnsubscribe(func() {
+				atomic.CompareAndSwapInt32(&source.state, subscribed, unsubscribed)
+			})
+		} else {
+			source.subscriber.OnUnsubscribe(subscriber.Unsubscribe)
+			subscriber.OnUnsubscribe(source.subscriber.Unsubscribe)
+		}
+		source.Unlock()
+	}
+	return Multicaster{Observable: observable, Connectable: connectable}
+}
+
+//jig:name Subject
+
+// Subject is a combination of an Observer and Observable.
+// Subjects are special because they are the only reactive constructs that
+// support multicasting. The items sent to it through its observer side are
+// multicasted to multiple clients subscribed to its observable side.
+//
+// The Subject exposes all methods from the embedded Observer and
+// Observable. Use the Observer Next, Error and Complete methods to feed
+// data to it. Use the Observable methods to subscribe to it.
+//
+// After a subject has been terminated by calling either Error or Complete,
+// it goes into terminated state. All subsequent calls to its observer side
+// will be silently ignored. All subsequent subscriptions to the observable
+// side will be handled according to the specific behavior of the subject.
+// There are different types of subjects, see the different NewXxxSubject
+// functions for more info.
+type Subject struct {
+	Observer
+	Observable
+}
+
+// Next is called by an Observable to emit the next interface{} value to the
+// Observer.
+func (o Observer) Next(next interface{}) {
+	o(next, nil, false)
+}
+
+// Error is called by an Observable to report an error to the Observer.
+func (o Observer) Error(err error) {
+	var zero interface{}
+	o(zero, err, true)
+}
+
+// Complete is called by an Observable to signal that no more data is
+// forthcoming to the Observer.
+func (o Observer) Complete() {
+	var zero interface{}
+	o(zero, nil, true)
+}
+
+//jig:name Observer_AsObserver
+
+// AsObserver converts an observer of interface{} items to an observer of
+// interface{} items.
+func (o Observer) AsObserver() Observer {
+	observer := func(next interface{}, err error, done bool) {
+		o(next, err, done)
+	}
+	return observer
+}
+
+//jig:name Observable_AsObservable
+
+// AsObservable returns the source Observable unchanged.
+// This is a special case needed for internal plumbing.
+func (o Observable) AsObservable() Observable {
+	return o
+}
+
+//jig:name NewSubject
+
+// NewSubject creates a new Subject. After the subject is terminated, all
+// subsequent subscriptions to the observable side will be terminated
+// immediately with either an Error or Complete notification send to the
+// subscribing client
+//
+// Note that this implementation is blocking. When there are subscribers, the
+// observable goroutine is blocked until all subscribers have processed the
+// next, error or complete notification.
+func NewSubject() Subject {
+	observer, observable := MakeObserverObservable(0, 0)
+	return Subject{observer.AsObserver(), observable.AsObservable()}
+}
+
+//jig:name Observable_Publish
+
+// Publish uses the Multicast operator to control the subscription of a
+// Subject to a source observable and turns the subject it into a connnectable
+// observable. A Subject emits to an observer only those items that are emitted
+// by the source Observable subsequent to the time of the observer subscribes.
+//
+// If the source completed and as a result the internal Subject terminated, then
+// calling Connect again will replace the old Subject with a newly created one.
+// So this Publish operator is re-connectable, unlike the RxJS 5 behavior that
+// isn't. To simulate the RxJS 5 behavior use Publish().AutoConnect(1) this will
+// connect on the first subscription but will never re-connect.
+func (o Observable) Publish() Multicaster {
+	return o.Multicast(NewSubject)
 }
 
 //jig:name ObservableInt_AsObservable
@@ -930,26 +1167,22 @@ func (o ObservableInt) AsObservable() Observable {
 	return observable
 }
 
-//jig:name ErrAutoConnect
-
-const InvalidCount = RxError("invalid count")
-
 //jig:name IntMulticaster_AutoConnect
 
 // AutoConnect makes a IntMulticaster behave like an ordinary ObservableInt
 // that automatically connects the multicaster to its source when the
 // specified number of observers have subscribed to it. If the count is less
-// than 1 it will return a ThrowInt(InvalidCount). After
-// connecting, when the number of subscribed observers eventually drops to 0,
-// AutoConnect will cancel the source connection if it hasn't terminated yet.
-// When subsequently the next observer subscribes, AutoConnect will connect to
-// the source only when it was previously canceled or because the source
-// terminated with an error. So it will not reconnect when the source
-// completed succesfully. This specific behavior allows for implementing a
-// caching observable that can be retried until it succeeds. Another thing to
-// notice is that AutoConnect will disconnect an active connection when the
-// number of observers drops to zero. The reason for this is that not doing so
-// would leak a task and leave it hanging in the scheduler.
+// than 1 it will return a ThrowInt(InvalidCount). After connecting, when the
+// number of subscribed observers eventually drops to 0, AutoConnect will
+// cancel the source connection if it hasn't terminated yet. When subsequently
+// the next observer subscribes, AutoConnect will connect to the source only
+// when it was previously canceled or because the source terminated with an
+// error. So it will not reconnect when the source completed succesfully. This
+// specific behavior allows for implementing a caching observable that can be
+// retried until it succeeds. Another thing to notice is that AutoConnect will
+// disconnect an active connection when the number of observers drops to zero.
+// The reason for this is that not doing so would leak a task and leave it
+// hanging in the scheduler.
 func (o IntMulticaster) AutoConnect(count int) ObservableInt {
 	if count < 1 {
 		return ThrowInt(InvalidCount)
@@ -970,6 +1203,73 @@ func (o IntMulticaster) AutoConnect(count int) ObservableInt {
 			source.Unlock()
 		})
 		o.ObservableInt(observe, subscribeOn, withSubscriber)
+		source.Lock()
+		if atomic.AddInt32(&source.refcount, 1) == int32(count) {
+			if source.subscriber == nil || source.subscriber.Error() != nil {
+				source.subscriber = subscriber.New()
+				source.Unlock()
+				o.Connectable(subscribeOn, source.subscriber)
+				source.Lock()
+			}
+		}
+		source.Unlock()
+	}
+	return observable
+}
+
+//jig:name Throw
+
+// Throw creates an Observable that emits no items and terminates with an
+// error.
+func Throw(err error) Observable {
+	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
+		runner := scheduler.Schedule(func() {
+			if subscriber.Subscribed() {
+				var zero interface{}
+				observe(zero, err, true)
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
+}
+
+//jig:name Multicaster_AutoConnect
+
+// AutoConnect makes a Multicaster behave like an ordinary Observable
+// that automatically connects the multicaster to its source when the
+// specified number of observers have subscribed to it. If the count is less
+// than 1 it will return a Throw(InvalidCount). After connecting, when the
+// number of subscribed observers eventually drops to 0, AutoConnect will
+// cancel the source connection if it hasn't terminated yet. When subsequently
+// the next observer subscribes, AutoConnect will connect to the source only
+// when it was previously canceled or because the source terminated with an
+// error. So it will not reconnect when the source completed succesfully. This
+// specific behavior allows for implementing a caching observable that can be
+// retried until it succeeds. Another thing to notice is that AutoConnect will
+// disconnect an active connection when the number of observers drops to zero.
+// The reason for this is that not doing so would leak a task and leave it
+// hanging in the scheduler.
+func (o Multicaster) AutoConnect(count int) Observable {
+	if count < 1 {
+		return Throw(InvalidCount)
+	}
+	var source struct {
+		sync.Mutex
+		refcount	int32
+		subscriber	Subscriber
+	}
+	observable := func(observe Observer, subscribeOn Scheduler, withSubscriber Subscriber) {
+		withSubscriber.OnUnsubscribe(func() {
+			source.Lock()
+			if atomic.AddInt32(&source.refcount, -1) == 0 {
+				if source.subscriber != nil {
+					source.subscriber.Unsubscribe()
+				}
+			}
+			source.Unlock()
+		})
+		o.Observable(observe, subscribeOn, withSubscriber)
 		source.Lock()
 		if atomic.AddInt32(&source.refcount, 1) == int32(count) {
 			if source.subscriber == nil || source.subscriber.Error() != nil {
@@ -1038,6 +1338,22 @@ func (o ObservableInt) ToSingle() (entry int, err error) {
 	o(observer, scheduler, subscriber)
 	err = subscriber.Wait()
 	return
+}
+
+//jig:name Observable_SubscribeOn
+
+// SubscribeOn specifies the scheduler an Observable should use when it is
+// subscribed to.
+func (o Observable) SubscribeOn(scheduler Scheduler) Observable {
+	observable := func(observe Observer, _ Scheduler, subscriber Subscriber) {
+		if scheduler.IsConcurrent() {
+			subscriber.OnWait(nil)
+		} else {
+			subscriber.OnWait(scheduler.Wait)
+		}
+		o(observe, scheduler, subscriber)
+	}
+	return observable
 }
 
 //jig:name ObservableInt_Single

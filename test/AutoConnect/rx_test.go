@@ -372,8 +372,8 @@ func TestObservable(e *testing.T) {
 			published := Timer(10 * ms).Publish()
 			autopub := published.AutoConnect(2).SubscribeOn(concurrent)
 
-			obs1 := autopub.Subscribe(func(int, error, bool) {})
-			obs2 := autopub.Subscribe(func(int, error, bool) {})
+			obs1 := autopub.Subscribe(func(interface{}, error, bool) {})
+			obs2 := autopub.Subscribe(func(interface{}, error, bool) {})
 
 			con := published.Connect()
 			Asser(t).Must(con.Subscribed(), "con.Subscribed()")

@@ -394,19 +394,19 @@ func (o ObservableFoo) Timeout(timeout time.Duration) ObservableFoo {
 	return o.AsObservable().Timeout(timeout).AsObservableFoo()
 }
 
-//jig:template Timer
-//jig:needs ObservableInt
+//jig:template Timer<Foo>
+//jig:needs Observable<Foo>
 
-// Timer creates an ObservableInt that emits a sequence of integers (starting
-// at zero) after an initialDelay has passed. Subsequent values are emitted
-// using  a schedule of intervals passed in. If only the initialDelay is
-// given, Timer will emit only once.
-func Timer(initialDelay time.Duration, intervals ...time.Duration) ObservableInt {
-	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
+// TimerFoo creates an ObservableFoo that emits a sequence of integers 
+// (starting at zero) after an initialDelay has passed. Subsequent values are
+// emitted using  a schedule of intervals passed in. If only the initialDelay
+// is given, Timer will emit only once.
+func TimerFoo(initialDelay time.Duration, intervals ...time.Duration) ObservableFoo {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := subscribeOn.ScheduleFutureRecursive(initialDelay, func(self func(time.Duration)) {
 			if subscriber.Subscribed() {
-				observe(i, nil, false)
+				observe(foo(i), nil, false)
 				if subscriber.Subscribed() {
 					if len(intervals) > 0 {
 						self(intervals[i%len(intervals)])

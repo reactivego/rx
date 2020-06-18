@@ -1,0 +1,10 @@
+# Timer
+
+[![](../../svg/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx/test/Timer?tab=doc)
+[![](../../svg/godoc.svg)](https://godoc.org/github.com/reactivego/rx/test/Timer)
+[![](../../svg/rx.svg)](http://reactivex.io/documentation/operators/timer.html)
+
+**Timer** creates an Observable that emits a sequence of integers (starting at
+zero) after an initialDelay has passed. Subsequent values are emitted using  a
+schedule of intervals passed in. If only the initialDelay is given, **Timer** will
+emit only once.

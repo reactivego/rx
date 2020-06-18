@@ -167,21 +167,19 @@ func (o ObservableString) AsObservable() Observable {
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
 // Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableString) Println(a ...interface{}) (err error) {
+func (o ObservableString) Println(a ...interface{}) error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next string, e error, done bool) {
+	observer := func(next string, err error, done bool) {
 		if !done {
 			fmt.Println(append(a, next)...)
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
+	return subscriber.Wait()
 }
 
 //jig:name RxError
@@ -190,11 +188,11 @@ type RxError string
 
 func (e RxError) Error() string	{ return string(e) }
 
-//jig:name ErrTypecastToString
+//jig:name TypecastFailed
 
-// ErrTypecastToString is delivered to an observer if the generic value cannot be
-// typecast to string.
-const ErrTypecastToString = RxError("typecast to string failed")
+// ErrTypecast is delivered to an observer if the generic value cannot be
+// typecast to a specific type.
+const TypecastFailed = RxError("typecast failed")
 
 //jig:name Observable_AsObservableString
 
@@ -208,12 +206,12 @@ func (o Observable) AsObservableString() ObservableString {
 				if nextString, ok := next.(string); ok {
 					observe(nextString, err, done)
 				} else {
-					var zeroString string
-					observe(zeroString, ErrTypecastToString, true)
+					var zero string
+					observe(zero, TypecastFailed, true)
 				}
 			} else {
-				var zeroString string
-				observe(zeroString, err, true)
+				var zero string
+				observe(zero, err, true)
 			}
 		}
 		o(observer, subscribeOn, subscriber)
