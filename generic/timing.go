@@ -316,10 +316,19 @@ func Ticker(initialDelay time.Duration, intervals ...time.Duration) ObservableTi
 		i := 0
 		runner := subscribeOn.ScheduleFutureRecursive(initialDelay, func(self func(time.Duration)) {
 			if subscriber.Subscribed() {
-				observe(subscribeOn.Now(), nil, false)
+				if i == 0 || (i > 0 && len(intervals) > 0) {
+					observe(subscribeOn.Now(), nil, false)
+				}
 				if subscriber.Subscribed() {
 					if len(intervals) > 0 {
 						self(intervals[i%len(intervals)])
+					} else {
+						if i == 0 {
+							self(0)
+						} else {
+							var zero time.Time
+							observe(zero, nil, true)
+						}
 					}
 				}
 				i++
@@ -397,7 +406,7 @@ func (o ObservableFoo) Timeout(timeout time.Duration) ObservableFoo {
 //jig:template Timer<Foo>
 //jig:needs Observable<Foo>
 
-// TimerFoo creates an ObservableFoo that emits a sequence of integers 
+// TimerFoo creates an ObservableFoo that emits a sequence of integers
 // (starting at zero) after an initialDelay has passed. Subsequent values are
 // emitted using  a schedule of intervals passed in. If only the initialDelay
 // is given, Timer will emit only once.
@@ -406,10 +415,19 @@ func TimerFoo(initialDelay time.Duration, intervals ...time.Duration) Observable
 		i := 0
 		runner := subscribeOn.ScheduleFutureRecursive(initialDelay, func(self func(time.Duration)) {
 			if subscriber.Subscribed() {
-				observe(foo(i), nil, false)
+				if i == 0 || (i > 0 && len(intervals) > 0) {
+					observe(foo(i), nil, false)
+				}
 				if subscriber.Subscribed() {
 					if len(intervals) > 0 {
 						self(intervals[i%len(intervals)])
+					} else {
+						if i == 0 {
+							self(0)
+						} else {
+							var zero foo
+							observe(zero, nil, true)
+						}
 					}
 				}
 				i++
@@ -432,7 +450,7 @@ type TimestampFoo struct {
 
 // Timestamp attaches a timestamp to each item emitted by an observable
 // indicating when it was emitted.
-func (o ObservableFoo) Timestamp() ObservableTimestampFoo  {
+func (o ObservableFoo) Timestamp() ObservableTimestampFoo {
 	observable := func(observe TimestampFooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next foo, err error, done bool) {
 			if subscriber.Subscribed() {
