@@ -124,7 +124,8 @@ func (s *subscriber) Wait() error {
 	s.Unlock()
 	if wait != nil {
 		wait()
-	} else {
+	}
+	if atomic.LoadInt32(&s.state) == subscribed {
 		var wg sync.WaitGroup
 		wg.Add(1)
 		s.OnUnsubscribe(wg.Done)
