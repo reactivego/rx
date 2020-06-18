@@ -75,6 +75,16 @@ func (o ObservableFoo) MergeMapBar(project func(foo) ObservableBar) ObservableBa
 	return o.MapObservableBar(project).MergeAll()
 }
 
+//jig:template Observable<Foo> MergeMapTo<Bar>
+
+// MergeMapToBar maps every entry emitted by the ObservableFoo into a single
+// ObservableBar. The stream of ObservableBar items is then merged into a
+// single stream of Bar items using the MergeAll operator.
+func (o ObservableFoo) MergeMapToBar(inner ObservableBar) ObservableBar {
+	project := func(foo) ObservableBar { return inner }
+	return o.MapObservableBar(project).MergeAll()
+}
+
 //jig:template ObservableObservable<Foo> MergeAll
 
 // MergeAll flattens a higher order observable by merging the observables it emits.

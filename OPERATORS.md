@@ -11,17 +11,17 @@ Currently 94 operators have been implemented:
 | [AutoConnect]           | [Do] :star:           | [MergeDelayError]      | [ReplaySubject]    | [ThrottleTime] |
 | [Average]               | [DoOnComplete]        | [MergeDelayErrorWith]  | [Retry]            | [Throw]        |
 | [BehaviorSubject]       | [DoOnError]           | [MergeMap] :star:      | [Sample]           | [Ticker]       |
-| [Catch] :star:          | [ElementAt]           | [MergeWith] :star:     | [Scan] :star:      | [TimeInterval] |
-| [CatchError] :star:     | [Empty]               | [Min]                  | [Serialize]        | [Timeout]      |
-| [CombineLatest] :star:  | [Filter] :star:       | [Never]                | [Single]           | [Timer]        |
-| [CombineLatestAll]      | [Finally]             | [ObserveOn]            | [Skip]             | [Timestamp]    |
-| [CombineLatestMap]      | [First]               | [Of] :star:            | [SkipLast]         | [ToChan]       |
-| [CombineLatestMapTo]    | [From] :star:         | [Only]                 | [Start]            | [ToSingle]     |
-| [CombineLatestWith]     | [FromChan]            | [Passthrough]          | [Subject]          | [ToSlice]      |
-| [Concat] :star:         | [IgnoreCompletion]    | [Println]              | [Subscribe]        | [Wait]         |
-| [ConcatAll]             | [IgnoreElements]      | [Publish] :star:       | [SubscribeOn]      |
-| [ConcatMap] :star:      | [Interval]            | [PublishReplay] :star: | [Sum]              |
-| [ConcatMapTo]           | [Just] :star:         |                        | [SwitchAll]        |
+| [Catch] :star:          | [ElementAt]           | [MergeMapTo]           | [Scan] :star:      | [TimeInterval] |
+| [CatchError] :star:     | [Empty]               | [MergeWith] :star:     | [Serialize]        | [Timeout]      |
+| [CombineLatest] :star:  | [Filter] :star:       | [Min]                  | [Single]           | [Timer]        |
+| [CombineLatestAll]      | [Finally]             | [Never]                | [Skip]             | [Timestamp]    |
+| [CombineLatestMap]      | [First]               | [ObserveOn]            | [SkipLast]         | [ToChan]       |
+| [CombineLatestMapTo]    | [From] :star:         | [Of] :star:            | [Start]            | [ToSingle]     |
+| [CombineLatestWith]     | [FromChan]            | [Only]                 | [Subject]          | [ToSlice]      |
+| [Concat] :star:         | [IgnoreCompletion]    | [Passthrough]          | [Subscribe]        | [Wait]         |
+| [ConcatAll]             | [IgnoreElements]      | [Println]              | [SubscribeOn]      |
+| [ConcatMap] :star:      | [Interval]            | [Publish] :star:       | [Sum]              |
+| [ConcatMapTo]           | [Just] :star:         | [PublishReplay] :star: | [SwitchAll]        |
 | [ConcatWith] :star:     | [Last]                |                        | [SwitchMap] :star: |
 | [Connect]               |
 | [Count]                 |
@@ -81,6 +81,7 @@ Currently 94 operators have been implemented:
 [MergeDelayError]: #mergedelayerror
 [MergeDelayErrorWith]: #mergedelayerrorwith
 [MergeMap]: #mergemap
+[MergeMapTo]: #mergemap
 [MergeWith]: #mergewith
 [Min]: #min
 [Never]: #never
@@ -275,6 +276,8 @@ See [MergeDelayError](test/MergeDelayError) in test folder.
 See [MergeDelayErrorWith](test/MergeDelayErrorWith) in test folder.
 ## MergeMap
 See [MergeMap](test/MergeMap) in test folder.
+## MergeMapTo
+See [MergeMapTo](test/MergeMapTo) in test folder.
 ## MergeWith
 See [MergeWith](test/MergeWith) in test folder.
 ## Min
