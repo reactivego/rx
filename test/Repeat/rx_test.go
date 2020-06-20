@@ -37,11 +37,11 @@ func Example_trampoline() {
 	scheduler := MakeTrampolineScheduler()
 	slice, err := source.Repeat(_1M).TakeLast(9).SubscribeOn(scheduler).ToSlice()
 
-	fmt.Println(scheduler)
+	fmt.Println("tasks =", scheduler.Count())
 	fmt.Println(slice)
 	fmt.Println(err)
 	// Output:
-	// Trampoline{ tasks = 0 }
+	// tasks = 0
 	// [1 2 3 1 2 3 1 2 3]
 	// <nil>
 }

@@ -35,14 +35,12 @@ func Example_observeOn() {
 			fmt.Println("complete")
 		}
 	})
+	go subscription.Unsubscribe()
 	subscription.Wait()
 
 	// Source ran to completion but nothing happended yet, all tasks have been
 	// parked.
 	fmt.Printf("%d parked tasks\n", len(tasks.Tasks))
-	if subscription.Subscribed() {
-		fmt.Println("subscribed") // complete has not yet been delivered.
-	}
 
 	// Now let's run those tasks
 	fmt.Println("---Hey Ho Let's Go!---")
@@ -55,7 +53,6 @@ func Example_observeOn() {
 
 	// Output:
 	// 6 parked tasks
-	// subscribed
 	// ---Hey Ho Let's Go!---
 	// task 1
 	// task 2

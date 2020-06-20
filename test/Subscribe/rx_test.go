@@ -61,6 +61,11 @@ func Example_direct() {
 		E(RxError("error"))
 	})
 
+	// Non standard way of subscribing to an observable. But it does illustrate
+	// that an observable is just a function that can be called directly.
+	scheduler := MakeTrampolineScheduler()
+	subscriber := NewSubscriber()
+
 	// Observe function. Note that done is true for both an error as well as
 	// for a normal completion.
 	observe := func(next int, err error, done bool) {
@@ -69,15 +74,13 @@ func Example_direct() {
 			fmt.Println(next)
 		case err != nil:
 			fmt.Println(err)
+			subscriber.Done(err)
 		default:
 			fmt.Println("complete")
+			subscriber.Done(nil)
 		}
 	}
 
-	// Non standard way of subscribing to an observable. But it does illustrate
-	// that an observable is just a function that can be called directly.
-	scheduler := MakeTrampolineScheduler()
-	subscriber := NewSubscriber()
 	observable(observe, scheduler, subscriber)
 
 	// We could just call scheduler.Wait(), but we hook the scheduler into the
@@ -86,12 +89,7 @@ func Example_direct() {
 	// Now wait for the observable to finish.
 	subscriber.Wait()
 
-	// Although the observable completed, the subscription is still active.
-	if subscriber.Canceled() {
-		fmt.Println("error: subscriber should still be subscribed")
-	}
 	// Output:
 	// 456
 	// complete
-	// error
 }

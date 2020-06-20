@@ -30,5 +30,5 @@ func Example_asObservableFloat64() {
 	// 1.2
 	// 2.3
 	// ---
-	// typecast to float64 failed
+	// typecast failed
 }

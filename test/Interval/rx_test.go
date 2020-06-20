@@ -14,8 +14,8 @@ func Example_intervalAccuracy() {
 	Interval(10 * ms).Take(1).Wait()
 	
 	onems := (10 * ms * ms) / time.Since(start)
-	fmt.Println("1ms takes between 0.995ms and 1.005ms =", 995 < onems.Microseconds() && onems.Microseconds() < 1005)
-	// Output: 1ms takes between 0.995ms and 1.005ms = true
+	fmt.Println("1ms takes between 0.990ms and 1.010ms =", 990 < onems.Microseconds() && onems.Microseconds() < 1010)
+	// Output: 1ms takes between 0.990ms and 1.010ms = true
 }
 
 // After 100ms the example cancels the observable subscription by calling the

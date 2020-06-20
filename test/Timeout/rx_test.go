@@ -8,16 +8,14 @@ import (
 )
 
 func Example_timeout() {
-	const _0ms = 0
-	const _250ms = 250 * time.Millisecond
-	const _500ms = 500 * time.Millisecond
+	const ms = time.Millisecond
 
 	scheduler := MakeTrampolineScheduler()
 	//scheduler := GoroutineScheduler()
 	start := scheduler.Now()
 
 	active := true
-	source := CreateFutureRecursiveInt(_0ms, func(Next NextInt, E Error, Complete Complete) time.Duration {
+	source := CreateFutureRecursiveInt(0*ms, func(Next NextInt, E Error, Complete Complete) time.Duration {
 		if active {
 			fmt.Println("Next(1) ->")
 			Next(1)
@@ -26,17 +24,17 @@ func Example_timeout() {
 			fmt.Println("Complete ->")
 			Complete()
 		}
-		return _500ms
+		return 500 * ms
 	})
 
-	timed := source.Timeout(_250ms).SubscribeOn(scheduler)
+	timed := source.Timeout(250 * ms).SubscribeOn(scheduler)
 
 	if err := timed.Println(); err == TimeoutOccured {
 		fmt.Println(TimeoutOccured.Error())
 	}
 
 	elapsed := scheduler.Since(start)
-	if elapsed > _250ms && elapsed < _500ms {
+	if elapsed > 250*ms && elapsed < 500*ms {
 		fmt.Println("elapsed time is be between 250 and 500 ms")
 	} else {
 		fmt.Println("elapsed", elapsed)
@@ -45,7 +43,7 @@ func Example_timeout() {
 	// Output:
 	// Next(1) ->
 	// 1
-	// timeout
+	// timeout occured
 	// elapsed time is be between 250 and 500 ms
 }
 
@@ -65,7 +63,7 @@ func Example_timeoutTwice() {
 	fmt.Println(source.Timeout(10 * ms).Println())
 
 	// Output:
-	// timeout
+	// timeout occured
 	// 1
 	// <nil>
 }
