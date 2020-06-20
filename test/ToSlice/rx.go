@@ -69,10 +69,10 @@ func Range(start, count int) Observable {
 // Throw creates an Observable that emits no items and terminates with an
 // error.
 func Throw(err error) Observable {
-	var zero interface{}
 	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
 			if subscriber.Subscribed() {
+				var zero interface{}
 				observe(zero, err, true)
 			}
 		})
@@ -95,16 +95,15 @@ func (e RxError) Error() string	{ return string(e) }
 func (o Observable) ToSlice() (slice []interface{}, err error) {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next interface{}, e error, done bool) {
+	observer := func(next interface{}, err error, done bool) {
 		if !done {
 			slice = append(slice, next)
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
+	err = subscriber.Wait()
 	return
 }

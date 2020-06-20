@@ -44,7 +44,6 @@ type ObservableInt func(IntObserver, Scheduler, Subscriber)
 
 // FromInt creates an ObservableInt from multiple int values passed in.
 func FromInt(slice ...int) ObservableInt {
-	var zeroInt int
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -56,7 +55,8 @@ func FromInt(slice ...int) ObservableInt {
 						self()
 					}
 				} else {
-					observe(zeroInt, nil, true)
+					var zero int
+					observe(zero, nil, true)
 				}
 			}
 		})
@@ -86,7 +86,6 @@ type ObservableString func(StringObserver, Scheduler, Subscriber)
 // OfString emits a variable amount of values in a sequence and then emits a
 // complete notification.
 func OfString(slice ...string) ObservableString {
-	var zeroString string
 	observable := func(observe StringObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -98,7 +97,8 @@ func OfString(slice ...string) ObservableString {
 						self()
 					}
 				} else {
-					observe(zeroString, nil, true)
+					var zero string
+					observe(zero, nil, true)
 				}
 			}
 		})

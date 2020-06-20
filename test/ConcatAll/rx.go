@@ -94,14 +94,14 @@ func RangeInt(start, count int) ObservableInt {
 
 // JustInt creates an ObservableInt that emits a particular item.
 func JustInt(element int) ObservableInt {
-	var zeroInt int
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
 			if subscriber.Subscribed() {
 				observe(element, nil, false)
 			}
 			if subscriber.Subscribed() {
-				observe(zeroInt, nil, true)
+				var zero int
+				observe(zero, nil, true)
 			}
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
@@ -113,7 +113,6 @@ func JustInt(element int) ObservableInt {
 
 // FromInt creates an ObservableInt from multiple int values passed in.
 func FromInt(slice ...int) ObservableInt {
-	var zeroInt int
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -125,7 +124,8 @@ func FromInt(slice ...int) ObservableInt {
 						self()
 					}
 				} else {
-					observe(zeroInt, nil, true)
+					var zero int
+					observe(zero, nil, true)
 				}
 			}
 		})
@@ -304,11 +304,11 @@ type RxError string
 
 func (e RxError) Error() string	{ return string(e) }
 
-//jig:name ErrTypecastToInt
+//jig:name TypecastFailed
 
-// ErrTypecastToInt is delivered to an observer if the generic value cannot be
-// typecast to int.
-const ErrTypecastToInt = RxError("typecast to int failed")
+// ErrTypecast is delivered to an observer if the generic value cannot be
+// typecast to a specific type.
+const TypecastFailed = RxError("typecast failed")
 
 //jig:name Observable_AsObservableInt
 
@@ -322,12 +322,12 @@ func (o Observable) AsObservableInt() ObservableInt {
 				if nextInt, ok := next.(int); ok {
 					observe(nextInt, err, done)
 				} else {
-					var zeroInt int
-					observe(zeroInt, ErrTypecastToInt, true)
+					var zero int
+					observe(zero, TypecastFailed, true)
 				}
 			} else {
-				var zeroInt int
-				observe(zeroInt, err, true)
+				var zero int
+				observe(zero, err, true)
 			}
 		}
 		o(observer, subscribeOn, subscriber)

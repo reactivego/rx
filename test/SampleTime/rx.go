@@ -179,11 +179,11 @@ type RxError string
 
 func (e RxError) Error() string	{ return string(e) }
 
-//jig:name ErrTypecastToInt
+//jig:name TypecastFailed
 
-// ErrTypecastToInt is delivered to an observer if the generic value cannot be
-// typecast to int.
-const ErrTypecastToInt = RxError("typecast to int failed")
+// ErrTypecast is delivered to an observer if the generic value cannot be
+// typecast to a specific type.
+const TypecastFailed = RxError("typecast failed")
 
 //jig:name Observable_AsObservableInt
 
@@ -197,12 +197,12 @@ func (o Observable) AsObservableInt() ObservableInt {
 				if nextInt, ok := next.(int); ok {
 					observe(nextInt, err, done)
 				} else {
-					var zeroInt int
-					observe(zeroInt, ErrTypecastToInt, true)
+					var zero int
+					observe(zero, TypecastFailed, true)
 				}
 			} else {
-				var zeroInt int
-				observe(zeroInt, err, true)
+				var zero int
+				observe(zero, err, true)
 			}
 		}
 		o(observer, subscribeOn, subscriber)
@@ -216,19 +216,17 @@ func (o Observable) AsObservableInt() ObservableInt {
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
 // Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) Println(a ...interface{}) (err error) {
+func (o ObservableInt) Println(a ...interface{}) error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, e error, done bool) {
+	observer := func(next int, err error, done bool) {
 		if !done {
 			fmt.Println(append(a, next)...)
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
+	return subscriber.Wait()
 }

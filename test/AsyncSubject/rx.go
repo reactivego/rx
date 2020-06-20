@@ -68,6 +68,7 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 		cursor		uint64
 		state		uint64		// active, canceled, closed
 		activated	time.Time	// track activity to deterime backoff
+		subscribeOn	Scheduler
 	}
 
 	// cursor
@@ -173,12 +174,14 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 	send := func(value interface{}) {
 		for buf.commit == buf.end {
 			full := false
+			subscribeOn := Scheduler(nil)
 			gosched := accessSubscriptions(func(subscriptions []subscription) {
 				slowest := maxuint64
 				for i := range subscriptions {
 					current := atomic.LoadUint64(&subscriptions[i].cursor)
 					if current < slowest {
 						slowest = current
+						subscribeOn = subscriptions[i].subscribeOn
 					}
 				}
 				end := atomic.LoadUint64(&buf.end)
@@ -199,7 +202,11 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 			})
 			if full {
 				if !gosched {
-					runtime.Gosched()
+					if subscribeOn != nil {
+						subscribeOn.Gosched()
+					} else {
+						runtime.Gosched()
+					}
 				}
 				if atomic.LoadUint64(&buf.state) != active {
 					return
@@ -235,18 +242,19 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 		}
 	}
 
-	appendSubscription := func() (sub *subscription, err error) {
+	appendSubscription := func(subscribeOn Scheduler) (sub *subscription, err error) {
 		accessSubscriptions(func([]subscription) {
 			cursor := atomic.LoadUint64(&buf.begin)
 			s := &buf.subscriptions
 			if len(s.entries) < cap(s.entries) {
-				s.entries = append(s.entries, subscription{cursor: cursor})
+				s.entries = append(s.entries, subscription{cursor: cursor, subscribeOn: subscribeOn})
 				sub = &s.entries[len(s.entries)-1]
 				return
 			}
 			for i := range s.entries {
 				sub = &s.entries[i]
 				if atomic.CompareAndSwapUint64(&sub.cursor, maxuint64, cursor) {
+					sub.subscribeOn = subscribeOn
 					return
 				}
 			}
@@ -258,7 +266,7 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 	}
 
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		sub, err := appendSubscription()
+		sub, err := appendSubscription(subscribeOn)
 		if err != nil {
 			runner := subscribeOn.Schedule(func() {
 				if subscriber.Subscribed() {
@@ -465,10 +473,11 @@ func (o Observable) AsObservableString() ObservableString {
 func NewAsyncSubjectString() SubjectString {
 	observer, observable := MakeObserverObservable(0, 1)
 	var async struct {
+		subject	SubjectString
 		set	bool
 		last	string
 	}
-	observerString := func(next string, err error, done bool) {
+	async.subject.StringObserver = func(next string, err error, done bool) {
 		if !done {
 			async.set = true
 			async.last = next
@@ -479,7 +488,8 @@ func NewAsyncSubjectString() SubjectString {
 			observer(next, err, true)
 		}
 	}
-	return SubjectString{observerString, observable.AsObservableString()}
+	async.subject.ObservableString = observable.AsObservableString()
+	return async.subject
 }
 
 //jig:name PrintlnString

@@ -71,7 +71,6 @@ type ObservableString func(StringObserver, Scheduler, Subscriber)
 
 // From creates an Observable from multiple interface{} values passed in.
 func From(slice ...interface{}) Observable {
-	var zero interface{}
 	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -83,6 +82,7 @@ func From(slice ...interface{}) Observable {
 						self()
 					}
 				} else {
+					var zero interface{}
 					observe(zero, nil, true)
 				}
 			}
@@ -134,11 +134,11 @@ func Interval(interval time.Duration) ObservableInt {
 
 // EmptyString creates an Observable that emits no items but terminates normally.
 func EmptyString() ObservableString {
-	var zeroString string
 	observable := func(observe StringObserver, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
 			if subscriber.Subscribed() {
-				observe(zeroString, nil, true)
+				var zero string
+				observe(zero, nil, true)
 			}
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
@@ -178,7 +178,7 @@ func (o Observable) Serialize() Observable {
 //jig:name Observable_Timeout
 
 // TimeoutOccured is delivered to an observer if the stream times out.
-const TimeoutOccured = RxError("timeout")
+const TimeoutOccured = RxError("timeout occured")
 
 // Timeout mirrors the source Observable, but issues an error notification if a
 // particular period of time elapses without any emitted items.
@@ -228,11 +228,11 @@ func (o Observable) Timeout(due time.Duration) Observable {
 	return observable
 }
 
-//jig:name ErrTypecastToString
+//jig:name TypecastFailed
 
-// ErrTypecastToString is delivered to an observer if the generic value cannot be
-// typecast to string.
-const ErrTypecastToString = RxError("typecast to string failed")
+// ErrTypecast is delivered to an observer if the generic value cannot be
+// typecast to a specific type.
+const TypecastFailed = RxError("typecast failed")
 
 //jig:name Observable_AsObservableString
 
@@ -246,12 +246,12 @@ func (o Observable) AsObservableString() ObservableString {
 				if nextString, ok := next.(string); ok {
 					observe(nextString, err, done)
 				} else {
-					var zeroString string
-					observe(zeroString, ErrTypecastToString, true)
+					var zero string
+					observe(zero, TypecastFailed, true)
 				}
 			} else {
-				var zeroString string
-				observe(zeroString, err, true)
+				var zero string
+				observe(zero, err, true)
 			}
 		}
 		o(observer, subscribeOn, subscriber)
@@ -331,11 +331,26 @@ func (o ObservableInt) SwitchMapString(project func(int) ObservableString) Obser
 	return o.MapObservableString(project).SwitchAll()
 }
 
-//jig:name ErrTypecastToInt
+//jig:name ObservableString_Println
 
-// ErrTypecastToInt is delivered to an observer if the generic value cannot be
-// typecast to int.
-const ErrTypecastToInt = RxError("typecast to int failed")
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableString) Println(a ...interface{}) error {
+	subscriber := subscriber.New()
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next string, err error, done bool) {
+		if !done {
+			fmt.Println(append(a, next)...)
+		} else {
+			subscriber.Done(err)
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	return subscriber.Wait()
+}
 
 //jig:name Observable_AsObservableInt
 
@@ -349,12 +364,12 @@ func (o Observable) AsObservableInt() ObservableInt {
 				if nextInt, ok := next.(int); ok {
 					observe(nextInt, err, done)
 				} else {
-					var zeroInt int
-					observe(zeroInt, ErrTypecastToInt, true)
+					var zero int
+					observe(zero, TypecastFailed, true)
 				}
 			} else {
-				var zeroInt int
-				observe(zeroInt, err, true)
+				var zero int
+				observe(zero, err, true)
 			}
 		}
 		o(observer, subscribeOn, subscriber)
@@ -380,29 +395,6 @@ func (o ObservableInt) MapObservableString(project func(int) ObservableString) O
 	return observable
 }
 
-//jig:name ObservableString_Println
-
-// Println subscribes to the Observable and prints every item to os.Stdout
-// while it waits for completion or error. Returns either the error or nil
-// when the Observable completed normally.
-// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableString) Println(a ...interface{}) (err error) {
-	subscriber := subscriber.New()
-	scheduler := scheduler.MakeTrampoline()
-	observer := func(next string, e error, done bool) {
-		if !done {
-			fmt.Println(append(a, next)...)
-		} else {
-			err = e
-			subscriber.Unsubscribe()
-		}
-	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
-}
-
 //jig:name ObservableStringObserver
 
 // ObservableStringObserver is a function that gets called whenever the Observable has
@@ -418,6 +410,16 @@ type ObservableStringObserver func(next ObservableString, err error, done bool)
 // ObservableObservableString is a function taking an Observer, Scheduler and Subscriber.
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableObservableString func(ObservableStringObserver, Scheduler, Subscriber)
+
+//jig:name LinkErrors
+
+const (
+	AlreadyDone		= RxError("already done")
+	AlreadySubscribed	= RxError("already subscribed")
+	AlreadyWaiting		= RxError("already waiting")
+	RecursionNotAllowed	= RxError("recursion not allowed")
+	StateTransitionFailed	= RxError("state transition faled")
+)
 
 //jig:name LinkEnums
 
@@ -473,24 +475,24 @@ func newLinkString(observe linkStringObserver, subscriber Subscriber) *linkStrin
 func (o *linkString) Observe(next string, err error, done bool) error {
 	if !atomic.CompareAndSwapInt32(&o.state, linkIdle, linkBusy) {
 		if atomic.LoadInt32(&o.state) > linkBusy {
-			return RxError("Already Done")
+			return AlreadyDone
 		}
-		return RxError("Recursion Error")
+		return RecursionNotAllowed
 	}
 	o.observe(o, next, err, done)
 	if done {
 		if err != nil {
 			if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkError) {
-				return RxError("Internal Error: 'busy' -> 'error'")
+				return StateTransitionFailed
 			}
 		} else {
 			if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkCompleting) {
-				return RxError("Internal Error: 'busy' -> 'completing'")
+				return StateTransitionFailed
 			}
 		}
 	} else {
 		if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkIdle) {
-			return RxError("Internal Error: 'busy' -> 'idle'")
+			return StateTransitionFailed
 		}
 	}
 	if atomic.LoadInt32(&o.callbackState) != callbackSet {
@@ -509,26 +511,26 @@ func (o *linkString) Observe(next string, err error, done bool) error {
 
 func (o *linkString) SubscribeTo(observable ObservableString, scheduler Scheduler) error {
 	if !atomic.CompareAndSwapInt32(&o.state, linkUnsubscribed, linkSubscribing) {
-		return RxError("Already Subscribed")
+		return AlreadySubscribed
 	}
 	observer := func(next string, err error, done bool) {
 		o.Observe(next, err, done)
 	}
 	observable(observer, scheduler, o.subscriber)
 	if !atomic.CompareAndSwapInt32(&o.state, linkSubscribing, linkIdle) {
-		return RxError("Internal Error")
+		return StateTransitionFailed
 	}
 	return nil
 }
 
 func (o *linkString) Cancel(callback func()) error {
 	if !atomic.CompareAndSwapInt32(&o.callbackState, callbackNil, settingCallback) {
-		return RxError("Already Waiting")
+		return AlreadyWaiting
 	}
 	o.callbackKind = linkCancelOrCompleted
 	o.callback = callback
 	if !atomic.CompareAndSwapInt32(&o.callbackState, settingCallback, callbackSet) {
-		return RxError("Internal Error")
+		return StateTransitionFailed
 	}
 	o.subscriber.Unsubscribe()
 	if atomic.CompareAndSwapInt32(&o.state, linkCompleting, linkComplete) {
@@ -542,12 +544,12 @@ func (o *linkString) Cancel(callback func()) error {
 
 func (o *linkString) OnComplete(callback func()) error {
 	if !atomic.CompareAndSwapInt32(&o.callbackState, callbackNil, settingCallback) {
-		return RxError("Already Waiting")
+		return AlreadyWaiting
 	}
 	o.callbackKind = linkCallbackOnComplete
 	o.callback = callback
 	if !atomic.CompareAndSwapInt32(&o.callbackState, settingCallback, callbackSet) {
-		return RxError("Internal Error")
+		return StateTransitionFailed
 	}
 	if atomic.CompareAndSwapInt32(&o.state, linkCompleting, linkComplete) {
 		o.callback()
@@ -587,14 +589,14 @@ func (o ObservableObservableString) SwitchAll() ObservableString {
 				})
 			case err != nil:
 				currentLink.Cancel(func() {
-					var zeroString string
-					observe(zeroString, err, true)
+					var zero string
+					observe(zero, err, true)
 				})
 				switcherSubscriber.Unsubscribe()
 			default:
 				currentLink.OnComplete(func() {
-					var zeroString string
-					observe(zeroString, nil, true)
+					var zero string
+					observe(zero, nil, true)
 				})
 				switcherSubscriber.Unsubscribe()
 			}

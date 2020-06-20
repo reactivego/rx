@@ -87,7 +87,7 @@ func (o Observable) Serialize() Observable {
 //jig:name Observable_Timeout
 
 // TimeoutOccured is delivered to an observer if the stream times out.
-const TimeoutOccured = RxError("timeout")
+const TimeoutOccured = RxError("timeout occured")
 
 // Timeout mirrors the source Observable, but issues an error notification if a
 // particular period of time elapses without any emitted items.
@@ -141,10 +141,14 @@ func (o Observable) Timeout(due time.Duration) Observable {
 
 // SubscribeOn specifies the scheduler an Observable should use when it is
 // subscribed to.
-func (o Observable) SubscribeOn(subscribeOn Scheduler) Observable {
+func (o Observable) SubscribeOn(scheduler Scheduler) Observable {
 	observable := func(observe Observer, _ Scheduler, subscriber Subscriber) {
-		subscriber.OnWait(subscribeOn.Wait)
-		o(observe, subscribeOn, subscriber)
+		if scheduler.IsConcurrent() {
+			subscriber.OnWait(nil)
+		} else {
+			subscriber.OnWait(scheduler.Wait)
+		}
+		o(observe, scheduler, subscriber)
 	}
 	return observable
 }
@@ -168,7 +172,7 @@ func (o Observable) Subscribe(observe Observer, subscribers ...Subscriber) Subsc
 		} else {
 			var zero interface{}
 			observe(zero, err, true)
-			subscribers[0].Unsubscribe()
+			subscribers[0].Done(err)
 		}
 	}
 	subscribers[0].OnWait(scheduler.Wait)

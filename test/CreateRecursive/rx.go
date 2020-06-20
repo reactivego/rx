@@ -64,11 +64,10 @@ type NextInt func(int)
 // and Complete function that can be called by the code that implements the
 // Observable.
 func CreateRecursiveInt(create func(NextInt, Error, Complete)) ObservableInt {
-	var zeroInt int
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		done := false
 		runner := scheduler.ScheduleRecursive(func(self func()) {
-			if subscriber.Canceled() {
+			if !subscriber.Subscribed() {
 				return
 			}
 			n := func(next int) {
@@ -79,13 +78,15 @@ func CreateRecursiveInt(create func(NextInt, Error, Complete)) ObservableInt {
 			e := func(err error) {
 				done = true
 				if subscriber.Subscribed() {
-					observe(zeroInt, err, true)
+					var zero int
+					observe(zero, err, true)
 				}
 			}
 			c := func() {
 				done = true
 				if subscriber.Subscribed() {
-					observe(zeroInt, nil, true)
+					var zero int
+					observe(zero, nil, true)
 				}
 			}
 			create(n, e, c)
@@ -104,19 +105,17 @@ func CreateRecursiveInt(create func(NextInt, Error, Complete)) ObservableInt {
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
 // Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) Println(a ...interface{}) (err error) {
+func (o ObservableInt) Println(a ...interface{}) error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, e error, done bool) {
+	observer := func(next int, err error, done bool) {
 		if !done {
 			fmt.Println(append(a, next)...)
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
+	return subscriber.Wait()
 }

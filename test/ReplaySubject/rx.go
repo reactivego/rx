@@ -67,6 +67,7 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 		cursor		uint64
 		state		uint64		// active, canceled, closed
 		activated	time.Time	// track activity to deterime backoff
+		subscribeOn	Scheduler
 	}
 
 	// cursor
@@ -172,12 +173,14 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 	send := func(value interface{}) {
 		for buf.commit == buf.end {
 			full := false
+			subscribeOn := Scheduler(nil)
 			gosched := accessSubscriptions(func(subscriptions []subscription) {
 				slowest := maxuint64
 				for i := range subscriptions {
 					current := atomic.LoadUint64(&subscriptions[i].cursor)
 					if current < slowest {
 						slowest = current
+						subscribeOn = subscriptions[i].subscribeOn
 					}
 				}
 				end := atomic.LoadUint64(&buf.end)
@@ -198,7 +201,11 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 			})
 			if full {
 				if !gosched {
-					runtime.Gosched()
+					if subscribeOn != nil {
+						subscribeOn.Gosched()
+					} else {
+						runtime.Gosched()
+					}
 				}
 				if atomic.LoadUint64(&buf.state) != active {
 					return
@@ -234,18 +241,19 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 		}
 	}
 
-	appendSubscription := func() (sub *subscription, err error) {
+	appendSubscription := func(subscribeOn Scheduler) (sub *subscription, err error) {
 		accessSubscriptions(func([]subscription) {
 			cursor := atomic.LoadUint64(&buf.begin)
 			s := &buf.subscriptions
 			if len(s.entries) < cap(s.entries) {
-				s.entries = append(s.entries, subscription{cursor: cursor})
+				s.entries = append(s.entries, subscription{cursor: cursor, subscribeOn: subscribeOn})
 				sub = &s.entries[len(s.entries)-1]
 				return
 			}
 			for i := range s.entries {
 				sub = &s.entries[i]
 				if atomic.CompareAndSwapUint64(&sub.cursor, maxuint64, cursor) {
+					sub.subscribeOn = subscribeOn
 					return
 				}
 			}
@@ -257,7 +265,7 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 	}
 
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		sub, err := appendSubscription()
+		sub, err := appendSubscription(subscribeOn)
 		if err != nil {
 			runner := subscribeOn.Schedule(func() {
 				if subscriber.Subscribed() {
@@ -413,6 +421,43 @@ func (o Observer) AsIntObserver() IntObserver {
 	return observer
 }
 
+//jig:name RxError
+
+type RxError string
+
+func (e RxError) Error() string	{ return string(e) }
+
+//jig:name TypecastFailed
+
+// ErrTypecast is delivered to an observer if the generic value cannot be
+// typecast to a specific type.
+const TypecastFailed = RxError("typecast failed")
+
+//jig:name Observable_AsObservableInt
+
+// AsObservableInt turns an Observable of interface{} into an ObservableInt.
+// If during observing a typecast fails, the error ErrTypecastToInt will be
+// emitted.
+func (o Observable) AsObservableInt() ObservableInt {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				if nextInt, ok := next.(int); ok {
+					observe(nextInt, err, done)
+				} else {
+					var zero int
+					observe(zero, TypecastFailed, true)
+				}
+			} else {
+				var zero int
+				observe(zero, err, true)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name DefaultReplayCapacity
 
 // DefaultReplayCapacity is the default capacity of a replay buffer when
@@ -502,6 +547,31 @@ func (o Observer) AsStringObserver() StringObserver {
 	return observer
 }
 
+//jig:name Observable_AsObservableString
+
+// AsObservableString turns an Observable of interface{} into an ObservableString.
+// If during observing a typecast fails, the error ErrTypecastToString will be
+// emitted.
+func (o Observable) AsObservableString() ObservableString {
+	observable := func(observe StringObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				if nextString, ok := next.(string); ok {
+					observe(nextString, err, done)
+				} else {
+					var zero string
+					observe(zero, TypecastFailed, true)
+				}
+			} else {
+				var zero string
+				observe(zero, err, true)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name NewReplaySubjectString
 
 // NewReplaySubjectString creates a new ReplaySubject. ReplaySubject ensures that
@@ -527,68 +597,6 @@ func GoroutineScheduler() Scheduler {
 
 // Subscription is an alias for the subscriber.Subscription interface type.
 type Subscription = subscriber.Subscription
-
-//jig:name RxError
-
-type RxError string
-
-func (e RxError) Error() string	{ return string(e) }
-
-//jig:name TypecastFailed
-
-// ErrTypecast is delivered to an observer if the generic value cannot be
-// typecast to a specific type.
-const TypecastFailed = RxError("typecast failed")
-
-//jig:name Observable_AsObservableInt
-
-// AsObservableInt turns an Observable of interface{} into an ObservableInt.
-// If during observing a typecast fails, the error ErrTypecastToInt will be
-// emitted.
-func (o Observable) AsObservableInt() ObservableInt {
-	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				if nextInt, ok := next.(int); ok {
-					observe(nextInt, err, done)
-				} else {
-					var zero int
-					observe(zero, TypecastFailed, true)
-				}
-			} else {
-				var zero int
-				observe(zero, err, true)
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name Observable_AsObservableString
-
-// AsObservableString turns an Observable of interface{} into an ObservableString.
-// If during observing a typecast fails, the error ErrTypecastToString will be
-// emitted.
-func (o Observable) AsObservableString() ObservableString {
-	observable := func(observe StringObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				if nextString, ok := next.(string); ok {
-					observe(nextString, err, done)
-				} else {
-					var zero string
-					observe(zero, TypecastFailed, true)
-				}
-			} else {
-				var zero string
-				observe(zero, err, true)
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
 
 //jig:name ObservableInt_Subscribe
 

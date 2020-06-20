@@ -67,10 +67,9 @@ type Observable func(Observer, Scheduler, Subscriber)
 // Complete and Canceled function that can be called by the code that
 // implements the Observable.
 func Create(create func(Next, Error, Complete, Canceled)) Observable {
-	var zero interface{}
 	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
-			if subscriber.Canceled() {
+			if !subscriber.Subscribed() {
 				return
 			}
 			n := func(next interface{}) {
@@ -80,16 +79,18 @@ func Create(create func(Next, Error, Complete, Canceled)) Observable {
 			}
 			e := func(err error) {
 				if subscriber.Subscribed() {
+					var zero interface{}
 					observe(zero, err, true)
 				}
 			}
 			c := func() {
 				if subscriber.Subscribed() {
+					var zero interface{}
 					observe(zero, nil, true)
 				}
 			}
 			x := func() bool {
-				return subscriber.Canceled()
+				return !subscriber.Subscribed()
 			}
 			create(n, e, c, x)
 		})
@@ -126,8 +127,8 @@ func (o Observable) OnlyString() ObservableString {
 					observe(nextString, err, done)
 				}
 			} else {
-				var zeroString string
-				observe(zeroString, err, true)
+				var zero string
+				observe(zero, err, true)
 			}
 		}
 		o(observer, subscribeOn, subscriber)
@@ -163,8 +164,8 @@ func (o Observable) OnlySize() ObservableSize {
 					observe(nextSize, err, done)
 				}
 			} else {
-				var zeroSize Size
-				observe(zeroSize, err, true)
+				var zero Size
+				observe(zero, err, true)
 			}
 		}
 		o(observer, subscribeOn, subscriber)
@@ -200,8 +201,8 @@ func (o Observable) OnlyPoint() ObservablePoint {
 					observe(nextPoint, err, done)
 				}
 			} else {
-				var zeroPoint []point
-				observe(zeroPoint, err, true)
+				var zero []point
+				observe(zero, err, true)
 			}
 		}
 		o(observer, subscribeOn, subscriber)
@@ -226,9 +227,9 @@ func (o ObservableString) Subscribe(observe StringObserver, subscribers ...Subsc
 		if !done {
 			observe(next, err, done)
 		} else {
-			var zeroString string
-			observe(zeroString, err, true)
-			subscribers[0].Unsubscribe()
+			var zero string
+			observe(zero, err, true)
+			subscribers[0].Done(err)
 		}
 	}
 	subscribers[0].OnWait(scheduler.Wait)
@@ -248,9 +249,9 @@ func (o ObservableSize) Subscribe(observe SizeObserver, subscribers ...Subscribe
 		if !done {
 			observe(next, err, done)
 		} else {
-			var zeroSize Size
-			observe(zeroSize, err, true)
-			subscribers[0].Unsubscribe()
+			var zero Size
+			observe(zero, err, true)
+			subscribers[0].Done(err)
 		}
 	}
 	subscribers[0].OnWait(scheduler.Wait)
@@ -270,9 +271,9 @@ func (o ObservablePoint) Subscribe(observe PointObserver, subscribers ...Subscri
 		if !done {
 			observe(next, err, done)
 		} else {
-			var zeroPoint []point
-			observe(zeroPoint, err, true)
-			subscribers[0].Unsubscribe()
+			var zero []point
+			observe(zero, err, true)
+			subscribers[0].Done(err)
 		}
 	}
 	subscribers[0].OnWait(scheduler.Wait)

@@ -69,10 +69,9 @@ type ObservableInt func(IntObserver, Scheduler, Subscriber)
 // Complete and Canceled function that can be called by the code that
 // implements the Observable.
 func CreateInt(create func(NextInt, Error, Complete, Canceled)) ObservableInt {
-	var zeroInt int
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
-			if subscriber.Canceled() {
+			if !subscriber.Subscribed() {
 				return
 			}
 			n := func(next int) {
@@ -82,16 +81,18 @@ func CreateInt(create func(NextInt, Error, Complete, Canceled)) ObservableInt {
 			}
 			e := func(err error) {
 				if subscriber.Subscribed() {
-					observe(zeroInt, err, true)
+					var zero int
+					observe(zero, err, true)
 				}
 			}
 			c := func() {
 				if subscriber.Subscribed() {
-					observe(zeroInt, nil, true)
+					var zero int
+					observe(zero, nil, true)
 				}
 			}
 			x := func() bool {
-				return subscriber.Canceled()
+				return !subscriber.Subscribed()
 			}
 			create(n, e, c, x)
 		})
@@ -130,17 +131,17 @@ func (o ObservableInt) MergeDelayErrorWith(other ...ObservableInt) ObservableInt
 					observers.err = err
 				}
 				if observers.len--; observers.len == 0 {
-					var zeroInt int
-					observe(zeroInt, observers.err, true)
+					var zero int
+					observe(zero, observers.err, true)
 				}
 			}
 		}
 		subscribeOn.Schedule(func() {
-			if !subscriber.Canceled() {
+			if subscriber.Subscribed() {
 				observers.len = 1 + len(other)
 				o(observer, subscribeOn, subscriber)
 				for _, o := range other {
-					if subscriber.Canceled() {
+					if !subscriber.Subscribed() {
 						return
 					}
 					o(observer, subscribeOn, subscriber)
@@ -159,16 +160,15 @@ func (o ObservableInt) MergeDelayErrorWith(other ...ObservableInt) ObservableInt
 func (o ObservableInt) ToSlice() (slice []int, err error) {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, e error, done bool) {
+	observer := func(next int, err error, done bool) {
 		if !done {
 			slice = append(slice, next)
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
+	err = subscriber.Wait()
 	return
 }

@@ -67,10 +67,9 @@ type ObservableInt func(IntObserver, Scheduler, Subscriber)
 // Complete and Canceled function that can be called by the code that
 // implements the Observable.
 func CreateInt(create func(NextInt, Error, Complete, Canceled)) ObservableInt {
-	var zeroInt int
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
-			if subscriber.Canceled() {
+			if !subscriber.Subscribed() {
 				return
 			}
 			n := func(next int) {
@@ -80,16 +79,18 @@ func CreateInt(create func(NextInt, Error, Complete, Canceled)) ObservableInt {
 			}
 			e := func(err error) {
 				if subscriber.Subscribed() {
-					observe(zeroInt, err, true)
+					var zero int
+					observe(zero, err, true)
 				}
 			}
 			c := func() {
 				if subscriber.Subscribed() {
-					observe(zeroInt, nil, true)
+					var zero int
+					observe(zero, nil, true)
 				}
 			}
 			x := func() bool {
-				return subscriber.Canceled()
+				return !subscriber.Subscribed()
 			}
 			create(n, e, c, x)
 		})
@@ -134,9 +135,9 @@ func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber)
 		if !done {
 			observe(next, err, done)
 		} else {
-			var zeroInt int
-			observe(zeroInt, err, true)
-			subscribers[0].Unsubscribe()
+			var zero int
+			observe(zero, err, true)
+			subscribers[0].Done(err)
 		}
 	}
 	subscribers[0].OnWait(scheduler.Wait)

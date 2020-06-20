@@ -46,7 +46,6 @@ type ObservableInt func(IntObserver, Scheduler, Subscriber)
 // If the error is non-nil the returned ObservableInt will be an Observable that
 // emits and error, otherwise it will be a single-value ObservableInt of the value.
 func StartInt(f func() (int, error)) ObservableInt {
-	var zeroInt int
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		done := false
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -59,10 +58,12 @@ func StartInt(f func() (int, error)) ObservableInt {
 							self()
 						}
 					} else {
-						observe(zeroInt, err, true)
+						var zero int
+						observe(zero, err, true)
 					}
 				} else {
-					observe(zeroInt, nil, true)
+					var zero int
+					observe(zero, nil, true)
 				}
 			}
 		})
@@ -83,19 +84,17 @@ func (e RxError) Error() string	{ return string(e) }
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
 // Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) Println(a ...interface{}) (err error) {
+func (o ObservableInt) Println(a ...interface{}) error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, e error, done bool) {
+	observer := func(next int, err error, done bool) {
 		if !done {
 			fmt.Println(append(a, next)...)
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
+	return subscriber.Wait()
 }

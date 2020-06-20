@@ -55,13 +55,13 @@ func Never() Observable {
 
 // Just creates an Observable that emits a particular item.
 func Just(element interface{}) Observable {
-	var zero interface{}
 	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
 			if subscriber.Subscribed() {
 				observe(element, nil, false)
 			}
 			if subscriber.Subscribed() {
+				var zero interface{}
 				observe(zero, nil, true)
 			}
 		})
@@ -146,7 +146,7 @@ func (o Observable) Serialize() Observable {
 //jig:name Observable_Timeout
 
 // TimeoutOccured is delivered to an observer if the stream times out.
-const TimeoutOccured = RxError("timeout")
+const TimeoutOccured = RxError("timeout occured")
 
 // Timeout mirrors the source Observable, but issues an error notification if a
 // particular period of time elapses without any emitted items.
@@ -268,28 +268,26 @@ func (o Observable) Catch(catch Observable) Observable {
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
 // Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) Println(a ...interface{}) (err error) {
+func (o ObservableInt) Println(a ...interface{}) error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, e error, done bool) {
+	observer := func(next int, err error, done bool) {
 		if !done {
 			fmt.Println(append(a, next)...)
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
+	return subscriber.Wait()
 }
 
-//jig:name ErrTypecastToInt
+//jig:name TypecastFailed
 
-// ErrTypecastToInt is delivered to an observer if the generic value cannot be
-// typecast to int.
-const ErrTypecastToInt = RxError("typecast to int failed")
+// ErrTypecast is delivered to an observer if the generic value cannot be
+// typecast to a specific type.
+const TypecastFailed = RxError("typecast failed")
 
 //jig:name Observable_AsObservableInt
 
@@ -303,12 +301,12 @@ func (o Observable) AsObservableInt() ObservableInt {
 				if nextInt, ok := next.(int); ok {
 					observe(nextInt, err, done)
 				} else {
-					var zeroInt int
-					observe(zeroInt, ErrTypecastToInt, true)
+					var zero int
+					observe(zero, TypecastFailed, true)
 				}
 			} else {
-				var zeroInt int
-				observe(zeroInt, err, true)
+				var zero int
+				observe(zero, err, true)
 			}
 		}
 		o(observer, subscribeOn, subscriber)
@@ -320,10 +318,14 @@ func (o Observable) AsObservableInt() ObservableInt {
 
 // SubscribeOn specifies the scheduler an Observable should use when it is
 // subscribed to.
-func (o Observable) SubscribeOn(subscribeOn Scheduler) Observable {
+func (o Observable) SubscribeOn(scheduler Scheduler) Observable {
 	observable := func(observe Observer, _ Scheduler, subscriber Subscriber) {
-		subscriber.OnWait(subscribeOn.Wait)
-		o(observe, subscribeOn, subscriber)
+		if scheduler.IsConcurrent() {
+			subscriber.OnWait(nil)
+		} else {
+			subscriber.OnWait(scheduler.Wait)
+		}
+		o(observe, scheduler, subscriber)
 	}
 	return observable
 }

@@ -42,11 +42,11 @@ type ObservableInt func(IntObserver, Scheduler, Subscriber)
 // ThrowInt creates an Observable that emits no items and terminates with an
 // error.
 func ThrowInt(err error) ObservableInt {
-	var zeroInt int
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
 			if subscriber.Subscribed() {
-				observe(zeroInt, err, true)
+				var zero int
+				observe(zero, err, true)
 			}
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
@@ -64,11 +64,11 @@ func (e RxError) Error() string	{ return string(e) }
 
 // EmptyInt creates an Observable that emits no items but terminates normally.
 func EmptyInt() ObservableInt {
-	var zeroInt int
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
 			if subscriber.Subscribed() {
-				observe(zeroInt, nil, true)
+				var zero int
+				observe(zero, nil, true)
 			}
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
@@ -98,17 +98,15 @@ func (o ObservableInt) Finally(f func()) ObservableInt {
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
 // Wait uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) Wait() (err error) {
+func (o ObservableInt) Wait() error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, e error, done bool) {
+	observer := func(next int, err error, done bool) {
 		if done {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
+	return subscriber.Wait()
 }

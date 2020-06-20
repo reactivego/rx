@@ -51,10 +51,19 @@ func Timer(initialDelay time.Duration, intervals ...time.Duration) Observable {
 		i := 0
 		runner := subscribeOn.ScheduleFutureRecursive(initialDelay, func(self func(time.Duration)) {
 			if subscriber.Subscribed() {
-				observe(interface{}(i), nil, false)
+				if i == 0 || (i > 0 && len(intervals) > 0) {
+					observe(interface{}(i), nil, false)
+				}
 				if subscriber.Subscribed() {
 					if len(intervals) > 0 {
 						self(intervals[i%len(intervals)])
+					} else {
+						if i == 0 {
+							self(0)
+						} else {
+							var zero interface{}
+							observe(zero, nil, true)
+						}
 					}
 				}
 				i++

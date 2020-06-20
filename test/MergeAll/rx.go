@@ -72,10 +72,9 @@ type ObservableObservableString func(ObservableStringObserver, Scheduler, Subscr
 // Complete and Canceled function that can be called by the code that
 // implements the Observable.
 func CreateObservableString(create func(NextObservableString, Error, Complete, Canceled)) ObservableObservableString {
-	var zeroObservableString ObservableString
 	observable := func(observe ObservableStringObserver, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
-			if subscriber.Canceled() {
+			if !subscriber.Subscribed() {
 				return
 			}
 			n := func(next ObservableString) {
@@ -85,16 +84,18 @@ func CreateObservableString(create func(NextObservableString, Error, Complete, C
 			}
 			e := func(err error) {
 				if subscriber.Subscribed() {
-					observe(zeroObservableString, err, true)
+					var zero ObservableString
+					observe(zero, err, true)
 				}
 			}
 			c := func() {
 				if subscriber.Subscribed() {
-					observe(zeroObservableString, nil, true)
+					var zero ObservableString
+					observe(zero, nil, true)
 				}
 			}
 			x := func() bool {
-				return subscriber.Canceled()
+				return !subscriber.Subscribed()
 			}
 			create(n, e, c, x)
 		})
@@ -123,14 +124,14 @@ type ObservableString func(StringObserver, Scheduler, Subscriber)
 
 // JustString creates an ObservableString that emits a particular item.
 func JustString(element string) ObservableString {
-	var zeroString string
 	observable := func(observe StringObserver, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
 			if subscriber.Subscribed() {
 				observe(element, nil, false)
 			}
 			if subscriber.Subscribed() {
-				observe(zeroString, nil, true)
+				var zero string
+				observe(zero, nil, true)
 			}
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
@@ -196,7 +197,6 @@ type ObservableObservableInt func(ObservableIntObserver, Scheduler, Subscriber)
 
 // FromObservableInt creates an ObservableObservableInt from multiple ObservableInt values passed in.
 func FromObservableInt(slice ...ObservableInt) ObservableObservableInt {
-	var zeroObservableInt ObservableInt
 	observable := func(observe ObservableIntObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -208,7 +208,8 @@ func FromObservableInt(slice ...ObservableInt) ObservableObservableInt {
 						self()
 					}
 				} else {
-					observe(zeroObservableInt, nil, true)
+					var zero ObservableInt
+					observe(zero, nil, true)
 				}
 			}
 		})
@@ -236,12 +237,12 @@ func (o ObservableObservableString) MergeAll() ObservableString {
 					observe(next, nil, false)
 				case err != nil:
 					observers.done = true
-					var zeroString string
-					observe(zeroString, err, true)
+					var zero string
+					observe(zero, err, true)
 				default:
 					if atomic.AddInt32(&observers.len, -1) == 0 {
-						var zeroString string
-						observe(zeroString, nil, true)
+						var zero string
+						observe(zero, nil, true)
 					}
 				}
 			}
@@ -251,12 +252,12 @@ func (o ObservableObservableString) MergeAll() ObservableString {
 				atomic.AddInt32(&observers.len, 1)
 				next(observer, subscribeOn, subscriber)
 			} else {
-				var zeroString string
-				observer(zeroString, err, true)
+				var zero string
+				observer(zero, err, true)
 			}
 		}
 		subscribeOn.Schedule(func() {
-			if !subscriber.Canceled() {
+			if subscriber.Subscribed() {
 				observers.len = 1
 				o(merger, subscribeOn, subscriber)
 			}
@@ -313,12 +314,12 @@ func (o ObservableObservableInt) MergeAll() ObservableInt {
 					observe(next, nil, false)
 				case err != nil:
 					observers.done = true
-					var zeroInt int
-					observe(zeroInt, err, true)
+					var zero int
+					observe(zero, err, true)
 				default:
 					if atomic.AddInt32(&observers.len, -1) == 0 {
-						var zeroInt int
-						observe(zeroInt, nil, true)
+						var zero int
+						observe(zero, nil, true)
 					}
 				}
 			}
@@ -328,12 +329,12 @@ func (o ObservableObservableInt) MergeAll() ObservableInt {
 				atomic.AddInt32(&observers.len, 1)
 				next(observer, subscribeOn, subscriber)
 			} else {
-				var zeroInt int
-				observer(zeroInt, err, true)
+				var zero int
+				observer(zero, err, true)
 			}
 		}
 		subscribeOn.Schedule(func() {
-			if !subscriber.Canceled() {
+			if subscriber.Subscribed() {
 				observers.len = 1
 				o(merger, subscribeOn, subscriber)
 			}
@@ -358,52 +359,6 @@ type Observer func(next interface{}, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type Observable func(Observer, Scheduler, Subscriber)
 
-//jig:name ObservableString_Println
-
-// Println subscribes to the Observable and prints every item to os.Stdout
-// while it waits for completion or error. Returns either the error or nil
-// when the Observable completed normally.
-// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableString) Println(a ...interface{}) (err error) {
-	subscriber := subscriber.New()
-	scheduler := scheduler.MakeTrampoline()
-	observer := func(next string, e error, done bool) {
-		if !done {
-			fmt.Println(append(a, next)...)
-		} else {
-			err = e
-			subscriber.Unsubscribe()
-		}
-	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
-}
-
-//jig:name ObservableInt_Println
-
-// Println subscribes to the Observable and prints every item to os.Stdout
-// while it waits for completion or error. Returns either the error or nil
-// when the Observable completed normally.
-// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) Println(a ...interface{}) (err error) {
-	subscriber := subscriber.New()
-	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, e error, done bool) {
-		if !done {
-			fmt.Println(append(a, next)...)
-		} else {
-			err = e
-			subscriber.Unsubscribe()
-		}
-	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
-}
-
 //jig:name ObservableInt_AsObservable
 
 // AsObservable turns a typed ObservableInt into an Observable of interface{}.
@@ -417,17 +372,59 @@ func (o ObservableInt) AsObservable() Observable {
 	return observable
 }
 
+//jig:name ObservableString_Println
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableString) Println(a ...interface{}) error {
+	subscriber := subscriber.New()
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next string, err error, done bool) {
+		if !done {
+			fmt.Println(append(a, next)...)
+		} else {
+			subscriber.Done(err)
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	return subscriber.Wait()
+}
+
+//jig:name ObservableInt_Println
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableInt) Println(a ...interface{}) error {
+	subscriber := subscriber.New()
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next int, err error, done bool) {
+		if !done {
+			fmt.Println(append(a, next)...)
+		} else {
+			subscriber.Done(err)
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	return subscriber.Wait()
+}
+
 //jig:name RxError
 
 type RxError string
 
 func (e RxError) Error() string	{ return string(e) }
 
-//jig:name ErrTypecastToInt
+//jig:name TypecastFailed
 
-// ErrTypecastToInt is delivered to an observer if the generic value cannot be
-// typecast to int.
-const ErrTypecastToInt = RxError("typecast to int failed")
+// ErrTypecast is delivered to an observer if the generic value cannot be
+// typecast to a specific type.
+const TypecastFailed = RxError("typecast failed")
 
 //jig:name Observable_AsObservableInt
 
@@ -441,12 +438,12 @@ func (o Observable) AsObservableInt() ObservableInt {
 				if nextInt, ok := next.(int); ok {
 					observe(nextInt, err, done)
 				} else {
-					var zeroInt int
-					observe(zeroInt, ErrTypecastToInt, true)
+					var zero int
+					observe(zero, TypecastFailed, true)
 				}
 			} else {
-				var zeroInt int
-				observe(zeroInt, err, true)
+				var zero int
+				observe(zero, err, true)
 			}
 		}
 		o(observer, subscribeOn, subscriber)

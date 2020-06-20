@@ -43,7 +43,6 @@ type Observable func(Observer, Scheduler, Subscriber)
 
 // From creates an Observable from multiple interface{} values passed in.
 func From(slice ...interface{}) Observable {
-	var zero interface{}
 	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -55,6 +54,7 @@ func From(slice ...interface{}) Observable {
 						self()
 					}
 				} else {
+					var zero interface{}
 					observe(zero, nil, true)
 				}
 			}
@@ -128,10 +128,9 @@ type Next func(interface{})
 // Complete and Canceled function that can be called by the code that
 // implements the Observable.
 func Create(create func(Next, Error, Complete, Canceled)) Observable {
-	var zero interface{}
 	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
-			if subscriber.Canceled() {
+			if !subscriber.Subscribed() {
 				return
 			}
 			n := func(next interface{}) {
@@ -141,16 +140,18 @@ func Create(create func(Next, Error, Complete, Canceled)) Observable {
 			}
 			e := func(err error) {
 				if subscriber.Subscribed() {
+					var zero interface{}
 					observe(zero, err, true)
 				}
 			}
 			c := func() {
 				if subscriber.Subscribed() {
+					var zero interface{}
 					observe(zero, nil, true)
 				}
 			}
 			x := func() bool {
-				return subscriber.Canceled()
+				return !subscriber.Subscribed()
 			}
 			create(n, e, c, x)
 		})
@@ -174,8 +175,8 @@ func (e RxError) Error() string	{ return string(e) }
 //
 // ToChan uses the public scheduler.Goroutine variable for scheduling, because
 // it needs the concurrency so the returned channel can be used by used
-// by the calling code directly. To cancel ToChan you will need to supply a
-// subscriber that you hold on to.
+// by the calling code directly. To be able to cancel ToChan, you will need to
+// create a subscriber yourself and pass it to ToChan as an argument.
 func (o Observable) ToChan(subscribers ...Subscriber) <-chan interface{} {
 	subscribers = append(subscribers, subscriber.New())
 	scheduler := scheduler.Goroutine
@@ -206,7 +207,7 @@ func (o Observable) ToChan(subscribers ...Subscriber) <-chan interface{} {
 			}
 			if done {
 				atomic.StoreInt32(&state, closed)
-				subscribers[0].Unsubscribe()
+				subscribers[0].Done(err)
 			}
 			if !atomic.CompareAndSwapInt32(&state, busy, idle) {
 				close(nextch)

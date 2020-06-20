@@ -256,10 +256,19 @@ func Timer(initialDelay time.Duration, intervals ...time.Duration) Observable {
 		i := 0
 		runner := subscribeOn.ScheduleFutureRecursive(initialDelay, func(self func(time.Duration)) {
 			if subscriber.Subscribed() {
-				observe(interface{}(i), nil, false)
+				if i == 0 || (i > 0 && len(intervals) > 0) {
+					observe(interface{}(i), nil, false)
+				}
 				if subscriber.Subscribed() {
 					if len(intervals) > 0 {
 						self(intervals[i%len(intervals)])
+					} else {
+						if i == 0 {
+							self(0)
+						} else {
+							var zero interface{}
+							observe(zero, nil, true)
+						}
 					}
 				}
 				i++
@@ -1154,19 +1163,6 @@ func (o Observable) Publish() Multicaster {
 	return o.Multicast(NewSubject)
 }
 
-//jig:name ObservableInt_AsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name IntMulticaster_AutoConnect
 
 // AutoConnect makes a IntMulticaster behave like an ordinary ObservableInt
@@ -1280,6 +1276,19 @@ func (o Multicaster) AutoConnect(count int) Observable {
 			}
 		}
 		source.Unlock()
+	}
+	return observable
+}
+
+//jig:name ObservableInt_AsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
 	}
 	return observable
 }

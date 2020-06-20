@@ -101,21 +101,19 @@ func (o ObservableInt) MapObservableInt(project func(int) ObservableInt) Observa
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
 // Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) Println(a ...interface{}) (err error) {
+func (o ObservableInt) Println(a ...interface{}) error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, e error, done bool) {
+	observer := func(next int, err error, done bool) {
 		if !done {
 			fmt.Println(append(a, next)...)
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
+	return subscriber.Wait()
 }
 
 //jig:name ObservableIntObserver
@@ -153,12 +151,12 @@ func (o ObservableObservableInt) MergeAll() ObservableInt {
 					observe(next, nil, false)
 				case err != nil:
 					observers.done = true
-					var zeroInt int
-					observe(zeroInt, err, true)
+					var zero int
+					observe(zero, err, true)
 				default:
 					if atomic.AddInt32(&observers.len, -1) == 0 {
-						var zeroInt int
-						observe(zeroInt, nil, true)
+						var zero int
+						observe(zero, nil, true)
 					}
 				}
 			}
@@ -168,12 +166,12 @@ func (o ObservableObservableInt) MergeAll() ObservableInt {
 				atomic.AddInt32(&observers.len, 1)
 				next(observer, subscribeOn, subscriber)
 			} else {
-				var zeroInt int
-				observer(zeroInt, err, true)
+				var zero int
+				observer(zero, err, true)
 			}
 		}
 		subscribeOn.Schedule(func() {
-			if !subscriber.Canceled() {
+			if subscriber.Subscribed() {
 				observers.len = 1
 				o(merger, subscribeOn, subscriber)
 			}

@@ -44,7 +44,6 @@ type ObservableInt func(IntObserver, Scheduler, Subscriber)
 
 // FromInt creates an ObservableInt from multiple int values passed in.
 func FromInt(slice ...int) ObservableInt {
-	var zeroInt int
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -56,7 +55,8 @@ func FromInt(slice ...int) ObservableInt {
 						self()
 					}
 				} else {
-					observe(zeroInt, nil, true)
+					var zero int
+					observe(zero, nil, true)
 				}
 			}
 		})
@@ -69,14 +69,14 @@ func FromInt(slice ...int) ObservableInt {
 
 // JustInt creates an ObservableInt that emits a particular item.
 func JustInt(element int) ObservableInt {
-	var zeroInt int
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
 			if subscriber.Subscribed() {
 				observe(element, nil, false)
 			}
 			if subscriber.Subscribed() {
-				observe(zeroInt, nil, true)
+				var zero int
+				observe(zero, nil, true)
 			}
 		})
 		subscriber.OnUnsubscribe(runner.Cancel)
@@ -107,22 +107,22 @@ func (o ObservableInt) MergeWith(other ...ObservableInt) ObservableInt {
 					observe(next, nil, false)
 				case err != nil:
 					observers.done = true
-					var zeroInt int
-					observe(zeroInt, err, true)
+					var zero int
+					observe(zero, err, true)
 				default:
 					if observers.len--; observers.len == 0 {
-						var zeroInt int
-						observe(zeroInt, nil, true)
+						var zero int
+						observe(zero, nil, true)
 					}
 				}
 			}
 		}
 		subscribeOn.Schedule(func() {
-			if !subscriber.Canceled() {
+			if subscriber.Subscribed() {
 				observers.len = 1 + len(other)
 				o(observer, subscribeOn, subscriber)
 				for _, o := range other {
-					if subscriber.Canceled() {
+					if !subscriber.Subscribed() {
 						return
 					}
 					o(observer, subscribeOn, subscriber)
@@ -139,21 +139,19 @@ func (o ObservableInt) MergeWith(other ...ObservableInt) ObservableInt {
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
 // Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) Println(a ...interface{}) (err error) {
+func (o ObservableInt) Println(a ...interface{}) error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, e error, done bool) {
+	observer := func(next int, err error, done bool) {
 		if !done {
 			fmt.Println(append(a, next)...)
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
+	return subscriber.Wait()
 }
 
 //jig:name ObservableInt_DoOnComplete

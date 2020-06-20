@@ -42,10 +42,10 @@ type Observable func(Observer, Scheduler, Subscriber)
 // Throw creates an Observable that emits no items and terminates with an
 // error.
 func Throw(err error) Observable {
-	var zero interface{}
 	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
 			if subscriber.Subscribed() {
+				var zero interface{}
 				observe(zero, err, true)
 			}
 		})
@@ -81,17 +81,15 @@ func (o Observable) DoOnError(f func(err error)) Observable {
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
 // Wait uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o Observable) Wait() (err error) {
+func (o Observable) Wait() error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next interface{}, e error, done bool) {
+	observer := func(next interface{}, err error, done bool) {
 		if done {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
+	return subscriber.Wait()
 }

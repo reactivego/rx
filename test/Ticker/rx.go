@@ -55,10 +55,19 @@ func Ticker(initialDelay time.Duration, intervals ...time.Duration) ObservableTi
 		i := 0
 		runner := subscribeOn.ScheduleFutureRecursive(initialDelay, func(self func(time.Duration)) {
 			if subscriber.Subscribed() {
-				observe(subscribeOn.Now(), nil, false)
+				if i == 0 || (i > 0 && len(intervals) > 0) {
+					observe(subscribeOn.Now(), nil, false)
+				}
 				if subscriber.Subscribed() {
 					if len(intervals) > 0 {
 						self(intervals[i%len(intervals)])
+					} else {
+						if i == 0 {
+							self(0)
+						} else {
+							var zero time.Time
+							observe(zero, nil, true)
+						}
 					}
 				}
 				i++

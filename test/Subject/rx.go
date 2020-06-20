@@ -47,12 +47,11 @@ type Observable func(Observer, Scheduler, Subscriber)
 
 const OutOfSubscriptions = RxError("out of subscriptions")
 
-// MakeObserverObservable actually does make an observer observable. It
-// creates a buffering multicaster and returns both the Observer and the
-// Observable side of it. These are then used as the core of any Subject
-// implementation. The Observer side is used to pass items into the buffering
-// multicaster. This then multicasts the items to every Observer that
-// subscribes to the returned Observable.
+// MakeObserverObservable turns an observer into a multicasting and buffering
+// observable. Both the observer and the obeservable are returned. These are
+// then used as the core of any Subject implementation. The Observer side is
+// used to pass items into the buffering multicaster. This then multicasts the
+// items to every Observer that subscribes to the returned Observable.
 //
 //	age     age below which items are kept to replay to a new subscriber.
 //	length  length of the item buffer, number of items kept to replay to a new subscriber.
@@ -68,6 +67,7 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 		cursor		uint64
 		state		uint64		// active, canceled, closed
 		activated	time.Time	// track activity to deterime backoff
+		subscribeOn	Scheduler
 	}
 
 	// cursor
@@ -173,12 +173,14 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 	send := func(value interface{}) {
 		for buf.commit == buf.end {
 			full := false
+			subscribeOn := Scheduler(nil)
 			gosched := accessSubscriptions(func(subscriptions []subscription) {
 				slowest := maxuint64
 				for i := range subscriptions {
 					current := atomic.LoadUint64(&subscriptions[i].cursor)
 					if current < slowest {
 						slowest = current
+						subscribeOn = subscriptions[i].subscribeOn
 					}
 				}
 				end := atomic.LoadUint64(&buf.end)
@@ -199,7 +201,11 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 			})
 			if full {
 				if !gosched {
-					runtime.Gosched()
+					if subscribeOn != nil {
+						subscribeOn.Gosched()
+					} else {
+						runtime.Gosched()
+					}
 				}
 				if atomic.LoadUint64(&buf.state) != active {
 					return
@@ -235,18 +241,19 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 		}
 	}
 
-	appendSubscription := func() (sub *subscription, err error) {
+	appendSubscription := func(subscribeOn Scheduler) (sub *subscription, err error) {
 		accessSubscriptions(func([]subscription) {
 			cursor := atomic.LoadUint64(&buf.begin)
 			s := &buf.subscriptions
 			if len(s.entries) < cap(s.entries) {
-				s.entries = append(s.entries, subscription{cursor: cursor})
+				s.entries = append(s.entries, subscription{cursor: cursor, subscribeOn: subscribeOn})
 				sub = &s.entries[len(s.entries)-1]
 				return
 			}
 			for i := range s.entries {
 				sub = &s.entries[i]
 				if atomic.CompareAndSwapUint64(&sub.cursor, maxuint64, cursor) {
+					sub.subscribeOn = subscribeOn
 					return
 				}
 			}
@@ -258,7 +265,7 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 	}
 
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		sub, err := appendSubscription()
+		sub, err := appendSubscription(subscribeOn)
 		if err != nil {
 			runner := subscribeOn.Schedule(func() {
 				if subscriber.Subscribed() {

@@ -43,7 +43,6 @@ type ObservableInt func(IntObserver, Scheduler, Subscriber)
 
 // FromInt creates an ObservableInt from multiple int values passed in.
 func FromInt(slice ...int) ObservableInt {
-	var zeroInt int
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -55,7 +54,8 @@ func FromInt(slice ...int) ObservableInt {
 						self()
 					}
 				} else {
-					observe(zeroInt, nil, true)
+					var zero int
+					observe(zero, nil, true)
 				}
 			}
 		})
@@ -80,16 +80,16 @@ func (o ObservableInt) Min() ObservableInt {
 					}
 				} else {
 					observe(min, nil, false)
-					var zeroInt int
-					observe(zeroInt, err, done)
+					var zero int
+					observe(zero, err, done)
 				}
 			} else {
 				if !done {
 					min = next
 					started = true
 				} else {
-					var zeroInt int
-					observe(zeroInt, err, done)
+					var zero int
+					observe(zero, err, done)
 				}
 
 			}
@@ -105,19 +105,17 @@ func (o ObservableInt) Min() ObservableInt {
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
 // Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) Println(a ...interface{}) (err error) {
+func (o ObservableInt) Println(a ...interface{}) error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, e error, done bool) {
+	observer := func(next int, err error, done bool) {
 		if !done {
 			fmt.Println(append(a, next)...)
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
+	return subscriber.Wait()
 }

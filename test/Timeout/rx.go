@@ -77,7 +77,6 @@ type ObservableInt func(IntObserver, Scheduler, Subscriber)
 // long CreateFutureRecursiveInt has to wait before calling the create function
 // again.
 func CreateFutureRecursiveInt(timeout time.Duration, create func(NextInt, Error, Complete) time.Duration) ObservableInt {
-	var zeroInt int
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		done := false
 		runner := scheduler.ScheduleFutureRecursive(timeout, func(self func(time.Duration)) {
@@ -92,13 +91,15 @@ func CreateFutureRecursiveInt(timeout time.Duration, create func(NextInt, Error,
 			e := func(err error) {
 				done = true
 				if subscriber.Subscribed() {
-					observe(zeroInt, err, true)
+					var zero int
+					observe(zero, err, true)
 				}
 			}
 			c := func() {
 				done = true
 				if subscriber.Subscribed() {
-					observe(zeroInt, nil, true)
+					var zero int
+					observe(zero, nil, true)
 				}
 			}
 			timeout = create(n, e, c)
@@ -136,7 +137,6 @@ func NeverInt() ObservableInt {
 
 // FromInt creates an ObservableInt from multiple int values passed in.
 func FromInt(slice ...int) ObservableInt {
-	var zeroInt int
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -148,7 +148,8 @@ func FromInt(slice ...int) ObservableInt {
 						self()
 					}
 				} else {
-					observe(zeroInt, nil, true)
+					var zero int
+					observe(zero, nil, true)
 				}
 			}
 		})
@@ -189,7 +190,7 @@ func (o Observable) Serialize() Observable {
 //jig:name Observable_Timeout
 
 // TimeoutOccured is delivered to an observer if the stream times out.
-const TimeoutOccured = RxError("timeout")
+const TimeoutOccured = RxError("timeout occured")
 
 // Timeout mirrors the source Observable, but issues an error notification if a
 // particular period of time elapses without any emitted items.
@@ -281,14 +282,14 @@ func (o ObservableInt) AsObservable() Observable {
 
 // SubscribeOn specifies the scheduler an ObservableInt should use when it is
 // subscribed to.
-func (o ObservableInt) SubscribeOn(subscribeOn Scheduler) ObservableInt {
+func (o ObservableInt) SubscribeOn(scheduler Scheduler) ObservableInt {
 	observable := func(observe IntObserver, _ Scheduler, subscriber Subscriber) {
-		if subscribeOn.IsConcurrent() {
+		if scheduler.IsConcurrent() {
 			subscriber.OnWait(nil)
 		} else {
-			subscriber.OnWait(subscribeOn.Wait)
+			subscriber.OnWait(scheduler.Wait)
 		}
-		o(observe, subscribeOn, subscriber)
+		o(observe, scheduler, subscriber)
 	}
 	return observable
 }
@@ -314,11 +315,11 @@ func (o ObservableInt) Println(a ...interface{}) error {
 	return subscriber.Wait()
 }
 
-//jig:name ErrTypecastToInt
+//jig:name TypecastFailed
 
-// ErrTypecastToInt is delivered to an observer if the generic value cannot be
-// typecast to int.
-const ErrTypecastToInt = RxError("typecast to int failed")
+// ErrTypecast is delivered to an observer if the generic value cannot be
+// typecast to a specific type.
+const TypecastFailed = RxError("typecast failed")
 
 //jig:name Observable_AsObservableInt
 
@@ -332,12 +333,12 @@ func (o Observable) AsObservableInt() ObservableInt {
 				if nextInt, ok := next.(int); ok {
 					observe(nextInt, err, done)
 				} else {
-					var zeroInt int
-					observe(zeroInt, ErrTypecastToInt, true)
+					var zero int
+					observe(zero, TypecastFailed, true)
 				}
 			} else {
-				var zeroInt int
-				observe(zeroInt, err, true)
+				var zero int
+				observe(zero, err, true)
 			}
 		}
 		o(observer, subscribeOn, subscriber)

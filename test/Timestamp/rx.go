@@ -62,10 +62,19 @@ func Ticker(initialDelay time.Duration, intervals ...time.Duration) ObservableTi
 		i := 0
 		runner := subscribeOn.ScheduleFutureRecursive(initialDelay, func(self func(time.Duration)) {
 			if subscriber.Subscribed() {
-				observe(subscribeOn.Now(), nil, false)
+				if i == 0 || (i > 0 && len(intervals) > 0) {
+					observe(subscribeOn.Now(), nil, false)
+				}
 				if subscriber.Subscribed() {
 					if len(intervals) > 0 {
 						self(intervals[i%len(intervals)])
+					} else {
+						if i == 0 {
+							self(0)
+						} else {
+							var zero time.Time
+							observe(zero, nil, true)
+						}
 					}
 				}
 				i++
@@ -212,11 +221,11 @@ type RxError string
 
 func (e RxError) Error() string	{ return string(e) }
 
-//jig:name ErrTypecastToTimestampTime
+//jig:name TypecastFailed
 
-// ErrTypecastToTimestampTime is delivered to an observer if the generic value cannot be
-// typecast to TimestampTime.
-const ErrTypecastToTimestampTime = RxError("typecast to TimestampTime failed")
+// ErrTypecast is delivered to an observer if the generic value cannot be
+// typecast to a specific type.
+const TypecastFailed = RxError("typecast failed")
 
 //jig:name Observable_AsObservableTimestampTime
 
@@ -230,12 +239,12 @@ func (o Observable) AsObservableTimestampTime() ObservableTimestampTime {
 				if nextTimestampTime, ok := next.(TimestampTime); ok {
 					observe(nextTimestampTime, err, done)
 				} else {
-					var zeroTimestampTime TimestampTime
-					observe(zeroTimestampTime, ErrTypecastToTimestampTime, true)
+					var zero TimestampTime
+					observe(zero, TypecastFailed, true)
 				}
 			} else {
-				var zeroTimestampTime TimestampTime
-				observe(zeroTimestampTime, err, true)
+				var zero TimestampTime
+				observe(zero, err, true)
 			}
 		}
 		o(observer, subscribeOn, subscriber)
@@ -282,19 +291,17 @@ func (o Observable) All(predicate func(next interface{}) bool) ObservableBool {
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
 // Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableBool) Println(a ...interface{}) (err error) {
+func (o ObservableBool) Println(a ...interface{}) error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next bool, e error, done bool) {
+	observer := func(next bool, err error, done bool) {
 		if !done {
 			fmt.Println(append(a, next)...)
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
+	return subscriber.Wait()
 }

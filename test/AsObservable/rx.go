@@ -43,7 +43,6 @@ type ObservableString func(StringObserver, Scheduler, Subscriber)
 
 // FromString creates an ObservableString from multiple string values passed in.
 func FromString(slice ...string) ObservableString {
-	var zeroString string
 	observable := func(observe StringObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -55,7 +54,8 @@ func FromString(slice ...string) ObservableString {
 						self()
 					}
 				} else {
-					observe(zeroString, nil, true)
+					var zero string
+					observe(zero, nil, true)
 				}
 			}
 		})
@@ -84,7 +84,6 @@ type Observable func(Observer, Scheduler, Subscriber)
 
 // From creates an Observable from multiple interface{} values passed in.
 func From(slice ...interface{}) Observable {
-	var zero interface{}
 	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -96,6 +95,7 @@ func From(slice ...interface{}) Observable {
 						self()
 					}
 				} else {
+					var zero interface{}
 					observe(zero, nil, true)
 				}
 			}
@@ -140,11 +140,11 @@ type RxError string
 
 func (e RxError) Error() string	{ return string(e) }
 
-//jig:name ErrTypecastToFloat64
+//jig:name TypecastFailed
 
-// ErrTypecastToFloat64 is delivered to an observer if the generic value cannot be
-// typecast to float64.
-const ErrTypecastToFloat64 = RxError("typecast to float64 failed")
+// ErrTypecast is delivered to an observer if the generic value cannot be
+// typecast to a specific type.
+const TypecastFailed = RxError("typecast failed")
 
 //jig:name Observable_AsObservableFloat64
 
@@ -158,12 +158,12 @@ func (o Observable) AsObservableFloat64() ObservableFloat64 {
 				if nextFloat64, ok := next.(float64); ok {
 					observe(nextFloat64, err, done)
 				} else {
-					var zeroFloat64 float64
-					observe(zeroFloat64, ErrTypecastToFloat64, true)
+					var zero float64
+					observe(zero, TypecastFailed, true)
 				}
 			} else {
-				var zeroFloat64 float64
-				observe(zeroFloat64, err, true)
+				var zero float64
+				observe(zero, err, true)
 			}
 		}
 		o(observer, subscribeOn, subscriber)
@@ -177,21 +177,19 @@ func (o Observable) AsObservableFloat64() ObservableFloat64 {
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
 // Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o Observable) Println(a ...interface{}) (err error) {
+func (o Observable) Println(a ...interface{}) error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next interface{}, e error, done bool) {
+	observer := func(next interface{}, err error, done bool) {
 		if !done {
 			fmt.Println(append(a, next)...)
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
+	return subscriber.Wait()
 }
 
 //jig:name ObservableFloat64_Println
@@ -200,21 +198,19 @@ func (o Observable) Println(a ...interface{}) (err error) {
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
 // Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableFloat64) Println(a ...interface{}) (err error) {
+func (o ObservableFloat64) Println(a ...interface{}) error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next float64, e error, done bool) {
+	observer := func(next float64, err error, done bool) {
 		if !done {
 			fmt.Println(append(a, next)...)
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
+	return subscriber.Wait()
 }
 
 //jig:name ObservableFloat64_Wait
@@ -222,17 +218,15 @@ func (o ObservableFloat64) Println(a ...interface{}) (err error) {
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
 // Wait uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableFloat64) Wait() (err error) {
+func (o ObservableFloat64) Wait() error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next float64, e error, done bool) {
+	observer := func(next float64, err error, done bool) {
 		if done {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
+	return subscriber.Wait()
 }

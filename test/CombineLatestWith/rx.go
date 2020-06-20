@@ -44,7 +44,6 @@ type Observable func(Observer, Scheduler, Subscriber)
 
 // From creates an Observable from multiple interface{} values passed in.
 func From(slice ...interface{}) Observable {
-	var zero interface{}
 	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -56,6 +55,7 @@ func From(slice ...interface{}) Observable {
 						self()
 					}
 				} else {
+					var zero interface{}
 					observe(zero, nil, true)
 				}
 			}
@@ -79,12 +79,11 @@ type Slice = []interface{}
 // observables emits, a new slice will be emitted containing all the latest
 // value.
 func (o ObservableObservable) CombineLatestAll() ObservableSlice {
-	var zero interface{}
-	var zeroSlice []interface{}
 	observable := func(observe SliceObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observables := []Observable(nil)
 		var observers struct {
 			sync.Mutex
+			assigned	[]bool
 			values		[]interface{}
 			initialized	int
 			active		int
@@ -96,7 +95,8 @@ func (o ObservableObservable) CombineLatestAll() ObservableSlice {
 				if observers.active > 0 {
 					switch {
 					case !done:
-						if observers.values[index] == zero {
+						if !observers.assigned[index] {
+							observers.assigned[index] = true
 							observers.initialized++
 						}
 						observers.values[index] = next
@@ -105,10 +105,12 @@ func (o ObservableObservable) CombineLatestAll() ObservableSlice {
 						}
 					case err != nil:
 						observers.active = 0
-						observe(zeroSlice, err, true)
+						var zero []interface{}
+						observe(zero, err, true)
 					default:
 						if observers.active--; observers.active == 0 {
-							observe(zeroSlice, nil, true)
+							var zero []interface{}
+							observe(zero, nil, true)
 						}
 					}
 				}
@@ -121,15 +123,17 @@ func (o ObservableObservable) CombineLatestAll() ObservableSlice {
 			case !done:
 				observables = append(observables, next)
 			case err != nil:
-				observe(zeroSlice, err, true)
+				var zero []interface{}
+				observe(zero, err, true)
 			default:
 				subscribeOn.Schedule(func() {
-					if !subscriber.Canceled() {
+					if subscriber.Subscribed() {
 						numObservables := len(observables)
+						observers.assigned = make([]bool, numObservables)
 						observers.values = make([]interface{}, numObservables)
 						observers.active = numObservables
 						for i, v := range observables {
-							if subscriber.Canceled() {
+							if !subscriber.Subscribed() {
 								return
 							}
 							v(makeObserver(i), subscribeOn, subscriber)
@@ -190,7 +194,6 @@ type ObservableSlice func(SliceObserver, Scheduler, Subscriber)
 
 // FromObservable creates an ObservableObservable from multiple Observable values passed in.
 func FromObservable(slice ...Observable) ObservableObservable {
-	var zeroObservable Observable
 	observable := func(observe ObservableObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
@@ -202,7 +205,8 @@ func FromObservable(slice ...Observable) ObservableObservable {
 						self()
 					}
 				} else {
-					observe(zeroObservable, nil, true)
+					var zero Observable
+					observe(zero, nil, true)
 				}
 			}
 		})
@@ -217,19 +221,17 @@ func FromObservable(slice ...Observable) ObservableObservable {
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
 // Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableSlice) Println(a ...interface{}) (err error) {
+func (o ObservableSlice) Println(a ...interface{}) error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next Slice, e error, done bool) {
+	observer := func(next Slice, err error, done bool) {
 		if !done {
 			fmt.Println(append(a, next)...)
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
+	return subscriber.Wait()
 }

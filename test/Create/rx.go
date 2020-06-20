@@ -69,10 +69,9 @@ type ObservableString func(StringObserver, Scheduler, Subscriber)
 // Complete and Canceled function that can be called by the code that
 // implements the Observable.
 func CreateString(create func(NextString, Error, Complete, Canceled)) ObservableString {
-	var zeroString string
 	observable := func(observe StringObserver, scheduler Scheduler, subscriber Subscriber) {
 		runner := scheduler.Schedule(func() {
-			if subscriber.Canceled() {
+			if !subscriber.Subscribed() {
 				return
 			}
 			n := func(next string) {
@@ -82,16 +81,18 @@ func CreateString(create func(NextString, Error, Complete, Canceled)) Observable
 			}
 			e := func(err error) {
 				if subscriber.Subscribed() {
-					observe(zeroString, err, true)
+					var zero string
+					observe(zero, err, true)
 				}
 			}
 			c := func() {
 				if subscriber.Subscribed() {
-					observe(zeroString, nil, true)
+					var zero string
+					observe(zero, nil, true)
 				}
 			}
 			x := func() bool {
-				return subscriber.Canceled()
+				return !subscriber.Subscribed()
 			}
 			create(n, e, c, x)
 		})
@@ -106,19 +107,17 @@ func CreateString(create func(NextString, Error, Complete, Canceled)) Observable
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
 // Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableString) Println(a ...interface{}) (err error) {
+func (o ObservableString) Println(a ...interface{}) error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next string, e error, done bool) {
+	observer := func(next string, err error, done bool) {
 		if !done {
 			fmt.Println(append(a, next)...)
 		} else {
-			err = e
-			subscriber.Unsubscribe()
+			subscriber.Done(err)
 		}
 	}
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
-	subscriber.Wait()
-	return
+	return subscriber.Wait()
 }
