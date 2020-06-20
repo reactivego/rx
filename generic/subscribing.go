@@ -237,21 +237,21 @@ func (o ObservableFoo) ToChan(subscribers ...Subscriber) <-chan foo {
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
 // Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableFoo) Subscribe(observe FooObserver, subscribers ...Subscriber) Subscription {
-	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.MakeTrampoline()
+func (o ObservableFoo) Subscribe(observe FooObserver, schedulers ...Scheduler) Subscription {
+	subscriber := subscriber.New()
+	schedulers = append(schedulers, scheduler.MakeTrampoline())
 	observer := func(next foo, err error, done bool) {
 		if !done {
 			observe(next, err, done)
 		} else {
 			var zero foo
 			observe(zero, err, true)
-			subscribers[0].Done(err)
+			subscriber.Done(err)
 		}
 	}
-	subscribers[0].OnWait(scheduler.Wait)
-	o(observer, scheduler, subscribers[0])
-	return subscribers[0]
+	subscriber.OnWait(schedulers[0].Wait)
+	o(observer, schedulers[0], subscriber)
+	return subscriber
 }
 
 //jig:template Println<Foo>
