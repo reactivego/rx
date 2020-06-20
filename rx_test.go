@@ -295,27 +295,27 @@ func ExampleObservable_SubscribeOn_trampoline() {
 	observer := func(next interface{}, err error, done bool) {
 		switch {
 		case !done:
-			fmt.Println(trampoline, "print", next)
+			fmt.Println(trampoline.Count(), "print", next)
 		case err != nil:
-			fmt.Println(trampoline, "print", err)
+			fmt.Println(trampoline.Count(), "print", err)
 		default:
-			fmt.Println(trampoline, "print", "complete")
+			fmt.Println(trampoline.Count(), "print", "complete")
 		}
 	}
-	fmt.Println(trampoline, "SUBSCRIBING...")
+	fmt.Println(trampoline.Count(), "SUBSCRIBING...")
 	subscription := rx.From(1, 2, 3).SubscribeOn(trampoline).Subscribe(observer)
-	fmt.Println(trampoline, "WAITING...")
+	fmt.Println(trampoline.Count(), "WAITING...")
 	subscription.Wait()
-	fmt.Println(trampoline, "DONE")
+	fmt.Println(trampoline.Count(), "DONE")
 	
 	// Output:
-	// Trampoline{ tasks = 0 } SUBSCRIBING...
-	// Trampoline{ tasks = 1 } WAITING...
-	// Trampoline{ tasks = 1 } print 1
-	// Trampoline{ tasks = 1 } print 2
-	// Trampoline{ tasks = 1 } print 3
-	// Trampoline{ tasks = 1 } print complete
-	// Trampoline{ tasks = 0 } DONE
+	// 0 SUBSCRIBING...
+	// 1 WAITING...
+	// 1 print 1
+	// 1 print 2
+	// 1 print 3
+	// 1 print complete
+	// 0 DONE
 }
 
 func ExampleObservable_SubscribeOn_goroutine() {
@@ -324,26 +324,26 @@ func ExampleObservable_SubscribeOn_goroutine() {
 	observer := func(next interface{}, err error, done bool) {
 		switch {
 		case !done:
-			fmt.Println(goroutine, "print", next)
+			fmt.Println(goroutine.Count(), "print", next)
 		case err != nil:
-			fmt.Println(goroutine, "print", err)
+			fmt.Println(goroutine.Count(), "print", err)
 		default:
-			fmt.Println(goroutine, "print", "complete")
+			fmt.Println(goroutine.Count(), "print", "complete")
 		}
 	}
-	fmt.Println(goroutine, "SUBSCRIBING...")
+	fmt.Println(goroutine.Count(), "SUBSCRIBING...")
 	subscription := rx.From(1, 2, 3).Delay(10 * ms).SubscribeOn(goroutine).Subscribe(observer)
 	// Note that without a Delay the next Println lands at a random spot in the output.
 	fmt.Println("WAITING...")
 	subscription.Wait()
-	fmt.Println(goroutine, "DONE")
+	fmt.Println(goroutine.Count(), "DONE")
 	// Output:
-	// Goroutine{ tasks = 0 } SUBSCRIBING...
+	// 0 SUBSCRIBING...
 	// WAITING...
-	// Goroutine{ tasks = 1 } print 1
-	// Goroutine{ tasks = 1 } print 2
-	// Goroutine{ tasks = 1 } print 3
-	// Goroutine{ tasks = 1 } print complete 
-	// Goroutine{ tasks = 0 } DONE
+	// 1 print 1
+	// 1 print 2
+	// 1 print 3
+	// 1 print complete 
+	// 0 DONE
 }
 

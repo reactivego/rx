@@ -548,10 +548,19 @@ func Ticker(initialDelay time.Duration, intervals ...time.Duration) ObservableTi
 		i := 0
 		runner := subscribeOn.ScheduleFutureRecursive(initialDelay, func(self func(time.Duration)) {
 			if subscriber.Subscribed() {
-				observe(subscribeOn.Now(), nil, false)
+				if i == 0 || (i > 0 && len(intervals) > 0) {
+					observe(subscribeOn.Now(), nil, false)
+				}
 				if subscriber.Subscribed() {
 					if len(intervals) > 0 {
 						self(intervals[i%len(intervals)])
+					} else {
+						if i == 0 {
+							self(0)
+						} else {
+							var zero time.Time
+							observe(zero, nil, true)
+						}
 					}
 				}
 				i++
@@ -564,19 +573,28 @@ func Ticker(initialDelay time.Duration, intervals ...time.Duration) ObservableTi
 
 //jig:name Timer
 
-// Timer creates an ObservableInt that emits a sequence of integers (starting
-// at zero) after an initialDelay has passed. Subsequent values are emitted
-// using  a schedule of intervals passed in. If only the initialDelay is
-// given, Timer will emit only once.
-func Timer(initialDelay time.Duration, intervals ...time.Duration) ObservableInt {
-	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
+// Timer creates an Observable that emits a sequence of integers
+// (starting at zero) after an initialDelay has passed. Subsequent values are
+// emitted using  a schedule of intervals passed in. If only the initialDelay
+// is given, Timer will emit only once.
+func Timer(initialDelay time.Duration, intervals ...time.Duration) Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := subscribeOn.ScheduleFutureRecursive(initialDelay, func(self func(time.Duration)) {
 			if subscriber.Subscribed() {
-				observe(i, nil, false)
+				if i == 0 || (i > 0 && len(intervals) > 0) {
+					observe(interface{}(i), nil, false)
+				}
 				if subscriber.Subscribed() {
 					if len(intervals) > 0 {
 						self(intervals[i%len(intervals)])
+					} else {
+						if i == 0 {
+							self(0)
+						} else {
+							var zero interface{}
+							observe(zero, nil, true)
+						}
 					}
 				}
 				i++
@@ -605,6 +623,7 @@ func (o ObservableObservable) CombineLatestAll() ObservableSlice {
 		observables := []Observable(nil)
 		var observers struct {
 			sync.Mutex
+			assigned	[]bool
 			values		[]interface{}
 			initialized	int
 			active		int
@@ -616,8 +635,8 @@ func (o ObservableObservable) CombineLatestAll() ObservableSlice {
 				if observers.active > 0 {
 					switch {
 					case !done:
-						var zero interface{}
-						if observers.values[index] == zero {
+						if !observers.assigned[index] {
+							observers.assigned[index] = true
 							observers.initialized++
 						}
 						observers.values[index] = next
@@ -650,6 +669,7 @@ func (o ObservableObservable) CombineLatestAll() ObservableSlice {
 				subscribeOn.Schedule(func() {
 					if subscriber.Subscribed() {
 						numObservables := len(observables)
+						observers.assigned = make([]bool, numObservables)
 						observers.values = make([]interface{}, numObservables)
 						observers.active = numObservables
 						for i, v := range observables {
@@ -3159,14 +3179,13 @@ func (o Observable) Multicast(factory func() Subject) Multicaster {
 
 //jig:name MakeObserverObservable
 
-const ErrOutOfSubscriptions = RxError("out of subscriptions")
+const OutOfSubscriptions = RxError("out of subscriptions")
 
-// MakeObserverObservable actually does make an observer observable. It
-// creates a buffering multicaster and returns both the Observer and the
-// Observable side of it. These are then used as the core of any Subject
-// implementation. The Observer side is used to pass items into the buffering
-// multicaster. This then multicasts the items to every Observer that
-// subscribes to the returned Observable.
+// MakeObserverObservable turns an observer into a multicasting and buffering
+// observable. Both the observer and the obeservable are returned. These are
+// then used as the core of any Subject implementation. The Observer side is
+// used to pass items into the buffering multicaster. This then multicasts the
+// items to every Observer that subscribes to the returned Observable.
 //
 //	age     age below which items are kept to replay to a new subscriber.
 //	length  length of the item buffer, number of items kept to replay to a new subscriber.
@@ -3178,13 +3197,19 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 		us	= time.Microsecond
 	)
 
-	// Access to subscriptions
+	type subscription struct {
+		cursor		uint64
+		state		uint64		// active, canceled, closed
+		activated	time.Time	// track activity to deterime backoff
+		subscribeOn	Scheduler
+	}
+
+	// cursor
 	const (
-		idle	uint32	= iota
-		busy
+		maxuint64 uint64 = math.MaxUint64	// park unused cursor at maxuint64
 	)
 
-	// state of subscription and buffer
+	// state
 	const (
 		active	uint64	= iota
 		canceled
@@ -3192,23 +3217,18 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 		closed
 	)
 
-	const (
-		// cursor is parked so it does not influence advancing the commit index.
-		parked uint64 = math.MaxUint64
-	)
-
-	type subscription struct {
-		cursor		uint64
-		state		uint64		// active, canceled, closed
-		activated	time.Time	// track activity to deterime backoff
-	}
-
 	type subscriptions struct {
 		sync.Mutex
 		*sync.Cond
 		entries	[]subscription
-		access	uint32	// idle, busy
+		access	uint32	// unlocked, locked
 	}
+
+	// access
+	const (
+		unlocked	uint32	= iota
+		locked
+	)
 
 	type item struct {
 		Value	interface{}
@@ -3217,10 +3237,10 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 
 	type buffer struct {
 		age	time.Duration
-		len	uint64
-		cap	uint64
-
+		keep	uint64
 		mod	uint64
+		size	uint64
+
 		items	[]item
 		begin	uint64
 		end	uint64
@@ -3236,6 +3256,8 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 		if length < 0 {
 			length = 0
 		}
+		keep := uint64(length)
+
 		cap, scap := length, 32
 		switch {
 		case len(capacity) >= 2:
@@ -3246,13 +3268,21 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 		if cap < length {
 			cap = length
 		}
-		size := uint64(1) << uint(math.Ceil(math.Log2(float64(cap+1))))
+		if cap == 0 {
+			cap = 1
+		}
+		size := uint64(1) << uint(math.Ceil(math.Log2(float64(cap))))
+
+		if scap < 1 {
+			scap = 1
+		}
 		buf := &buffer{
-			len:	uint64(length),
-			cap:	size,
 			age:	age,
-			items:	make([]item, size),
+			keep:	keep,
 			mod:	size - 1,
+			size:	size,
+
+			items:	make([]item, size),
 			end:	size,
 			subscriptions: subscriptions{
 				entries: make([]subscription, 0, scap),
@@ -3264,47 +3294,52 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 	buf := make(age, length, capacity...)
 
 	accessSubscriptions := func(access func([]subscription)) bool {
-		spun := false
-		for !atomic.CompareAndSwapUint32(&buf.subscriptions.access, idle, busy) {
+		gosched := false
+		for !atomic.CompareAndSwapUint32(&buf.subscriptions.access, unlocked, locked) {
 			runtime.Gosched()
-			spun = true
+			gosched = true
 		}
 		access(buf.subscriptions.entries)
-		atomic.StoreUint32(&buf.subscriptions.access, idle)
-		return spun
+		atomic.StoreUint32(&buf.subscriptions.access, unlocked)
+		return gosched
 	}
 
 	send := func(value interface{}) {
 		for buf.commit == buf.end {
-			slowest := parked
-			spun := accessSubscriptions(func(subscriptions []subscription) {
+			full := false
+			subscribeOn := Scheduler(nil)
+			gosched := accessSubscriptions(func(subscriptions []subscription) {
+				slowest := maxuint64
 				for i := range subscriptions {
-					cursor := atomic.LoadUint64(&subscriptions[i].cursor)
-					if cursor < slowest {
-						slowest = cursor
+					current := atomic.LoadUint64(&subscriptions[i].cursor)
+					if current < slowest {
+						slowest = current
+						subscribeOn = subscriptions[i].subscribeOn
 					}
 				}
 				end := atomic.LoadUint64(&buf.end)
 				if atomic.LoadUint64(&buf.begin) < slowest && slowest <= end {
-					if slowest+buf.len > end {
-						slowest = end - buf.len
+					if slowest+buf.keep > end {
+						slowest = end - buf.keep + 1
 					}
 					atomic.StoreUint64(&buf.begin, slowest)
-					atomic.StoreUint64(&buf.end, slowest+buf.mod+1)
+					atomic.StoreUint64(&buf.end, slowest+buf.size)
 				} else {
-					if slowest != parked {
-						slowest = parked
-
-					} else {
-
+					if slowest == maxuint64 {
 						atomic.AddUint64(&buf.begin, 1)
 						atomic.AddUint64(&buf.end, 1)
+					} else {
+						full = true
 					}
 				}
 			})
-			if slowest == parked {
-				if !spun {
-					runtime.Gosched()
+			if full {
+				if !gosched {
+					if subscribeOn != nil {
+						subscribeOn.Gosched()
+					} else {
+						runtime.Gosched()
+					}
 				}
 				if atomic.LoadUint64(&buf.state) != active {
 					return
@@ -3340,29 +3375,31 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 		}
 	}
 
-	appendSubscription := func() (sub *subscription, err error) {
+	appendSubscription := func(subscribeOn Scheduler) (sub *subscription, err error) {
 		accessSubscriptions(func([]subscription) {
 			cursor := atomic.LoadUint64(&buf.begin)
 			s := &buf.subscriptions
 			if len(s.entries) < cap(s.entries) {
-				s.entries = append(s.entries, subscription{cursor: cursor})
+				s.entries = append(s.entries, subscription{cursor: cursor, subscribeOn: subscribeOn})
 				sub = &s.entries[len(s.entries)-1]
 				return
 			}
 			for i := range s.entries {
 				sub = &s.entries[i]
-				if atomic.CompareAndSwapUint64(&sub.cursor, parked, cursor) {
+				if atomic.CompareAndSwapUint64(&sub.cursor, maxuint64, cursor) {
+					sub.subscribeOn = subscribeOn
 					return
 				}
 			}
-			err = ErrOutOfSubscriptions
+			sub = nil
+			err = OutOfSubscriptions
 			return
 		})
 		return
 	}
 
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		sub, err := appendSubscription()
+		sub, err := appendSubscription(subscribeOn)
 		if err != nil {
 			runner := subscribeOn.Schedule(func() {
 				if subscriber.Subscribed() {
@@ -3373,8 +3410,8 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 			return
 		}
 		commit := atomic.LoadUint64(&buf.commit)
-		if atomic.LoadUint64(&buf.begin)+buf.len < commit {
-			atomic.StoreUint64(&sub.cursor, commit-buf.len)
+		if atomic.LoadUint64(&buf.begin)+buf.keep < commit {
+			atomic.StoreUint64(&sub.cursor, commit-buf.keep)
 		}
 		atomic.StoreUint64(&sub.state, atomic.LoadUint64(&buf.state))
 		sub.activated = time.Now()
@@ -3385,7 +3422,7 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 			if sub.cursor == commit {
 				if atomic.CompareAndSwapUint64(&sub.state, canceled, canceled) {
 
-					atomic.StoreUint64(&sub.cursor, parked)
+					atomic.StoreUint64(&sub.cursor, maxuint64)
 					return
 				} else {
 
@@ -3398,7 +3435,7 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 						if atomic.CompareAndSwapUint64(&sub.state, closed, closed) {
 
 							observe(nil, buf.err, true)
-							atomic.StoreUint64(&sub.cursor, parked)
+							atomic.StoreUint64(&sub.cursor, maxuint64)
 							return
 						}
 
@@ -3423,7 +3460,7 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 			}
 
 			if atomic.LoadUint64(&sub.state) == canceled {
-				atomic.StoreUint64(&sub.cursor, parked)
+				atomic.StoreUint64(&sub.cursor, maxuint64)
 				return
 			}
 			for ; sub.cursor != commit; atomic.AddUint64(&sub.cursor, 1) {
@@ -3432,7 +3469,7 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 					observe(item.Value, nil, false)
 				}
 				if atomic.LoadUint64(&sub.state) == canceled {
-					atomic.StoreUint64(&sub.cursor, parked)
+					atomic.StoreUint64(&sub.cursor, maxuint64)
 					return
 				}
 			}
@@ -3521,7 +3558,7 @@ func (o Observable) AsObservable() Observable {
 // observable goroutine is blocked until all subscribers have processed the
 // next, error or complete notification.
 func NewSubject() Subject {
-	observer, observable := MakeObserverObservable(0, 0, 1, 16)
+	observer, observable := MakeObserverObservable(0, 0)
 	return Subject{observer.AsObserver(), observable.AsObservable()}
 }
 
@@ -3545,7 +3582,7 @@ func (o Observable) Publish() Multicaster {
 
 // DefaultReplayCapacity is the default capacity of a replay buffer when
 // a bufferCapacity of 0 is passed to the NewReplaySubject function.
-const DefaultReplayCapacity = 16380
+const DefaultReplayCapacity = 16383
 
 //jig:name NewReplaySubject
 
