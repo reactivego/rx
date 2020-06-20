@@ -452,10 +452,11 @@ func NewBehaviorSubjectFoo(a foo) SubjectFoo {
 func NewAsyncSubjectFoo() SubjectFoo {
 	observer, observable := MakeObserverObservable(0, 1)
 	var async struct {
+		subject SubjectFoo
 		set  bool
 		last foo
 	}
-	observerFoo := func(next foo, err error, done bool) {
+	async.subject.FooObserver = func(next foo, err error, done bool) {
 		if !done {
 			async.set = true
 			async.last = next
@@ -466,5 +467,6 @@ func NewAsyncSubjectFoo() SubjectFoo {
 			observer(next, err, true)
 		}
 	}
-	return SubjectFoo{observerFoo, observable.AsObservableFoo()}
+	async.subject.ObservableFoo = observable.AsObservableFoo()
+	return async.subject
 }
