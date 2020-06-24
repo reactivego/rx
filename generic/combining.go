@@ -58,7 +58,7 @@ func (o ObservableFoo) CombineLatestMapToBar(inner ObservableBar) ObservableBarS
 type FooSlice = []foo
 
 //jig:template ObservableObservable<Foo> CombineLatestAll
-//jig:needs <Foo>Slice, <Foo>SliceObserver, Observable<Foo>Slice
+//jig:needs <Foo>Slice
 
 // CombineLatestAll flattens a higher order observable
 // (e.g. ObservableObservableFoo) by subscribing to
