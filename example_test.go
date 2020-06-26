@@ -24,7 +24,8 @@ func Example_subscriberLoop() {
 	parent := &subscriber{}
 
 	child1 := parent.Add()
-	child2 := parent.Add(parent.Unsubscribe)
+	child2 := parent.Add()
+	child2.OnUnsubscribe(parent.Unsubscribe)
 	child3 := parent.Add()
 
 	if parent.Canceled() || child1.Canceled() || child2.Canceled() || child3.Canceled() {
@@ -33,7 +34,7 @@ func Example_subscriberLoop() {
 
 	child2.Unsubscribe()
 
-	if !(parent.Canceled() && child1.Canceled() && child2.Canceled() && child3.Canceled()) {
+	if parent.Subscribed() || child1.Subscribed() || child2.Subscribed() || child3.Subscribed() {
 		fmt.Println("all of the subscribers should be cancelled here")
 	}
 

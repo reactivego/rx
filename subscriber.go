@@ -24,14 +24,12 @@ type Subscription interface {
 	// Subscribed returns true when the subscription is currently active.
 	Subscribed() bool
 
-	// Unsubscribe will cancel the subscription when it is still active.
+	// Unsubscribe will do nothing if the subscription is not active. If the
+	// state is still active however, it will be changed to canceled.
 	// Subsequently, it will call Unsubscribe on all child subscriptions added
-	// via Add along with all methods added through OnUnsubscribe. Unsubscribe
-	// can be safely called on a subscription that is no longer active and
-	// performs no operation in that case. There is no need to check if the
-	// subscription is still active before calling Unsubscribe. When the
-	// subscription is canceled by calling Unsubscribe a call to the Wait
-	// method will return the error ErrUnsubscribed.
+	// through Add, along with all methods added through OnUnsubscribe. When the
+	// subscription is canceled by calling Unsubscribe a call to the Wait method
+	// will return the error ErrUnsubscribed.
 	Unsubscribe()
 
 	// Canceled returns true when the subscription state is canceled.
@@ -53,14 +51,11 @@ type Subscriber interface {
 	// A Subscriber is also a Subscription.
 	Subscription
 
-	// Add will create and return a new child Subscriber with the given
-	// callback functions. The callbacks will be called when either the
-	// Unsubscribe of the parent or of the returned child subscriber is called.
+	// Add will create and return a new child Subscriber setup in such a way that
+	// calling Unsubscribe on the parent will also call Unsubscribe on the child.
 	// Calling the Unsubscribe method on the child will NOT propagate to the
-	// parent! The Unsubscribe will start calling callbacks only after it has
-	// set the subscription state to canceled. Even if you call Unsubscribe
-	// multiple times, callbacks will only be invoked once.
-	Add(callbacks ...func()) Subscriber
+	// parent!
+	Add() Subscriber
 
 	// OnUnsubscribe will add the given callback function to the subscriber.
 	// The callback will be called when either the Unsubscribe of the parent
@@ -81,8 +76,8 @@ type Subscriber interface {
 }
 
 // New will create and return a new Subscriber.
-func New(callbacks ...func()) Subscriber {
-	return &subscriber{callbacks: callbacks, err: ErrUnsubscribed}
+func New() Subscriber {
+	return &subscriber{err: ErrUnsubscribed}
 }
 
 const (
@@ -134,8 +129,8 @@ func (s *subscriber) Wait() error {
 	return s.Error()
 }
 
-func (s *subscriber) Add(callbacks ...func()) Subscriber {
-	child := New(callbacks...)
+func (s *subscriber) Add() Subscriber {
+	child := New()
 	s.Lock()
 	if atomic.LoadInt32(&s.state) != subscribed {
 		child.Unsubscribe()
