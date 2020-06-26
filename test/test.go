@@ -140,3 +140,147 @@ func (a Assertion) Equal(actual, expect interface{}, args ...interface{}) {
 			"actual: %s %s", vexpect, vactual, fmt.Sprint(args...)))
 	}
 }
+
+type observation struct {
+	t      T
+	actual []interface{}
+	err    error
+}
+
+type expect struct {
+	t            T
+	observations map[string]*observation
+}
+
+func Expec(t T) expect {
+	return expect{
+		t: t,
+		observations: make(map[string]*observation),
+	}
+}
+
+type observer = func(next interface{}, err error, done bool)
+
+func (e expect) MakeObservation(name string) observer {
+	observation := &observation{t: e.t}
+	e.observations[name] = observation
+	observer := func(next interface{}, err error, done bool) {
+		if !done {
+			observation.actual = append(observation.actual, next)
+		} else {
+			observation.err = err
+		}
+	}
+	return observer
+}
+
+func (e expect) Observation(name string) *observation {
+	return e.observations[name]
+}
+
+func (o *observation) ToBe(expect []interface{}) {
+	o.t.Helper()
+	Asser(o.t).Equal(o.actual,expect)
+}
+
+func (e expect) Error(expect error) observer {
+	observer := func(next interface{}, err error, done bool) {
+		if done {
+			Asser(e.t).Equal(err, expect)
+		}
+	}
+	return observer
+}
+
+func (e expect) Completion() observer {
+	observer := func(next interface{}, err error, done bool) {
+		if done {
+			Asser(e.t).NoError(err)
+		}
+	}
+	return observer
+}
+
+func (e expect) Never() observer {
+	observer := func(next interface{}, err error, done bool) {
+		if done {
+			Asser(e.t).NoError(err)
+		}
+	}
+	return observer
+}
+
+func (e expect) Slice(expect []interface{}) observer {
+	i := 0
+	actual := []interface{}(nil)
+	observer := func(next interface{}, err error, done bool) {
+		failed := false
+		if !done {
+			actual = append(actual, next)
+			failed = (i >= len(expect) || next != expect[i])
+			i++
+		} else {
+			failed = (i != len(expect))
+		}
+		if failed {
+			Asser(e.t).Equal(actual, expect)
+		}
+	}
+	return observer
+}
+
+func (e expect) Value(expect interface{}) observer {
+	initial := true
+	observer := func(actual interface{}, err error, done bool) {
+		switch {
+		case !done:
+			if initial {
+				initial = false
+				vactual := fmt.Sprintf("%+v", actual)
+				vexpect := fmt.Sprintf("%+v", expect)
+				if vactual != vexpect {
+					e.t.T.Fatal(fmt.Sprintf("Not equal: \n"+
+						"expect: %s\n"+
+						"actual: %s", vexpect, vactual))
+				}
+			} else {
+				e.t.T.Fatal("Observable emitted multiple values, expected exactly one")
+			}
+		case err != nil:
+			e.t.T.Fatalf("No error expected, but got: %s", err.Error())
+		default:
+			if initial {
+				e.t.T.Fatal("Observable completed without emitting a value, expected exactly one")
+			}
+		}
+	}
+	return observer
+}
+
+type intobserver = func(next int, err error, done bool)
+
+func (e expect) IntValue(expect int) intobserver {
+	initial := true
+	observer := func(actual int, err error, done bool) {
+		switch {
+		case !done:
+			if initial {
+				initial = false
+				if actual != expect {
+					e.t.T.Fatal(fmt.Sprintf("Not equal: \n"+
+						"expect: %d\n"+
+						"actual: %d", expect, actual))
+				}
+			} else {
+				e.t.T.Fatal("Observable emitted multiple values, expected exactly one")
+			}
+		case err != nil:
+			e.t.T.Fatalf("No error expected, but got: %s", err.Error())
+		default:
+			if initial {
+				e.t.T.Fatal("Observable completed without emitting a value, expected exactly one")
+			}
+		}
+	}
+	return observer
+}
