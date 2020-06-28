@@ -139,15 +139,14 @@ func (o ObservableFoo) Publish() FooMulticaster {
 //jig:template Observable<Foo> PublishReplay
 //jig:needs Observable<Foo> Multicast, NewReplaySubject<Foo>, <Foo>Multicaster
 
-// Replay uses the Multicast operator to control the subscription of a
-// ReplaySubject to a source observable and turns the subject into a
-// connectable observable. A ReplaySubject emits to any observer all of the
-// items that were emitted by the source observable, regardless of when the
+// PublishReplay returns a FooMulticaster for a ReplaySubject to an underlying
+// FooObservable and turns the subject into a connectable observable. A
+// ReplaySubject emits to any observer all of the items that were emitted by
+// the source observable, regardless of when the observer subscribes. When the
+// underlying FooObervable terminates with an error, then subscribed observers
+// will receive that error. After all observers have unsubscribed due to an
+// error, the FooMulticaster does an internal reset just before the next
 // observer subscribes.
-//
-// If the source completed and as a result the internal ReplaySubject
-// terminated, then calling Connect again will replace the old ReplaySubject
-// with a newly created one.
 func (o ObservableFoo) PublishReplay(bufferCapacity int, windowDuration time.Duration) FooMulticaster {
 	factory := func() SubjectFoo {
 		return NewReplaySubjectFoo(bufferCapacity, windowDuration)
