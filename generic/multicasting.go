@@ -122,16 +122,17 @@ func (o ObservableFoo) Multicast(factory func() SubjectFoo) FooMulticaster {
 //jig:template Observable<Foo> Publish
 //jig:needs Observable<Foo> Multicast, NewSubject<Foo>, <Foo>Multicaster
 
-// Publish uses the Multicast operator to control the subscription of a
-// Subject to a source observable and turns the subject it into a connnectable
-// observable. A Subject emits to an observer only those items that are emitted
-// by the source Observable subsequent to the time of the observer subscribes.
-//
-// If the source completed and as a result the internal Subject terminated, then
-// calling Connect again will replace the old Subject with a newly created one.
-// So this Publish operator is re-connectable, unlike the RxJS 5 behavior that
-// isn't. To simulate the RxJS 5 behavior use Publish().AutoConnect(1) this will
-// connect on the first subscription but will never re-connect.
+// Publish returns a FooMulticaster for a Subject to an underlying
+// FooObservable and turns the subject into a connnectable observable. A
+// Subject emits to an observer only those items that are emitted by the
+// underlying FooObservable subsequent to the time of the observer subscribes.
+// When the underlying FooObervable terminates with an error, then subscribed
+// observers will receive that error. After all observers have unsubscribed
+// due to an error, the FooMulticaster does an internal reset just before the
+// next observer subscribes. So this Publish operator is re-connectable,
+// unlike the RxJS 5 behavior that isn't. To simulate the RxJS 5 behavior use
+// Publish().AutoConnect(1) this will connect on the first subscription but
+// will never re-connect.
 func (o ObservableFoo) Publish() FooMulticaster {
 	return o.Multicast(NewSubjectFoo)
 }
