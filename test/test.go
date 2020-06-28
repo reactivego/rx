@@ -2,6 +2,7 @@ package test
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 )
 
@@ -25,7 +26,18 @@ Use it as follows:
 	     })
 	}
 */
-type T struct{ *testing.T }
+type T struct {
+	*testing.T
+	observations map[string]*observation
+}
+
+type observation struct {
+	T
+	sync.Mutex
+	actual []interface{}
+	err    error
+	done   bool
+}
 
 // Describ(e) is used to describe a data type, method or an example group. This
 // is the outer block which actually contains the test code and it depicts the
@@ -33,7 +45,7 @@ type T struct{ *testing.T }
 // to the module or data type being tested.
 func Describ(e *testing.T, name string, f func(T)) bool {
 	e.Helper()
-	return e.Run(name, func(t *testing.T) { f(T{t}) })
+	return e.Run(name, func(t *testing.T) { f(T{T: t}) })
 }
 
 // Contex(t) block is used to describe the context in which the data type or
@@ -42,7 +54,7 @@ func Describ(e *testing.T, name string, f func(T)) bool {
 // are to be performed.
 func Contex(t T, description string, f func(T)) bool {
 	t.Helper()
-	return t.Run(description, func(t *testing.T) { f(T{t}) })
+	return t.Run(description, func(t *testing.T) { f(T{T: t}) })
 }
 
 // I(t) describes the specification of the example in the context. The
@@ -50,7 +62,9 @@ func Contex(t T, description string, f func(T)) bool {
 // expected to perform or in other words it can be considered as a test case.
 func I(t T, description string, f func(T)) bool {
 	t.Helper()
-	return t.Run(description, func(t *testing.T) { f(T{t}) })
+	return t.Run(description, func(t *testing.T) {
+		f(T{T: t, observations: make(map[string]*observation)})
+	})
 }
 
 // Assert returns an assertion to me made.
@@ -141,35 +155,43 @@ func (a Assertion) Equal(actual, expect interface{}, args ...interface{}) {
 	}
 }
 
-type observation struct {
-	t      T
-	actual []interface{}
-	err    error
-}
-
-type expect struct {
-	t            T
-	observations map[string]*observation
-}
+type expect struct{ T }
 
 func Expec(t T) expect {
-	return expect{
-		t: t,
-		observations: make(map[string]*observation),
-	}
+	return expect{t}
 }
 
 type observer = func(next interface{}, err error, done bool)
+type intobserver = func(next int, err error, done bool)
 
 func (e expect) MakeObservation(name string) observer {
-	observation := &observation{t: e.t}
-	e.observations[name] = observation
+	observation := &observation{T: e.T}
+	e.T.observations[name] = observation
 	observer := func(next interface{}, err error, done bool) {
+		observation.Lock()
 		if !done {
 			observation.actual = append(observation.actual, next)
 		} else {
 			observation.err = err
+			observation.done = true
 		}
+		observation.Unlock()
+	}
+	return observer
+}
+
+func (e expect) MakeIntObservation(name string) intobserver {
+	observation := &observation{T: e.T}
+	e.observations[name] = observation
+	observer := func(next int, err error, done bool) {
+		observation.Lock()
+		if !done {
+			observation.actual = append(observation.actual, next)
+		} else {
+			observation.err = err
+			observation.done = true
+		}
+		observation.Unlock()
 	}
 	return observer
 }
@@ -178,109 +200,35 @@ func (e expect) Observation(name string) *observation {
 	return e.observations[name]
 }
 
-func (o *observation) ToBe(expect []interface{}) {
-	o.t.Helper()
-	Asser(o.t).Equal(o.actual,expect)
+func (e expect) IntObservation(name string) *observation {
+	return e.observations[name]
 }
 
-func (e expect) Error(expect error) observer {
-	observer := func(next interface{}, err error, done bool) {
-		if done {
-			Asser(e.t).Equal(err, expect)
-		}
-	}
-	return observer
+func (o *observation) ToBe(expect ...interface{}) {
+	o.Helper()
+	o.Lock()
+	defer o.Unlock()
+	Asser(o.T).Equal(o.actual, expect)
+	Asser(o.T).Equal(o.err, nil, "for error")
+	Asser(o.T).Equal(o.done, true, "for done")
 }
 
-func (e expect) Completion() observer {
-	observer := func(next interface{}, err error, done bool) {
-		if done {
-			Asser(e.t).NoError(err)
-		}
-	}
-	return observer
+func (o *observation) ToBeError(expect error) {
+	o.Helper()
+	Asser(o.T).Equal(o.err, expect, "for error")
 }
 
-func (e expect) Never() observer {
-	observer := func(next interface{}, err error, done bool) {
-		if done {
-			Asser(e.t).NoError(err)
-		}
-	}
-	return observer
+func (o *observation) ToComplete() {
+	o.Helper()
+	o.Lock()
+	defer o.Unlock()
+	Asser(o.T).Equal(o.err, nil, "for error, expected to complete")
+	Asser(o.T).Equal(o.done, true, "for done, expected to complete")
 }
 
-func (e expect) Slice(expect []interface{}) observer {
-	i := 0
-	actual := []interface{}(nil)
-	observer := func(next interface{}, err error, done bool) {
-		failed := false
-		if !done {
-			actual = append(actual, next)
-			failed = (i >= len(expect) || next != expect[i])
-			i++
-		} else {
-			failed = (i != len(expect))
-		}
-		if failed {
-			Asser(e.t).Equal(actual, expect)
-		}
-	}
-	return observer
-}
-
-func (e expect) Value(expect interface{}) observer {
-	initial := true
-	observer := func(actual interface{}, err error, done bool) {
-		switch {
-		case !done:
-			if initial {
-				initial = false
-				vactual := fmt.Sprintf("%+v", actual)
-				vexpect := fmt.Sprintf("%+v", expect)
-				if vactual != vexpect {
-					e.t.T.Fatal(fmt.Sprintf("Not equal: \n"+
-						"expect: %s\n"+
-						"actual: %s", vexpect, vactual))
-				}
-			} else {
-				e.t.T.Fatal("Observable emitted multiple values, expected exactly one")
-			}
-		case err != nil:
-			e.t.T.Fatalf("No error expected, but got: %s", err.Error())
-		default:
-			if initial {
-				e.t.T.Fatal("Observable completed without emitting a value, expected exactly one")
-			}
-		}
-	}
-	return observer
-}
-
-type intobserver = func(next int, err error, done bool)
-
-func (e expect) IntValue(expect int) intobserver {
-	initial := true
-	observer := func(actual int, err error, done bool) {
-		switch {
-		case !done:
-			if initial {
-				initial = false
-				if actual != expect {
-					e.t.T.Fatal(fmt.Sprintf("Not equal: \n"+
-						"expect: %d\n"+
-						"actual: %d", expect, actual))
-				}
-			} else {
-				e.t.T.Fatal("Observable emitted multiple values, expected exactly one")
-			}
-		case err != nil:
-			e.t.T.Fatalf("No error expected, but got: %s", err.Error())
-		default:
-			if initial {
-				e.t.T.Fatal("Observable completed without emitting a value, expected exactly one")
-			}
-		}
-	}
-	return observer
+func (o *observation) ToBeActive() {
+	o.Helper()
+	o.Lock()
+	defer o.Unlock()
+	Asser(o.T).Equal(o.done, false, "for done, expected to be active")
 }
