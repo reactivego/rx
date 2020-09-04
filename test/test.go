@@ -208,7 +208,7 @@ func (o *observation) ToBe(expect ...interface{}) {
 	o.Helper()
 	o.Lock()
 	defer o.Unlock()
-	Asser(o.T).Equal(o.actual, expect)
+	Asser(o.T).Equal(o.actual, expect, "for value")
 }
 
 func (o *observation) ToBeError(expect error) {

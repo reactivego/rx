@@ -289,21 +289,23 @@ type Subscription = subscriber.Subscription
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
 // Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber) Subscription {
-	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.MakeTrampoline()
+func (o ObservableInt) Subscribe(observe IntObserver, schedulers ...Scheduler) Subscription {
+	subscriber := subscriber.New()
+	schedulers = append(schedulers, scheduler.MakeTrampoline())
 	observer := func(next int, err error, done bool) {
 		if !done {
 			observe(next, err, done)
 		} else {
 			var zero int
 			observe(zero, err, true)
-			subscribers[0].Done(err)
+			subscriber.Done(err)
 		}
 	}
-	subscribers[0].OnWait(scheduler.Wait)
-	o(observer, scheduler, subscribers[0])
-	return subscribers[0]
+	if !schedulers[0].IsConcurrent() {
+		subscriber.OnWait(schedulers[0].Wait)
+	}
+	o(observer, schedulers[0], subscriber)
+	return subscriber
 }
 
 //jig:name Connectable
@@ -829,15 +831,14 @@ func NewReplaySubjectInt(bufferCapacity int, windowDuration time.Duration) Subje
 
 //jig:name ObservableInt_PublishReplay
 
-// Replay uses the Multicast operator to control the subscription of a
-// ReplaySubject to a source observable and turns the subject into a
-// connectable observable. A ReplaySubject emits to any observer all of the
-// items that were emitted by the source observable, regardless of when the
+// PublishReplay returns a IntMulticaster for a ReplaySubject to an underlying
+// IntObservable and turns the subject into a connectable observable. A
+// ReplaySubject emits to any observer all of the items that were emitted by
+// the source observable, regardless of when the observer subscribes. When the
+// underlying IntObervable terminates with an error, then subscribed observers
+// will receive that error. After all observers have unsubscribed due to an
+// error, the IntMulticaster does an internal reset just before the next
 // observer subscribes.
-//
-// If the source completed and as a result the internal ReplaySubject
-// terminated, then calling Connect again will replace the old ReplaySubject
-// with a newly created one.
 func (o ObservableInt) PublishReplay(bufferCapacity int, windowDuration time.Duration) IntMulticaster {
 	factory := func() SubjectInt {
 		return NewReplaySubjectInt(bufferCapacity, windowDuration)
@@ -862,16 +863,17 @@ func NewSubjectInt() SubjectInt {
 
 //jig:name ObservableInt_Publish
 
-// Publish uses the Multicast operator to control the subscription of a
-// Subject to a source observable and turns the subject it into a connnectable
-// observable. A Subject emits to an observer only those items that are emitted
-// by the source Observable subsequent to the time of the observer subscribes.
-//
-// If the source completed and as a result the internal Subject terminated, then
-// calling Connect again will replace the old Subject with a newly created one.
-// So this Publish operator is re-connectable, unlike the RxJS 5 behavior that
-// isn't. To simulate the RxJS 5 behavior use Publish().AutoConnect(1) this will
-// connect on the first subscription but will never re-connect.
+// Publish returns a IntMulticaster for a Subject to an underlying
+// IntObservable and turns the subject into a connnectable observable. A
+// Subject emits to an observer only those items that are emitted by the
+// underlying IntObservable subsequent to the time of the observer subscribes.
+// When the underlying IntObervable terminates with an error, then subscribed
+// observers will receive that error. After all observers have unsubscribed
+// due to an error, the IntMulticaster does an internal reset just before the
+// next observer subscribes. So this Publish operator is re-connectable,
+// unlike the RxJS 5 behavior that isn't. To simulate the RxJS 5 behavior use
+// Publish().AutoConnect(1) this will connect on the first subscription but
+// will never re-connect.
 func (o ObservableInt) Publish() IntMulticaster {
 	return o.Multicast(NewSubjectInt)
 }
@@ -966,21 +968,23 @@ func (o ObservableInt) Timeout(timeout time.Duration) ObservableInt {
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
 // Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o Observable) Subscribe(observe Observer, subscribers ...Subscriber) Subscription {
-	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.MakeTrampoline()
+func (o Observable) Subscribe(observe Observer, schedulers ...Scheduler) Subscription {
+	subscriber := subscriber.New()
+	schedulers = append(schedulers, scheduler.MakeTrampoline())
 	observer := func(next interface{}, err error, done bool) {
 		if !done {
 			observe(next, err, done)
 		} else {
 			var zero interface{}
 			observe(zero, err, true)
-			subscribers[0].Done(err)
+			subscriber.Done(err)
 		}
 	}
-	subscribers[0].OnWait(scheduler.Wait)
-	o(observer, scheduler, subscribers[0])
-	return subscribers[0]
+	if !schedulers[0].IsConcurrent() {
+		subscriber.OnWait(schedulers[0].Wait)
+	}
+	o(observer, schedulers[0], subscriber)
+	return subscriber
 }
 
 //jig:name Multicaster
@@ -1149,18 +1153,32 @@ func NewSubject() Subject {
 
 //jig:name Observable_Publish
 
-// Publish uses the Multicast operator to control the subscription of a
-// Subject to a source observable and turns the subject it into a connnectable
-// observable. A Subject emits to an observer only those items that are emitted
-// by the source Observable subsequent to the time of the observer subscribes.
-//
-// If the source completed and as a result the internal Subject terminated, then
-// calling Connect again will replace the old Subject with a newly created one.
-// So this Publish operator is re-connectable, unlike the RxJS 5 behavior that
-// isn't. To simulate the RxJS 5 behavior use Publish().AutoConnect(1) this will
-// connect on the first subscription but will never re-connect.
+// Publish returns a Multicaster for a Subject to an underlying
+// Observable and turns the subject into a connnectable observable. A
+// Subject emits to an observer only those items that are emitted by the
+// underlying Observable subsequent to the time of the observer subscribes.
+// When the underlying Obervable terminates with an error, then subscribed
+// observers will receive that error. After all observers have unsubscribed
+// due to an error, the Multicaster does an internal reset just before the
+// next observer subscribes. So this Publish operator is re-connectable,
+// unlike the RxJS 5 behavior that isn't. To simulate the RxJS 5 behavior use
+// Publish().AutoConnect(1) this will connect on the first subscription but
+// will never re-connect.
 func (o Observable) Publish() Multicaster {
 	return o.Multicast(NewSubject)
+}
+
+//jig:name ObservableInt_AsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
 }
 
 //jig:name IntMulticaster_AutoConnect
@@ -1276,19 +1294,6 @@ func (o Multicaster) AutoConnect(count int) Observable {
 			}
 		}
 		source.Unlock()
-	}
-	return observable
-}
-
-//jig:name ObservableInt_AsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
 	}
 	return observable
 }

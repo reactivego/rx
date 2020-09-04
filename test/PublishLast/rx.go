@@ -1087,24 +1087,6 @@ func (o Observable) MergeMap(project func(interface{}) Observable) Observable {
 	return o.MapObservable(project).MergeAll()
 }
 
-//jig:name Observable_MapObservable
-
-// MapObservable transforms the items emitted by an Observable by applying a
-// function to each item.
-func (o Observable) MapObservable(project func(interface{}) Observable) ObservableObservable {
-	observable := func(observe ObservableObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			var mapped Observable
-			if !done {
-				mapped = project(next)
-			}
-			observe(mapped, err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name Observable_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
@@ -1231,6 +1213,24 @@ func (o Multicaster) RefCount() Observable {
 			source.Lock()
 		}
 		source.Unlock()
+	}
+	return observable
+}
+
+//jig:name Observable_MapObservable
+
+// MapObservable transforms the items emitted by an Observable by applying a
+// function to each item.
+func (o Observable) MapObservable(project func(interface{}) Observable) ObservableObservable {
+	observable := func(observe ObservableObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			var mapped Observable
+			if !done {
+				mapped = project(next)
+			}
+			observe(mapped, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
 	}
 	return observable
 }

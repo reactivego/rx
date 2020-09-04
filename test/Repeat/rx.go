@@ -266,6 +266,22 @@ func (o ObservableInt) TakeLast(n int) ObservableInt {
 	return o.AsObservable().TakeLast(n).AsObservableInt()
 }
 
+//jig:name ObservableInt_SubscribeOn
+
+// SubscribeOn specifies the scheduler an ObservableInt should use when it is
+// subscribed to.
+func (o ObservableInt) SubscribeOn(scheduler Scheduler) ObservableInt {
+	observable := func(observe IntObserver, _ Scheduler, subscriber Subscriber) {
+		if scheduler.IsConcurrent() {
+			subscriber.OnWait(nil)
+		} else {
+			subscriber.OnWait(scheduler.Wait)
+		}
+		o(observe, scheduler, subscriber)
+	}
+	return observable
+}
+
 //jig:name RxError
 
 type RxError string
@@ -299,22 +315,6 @@ func (o Observable) AsObservableInt() ObservableInt {
 			}
 		}
 		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableInt_SubscribeOn
-
-// SubscribeOn specifies the scheduler an ObservableInt should use when it is
-// subscribed to.
-func (o ObservableInt) SubscribeOn(scheduler Scheduler) ObservableInt {
-	observable := func(observe IntObserver, _ Scheduler, subscriber Subscriber) {
-		if scheduler.IsConcurrent() {
-			subscriber.OnWait(nil)
-		} else {
-			subscriber.OnWait(scheduler.Wait)
-		}
-		o(observe, scheduler, subscriber)
 	}
 	return observable
 }

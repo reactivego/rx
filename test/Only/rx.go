@@ -220,21 +220,23 @@ type Subscription = subscriber.Subscription
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
 // Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableString) Subscribe(observe StringObserver, subscribers ...Subscriber) Subscription {
-	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.MakeTrampoline()
+func (o ObservableString) Subscribe(observe StringObserver, schedulers ...Scheduler) Subscription {
+	subscriber := subscriber.New()
+	schedulers = append(schedulers, scheduler.MakeTrampoline())
 	observer := func(next string, err error, done bool) {
 		if !done {
 			observe(next, err, done)
 		} else {
 			var zero string
 			observe(zero, err, true)
-			subscribers[0].Done(err)
+			subscriber.Done(err)
 		}
 	}
-	subscribers[0].OnWait(scheduler.Wait)
-	o(observer, scheduler, subscribers[0])
-	return subscribers[0]
+	if !schedulers[0].IsConcurrent() {
+		subscriber.OnWait(schedulers[0].Wait)
+	}
+	o(observer, schedulers[0], subscriber)
+	return subscriber
 }
 
 //jig:name ObservableSize_Subscribe
@@ -242,21 +244,23 @@ func (o ObservableString) Subscribe(observe StringObserver, subscribers ...Subsc
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
 // Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableSize) Subscribe(observe SizeObserver, subscribers ...Subscriber) Subscription {
-	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.MakeTrampoline()
+func (o ObservableSize) Subscribe(observe SizeObserver, schedulers ...Scheduler) Subscription {
+	subscriber := subscriber.New()
+	schedulers = append(schedulers, scheduler.MakeTrampoline())
 	observer := func(next Size, err error, done bool) {
 		if !done {
 			observe(next, err, done)
 		} else {
 			var zero Size
 			observe(zero, err, true)
-			subscribers[0].Done(err)
+			subscriber.Done(err)
 		}
 	}
-	subscribers[0].OnWait(scheduler.Wait)
-	o(observer, scheduler, subscribers[0])
-	return subscribers[0]
+	if !schedulers[0].IsConcurrent() {
+		subscriber.OnWait(schedulers[0].Wait)
+	}
+	o(observer, schedulers[0], subscriber)
+	return subscriber
 }
 
 //jig:name ObservablePoint_Subscribe
@@ -264,19 +268,21 @@ func (o ObservableSize) Subscribe(observe SizeObserver, subscribers ...Subscribe
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
 // Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservablePoint) Subscribe(observe PointObserver, subscribers ...Subscriber) Subscription {
-	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.MakeTrampoline()
+func (o ObservablePoint) Subscribe(observe PointObserver, schedulers ...Scheduler) Subscription {
+	subscriber := subscriber.New()
+	schedulers = append(schedulers, scheduler.MakeTrampoline())
 	observer := func(next []point, err error, done bool) {
 		if !done {
 			observe(next, err, done)
 		} else {
 			var zero []point
 			observe(zero, err, true)
-			subscribers[0].Done(err)
+			subscriber.Done(err)
 		}
 	}
-	subscribers[0].OnWait(scheduler.Wait)
-	o(observer, scheduler, subscribers[0])
-	return subscribers[0]
+	if !schedulers[0].IsConcurrent() {
+		subscriber.OnWait(schedulers[0].Wait)
+	}
+	o(observer, schedulers[0], subscriber)
+	return subscriber
 }

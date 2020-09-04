@@ -78,24 +78,6 @@ func (o Observable) MergeMapTo(inner Observable) Observable {
 	return o.MapObservable(project).MergeAll()
 }
 
-//jig:name Observable_MapObservable
-
-// MapObservable transforms the items emitted by an Observable by applying a
-// function to each item.
-func (o Observable) MapObservable(project func(interface{}) Observable) ObservableObservable {
-	observable := func(observe ObservableObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			var mapped Observable
-			if !done {
-				mapped = project(next)
-			}
-			observe(mapped, err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name Observable_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
@@ -115,6 +97,24 @@ func (o Observable) Println(a ...interface{}) error {
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
 	return subscriber.Wait()
+}
+
+//jig:name Observable_MapObservable
+
+// MapObservable transforms the items emitted by an Observable by applying a
+// function to each item.
+func (o Observable) MapObservable(project func(interface{}) Observable) ObservableObservable {
+	observable := func(observe ObservableObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			var mapped Observable
+			if !done {
+				mapped = project(next)
+			}
+			observe(mapped, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
 }
 
 //jig:name ObservableObserver

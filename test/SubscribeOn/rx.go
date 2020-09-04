@@ -106,7 +106,9 @@ func (o ObservableInt) Subscribe(observe IntObserver, schedulers ...Scheduler) S
 			subscriber.Done(err)
 		}
 	}
-	subscriber.OnWait(schedulers[0].Wait)
+	if !schedulers[0].IsConcurrent() {
+		subscriber.OnWait(schedulers[0].Wait)
+	}
 	o(observer, schedulers[0], subscriber)
 	return subscriber
 }

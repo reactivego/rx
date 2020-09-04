@@ -331,27 +331,6 @@ func (o ObservableInt) SwitchMapString(project func(int) ObservableString) Obser
 	return o.MapObservableString(project).SwitchAll()
 }
 
-//jig:name ObservableString_Println
-
-// Println subscribes to the Observable and prints every item to os.Stdout
-// while it waits for completion or error. Returns either the error or nil
-// when the Observable completed normally.
-// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableString) Println(a ...interface{}) error {
-	subscriber := subscriber.New()
-	scheduler := scheduler.MakeTrampoline()
-	observer := func(next string, err error, done bool) {
-		if !done {
-			fmt.Println(append(a, next)...)
-		} else {
-			subscriber.Done(err)
-		}
-	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	return subscriber.Wait()
-}
-
 //jig:name Observable_AsObservableInt
 
 // AsObservableInt turns an Observable of interface{} into an ObservableInt.
@@ -393,6 +372,27 @@ func (o ObservableInt) MapObservableString(project func(int) ObservableString) O
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
+}
+
+//jig:name ObservableString_Println
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableString) Println(a ...interface{}) error {
+	subscriber := subscriber.New()
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next string, err error, done bool) {
+		if !done {
+			fmt.Println(append(a, next)...)
+		} else {
+			subscriber.Done(err)
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	return subscriber.Wait()
 }
 
 //jig:name ObservableStringObserver
