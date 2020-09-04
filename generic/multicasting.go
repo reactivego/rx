@@ -155,6 +155,36 @@ func (o ObservableFoo) PublishReplay(bufferCapacity int, windowDuration time.Dur
 	return o.Multicast(factory)
 }
 
+//jig:template Observable<Foo> PublishBehavior
+//jig:needs Observable<Foo> Multicast, NewBehaviorSubject<Foo>, <Foo>Multicaster
+
+// PublishBehavior returns a FooMulticaster that shares a single subscription
+// to the underlying FooObservable returning an initial value or the last
+// value emitted by the underlying FooObservable. When the underlying
+// FooObervable terminates with an error, then subscribed observers will
+// receive that error. After all observers have unsubscribed due to an error,
+// the FooMulticaster does an internal reset just before the next observer
+// subscribes.
+func (o ObservableFoo) PublishBehavior(a foo) FooMulticaster {
+	factory := func() SubjectFoo {
+		return NewBehaviorSubjectFoo(a)
+	}
+	return o.Multicast(factory)
+}
+
+//jig:template Observable<Foo> PublishLast
+//jig:needs Observable<Foo> Multicast, NewAsyncSubject<Foo>, <Foo>Multicaster
+
+// PublishLast returns a FooMulticaster that shares a single subscription to
+// the underlying FooObservable containing only the last value emitted before
+// it completes. When the underlying FooObervable terminates with an error,
+// then subscribed observers will receive only that error (and no value).
+// After all observers have unsubscribed due to an error, the FooMulticaster
+// does an internal reset just before the next observer subscribes.
+func (o ObservableFoo) PublishLast() FooMulticaster {
+	return o.Multicast(NewAsyncSubjectFoo)
+}
+
 //jig:template <Foo>Multicaster RefCount
 //jig:needs Observable<Foo>
 
