@@ -1,0 +1,102 @@
+marble All
+{
+	source a:                +-1-2-6-2-1-|
+	operator All(LessThan5): +-----------(false)|
+}
+
+marble Buffer
+{
+	source a:        +-a-b--    c-d-e-      -f-g--    --|
+	source b:        +-----0    -----1      -----2    --|
+	operator Buffer: +-----{a,b}-----{c,d,e}-----{f,g}--|
+}
+
+marble BufferTime
+{
+	source a:                 +-a-b--    c-d-e-      -f-g--    --|
+	operator BufferTime(100): +-----{a,b}-----{c,d,e}-----{f,g}--|
+}
+
+marble Catch
+{
+	source a:       +-1-2-3-#
+	source b:       ......+-4-5-|
+	operator Catch: +-1-2-3-4-5-|
+}
+
+marble CatchError
+{
+	source a:                        +-1-2-3-#
+	source b:                        ......+-4-5-|
+	operator CatchError(err,caught): +-1-2-3-4-5-|
+}
+
+marble ConcatWith
+{
+	source a:            +-1----1------1--|
+	source b:            +-2-2-|
+	operator ConcatWith: +-1----1------1---2-2-|
+}
+
+marble Distinct
+{
+	source a:          +-1----2---2---1--3-|
+	operator Distinct: +-1----2----------3-|
+}
+
+marble DistinctUntilChanged
+{
+	source a:                      +-1----2---2---1--3-|
+	operator DistinctUntilChanged: +-1----2-------1--3-|
+}
+
+marble Merge
+{
+	source a:       +-0---2---4--|
+	source b:       +---1---3---5-|
+	operator Merge: +-0-1-2-3-4-5-|
+}
+
+marble MergeDelayError
+{
+	source a:                 +-(20)--(40)--(60)--(80)#
+	source b:                 +--   ---   ---   1--   -1|
+	operator MergeDelayError: +-(20)--(40)--(60)1-(80)-1#
+}
+
+marble MergeDelayErrorWith
+{
+	source a:                     +-(20)--(40)--(60)--(80)#
+	source b:                     +--   ---   ---   1--   -1|
+	operator MergeDelayErrorWith: +-(20)--(40)--(60)1-(80)-1#
+}
+
+marble MergeWith
+{
+	source a:           +-0---2---4--|
+	source b:           +---1---3---5-|
+	operator MergeWith: +-0-1-2-3-4-5-|
+}
+
+marble StartWith
+{
+	source a:              +-----2-3------|
+	operator StartWith(1): +-1---2-3------|
+}
+
+marble WithLatestFrom
+{
+	source a:                +-1-2    --3    --4    --5    ---|
+	source b:                +--A-    -B-    -C-    -D-    -E-|
+	operator WithLatestFrom: +---{2,A}--{3,B}--{4,C}--{5,D}---|
+}
+
+marble WithLatestFromAll
+{
+	source a:
+			{
+			                    +--1---2    --3    --4    --5    ---|
+                                ...+--A-    -B-    -C-    -D-    -E-|
+			} 
+	operator WithLatestFromAll: +------{2,A}--{3,B}--{4,C}--{5,D}---|
+}
