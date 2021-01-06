@@ -1,13 +1,13 @@
 # MergeDelayError
 
-[![](../../svg/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx/test/MergeDelayError?tab=doc)
-[![](../../svg/godoc.svg)](http://godoc.org/github.com/reactivego/rx/test/MergeDelayError)
-[![](../../svg/rx.svg)](http://reactivex.io/documentation/operators/merge.html)
+[![](../../../assets/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx/test/MergeDelayError?tab=doc)
+[![](../../../assets/godoc.svg)](http://godoc.org/github.com/reactivego/rx/test/MergeDelayError)
+[![](../../../assets/rx.svg)](http://reactivex.io/documentation/operators/merge.html)
 
 **MergeDelayError** combines multiple Observables into one by merging their emissions.
 Any error will be deferred until all observables terminate.
 
-![MergeDelayError](../../svg/MergeDelayError.svg)
+![MergeDelayError](../../../assets/MergeDelayError.svg)
 
 ## Example
 ```go

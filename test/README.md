@@ -2,9 +2,9 @@
 
     import "github.com/reactivego/rx/test"
 
-[![](../svg/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx/test?tab=subdirectories)
-[![](../svg/godoc.svg)](https://godoc.org/github.com/reactivego/rx/test#pkg-subdirectories)
-[![](../svg/rx.svg)](http://reactivex.io/documentation/operators.html)
+[![](../../assets/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx/test?tab=subdirectories)
+[![](../../assets/godoc.svg)](https://godoc.org/github.com/reactivego/rx/test#pkg-subdirectories)
+[![](../../assets/rx.svg)](http://reactivex.io/documentation/operators.html)
 
 Package `test` provides tests for the generic rx package.
 

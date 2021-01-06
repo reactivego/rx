@@ -1,8 +1,8 @@
 # AsyncSubject
 
-[![](../../svg/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx/test/AsyncSubject?tab=doc)
-[![](../../svg/godoc.svg)](https://godoc.org/github.com/reactivego/rx/test/AsyncSubject)
-[![](../../svg/rx.svg)](http://reactivex.io/documentation/subject.html)
+[![](../../../assets/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx/test/AsyncSubject?tab=doc)
+[![](../../../assets/godoc.svg)](https://godoc.org/github.com/reactivego/rx/test/AsyncSubject)
+[![](../../../assets/rx.svg)](http://reactivex.io/documentation/subject.html)
 
 **AsyncSubject** emits the last value (and only the last value) emitted by the
 Observable part, and only after that Observable part completes. (If the

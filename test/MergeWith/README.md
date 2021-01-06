@@ -1,13 +1,13 @@
 # MergeWith
 
-[![](../../svg/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx/test/MergeWith?tab=doc)
-[![](../../svg/godoc.svg)](http://godoc.org/github.com/reactivego/rx/test/MergeWith)
-[![](../../svg/rx.svg)](http://reactivex.io/documentation/operators/merge.html)
+[![](../../../assets/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx/test/MergeWith?tab=doc)
+[![](../../../assets/godoc.svg)](http://godoc.org/github.com/reactivego/rx/test/MergeWith)
+[![](../../../assets/rx.svg)](http://reactivex.io/documentation/operators/merge.html)
 
 **MergeWith** combines multiple Observables into one by merging their emissions.
 An error from any of the observables will terminate the merged observables.
 
-![MergeWith](../../svg/MergeWith.svg)
+![MergeWith](../../../assets/MergeWith.svg)
 
 ## Example
 

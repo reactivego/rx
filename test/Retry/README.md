@@ -1,8 +1,8 @@
 # Retry
 
-[![](../../svg/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx/test/Retry?tab=doc)
-[![](../../svg/godoc.svg)](https://godoc.org/github.com/reactivego/rx/test/Retry)
-[![](../../svg/rx.svg)](http://reactivex.io/documentation/operators/retry.html)
+[![](../../../assets/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx/test/Retry?tab=doc)
+[![](../../../assets/godoc.svg)](https://godoc.org/github.com/reactivego/rx/test/Retry)
+[![](../../../assets/rx.svg)](http://reactivex.io/documentation/operators/retry.html)
 
 **Retry** if a source Observable sends an error notification, resubscribe to
 it in the hopes that it will complete without error. If count is zero or

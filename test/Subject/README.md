@@ -1,8 +1,8 @@
 # Subject
 
-[![](../../svg/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx/test/Subject?tab=doc)
-[![](../../svg/godoc.svg)](https://godoc.org/github.com/reactivego/rx/test/Subject)
-[![](../../svg/rx.svg)](http://reactivex.io/documentation/subject.html)
+[![](../../../assets/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx/test/Subject?tab=doc)
+[![](../../../assets/godoc.svg)](https://godoc.org/github.com/reactivego/rx/test/Subject)
+[![](../../../assets/rx.svg)](http://reactivex.io/documentation/subject.html)
 
 **Subject** is a combination of an observer and observable. Subjects are
 special because they are the only reactive constructs that support

@@ -1,8 +1,8 @@
 # AuditTime
 
-[![](../../svg/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx/test/AuditTime?tab=doc)
-[![](../../svg/godoc.svg)](https://godoc.org/github.com/reactivego/rx/test/AuditTime)
-[![](../../svg/rx.svg)](https://rxjs.dev/api/operators/auditTime)
+[![](../../../assets/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx/test/AuditTime?tab=doc)
+[![](../../../assets/godoc.svg)](https://godoc.org/github.com/reactivego/rx/test/AuditTime)
+[![](../../../assets/rx.svg)](https://rxjs.dev/api/operators/auditTime)
 
 **AuditTime** waits until the source emits and then starts a timer. When the timer
 expires, **AuditTime** will emit the last value received from the source during the
