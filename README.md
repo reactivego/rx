@@ -36,7 +36,7 @@ For documentation and examples, see the online [go.dev](https://pkg.go.dev/githu
 
 ## Observables
 The main focus of `rx` is on [Observables](http://reactivex.io/documentation/observable.html).
-In accordance with Dijkstra's observation that we are relatively bad at grasping dynamic processes evolving in time, Observables indeed shorten the conceptual gap between the static program and the dynamic process. Observables have dynamic behavior folded into their core as they are defined as values changing over time. Observables are combined using (lots of different) operators that compose well together. At the program level you are no longer dealing explicitly with dynamic processes, that is all defined and implied by the operators that were used to construct the program.
+In accordance with Dijkstra's observation that we are relatively bad at grasping dynamic processes evolving in time, Observables indeed narrow the conceptual gap between the static program and the dynamic process. Observables have a dynamic process at their core as they are defined as values changing over time. They are combined into static relations using many different Operators. This makes, that at the program level (spread out in text space) you are no longer dealing explicitly with dynamic processes.
 
 An Observable:
 
