@@ -2,9 +2,9 @@
 
     import "github.com/reactivego/rx"
 
-[![](svg/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc)
-[![](svg/godoc.svg)](https://godoc.org/github.com/reactivego/rx)
-[![](svg/rx.svg)](http://reactivex.io/intro.html)
+[![](../assets/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc)
+[![](../assets/godoc.svg)](https://godoc.org/github.com/reactivego/rx)
+[![](../assets/rx.svg)](http://reactivex.io/intro.html)
 
 Package `rx` provides *Reactive Extensions* for Go, an API for asynchronous programming with observable streams.
 
@@ -168,7 +168,7 @@ Following are the most commonly used operators:
 combines multiple Observables into one by merging their emissions.
 An error from any of the observables will terminate the merged observables.
 
-![Merge](svg/Merge.svg)
+![Merge](../assets/Merge.svg)
 
 Code:
 ```go
@@ -197,7 +197,7 @@ Output:
 combines multiple Observables into one by merging their emissions.
 An error from any of the observables will terminate the merged observables.
 
-![Merge](svg/MergeWith.svg)
+![Merge](../assets/MergeWith.svg)
 
 Code:
 ```go
