@@ -1,38 +1,8 @@
-# Generics Library
+# Quick Start
 
-In order to use the package as a generic programming library for *Go 1*, first install the [*jig* generator tool](https://github.com/reactivego/jig). It will generate source code from a generics library.
+Guide showing how to write programs using the rx generics library.
 
-Using the library is very simple. Just import the library with the blank identifier `_`.
-
-```go
-import _ "github.com/reactivego/rx"
-```
-The use of `_` stops the *go* tool from complaining about you not using any code from the package while at the same time allowing the [*jig*](https://github.com/reactivego/jig) tool to actually find the generics in the library.
-
-Then you write a program as follows:
-
-```go	
-package main
-
-import _ "github.com/reactivego/rx"
-
-func main() {
-  JustString("Hello, World!").Println()
-  // Output: Hello, World!
-}
-```
-This will not build currently, because `JustString` doesn't exists yet. Follow the following steps:
-
-1. You write a program that references templates from the `rx` library, as was shown above.
-2. You run the [jig](https://github.com/reactivego/jig) command in the directory where your program source is located.
-3. **Now [jig](https://github.com/reactivego/jig) analyzes your source code and determines what additional code is needed to make it build**.
-4. *[jig](https://github.com/reactivego/jig)* takes templates from the `rx` library and specializes them on specific types.
-5. Specializations are generated into the file `rx.go` alongside your own code.
-6. If all went well, your code will now build.
-
-This was a bird's-eye view of the whole process. In the rest of this document we'll go through all the steps in more detail. Starting from the beginning:
-
-## Preparing the Working Directory
+## Prepare the Working Directory
 Let's create a new folder for our simple program and start editing the file `main.go`.
 
 ```bash
@@ -44,13 +14,13 @@ $ subl main.go
 ```
 > We use *Sublime Text* for code editing, hence the use of the `subl` command.
 
-## Writing the Program
+## Write the Program
 Now that you have your `main.go` file open (in the editor of your choice), enter the following code:
 
 ```go
 package main
 
-import _ "github.com/reactivego/rx"
+import _ "github.com/reactivego/rx/generic"
 
 func main() {
 	FromString("You!", "Gophers!", "World!").
@@ -67,7 +37,7 @@ $ go run *.go
 ./main.go:6:2: undefined: FromString
 ```
 
-## Generating Code
+## Generate Code
 Go to the command-line now and run the [jig](https://github.com/reactivego/jig) tool.
 Use the verbose flag `-v` to see what [jig](https://github.com/reactivego/jig) is doing:
 ```bash
@@ -87,7 +57,7 @@ writing file "rx.go"
 ```
 > The file **rx.go** was generated
 
-## Running the Program
+## Run the Program
 Now we can try to run the code and see what it does.
 
 ```bash
@@ -98,7 +68,8 @@ Hello, World!
 ```
 > Success! 
 
-Code was generated into the file *rx.go* and we were able to run the program.
+## Inspect the Code
+Let's take a look at the code generated into the file *rx.go*.
 The idea behind [jig](https://github.com/reactivego/jig) (Just In-time Generics) has been to generate the minimal ammount of code needed to make a program run.
 Turns out the generated file *rx.go* contains only around 70 lines of code:
 

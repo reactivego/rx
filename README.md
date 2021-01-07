@@ -20,23 +20,60 @@ Use the go tool to get the package:
 $ go get github.com/reactivego/rx
 ```
 
-Then import it in your program:
+Optionally install the [jig](http://github.com/reactivego/jig) tool, in order to use the package as a generics library.
 
-```go
-import "github.com/reactivego/rx"
+```bash
+$ go get github.com/reactivego/jig
 ```
+The [jig](http://github.com/reactivego/jig) tool provides the parametric polymorphism capability that Go 1 is missing.
+It works by generating code, replacing place-holder types in generic functions and datatypes with specific types.
+
 ## Usage
-The API is accessed directly through the `rx` prefix.
-```go
-rx.From(1,2,"hello").Println()
-```
-For documentation and examples, see the online [go.dev](https://pkg.go.dev/github.com/reactivego/rx?tab=doc) or [godoc](http://godoc.org/github.com/reactivego/rx) reference.
 
-> NOTE : this package can also be used as a *Generics Library* for *Go 1* see [below](#generics-library)
+This package can be used either directly as a standard package or as a generics library for Go 1.
+
+### Standard Package
+To use as a standard package, import the root `rx` package to access the API directly.
+```go
+package main
+
+import "github.com/reactivego/rx"
+
+func main() {
+    rx.From(1,2,"hello").Println()
+}
+```
+Links to documentation are at the top of this page.
+
+### Generics Library
+To use as a *Generics Library* for *Go 1*, import the `rx/generic` package.
+Generic programming supports writing programs that use statically typed *Observables* and *Operators*.
+For example:
+
+```go
+package main
+
+import _ "github.com/reactivego/rx/generic"
+
+func main() {
+	FromString("Hello", "Gophers!").Println()
+}
+```
+> Note that From**String** is statically typed.
+
+Generate statically typed code by running the [jig](http://github.com/reactivego/jig) tool.
+
+```bash
+$ jig -v
+found 149 templates in package "rx" (github.com/reactivego/rx/generic)
+...
+```
+Details on how to use generics can be found in the [doc](doc) folder.
 
 ## Observables
-The main focus of `rx` is on [Observables](http://reactivex.io/documentation/observable.html).
-In accordance with Dijkstra's observation that we are relatively bad at grasping dynamic processes evolving in time, Observables indeed narrow the conceptual gap between the static program and the dynamic process. Observables have a dynamic process at their core as they are defined as values changing over time. They are combined into static relations using many different Operators. This makes, that at the program level (spread out in text space) you are no longer dealing explicitly with dynamic processes.
+The main focus of `rx` is [Observables](http://reactivex.io/documentation/observable.html).
+In accordance with Dijkstra's observation that we are ill-equipped to visualize how dynamic processes evolve over time, the use of Observables indeed narrows the conceptual gap between the static program and the dynamic process. Observables have a dynamic process at their core because they are defined as values which change over time. They are combined in static relations with the help of many different operators. This means that at the program level (spread out in the text space) you no longer have to deal explicitly with dynamic processes, but with more tangible static relations.
+
 
 An Observable:
 
@@ -83,10 +120,10 @@ changing stream of values. Every Observable conceptually has at its core a
 concurrently running process that pushes out values.
 
 ## Operators 
-Operators form a language in which programs featuring Observables can be expressed.
+[Operators](OPERATORS.md) form a language in which programs featuring Observables can be expressed.
 They work on one or more Observables to transform, filter and combine them into new Observables.
 
-Following are the most commonly used operators:
+Following are the most commonly used [operators](OPERATORS.md):
 
 <details><summary>BufferTime</summary>
 
@@ -280,10 +317,6 @@ This package is generated from generics in the sub-folder `generic` by the [jig]
 You don't need to regenerate this package in order to use it. However, if you are
 interested in regenerating it, then read on.
 
-The [jig](http://github.com/reactivego/jig) tool provides the parametric polymorphism capability that Go 1 is missing.
-It works by replacing place-holder types of generic functions and datatypes
-with `interface{}` (it can also generate statically typed code though).
-
 To regenerate, change the current working directory to the package directory
 and run the [jig](http://github.com/reactivego/jig) tool as follows:
 
@@ -291,21 +324,8 @@ and run the [jig](http://github.com/reactivego/jig) tool as follows:
 $ go get -d github.com/reactivego/jig
 $ go run github.com/reactivego/jig -v
 ```
-## Generics Library
-This package can be used as a *Generics Library* for *Go 1*. It supports the writing of programs that use statically typed *Observables* and *Operators*. For example:
 
-```go
-package main
-
-import _ "github.com/reactivego/rx"
-
-func main() {
-	FromString("Hello", "Gophers!").Println()
-}
-```
-> Note that From**String** is statically typed.
-
-Instructions on how to use the package this way, are located in the [generic](generic) folder.
+This works by replacing place-holder types of generic functions and datatypes with the `interface{}` type.
 
 ## Acknowledgements
 This library started life as the [Reactive eXtensions for Go](https://github.com/alecthomas/gorx) library by *Alec Thomas*. Although the library has been through the metaphorical meat grinder a few times, its DNA is still clearly present in this library and I owe Alec a debt of grattitude for the work he has made so generously available.
