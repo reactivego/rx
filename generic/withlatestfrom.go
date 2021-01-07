@@ -6,10 +6,10 @@ import "sync"
 //jig:needs ObservableObservable<Foo> WithLatestFromAll
 
 // WithLatestFrom will subscribe to all Observables and wait for all of them to emit before emitting
-// the first slice. The source observable determines the rate at which the values are emitted. The idea
-// is that observables that are faster than the source, don't determine the rate at which the resulting
-// observable emits. The observables that are combined with the source will be allowed to continue
-// emitting but only will have their last emitted value emitted whenever the source emits.
+// the first slice. The source observable determines the rate at which the values are emitted. The
+// idea is that observables that are faster than the source, don't determine the rate at which the
+// resulting observable emits. The observables that are combined with the source will be allowed to
+// continue emitting but only will have their last emitted value emitted whenever the source emits.
 func (o ObservableFoo) WithLatestFrom(other ...ObservableFoo) ObservableFooSlice {
 	return FromObservableFoo(append([]ObservableFoo{o}, other...)...).WithLatestFromAll()
 }
@@ -18,11 +18,11 @@ func (o ObservableFoo) WithLatestFrom(other ...ObservableFoo) ObservableFooSlice
 //jig:template ObservableObservable<Foo> WithLatestFromAll
 //jig:needs <Foo>Slice
 
-// WithLatestFromAll flattens a higher order observable (e.g. ObservableObservableFoo) by
-// subscribing to all emitted observables (ie. ObservableFoo entries) until the source completes. It
-// will then wait for all of the subscribed ObservableFoos to emit before emitting the first slice.
-// Whenever the first emitted observable emits, a new slice will be emitted containing all the
-// latest value.
+// WithLatestFromAll flattens a higher order observable (e.g. ObservableObservable) by subscribing
+// to all emitted observables (ie. Observable entries) until the source completes. It will then wait
+// for all of the subscribed Observables to emit before emitting the first slice. The first
+// observable that was emitted by the source will be used as the trigger observable. Whenever the
+// trigger observable emits, a new slice will be emitted containing all the latest values.
 func (o ObservableObservableFoo) WithLatestFromAll() ObservableFooSlice {
 	observable := func(observe FooSliceObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		observables := []ObservableFoo(nil)

@@ -53,7 +53,7 @@ This was a bird's-eye view of the whole process. Look in the [Quick Start Guide]
 
 [![](../../assets/rx.svg)](http://reactivex.io/documentation/operators.html) 
 
-Currently 94 operators have been implemented:
+Currently 98 operators have been implemented:
     
 | A … C                   | D … L                 | M … P                  | R … S              | T … W                   |
 |:------------------------|:----------------------|:-----------------------|:-------------------|:------------------------|
@@ -70,13 +70,13 @@ Currently 94 operators have been implemented:
 | [CombineLatestAll]      | [Finally]             | [Never]                | [Skip]             | [Timestamp]             |
 | [CombineLatestMap]      | [First]               | [ObserveOn]            | [SkipLast]         | [ToChan]                |
 | [CombineLatestMapTo]    | [From] :star:         | [Of] :star:            | [Start]            | [ToSingle]              |
-| [CombineLatestWith]     | [FromChan]            | [Only]                 | [Subject]          | [ToSlice]               |
-| [Concat] :star:         | [IgnoreCompletion]    | [Passthrough]          | [Subscribe]        | [Wait]                  |
-| [ConcatAll]             | [IgnoreElements]      | [Println]              | [SubscribeOn]      | [WithLatestFrom] :star: |
-| [ConcatMap] :star:      | [Interval]            | [Publish] :star:       | [Sum]              | [WithLatestFromAll]     |
-| [ConcatMapTo]           | [Just] :star:         | [PublishReplay] :star: | [SwitchAll]        |
-| [ConcatWith] :star:     | [Last]                |                        | [SwitchMap] :star: |
-| [Connect]               |
+| [CombineLatestWith]     | [FromChan]            | [Only]                 | [StartWith] :star: | [ToSlice]               |
+| [Concat] :star:         | [IgnoreCompletion]    | [Passthrough]          | [Subject]          | [Wait]                  |
+| [ConcatAll]             | [IgnoreElements]      | [Println]              | [Subscribe]        | [WithLatestFrom] :star: |
+| [ConcatMap] :star:      | [Interval]            | [Publish] :star:       | [SubscribeOn]      | [WithLatestFromAll]     |
+| [ConcatMapTo]           | [Just] :star:         | [PublishReplay] :star: | [Sum]              |
+| [ConcatWith] :star:     | [Last]                |                        | [SwitchAll]        |
+| [Connect]               |                       |                        | [SwitchMap] :star: 
 | [Count]                 |
 | [Create] :star:         |
 | [CreateFutureRecursive] |
@@ -158,6 +158,7 @@ Currently 94 operators have been implemented:
 [Skip]: operators/Skip.md
 [SkipLast]: operators/SkipLast.md
 [Start]: operators/Start.md
+[StartWith]: operators/StartWith.md
 [Subject]: operators/Subject.md
 [Subscribe]: operators/Subscribe.md
 [SubscribeOn]: operators/SubscribeOn.md

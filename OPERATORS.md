@@ -1,29 +1,29 @@
 # Operators
 
-Currently 97 operators have been implemented:
+Currently 98 operators have been implemented:
     
-| A … C                   | D … L                 | M … P                  | R … S              | T … W                  |
-|:------------------------|:----------------------|:-----------------------|:-------------------|:-----------------------|
-| [All]                   | [DebounceTime] :star: | [Map] :star:           | [Range]            | [Take]                 |
-| [AsObservable]          | [Defer]               | [Max]                  | [Reduce]           | [TakeLast]             |
-| [AsyncSubject]          | [Delay]               | [Merge] :star:         | [RefCount]         | [TakeUntil]            |
-| [AuditTime]             | [Distinct]            | [MergeAll]             | [Repeat]           | [TakeWhile]            |
-| [AutoConnect]           | [Do] :star:           | [MergeDelayError]      | [ReplaySubject]    | [ThrottleTime]         |
-| [Average]               | [DoOnComplete]        | [MergeDelayErrorWith]  | [Retry]            | [Throw]                |
-| [BehaviorSubject]       | [DoOnError]           | [MergeMap] :star:      | [Sample]           | [Ticker]               |
-| [Catch] :star:          | [ElementAt]           | [MergeMapTo]           | [Scan] :star:      | [TimeInterval]         |
-| [CatchError] :star:     | [Empty]               | [MergeWith] :star:     | [Serialize]        | [Timeout]              |
-| [CombineLatest] :star:  | [Filter] :star:       | [Min]                  | [Single]           | [Timer]                |
-| [CombineLatestAll]      | [Finally]             | [Never]                | [Skip]             | [Timestamp]            |
-| [CombineLatestMap]      | [First]               | [ObserveOn]            | [SkipLast]         | [ToChan]               |
-| [CombineLatestMapTo]    | [From] :star:         | [Of] :star:            | [Start]            | [ToSingle]             |
-| [CombineLatestWith]     | [FromChan]            | [Only]                 | [Subject]          | [ToSlice]              |
-| [Concat] :star:         | [IgnoreCompletion]    | [Passthrough]          | [Subscribe]        | [Wait]                 |
-| [ConcatAll]             | [IgnoreElements]      | [Println]              | [SubscribeOn]      | [WithLatestFrom] :star:|
-| [ConcatMap] :star:      | [Interval]            | [Publish] :star:       | [Sum]              | [WithLatestFromAll]    |
-| [ConcatMapTo]           | [Just] :star:         | [PublishReplay] :star: | [SwitchAll]        |
-| [ConcatWith] :star:     | [Last]                |                        | [SwitchMap] :star: |
-| [Connect]               |
+| A … C                   | D … L                 | M … P                  | R … S              | T … W                   |
+|:------------------------|:----------------------|:-----------------------|:-------------------|:------------------------|
+| [All]                   | [DebounceTime] :star: | [Map] :star:           | [Range]            | [Take]                  |
+| [AsObservable]          | [Defer]               | [Max]                  | [Reduce]           | [TakeLast]              |
+| [AsyncSubject]          | [Delay]               | [Merge] :star:         | [RefCount]         | [TakeUntil]             |
+| [AuditTime]             | [Distinct]            | [MergeAll]             | [Repeat]           | [TakeWhile]             |
+| [AutoConnect]           | [Do] :star:           | [MergeDelayError]      | [ReplaySubject]    | [ThrottleTime]          |
+| [Average]               | [DoOnComplete]        | [MergeDelayErrorWith]  | [Retry]            | [Throw]                 |
+| [BehaviorSubject]       | [DoOnError]           | [MergeMap] :star:      | [Sample]           | [Ticker]                |
+| [Catch] :star:          | [ElementAt]           | [MergeMapTo]           | [Scan] :star:      | [TimeInterval]          |
+| [CatchError] :star:     | [Empty]               | [MergeWith] :star:     | [Serialize]        | [Timeout]               |
+| [CombineLatest] :star:  | [Filter] :star:       | [Min]                  | [Single]           | [Timer]                 |
+| [CombineLatestAll]      | [Finally]             | [Never]                | [Skip]             | [Timestamp]             |
+| [CombineLatestMap]      | [First]               | [ObserveOn]            | [SkipLast]         | [ToChan]                |
+| [CombineLatestMapTo]    | [From] :star:         | [Of] :star:            | [Start]            | [ToSingle]              |
+| [CombineLatestWith]     | [FromChan]            | [Only]                 | [StartWith] :star: | [ToSlice]               |
+| [Concat] :star:         | [IgnoreCompletion]    | [Passthrough]          | [Subject]          | [Wait]                  |
+| [ConcatAll]             | [IgnoreElements]      | [Println]              | [Subscribe]        | [WithLatestFrom] :star: |
+| [ConcatMap] :star:      | [Interval]            | [Publish] :star:       | [SubscribeOn]      | [WithLatestFromAll]     |
+| [ConcatMapTo]           | [Just] :star:         | [PublishReplay] :star: | [Sum]              |
+| [ConcatWith] :star:     | [Last]                |                        | [SwitchAll]        |
+| [Connect]               |                       |                        | [SwitchMap] :star: 
 | [Count]                 |
 | [Create] :star:         |
 | [CreateFutureRecursive] |
@@ -105,6 +105,7 @@ Currently 97 operators have been implemented:
 [Skip]: #skip
 [SkipLast]: #skiplast
 [Start]: #start
+[StartWith]: #startwith
 [Subject]: #subject
 [Subscribe]: #subscribe
 [SubscribeOn]: #subscribeon
@@ -126,8 +127,8 @@ Currently 97 operators have been implemented:
 [ToSingle]: #tosingle
 [ToSlice]: #toslice
 [Wait]: #wait
-[WithLatestFrom]: #WithLatestFrom
-[WithLatestFromAll]: #WithLatestFromAll
+[WithLatestFrom]: #withlatestfrom
+[WithLatestFromAll]: #withlatestfromall
 
 ## All
 [![](../assets/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc#Observable.All)
@@ -326,6 +327,8 @@ See [Skip](test/Skip) in test folder.
 See [SkipLast](test/SkipLast) in test folder.
 ## Start
 See [Start](test/Start) in test folder.
+## StartWith
+See [StartWith](test/StartWith) in test folder.
 ## Subject
 See [Subject](test/Subject) in test folder.
 ## Subscribe
