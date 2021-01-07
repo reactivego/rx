@@ -53,10 +53,6 @@ func (o ObservableFoo) CombineLatestMapToBar(inner ObservableBar) ObservableBarS
 	return o.MapObservableBar(project).CombineLatestAll()
 }
 
-//jig:template <Foo>Slice
-
-type FooSlice = []foo
-
 //jig:template ObservableObservable<Foo> CombineLatestAll
 //jig:needs <Foo>Slice
 
