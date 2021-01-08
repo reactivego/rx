@@ -1,8 +1,8 @@
 # CatchError
 
-[![](../../../assets/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx/test/CatchError?tab=doc)
-[![](../../../assets/godoc.svg)](https://godoc.org/github.com/reactivego/rx/test/CatchError)
-[![](../../../assets/rx.svg)](https://rxjs-dev.firebaseapp.com/api/operators/catchError)
+[![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/CatchError?tab=doc)
+[![](../../../assets/godoc.svg?raw=true)](https://godoc.org/github.com/reactivego/rx/test/CatchError)
+[![](../../../assets/rx.svg?raw=true)](https://rxjs-dev.firebaseapp.com/api/operators/catchError)
 
 **CatchError** catches errors on the Observable to be handled by returning a
 new Observable or throwing an error. It is passed a selector function 

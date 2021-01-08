@@ -2,9 +2,9 @@
 
     import _ "github.com/reactivego/rx/generic"
 
-[![](../../assets/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx/generic?tab=doc)
-[![](../../assets/godoc.svg)](https://godoc.org/github.com/reactivego/rx/generic)
-[![](../../assets/rx.svg)](http://reactivex.io/intro.html)
+[![](../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/generic?tab=doc)
+[![](../../assets/godoc.svg?raw=true)](https://godoc.org/github.com/reactivego/rx/generic)
+[![](../../assets/rx.svg?raw=true)](http://reactivex.io/intro.html)
 
 Package `rx` provides *Reactive Extensions* for Go, an API for asynchronous programming with observable streams.
 
@@ -51,7 +51,7 @@ This was a bird's-eye view of the whole process. Look in the [Quick Start Guide]
 
 ## Operators
 
-[![](../../assets/rx.svg)](http://reactivex.io/documentation/operators.html) 
+[![](../../assets/rx.svg?raw=true)](http://reactivex.io/documentation/operators.html) 
 
 Currently 98 operators have been implemented:
     

@@ -1,8 +1,8 @@
 # BehaviorSubject
 
-[![](../../../assets/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx/test/BehaviorSubject?tab=doc)
-[![](../../../assets/godoc.svg)](https://godoc.org/github.com/reactivego/rx/test/BehaviorSubject)
-[![](../../../assets/rx.svg)](http://reactivex.io/documentation/subject.html)
+[![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/BehaviorSubject?tab=doc)
+[![](../../../assets/godoc.svg?raw=true)](https://godoc.org/github.com/reactivego/rx/test/BehaviorSubject)
+[![](../../../assets/rx.svg?raw=true)](http://reactivex.io/documentation/subject.html)
 
 When an observer subscribes to a `BehaviorSubject`, it begins by emitting the item most
 recently emitted by the Observable part of the subject (or a seed/default

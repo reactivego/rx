@@ -131,9 +131,9 @@ Currently 98 operators have been implemented:
 [WithLatestFromAll]: #withlatestfromall
 
 ## All
-[![](../assets/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc#Observable.All)
-[![](../assets/godoc.svg)](https://godoc.org/github.com/reactivego/rx#Observable.All)
-[![](../assets/rx.svg)](http://reactivex.io/documentation/operators/all.html)
+[![](../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc#Observable.All)
+[![](../assets/godoc.svg?raw=true)](https://godoc.org/github.com/reactivego/rx#Observable.All)
+[![](../assets/rx.svg?raw=true)](http://reactivex.io/documentation/operators/all.html)
 
 **All** determines whether all items emitted by an Observable meet some
 criteria.
@@ -146,7 +146,7 @@ normally and every item emitted by the source Observable evaluated as
 true according to the predicate; false if any item emitted by the source
 Observable evaluates as false according to the predicate.
 
-![All](../assets/All.svg)
+![All](../assets/All.svg?raw=true)
 
 Code:
 ```go
@@ -169,17 +169,17 @@ All values less than 5? false <nil>
 All values less than 5? true <nil>
 ```
 ## AsObservable
-[![](../assets/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc#Observable.AsObservable)
-[![](../assets/godoc.svg)](https://godoc.org/github.com/reactivego/rx#Observable.AsObservable)
+[![](../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc#Observable.AsObservable)
+[![](../assets/godoc.svg?raw=true)](https://godoc.org/github.com/reactivego/rx#Observable.AsObservable)
 
 `AsObservableInt` or `AsObservableBool` type asserts an `Observable` to an observable of type `int` or `bool`.
 Also `AsObservable` can be called on an `ObservableInt` and `ObservableBool` to convert to an observable of type `interface{}`.
 
 
 ## AuditTime
-[![](../assets/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc#Observable.AuditTime)
-[![](../assets/godoc.svg)](https://godoc.org/github.com/reactivego/rx#Observable.AuditTime)
-[![](../assets/rx.svg)](https://rxjs.dev/api/operators/auditTime)
+[![](../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc#Observable.AuditTime)
+[![](../assets/godoc.svg?raw=true)](https://godoc.org/github.com/reactivego/rx#Observable.AuditTime)
+[![](../assets/rx.svg?raw=true)](https://rxjs.dev/api/operators/auditTime)
 
 **AuditTime** waits until the source emits and then starts a timer. When the timer
 expires, **AuditTime** will emit the last value received from the source during the
@@ -334,9 +334,9 @@ See [Subject](test/Subject) in test folder.
 ## Subscribe
 See [Subscribe](test/Subscribe) in test folder.
 ## SubscribeOn
-[![](../assets/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc#Observable.SubscribeOn)
-[![](../assets/godoc.svg)](https://godoc.org/github.com/reactivego/rx#Observable.SubscribeOn)
-[![](../assets/rx.svg)](http://reactivex.io/documentation/operators/subscribeon.html)
+[![](../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc#Observable.SubscribeOn)
+[![](../assets/godoc.svg?raw=true)](https://godoc.org/github.com/reactivego/rx#Observable.SubscribeOn)
+[![](../assets/rx.svg?raw=true)](http://reactivex.io/documentation/operators/subscribeon.html)
 
 **SubscribeOn** specifies which [scheduler](https://github.com/reactivego/scheduler) an Observable should use when it is subscribed to.
 

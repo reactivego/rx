@@ -1,13 +1,13 @@
 # Merge
 
-[![](../../../assets/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx/test/Merge?tab=doc)
-[![](../../../assets/godoc.svg)](http://godoc.org/github.com/reactivego/rx/test/Merge)
-[![](../../../assets/rx.svg)](http://reactivex.io/documentation/operators/merge.html)
+[![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/Merge?tab=doc)
+[![](../../../assets/godoc.svg?raw=true)](http://godoc.org/github.com/reactivego/rx/test/Merge)
+[![](../../../assets/rx.svg?raw=true)](http://reactivex.io/documentation/operators/merge.html)
 
 **Merge** combines multiple Observables into one by merging their emissions.
 An error from any of the observables will terminate the merged observables.
 
-![Merge](../../../assets/Merge.svg)
+![Merge](../../../assets/Merge.svg?raw=true)
 
 ## Example
 

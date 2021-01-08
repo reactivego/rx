@@ -1,8 +1,8 @@
 # All
 
-[![](../../../assets/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx/test/All?tab=doc)
-[![](../../../assets/godoc.svg)](https://godoc.org/github.com/reactivego/rx/test/All)
-[![](../../../assets/rx.svg)](http://reactivex.io/documentation/operators/all.html)
+[![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/All?tab=doc)
+[![](../../../assets/godoc.svg?raw=true)](https://godoc.org/github.com/reactivego/rx/test/All)
+[![](../../../assets/rx.svg?raw=true)](http://reactivex.io/documentation/operators/all.html)
 
 **All** determines whether all items emitted by an Observable meet some
 criteria.
@@ -15,7 +15,7 @@ normally and every item emitted by the source Observable evaluated as
 true according to the predicate; false if any item emitted by the source
 Observable evaluates as false according to the predicate.
 
-![All](../../../assets/All.svg)
+![All](../../../assets/All.svg?raw=true)
 
 ## Example
 ```go

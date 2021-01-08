@@ -1,8 +1,8 @@
 # Publish
 
-[![](../../../assets/godev.svg)](https://pkg.go.dev/github.com/reactivego/rx/test/Publish?tab=doc)
-[![](../../../assets/godoc.svg)](https://godoc.org/github.com/reactivego/rx/test/Publish)
-[![](../../../assets/rx.svg)](http://reactivex.io/documentation/operators/publish.html)
+[![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/Publish?tab=doc)
+[![](../../../assets/godoc.svg?raw=true)](https://godoc.org/github.com/reactivego/rx/test/Publish)
+[![](../../../assets/rx.svg?raw=true)](http://reactivex.io/documentation/operators/publish.html)
 
 **Publish** returns a Multicaster for a Subject to an underlying Observable
 and turns the subject into a connnectable observable.
