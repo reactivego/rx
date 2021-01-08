@@ -118,27 +118,6 @@ func MergeDelayErrorInt(observables ...ObservableInt) ObservableInt {
 	return observables[0].MergeDelayErrorWith(observables[1:]...)
 }
 
-//jig:name ObservableInt_ToSlice
-
-// ToSlice collects all values from the ObservableInt into an slice. The
-// complete slice and any error are returned.
-// ToSlice uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) ToSlice() (slice []int, err error) {
-	subscriber := subscriber.New()
-	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, err error, done bool) {
-		if !done {
-			slice = append(slice, next)
-		} else {
-			subscriber.Done(err)
-		}
-	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	err = subscriber.Wait()
-	return
-}
-
 //jig:name EmptyInt
 
 // EmptyInt creates an Observable that emits no items but terminates normally.
@@ -198,4 +177,25 @@ func (o ObservableInt) MergeDelayErrorWith(other ...ObservableInt) ObservableInt
 		})
 	}
 	return observable
+}
+
+//jig:name ObservableInt_ToSlice
+
+// ToSlice collects all values from the ObservableInt into an slice. The
+// complete slice and any error are returned.
+// ToSlice uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableInt) ToSlice() (slice []int, err error) {
+	subscriber := subscriber.New()
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next int, err error, done bool) {
+		if !done {
+			slice = append(slice, next)
+		} else {
+			subscriber.Done(err)
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	err = subscriber.Wait()
+	return
 }

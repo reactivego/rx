@@ -508,22 +508,6 @@ func PrintlnString(a ...interface{}) StringObserver {
 	return observer
 }
 
-//jig:name EmptyString
-
-// EmptyString creates an Observable that emits no items but terminates normally.
-func EmptyString() ObservableString {
-	observable := func(observe StringObserver, scheduler Scheduler, subscriber Subscriber) {
-		runner := scheduler.Schedule(func() {
-			if subscriber.Subscribed() {
-				var zero string
-				observe(zero, nil, true)
-			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
-}
-
 //jig:name Observable_Serialize
 
 // Serialize forces an Observable to make serialized calls and to be
@@ -628,6 +612,22 @@ func (o ObservableString) Println(a ...interface{}) error {
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
 	return subscriber.Wait()
+}
+
+//jig:name EmptyString
+
+// EmptyString creates an Observable that emits no items but terminates normally.
+func EmptyString() ObservableString {
+	observable := func(observe StringObserver, scheduler Scheduler, subscriber Subscriber) {
+		runner := scheduler.Schedule(func() {
+			if subscriber.Subscribed() {
+				var zero string
+				observe(zero, nil, true)
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
 }
 
 //jig:name ObservableString_AsObservable

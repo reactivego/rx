@@ -2052,18 +2052,46 @@ func (o Observable) Repeat(count int) Observable {
 //jig:name Observable_Retry
 
 // Retry if a source Observable sends an error notification, resubscribe to
-// it in the hopes that it will complete without error.
-func (o Observable) Retry() Observable {
+// it in the hopes that it will complete without error. If count is zero or
+// negative, the retry count will be effectively infinite. The scheduler
+// passed when subscribing is used by Retry to schedule any retry attempt. The
+// time between retries is 1 millisecond, so retry frequency is 1 kHz. Any
+// SubscribeOn operators should be called after Retry to prevent lockups
+// caused by mixing different schedulers in the same subscription for retrying
+// and subscribing.
+func (o Observable) Retry(count ...int) Observable {
+	count = append(count, int(^uint(0)>>1))
+	if count[0] <= 0 {
+		count = []int{int(^uint(0) >> 1)}
+	}
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		var observer Observer
-		observer = func(next interface{}, err error, done bool) {
-			if err != nil {
-				o(observer, subscribeOn, subscriber)
+		var retry struct {
+			count		int
+			observer	Observer
+			subscriber	Subscriber
+			resubscribe	func()
+		}
+		retry.count = count[0]
+		retry.observer = func(next interface{}, err error, done bool) {
+			if err != nil && retry.count > 0 {
+				retry.count--
+				retry.subscriber.Done(err)
+				subscribeOn.ScheduleFuture(1*time.Millisecond, retry.resubscribe)
 			} else {
-				observe(next, nil, done)
+				observe(next, err, done)
 			}
 		}
-		o(observer, subscribeOn, subscriber)
+		retry.resubscribe = func() {
+			if subscriber.Subscribed() {
+				retry.subscriber = subscriber.Add()
+				if !subscribeOn.IsConcurrent() {
+					retry.subscriber.OnWait(subscribeOn.Wait)
+					subscriber.OnWait(func() { retry.subscriber.Wait() })
+				}
+				o(retry.observer, subscribeOn, retry.subscriber)
+			}
+		}
+		retry.resubscribe()
 	}
 	return observable
 }
@@ -2592,21 +2620,23 @@ func (o ObservableInt) Println(a ...interface{}) error {
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
 // Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o Observable) Subscribe(observe Observer, subscribers ...Subscriber) Subscription {
-	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.MakeTrampoline()
+func (o Observable) Subscribe(observe Observer, schedulers ...Scheduler) Subscription {
+	subscriber := subscriber.New()
+	schedulers = append(schedulers, scheduler.MakeTrampoline())
 	observer := func(next interface{}, err error, done bool) {
 		if !done {
 			observe(next, err, done)
 		} else {
 			var zero interface{}
 			observe(zero, err, true)
-			subscribers[0].Done(err)
+			subscriber.Done(err)
 		}
 	}
-	subscribers[0].OnWait(scheduler.Wait)
-	o(observer, scheduler, subscribers[0])
-	return subscribers[0]
+	if !schedulers[0].IsConcurrent() {
+		subscriber.OnWait(schedulers[0].Wait)
+	}
+	o(observer, schedulers[0], subscriber)
+	return subscriber
 }
 
 //jig:name ObservableBool_Subscribe
@@ -2614,21 +2644,23 @@ func (o Observable) Subscribe(observe Observer, subscribers ...Subscriber) Subsc
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
 // Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableBool) Subscribe(observe BoolObserver, subscribers ...Subscriber) Subscription {
-	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.MakeTrampoline()
+func (o ObservableBool) Subscribe(observe BoolObserver, schedulers ...Scheduler) Subscription {
+	subscriber := subscriber.New()
+	schedulers = append(schedulers, scheduler.MakeTrampoline())
 	observer := func(next bool, err error, done bool) {
 		if !done {
 			observe(next, err, done)
 		} else {
 			var zero bool
 			observe(zero, err, true)
-			subscribers[0].Done(err)
+			subscriber.Done(err)
 		}
 	}
-	subscribers[0].OnWait(scheduler.Wait)
-	o(observer, scheduler, subscribers[0])
-	return subscribers[0]
+	if !schedulers[0].IsConcurrent() {
+		subscriber.OnWait(schedulers[0].Wait)
+	}
+	o(observer, schedulers[0], subscriber)
+	return subscriber
 }
 
 //jig:name ObservableInt_Subscribe
@@ -2636,21 +2668,23 @@ func (o ObservableBool) Subscribe(observe BoolObserver, subscribers ...Subscribe
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
 // Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) Subscribe(observe IntObserver, subscribers ...Subscriber) Subscription {
-	subscribers = append(subscribers, subscriber.New())
-	scheduler := scheduler.MakeTrampoline()
+func (o ObservableInt) Subscribe(observe IntObserver, schedulers ...Scheduler) Subscription {
+	subscriber := subscriber.New()
+	schedulers = append(schedulers, scheduler.MakeTrampoline())
 	observer := func(next int, err error, done bool) {
 		if !done {
 			observe(next, err, done)
 		} else {
 			var zero int
 			observe(zero, err, true)
-			subscribers[0].Done(err)
+			subscriber.Done(err)
 		}
 	}
-	subscribers[0].OnWait(scheduler.Wait)
-	o(observer, scheduler, subscribers[0])
-	return subscribers[0]
+	if !schedulers[0].IsConcurrent() {
+		subscriber.OnWait(schedulers[0].Wait)
+	}
+	o(observer, schedulers[0], subscriber)
+	return subscriber
 }
 
 //jig:name Observable_ToChan
@@ -3564,16 +3598,17 @@ func NewSubject() Subject {
 
 //jig:name Observable_Publish
 
-// Publish uses the Multicast operator to control the subscription of a
-// Subject to a source observable and turns the subject it into a connnectable
-// observable. A Subject emits to an observer only those items that are emitted
-// by the source Observable subsequent to the time of the observer subscribes.
-//
-// If the source completed and as a result the internal Subject terminated, then
-// calling Connect again will replace the old Subject with a newly created one.
-// So this Publish operator is re-connectable, unlike the RxJS 5 behavior that
-// isn't. To simulate the RxJS 5 behavior use Publish().AutoConnect(1) this will
-// connect on the first subscription but will never re-connect.
+// Publish returns a Multicaster for a Subject to an underlying
+// Observable and turns the subject into a connnectable observable. A
+// Subject emits to an observer only those items that are emitted by the
+// underlying Observable subsequent to the time of the observer subscribes.
+// When the underlying Obervable terminates with an error, then subscribed
+// observers will receive that error. After all observers have unsubscribed
+// due to an error, the Multicaster does an internal reset just before the
+// next observer subscribes. So this Publish operator is re-connectable,
+// unlike the RxJS 5 behavior that isn't. To simulate the RxJS 5 behavior use
+// Publish().AutoConnect(1) this will connect on the first subscription but
+// will never re-connect.
 func (o Observable) Publish() Multicaster {
 	return o.Multicast(NewSubject)
 }
@@ -3601,15 +3636,14 @@ func NewReplaySubject(bufferCapacity int, windowDuration time.Duration) Subject 
 
 //jig:name Observable_PublishReplay
 
-// Replay uses the Multicast operator to control the subscription of a
-// ReplaySubject to a source observable and turns the subject into a
-// connectable observable. A ReplaySubject emits to any observer all of the
-// items that were emitted by the source observable, regardless of when the
+// PublishReplay returns a Multicaster for a ReplaySubject to an underlying
+// Observable and turns the subject into a connectable observable. A
+// ReplaySubject emits to any observer all of the items that were emitted by
+// the source observable, regardless of when the observer subscribes. When the
+// underlying Obervable terminates with an error, then subscribed observers
+// will receive that error. After all observers have unsubscribed due to an
+// error, the Multicaster does an internal reset just before the next
 // observer subscribes.
-//
-// If the source completed and as a result the internal ReplaySubject
-// terminated, then calling Connect again will replace the old ReplaySubject
-// with a newly created one.
 func (o Observable) PublishReplay(bufferCapacity int, windowDuration time.Duration) Multicaster {
 	factory := func() Subject {
 		return NewReplaySubject(bufferCapacity, windowDuration)
