@@ -6,21 +6,23 @@
 [![](../assets/godoc.svg?raw=true)](https://godoc.org/github.com/reactivego/rx)
 [![](../assets/rx.svg?raw=true)](http://reactivex.io/intro.html)
 
-Package `rx` provides *Reactive Extensions* for Go, an API for asynchronous programming with observable streams.
+Package `rx` provides *Reactive Extensions* for Go, an API for asynchronous programming with [observables](#observables) and [operators](#operators).
 
 > Our intellectual powers are rather geared to master static relations and our powers to visualize processes evolving in time are relatively poorly developed.
 > For that reason we should do our utmost to shorten the conceptual gap between the static program and the dynamic process, to make the correspondence between the program (spread out in text space) and the process (spread out in time) as trivial as possible.
 >
 > *Edsger W. Dijkstra*, March 1968
 
-### Installation
-Use the go tool to get the package:
+## Prerequisites
 
-```bash
-$ go get github.com/reactivego/rx
-```
+A working [Go](https://golang.org/dl/) environment on your system.
 
-Optionally install the [jig](http://github.com/reactivego/jig) tool, in order to use the package as a generics library.
+## Installation
+
+You can use this package [directly](#standard-package) without installing anything.
+
+Optionally, install the [jig](http://github.com/reactivego/jig) tool in order to [regenerate](#regenerating-this-package) this package.
+The [jig](http://github.com/reactivego/jig) tool is also needed to support using the `rx/generic` sub-package as a generics library.
 
 ```bash
 $ go get github.com/reactivego/jig
@@ -33,7 +35,7 @@ It works by generating code, replacing place-holder types in generic functions a
 This package can be used either directly as a standard package or as a generics library for Go 1.
 
 ### Standard Package
-To use as a standard package, import the root `rx` package to access the API directly.
+To use it as a standard package, import the root `rx` package to access the API directly.
 ```go
 package main
 
@@ -43,10 +45,10 @@ func main() {
     rx.From(1,2,"hello").Println()
 }
 ```
-Links to documentation are at the top of this page.
+For more information see the [Go Package Documentation](https://pkg.go.dev/github.com/reactivego/rx?tab=doc). In this document there is a [selection](#operators) of the most used operators and there is also a complete list of operators in a separate [document](OPERATORS.md).
 
 ### Generics Library
-To use as a *Generics Library* for *Go 1*, import the `rx/generic` package.
+To use it as a *Generics Library* for *Go 1*, import the `rx/generic` package.
 Generic programming supports writing programs that use statically typed *Observables* and *Operators*.
 For example:
 
@@ -84,8 +86,8 @@ An Observable:
 - is cancellable
 - is lazy (it doesn't do anything until you subscribe).
 
-This package uses `interface{}` for entry types, so an observable can emit a
-mix of differently typed entries. To create an observable that emits three
+This package uses `interface{}` for value types, so an observable can emit a
+mix of differently typed values. To create an observable that emits three
 values of different types you could write the following little program.
 
 ```go
@@ -103,11 +105,10 @@ Observables in `rx` are somewhat similar to Go channels but have much richer
 semantics:
 
 Observables can be hot or cold. A hot observable will try to emit values even
-when nobody is subscribed. As long as there are no subscribers the values of
-a hot observable are lost. The position of a mouse pointer or the current time
-are examples of hot observables. 
+when nobody is subscribed. Values emitted during that period will be lost.
+The position of a mouse pointer or the current time are examples of hot observables. 
 
-A cold observable will only start emitting values when somebody subscribes.
+A cold observable will only start emitting values after somebody subscribes.
 The contents of a file or a database are examples of cold observables.
 
 An observable can complete normally or with an error, it uses subscriptions
@@ -120,54 +121,78 @@ changing stream of values. Every Observable conceptually has at its core a
 concurrently running process that pushes out values.
 
 ## Operators 
-[Operators](OPERATORS.md) form a language in which programs featuring Observables can be expressed.
+Operators form a language in which programs featuring Observables can be expressed.
 They work on one or more Observables to transform, filter and combine them into new Observables.
 
-Following are the most commonly used [operators](OPERATORS.md):
+Following are the most commonly used operators:
 
 <details><summary>BufferTime</summary>
 
-#### TBD
+buffers the source Observable values for a specific time period and emits those as a
+slice periodically in time.
+
+![BufferTime](../assets/BufferTime.svg?raw=true)
 
 </details>
 <details><summary>Catch</summary>
 
-#### TBD
+recovers from an error notification by continuing the sequence without
+emitting the error but by switching to the catch ObservableInt to provide
+items.
 
 </details>
 <details><summary>CatchError</summary>
 
-#### TBD
+catches errors on the Observable to be handled by returning a
+new Observable or throwing an error. It is passed a selector function 
+that takes as arguments err, which is the error, and caught, which is the
+source observable, in case you'd like to "retry" that observable by
+returning it again. Whatever observable is returned by the selector will be
+used to continue the observable chain.
 
 </details>
 <details><summary>CombineLatest</summary>
 
-#### TBD
+will subscribe to all Observables. It will then wait for all of
+them to emit before emitting the first slice. Whenever any of the subscribed
+observables emits, a new slice will be emitted containing all the latest value.
 
 </details>
 <details><summary>Concat</summary>
 
-#### TBD
+emits the emissions from two or more observables without interleaving them.
 
 </details>
 <details><summary>ConcatMap</summary>
 
-#### TBD
+transforms the items emitted by an Observable by applying a
+function to each item and returning an Observable. The stream of
+Observable items is then flattened by concattenating the emissions from
+the observables without interleaving.
 
 </details>
 <details><summary>ConcatWith</summary>
 
-#### TBD
+emits the emissions from two or more observables without interleaving them.
+
+![ConcatWith](../assets/ConcatWith.svg?raw=true)
 
 </details>
 <details><summary>Create</summary>
 
-#### TBD
+provides a way of creating an Observable from scratch by calling observer 
+methods programmatically.
+
+The create function provided to Create will be called once
+to implement the observable. It is provided with a Next, Error,
+Complete and Canceled function that can be called by the code that
+implements the Observable.
 
 </details>
 <details><summary>DebounceTime</summary>
 
-#### TBD
+only emits the last item of a burst from an Observable if a
+particular timespan has passed without it emitting another item.
 
 </details>
 <details><summary>DistinctUntilChanged</summary>
@@ -177,27 +202,28 @@ Following are the most commonly used [operators](OPERATORS.md):
 </details>
 <details><summary>Do</summary>
 
-#### TBD
+calls a function for each next value passing through the observable.
 
 </details>
 <details><summary>Filter</summary>
 
-#### TBD
+emits only those items from an observable that pass a predicate test.
 
 </details>
 <details><summary>From</summary>
 
-#### TBD
+creates an observable from multiple values passed in.
 
 </details>
 <details><summary>Just</summary>
 
-#### TBD
+creates an observable that emits a particular item.
 
 </details>
 <details><summary>Map</summary>
 
-#### TBD
+transforms the items emitted by an Observable by applying a
+function to each item.
 
 </details>
 <details><summary>Merge</summary>
@@ -226,7 +252,14 @@ Output:
 </details>
 <details><summary>MergeMap</summary>
 
-#### TBD
+transforms the items emitted by an Observable by applying a
+function to each item an returning an Observable. The stream of Observable
+items is then merged into a single stream of items using the MergeAll
+operator.
+
+This operator was previously named FlatMap. The name FlatMap is deprecated as
+MergeMap more accurately describes what the operator does with the observables
+returned from the Map project function.
 
 </details>
 <details><summary>MergeWith</summary>
@@ -234,7 +267,7 @@ Output:
 combines multiple Observables into one by merging their emissions.
 An error from any of the observables will terminate the merged observables.
 
-![Merge](../assets/MergeWith.svg?raw=true)
+![MergeWith](../assets/MergeWith.svg?raw=true)
 
 Code:
 ```go
@@ -255,49 +288,105 @@ Output:
 </details>
 <details><summary>Of</summary>
 
-#### TBD
+emits a variable amount of values in a sequence and then emits a complete
+notification.
 
 </details>
 <details><summary>Publish</summary>
 
-#### TBD
+returns a Multicaster for a Subject to an underlying Observable
+and turns the subject into a connnectable observable.
+
+A Subject emits to an observer only those items that are emitted by the
+underlying Observable subsequent to the time the observer subscribes.
+
+When the underlying Obervable terminates with an error, then subscribed
+observers will receive that error. After all observers have unsubscribed due
+to an error, the Multicaster does an internal reset just before the next
+observer subscribes. So this Publish operator is re-connectable, unlike the
+RxJS 5 behavior that isn't. To simulate the RxJS 5 behavior use
+Publish().AutoConnect(1) this will connect on the first subscription but will
+never re-connect.
 
 </details>
 <details><summary>PublishReplay</summary>
 
-#### TBD
+returns a Multicaster for a ReplaySubject to an underlying
+Observable and turns the subject into a connectable observable. A
+ReplaySubject emits to any observer all of the items that were emitted by
+the source observable, regardless of when the observer subscribes. When the
+underlying Obervable terminates with an error, then subscribed observers
+will receive that error. After all observers have unsubscribed due to an
+error, the Multicaster does an internal reset just before the next observer
+subscribes.
 
 </details>
 <details><summary>Scan</summary>
 
-#### TBD
+applies a accumulator function to each item emitted by an Observable and
+the previous accumulator result.
+
+The operator accepts a seed argument that is passed to the accumulator for the
+first item emitted by the Observable. Scan emits every value, both intermediate
+and final.
 
 </details>
 <details><summary>StartWith</summary>
 
-#### TBD
+returns an observable that, at the moment of subscription, will
+synchronously emit all values provided to this operator, then subscribe to
+the source and mirror all of its emissions to subscribers.
 
+![StartWith](../assets/StartWith.svg?raw=true)
+
+Code:
+```go
+rx.From(2, 3).StartWith(1).Println()
+```
+Output:
+```
+1
+2
+3
+```
 </details>
 <details><summary>SwitchMap</summary>
 
-#### TBD
+transforms the items emitted by an Observable by applying a function
+to each item an returning an Observable.
+
+In doing so, it behaves much like MergeMap (previously FlatMap), except that
+whenever a new Observable is emitted SwitchMap will unsubscribe from the
+previous Observable and begin emitting items from the newly emitted one.
 
 </details>
 <details><summary>Take</summary>
 
-#### TBD
+emits only the first n items emitted by an Observable.
 
 </details>
 <details><summary>TakeUntil</summary>
 
-#### TBD
+emits items emitted by an Observable until another Observable emits an item.
 
 </details>
 <details><summary>WithLatestFrom</summary>
 
-#### TBD
+will subscribe to all Observables and wait for all of them to emit before emitting
+the first slice. The source observable determines the rate at which the values are emitted. The idea
+is that observables that are faster than the source, don't determine the rate at which the resulting
+observable emits. The observables that are combined with the source will be allowed to continue
+emitting but only will have their last emitted value emitted whenever the source emits.
+
+Note that any values emitted by the source before all other observables have emitted will
+effectively be lost. The first emit will occur the first time the source emits after all other
+observables have emitted.
+
+![WithLatestFrom](../assets/WithLatestFrom.svg?raw=true)
 
 </details>
+
+There is also a complete list of supported [operators](OPERATORS.md).
 
 ## Concurency
 
@@ -314,17 +403,17 @@ To change the scheduler on which subscribing needs to occur, use the [SubscribeO
 
 ## Regenerating this Package
 This package is generated from generics in the sub-folder `generic` by the [jig](http://github.com/reactivego/jig) tool.
-You don't need to regenerate this package in order to use it. However, if you are
-interested in regenerating it, then read on.
+You don't need to regenerate this package in order to use it. However, if you are interested in regenerating it, then read on.
 
-To regenerate, change the current working directory to the package directory
-and run the [jig](http://github.com/reactivego/jig) tool as follows:
+If not already done so, install the [jig](http://github.com/reactivego/jig) tool.
 
 ```bash
-$ go get -d github.com/reactivego/jig
-$ go run github.com/reactivego/jig -v
+$ go get github.com/reactivego/jig
 ```
-
+Change the current working directory to the package directory and run the [jig](http://github.com/reactivego/jig) tool as follows:
+```bash
+$ jig -v
+```
 This works by replacing place-holder types of generic functions and datatypes with the `interface{}` type.
 
 ## Acknowledgements

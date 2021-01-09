@@ -38,7 +38,7 @@ $ go run *.go
 ```
 
 ## Generate Code
-Go to the command-line now and run the [jig](https://github.com/reactivego/jig) tool.
+Go to the command-line again and run the [jig](https://github.com/reactivego/jig) tool.
 Use the verbose flag `-v` to see what [jig](https://github.com/reactivego/jig) is doing:
 ```bash
 $ jig -v
@@ -70,7 +70,7 @@ Hello, World!
 
 ## Inspect the Code
 Let's take a look at the code generated into the file *rx.go*.
-The idea behind [jig](https://github.com/reactivego/jig) (Just In-time Generics) has been to generate the minimal ammount of code needed to make a program run.
+The idea behind [jig](https://github.com/reactivego/jig) (Just In-time Generics) has been to generate the minimal amount of code needed to make a program run.
 Turns out the generated file *rx.go* contains only around 70 lines of code:
 
 ```go

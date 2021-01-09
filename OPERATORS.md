@@ -191,41 +191,33 @@ time period when the timer was active.
 
 ## AutoConnect
 
-
 #### TBD
 
 ## Average
-
 
 #### TBD
 
 ## BehaviorSubject
 
-
 #### TBD
 
 ## Catch
-
 
 #### TBD
 
 ## CatchError
 
-
 #### TBD
 
 ## CombineLatest
-
 
 #### TBD
 
 ## CombineLatestAll
 
-
 #### TBD
 
 ## CombineLatestMap
-
 
 #### TBD
 
@@ -254,6 +246,8 @@ time period when the timer was active.
 #### TBD
 
 ## ConcatWith
+
+![ConcatWith](../assets/ConcatWith.svg?raw=true)
 
 #### TBD
 
@@ -363,6 +357,8 @@ time period when the timer was active.
 
 ## Merge
 
+![Merge](../assets/Merge.svg?raw=true)
+
 #### TBD
 
 ## MergeAll
@@ -371,9 +367,13 @@ time period when the timer was active.
 
 ## MergeDelayError
 
+![MergeDelayError](../assets/MergeDelayError.svg?raw=true)
+
 #### TBD
 
 ## MergeDelayErrorWith
+
+![MergeDelayErrorWith](../assets/MergeDelayErrorWith.svg?raw=true)
 
 #### TBD
 
@@ -386,6 +386,8 @@ time period when the timer was active.
 #### TBD
 
 ## MergeWith
+
+![MergeWith](../assets/MergeWith.svg?raw=true)
 
 #### TBD
 
@@ -478,11 +480,26 @@ time period when the timer was active.
 #### TBD
 
 ## StartWith
+[![](../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc#Observable.StartWith)
+[![](../assets/godoc.svg?raw=true)](https://godoc.org/github.com/reactivego/rx#Observable.StartWith)
+[![](../assets/rx.svg?raw=true)](http://reactivex.io/documentation/operators/startwith.html)
+
+**StartWith** returns an observable that, at the moment of subscription, will
+synchronously emit all values provided to this operator, then subscribe to
+the source and mirror all of its emissions to subscribers.
 
 ![StartWith](../assets/StartWith.svg?raw=true)
 
-#### TBD
-
+Code:
+```go
+rx.From(2, 3).StartWith(1).Println()
+```
+Output:
+```
+1
+2
+3
+```
 ## Subject
 
 #### TBD

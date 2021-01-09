@@ -6,9 +6,7 @@
 [![](../../assets/godoc.svg?raw=true)](https://godoc.org/github.com/reactivego/rx/generic)
 [![](../../assets/rx.svg?raw=true)](http://reactivex.io/intro.html)
 
-Package `rx` provides *Reactive Extensions* for Go, an API for asynchronous programming with observable streams.
-
-Observables are combined with [operators](#operators) to form a program.
+Package `rx` provides *Reactive Extensions* for Go, an API for asynchronous programming with [Observables](#observables) and [Operators](#operators).
 
 ## Install
 In order to use the package as a generic programming library for *Go 1*, first install the [*jig*](https://github.com/reactivego/jig) generator tool. It will generate source code from a generics library.
@@ -16,17 +14,14 @@ In order to use the package as a generic programming library for *Go 1*, first i
 ```bash
 $ go get github.com/reactivego/jig
 ```
+## Usage
 
-Installing the actual library is very simple. Just import the library with the blank identifier `_` in a Go program.
+To use the library, write a Go program that imports the library as follows:
 
 ```go
 import _ "github.com/reactivego/rx/generic"
 ```
-The use of `_` stops the *go* tool from complaining about you not using any code from the package while at the same time allowing the [*jig*](https://github.com/reactivego/jig) tool to actually find the generics in the library.
-
-## Usage
-
-Write a program, placing the code in a file (e.g. `main.go`). In the code, import the `rx/generic` package.
+The `_` prefix stops Go from complaining about the imported package not being used. However, [*jig*](https://github.com/reactivego/jig) will be able to use the generics from the library via this import.
 
 ```go	
 package main
@@ -38,22 +33,37 @@ func main() {
   // Output: Hello, World!
 }
 ```
-This will not build as-is, because `JustString` doesn't exist.
-Code for `JustString` must first be generated with the [*jig*](https://github.com/reactivego/jig) tool.
+This will not build as-is, because `JustString` doesn't exist. Code for `JustString` must first be generated with the [*jig*](https://github.com/reactivego/jig) tool.
 
-1. You run the [jig](https://github.com/reactivego/jig) command in the directory where your program source is located.
-2. **Now [jig](https://github.com/reactivego/jig) analyzes your source code and determines what additional code is needed to make it build**.
-3. *[jig](https://github.com/reactivego/jig)* takes templates from the `rx` library and specializes them on specific types.
-4. Specializations are generated into the file `rx.go` alongside your own code.
-5. If all went well, your code will now build.
+```bash
+$ jig -v
+found 149 templates in package "rx" (github.com/reactivego/rx/generic)
+...
+```
+You run [*jig*](https://github.com/reactivego/jig) from the command line in the directory where your go file is stored. The [*jig*](https://github.com/reactivego/jig) tool then analyzes your code and determines what additional code is needed to make it build.
 
-This was a bird's-eye view of the whole process. Look in the [Quick Start Guide](QUICKSTART.md) for a more detailed explanation.
+In the example above, [*jig*](https://github.com/reactivego/jig) takes templates from the `rx` library and specializes them on specific types. The generated code is written to the file `rx.go`. If all went well, your code will now build with the Go tool.
+
+For a more in-depth look see the [Quick Start Guide](QUICKSTART.md).
+
+## Observables
+
+An Observable:
+
+- is a stream of events.
+- assumes zero to many values over time.
+- pushes values
+- can take any amount of time to complete (or may never)
+- is cancellable
+- is lazy (it doesn't do anything until you subscribe).
+
+An Observer subscribes to an Observable and **reacts** to whatever it emits.
 
 ## Operators
 
-[![](../../assets/rx.svg?raw=true)](http://reactivex.io/documentation/operators.html) 
+Operators work on one or more Observables to transform, filter and combine them into new Observables.
 
-Currently 98 operators have been implemented:
+Currently 98 operators are implemented:
     
 | A … C                   | D … L                 | M … P                  | R … S              | T … W                   |
 |:------------------------|:----------------------|:-----------------------|:-------------------|:------------------------|
