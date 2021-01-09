@@ -13,3 +13,5 @@ emitting but only will have their last emitted value emitted whenever the source
 Note that any values emitted by the source before all other observables have emitted will
 effectively be lost. The first emit will occur the first time the source emits after all other
 observables have emitted.
+
+![WithLatestFrom](../../../assets/WithLatestFrom.svg?raw=true)
