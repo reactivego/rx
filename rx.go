@@ -2274,6 +2274,15 @@ func (o Observable) SkipLast(n int) Observable {
 	return observable
 }
 
+//jig:name Observable_StartWith
+
+// StartWith returns an observable that, at the moment of subscription, will
+// synchronously emit all values provided to this operator, then subscribe to
+// the source and mirror all of its emissions to subscribers.
+func (o Observable) StartWith(values ...interface{}) Observable {
+	return From(values...).ConcatWith(o)
+}
+
 //jig:name Observable_SubscribeOn
 
 // SubscribeOn specifies the scheduler an Observable should use when it is

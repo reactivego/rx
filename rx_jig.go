@@ -123,6 +123,7 @@ func require() {
 	o.Single()
 	o.Skip(1)
 	o.SkipLast(1)
+	o.StartWith(1)
 	o.SubscribeOn(t)
 	i.Sum()
 	o.Take(1)

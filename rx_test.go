@@ -253,6 +253,15 @@ func ExampleObservable_Scan() {
 	// 15
 }
 
+func ExampleObservable_StartWith() {
+	rx.From(2, 3).StartWith(1).Println()
+
+	// Output:
+	// 1
+	// 2
+	// 3
+}
+
 func ExampleObservableObservable_SwitchAll() {
 	// intToObs creates a new observable that emits an integer starting after and then repeated every 20 milliseconds
 	// in the range starting at 0 and incrementing by 1. It takes only the first 10 emitted values and then uses
