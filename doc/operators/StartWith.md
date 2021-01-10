@@ -9,3 +9,18 @@ synchronously emit all values provided to this operator, then subscribe to
 the source and mirror all of its emissions to subscribers.
 
 ![StartWith](../../../assets/StartWith.svg?raw=true)
+
+## Example
+```go
+import _ "github.com/reactivego/rx/generic"
+```
+Code:
+```go
+FromInt(2, 3).StartWith(1).Println()
+```
+Output:
+```
+1
+2
+3
+```
