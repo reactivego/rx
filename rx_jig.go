@@ -21,6 +21,7 @@ func require() {
 	var b ObservableBool
 	var i ObservableInt
 	var oo ObservableObservable
+	var oa ObservableSlice
 
 	/*
 		Observable Create Functions
@@ -82,6 +83,8 @@ func require() {
 	// o.MergeDelayErrorMapTo(o)
 	//oo.MergeDelayErrorAll()
 
+	o.WithLatestFrom(o)
+	oo.WithLatestFromAll()
 
 	o.All(func(next interface{}) bool { return true })
 	o.AsObservableBool()
@@ -144,21 +147,27 @@ func require() {
 	o.Println()
 	b.Println()
 	i.Println()
+	oa.Println()
 	o.Subscribe(func(interface{}, error, bool) {})
 	b.Subscribe(func(bool, error, bool) {})
 	i.Subscribe(func(int, error, bool) {})
+	oa.Subscribe(func([]interface{}, error, bool) {})
 	o.ToChan()
 	b.ToChan()
 	i.ToChan()
+	oa.ToChan()
 	o.ToSingle()
 	b.ToSingle()
 	i.ToSingle()
+	oa.ToSingle()
 	o.ToSlice()
 	b.ToSlice()
 	i.ToSlice()
+	oa.ToSlice()
 	o.Wait()
 	b.Wait()
 	i.Wait()
+	oa.Wait()
 
 	/*
 		Multicast Types, Operator Methods and Connect Method

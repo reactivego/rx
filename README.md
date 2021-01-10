@@ -284,7 +284,6 @@ Output:
 4
 5
 ```
-
 </details>
 <details><summary>Of</summary>
 
@@ -384,6 +383,19 @@ observables have emitted.
 
 ![WithLatestFrom](../assets/WithLatestFrom.svg?raw=true)
 
+Code:
+```go
+a := rx.From(1,2,3,4,5)
+b := rx.From("A","B","C","D","E")
+a.WithLatestFrom(b).Println()
+```
+Output:
+```
+[2 A]
+[3 B]
+[4 C]
+[5 D]
+```
 </details>
 
 There is also a complete list of supported [operators](OPERATORS.md).

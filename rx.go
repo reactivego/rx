@@ -1291,6 +1291,93 @@ func (o ObservableObservable) MergeAll() Observable {
 	return observable
 }
 
+//jig:name ObservableObservable_WithLatestFromAll
+
+// WithLatestFromAll flattens a higher order observable (e.g. ObservableObservable) by subscribing
+// to all emitted observables (ie. Observable entries) until the source completes. It will then wait
+// for all of the subscribed Observables to emit before emitting the first slice. The first
+// observable that was emitted by the source will be used as the trigger observable. Whenever the
+// trigger observable emits, a new slice will be emitted containing all the latest values.
+func (o ObservableObservable) WithLatestFromAll() ObservableSlice {
+	observable := func(observe SliceObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		observables := []Observable(nil)
+		var observers struct {
+			sync.Mutex
+			assigned	[]bool
+			values		[]interface{}
+			initialized	int
+			active		int
+		}
+		makeObserver := func(index int) Observer {
+			observer := func(next interface{}, err error, done bool) {
+				observers.Lock()
+				defer observers.Unlock()
+				if observers.active > 0 {
+					switch {
+					case !done:
+						if !observers.assigned[index] {
+							observers.assigned[index] = true
+							observers.initialized++
+						}
+						observers.values[index] = next
+						if index == 0 && observers.initialized == len(observers.values) {
+							observe(observers.values, nil, false)
+						}
+					case err != nil:
+						observers.active = 0
+						var zero []interface{}
+						observe(zero, err, true)
+					default:
+						if observers.active--; observers.active == 0 {
+							var zero []interface{}
+							observe(zero, nil, true)
+						}
+					}
+				}
+			}
+			return observer
+		}
+
+		observer := func(next Observable, err error, done bool) {
+			switch {
+			case !done:
+				observables = append(observables, next)
+			case err != nil:
+				var zero []interface{}
+				observe(zero, err, true)
+			default:
+				subscribeOn.Schedule(func() {
+					if subscriber.Subscribed() {
+						numObservables := len(observables)
+						observers.assigned = make([]bool, numObservables)
+						observers.values = make([]interface{}, numObservables)
+						observers.active = numObservables
+						for i, v := range observables {
+							if !subscriber.Subscribed() {
+								return
+							}
+							v(makeObserver(i), subscribeOn, subscriber)
+						}
+					}
+				})
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name Observable_WithLatestFrom
+
+// WithLatestFrom will subscribe to all Observables and wait for all of them to emit before emitting
+// the first slice. The source observable determines the rate at which the values are emitted. The
+// idea is that observables that are faster than the source, don't determine the rate at which the
+// resulting observable emits. The observables that are combined with the source will be allowed to
+// continue emitting but only will have their last emitted value emitted whenever the source emits.
+func (o Observable) WithLatestFrom(other ...Observable) ObservableSlice {
+	return FromObservable(append([]Observable{o}, other...)...).WithLatestFromAll()
+}
+
 //jig:name Observable_All
 
 // All determines whether all items emitted by an Observable meet some
@@ -3726,4 +3813,214 @@ func (o ObservableBool) Single() ObservableBool {
 // than 1 item before completing  this reported as an error to the observer.
 func (o ObservableInt) Single() ObservableInt {
 	return o.AsObservable().Single().AsObservableInt()
+}
+
+//jig:name ObservableSlice_Println
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableSlice) Println(a ...interface{}) error {
+	subscriber := subscriber.New()
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next Slice, err error, done bool) {
+		if !done {
+			fmt.Println(append(a, next)...)
+		} else {
+			subscriber.Done(err)
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	return subscriber.Wait()
+}
+
+//jig:name ObservableSlice_Subscribe
+
+// Subscribe operates upon the emissions and notifications from an Observable.
+// This method returns a Subscription.
+// Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableSlice) Subscribe(observe SliceObserver, schedulers ...Scheduler) Subscription {
+	subscriber := subscriber.New()
+	schedulers = append(schedulers, scheduler.MakeTrampoline())
+	observer := func(next Slice, err error, done bool) {
+		if !done {
+			observe(next, err, done)
+		} else {
+			var zero Slice
+			observe(zero, err, true)
+			subscriber.Done(err)
+		}
+	}
+	if !schedulers[0].IsConcurrent() {
+		subscriber.OnWait(schedulers[0].Wait)
+	}
+	o(observer, schedulers[0], subscriber)
+	return subscriber
+}
+
+//jig:name ObservableSlice_ToChan
+
+// ToChan returns a channel that emits Slice values. If the source observable does
+// not emit values but emits an error or complete, then the returned channel
+// will close without emitting any values.
+//
+// ToChan uses the public scheduler.Goroutine variable for scheduling, because
+// it needs the concurrency so the returned channel can be used by used
+// by the calling code directly. To be able to cancel ToChan, you will need to
+// create a subscriber yourself and pass it to ToChan as an argument.
+func (o ObservableSlice) ToChan(subscribers ...Subscriber) <-chan Slice {
+	subscribers = append(subscribers, subscriber.New())
+	scheduler := scheduler.Goroutine
+	donech := make(chan struct{})
+	nextch := make(chan Slice)
+	const (
+		idle	= iota
+		busy
+		closed
+	)
+	state := int32(idle)
+	observer := func(next Slice, err error, done bool) {
+		if atomic.CompareAndSwapInt32(&state, idle, busy) {
+			if !done {
+				select {
+				case <-donech:
+					atomic.StoreInt32(&state, closed)
+				default:
+					select {
+					case <-donech:
+						atomic.StoreInt32(&state, closed)
+					case nextch <- next:
+					}
+				}
+			} else {
+				atomic.StoreInt32(&state, closed)
+				subscribers[0].Done(err)
+			}
+			if !atomic.CompareAndSwapInt32(&state, busy, idle) {
+				close(nextch)
+			}
+		}
+	}
+	subscribers[0].OnUnsubscribe(func() {
+		close(donech)
+		if atomic.CompareAndSwapInt32(&state, busy, closed) {
+			return
+		}
+		if atomic.CompareAndSwapInt32(&state, idle, closed) {
+			close(nextch)
+			return
+		}
+	})
+	o(observer, scheduler, subscribers[0])
+	return nextch
+}
+
+//jig:name ObservableSlice_ToSingle
+
+// ToSingle blocks until the ObservableSlice emits exactly one value or an error.
+// The value and any error are returned.
+// ToSingle uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableSlice) ToSingle() (entry Slice, err error) {
+	o = o.Single()
+	subscriber := subscriber.New()
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next Slice, err error, done bool) {
+		if !done {
+			entry = next
+		} else {
+			subscriber.Done(err)
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	err = subscriber.Wait()
+	return
+}
+
+//jig:name ObservableSlice_ToSlice
+
+// ToSlice collects all values from the ObservableSlice into an slice. The
+// complete slice and any error are returned.
+// ToSlice uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableSlice) ToSlice() (slice []Slice, err error) {
+	subscriber := subscriber.New()
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next Slice, err error, done bool) {
+		if !done {
+			slice = append(slice, next)
+		} else {
+			subscriber.Done(err)
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	err = subscriber.Wait()
+	return
+}
+
+//jig:name ObservableSlice_Wait
+
+// Wait subscribes to the Observable and waits for completion or error.
+// Returns either the error or nil when the Observable completed normally.
+// Wait uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableSlice) Wait() error {
+	subscriber := subscriber.New()
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next Slice, err error, done bool) {
+		if done {
+			subscriber.Done(err)
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	return subscriber.Wait()
+}
+
+//jig:name ObservableSlice_Single
+
+// Single enforces that the observableSlice sends exactly one data item and then
+// completes. If the observable sends no data before completing or sends more
+// than 1 item before completing  this reported as an error to the observer.
+func (o ObservableSlice) Single() ObservableSlice {
+	return o.AsObservable().Single().AsObservableSlice()
+}
+
+//jig:name ObservableSlice_AsObservable
+
+// AsObservable turns a typed ObservableSlice into an Observable of interface{}.
+func (o ObservableSlice) AsObservable() Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next Slice, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name Observable_AsObservableSlice
+
+// AsObservableSlice turns an Observable of interface{} into an ObservableSlice.
+// If during observing a typecast fails, the error ErrTypecastToSlice will be
+// emitted.
+func (o Observable) AsObservableSlice() ObservableSlice {
+	observable := func(observe SliceObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				if nextSlice, ok := next.(Slice); ok {
+					observe(nextSlice, err, done)
+				} else {
+					var zero Slice
+					observe(zero, TypecastFailed, true)
+				}
+			} else {
+				var zero Slice
+				observe(zero, err, true)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
 }
