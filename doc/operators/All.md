@@ -19,9 +19,8 @@ Observable evaluates as false according to the predicate.
 
 ## Example
 ```go
-import _ "github.com/reactivego/rx"
+import _ "github.com/reactivego/rx/generic"
 ```
-
 Code:
 ```go
 LessThan5 := func(i int) bool {
@@ -29,7 +28,6 @@ LessThan5 := func(i int) bool {
 }
 FromInt(1, 2, 6, 2, 1).All(LessThan5).Println("All values less than 5?")
 ```
-
 Output:
 ```
 All values less than 5? false
