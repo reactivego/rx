@@ -157,9 +157,9 @@ func ExampleMerge() {
 
 func ExampleObservable_MergeDelayError() {
 	const ms = time.Millisecond
-	AddMul := func(add, mul int) func(interface{}) interface{}{
+	AddMul := func(add, mul int) func(interface{}) interface{} {
 		return func(i interface{}) interface{} {
-			return mul * (i.(int)+add)
+			return mul * (i.(int) + add)
 		}
 	}
 	To := func(to int) func(interface{}) interface{} {
@@ -169,7 +169,7 @@ func ExampleObservable_MergeDelayError() {
 	}
 
 	a := rx.Interval(20 * ms).AsObservable().Map(AddMul(1, 20)).Take(4).ConcatWith(rx.Throw(rx.RxError("boom")))
-	b := rx.Timer(70 * ms, 20 * ms).AsObservable().Map(To(1)).Take(2)
+	b := rx.Timer(70*ms, 20*ms).AsObservable().Map(To(1)).Take(2)
 	err := rx.MergeDelayError(a, b).Println()
 	fmt.Println(err)
 	// Output:
@@ -184,9 +184,9 @@ func ExampleObservable_MergeDelayError() {
 
 func ExampleObservable_MergeDelayErrorWith() {
 	const ms = time.Millisecond
-	AddMul := func(add, mul int) func(interface{}) interface{}{
+	AddMul := func(add, mul int) func(interface{}) interface{} {
 		return func(i interface{}) interface{} {
-			return mul * (i.(int)+add)
+			return mul * (i.(int) + add)
 		}
 	}
 	To := func(to int) func(interface{}) interface{} {
@@ -196,7 +196,7 @@ func ExampleObservable_MergeDelayErrorWith() {
 	}
 
 	a := rx.Interval(20 * ms).AsObservable().Map(AddMul(1, 20)).Take(4).ConcatWith(rx.Throw(rx.RxError("boom")))
-	b := rx.Timer(70 * ms, 20 * ms).AsObservable().Map(To(1)).Take(2)
+	b := rx.Timer(70*ms, 20*ms).AsObservable().Map(To(1)).Take(2)
 
 	fmt.Println(a.MergeDelayErrorWith(b).Println())
 	// Output:
@@ -316,7 +316,7 @@ func ExampleObservable_SubscribeOn_trampoline() {
 	fmt.Println(trampoline.Count(), "WAITING...")
 	subscription.Wait()
 	fmt.Println(trampoline.Count(), "DONE")
-	
+
 	// Output:
 	// 0 SUBSCRIBING...
 	// 1 WAITING...
@@ -352,15 +352,14 @@ func ExampleObservable_SubscribeOn_goroutine() {
 	// 1 print 1
 	// 1 print 2
 	// 1 print 3
-	// 1 print complete 
+	// 1 print complete
 	// 0 DONE
 }
 
 func ExampleObservable_WithLatestFrom() {
-	a := rx.From(1,2,3,4,5)
-	b := rx.From("A","B","C","D","E")
+	a := rx.From(1, 2, 3, 4, 5)
+	b := rx.From("A", "B", "C", "D", "E")
 	a.WithLatestFrom(b).Println()
-
 	// Output:
 	// [2 A]
 	// [3 B]
@@ -369,5 +368,13 @@ func ExampleObservable_WithLatestFrom() {
 }
 
 func ExampleObservableObservable_WithLatestFromAll() {
-
+	a := rx.From(1, 2, 3, 4, 5)
+	b := rx.From("A", "B", "C", "D", "E")
+	c := rx.FromObservable(a, b)
+	c.WithLatestFromAll().Println()
+	// Output:
+	// [2 A]
+	// [3 B]
+	// [4 C]
+	// [5 D]
 }
