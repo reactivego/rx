@@ -52,25 +52,34 @@ type ObservableInt func(IntObserver, Scheduler, Subscriber)
 // channel will be seen as completion.
 func FromChanInt(ch <-chan int) ObservableInt {
 	observable := func(observe IntObserver, scheduler Scheduler, subscriber Subscriber) {
+		cancel := make(chan struct{})
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if !subscriber.Subscribed() {
 				return
 			}
-			next, ok := <-ch
-			if !subscriber.Subscribed() {
+			select {
+			case next, ok := <-ch:
+				if !subscriber.Subscribed() {
+					return
+				}
+				if ok {
+					observe(next, nil, false)
+					if !subscriber.Subscribed() {
+						return
+					}
+					self()
+				} else {
+					var zero int
+					observe(zero, nil, true)
+				}
+			case <-cancel:
 				return
 			}
-			if ok {
-				observe(next, nil, false)
-				if subscriber.Subscribed() {
-					self()
-				}
-			} else {
-				var zero int
-				observe(zero, nil, true)
-			}
 		})
-		subscriber.OnUnsubscribe(runner.Cancel)
+		subscriber.OnUnsubscribe(func() {
+			runner.Cancel()
+			close(cancel)
+		})
 	}
 	return observable
 }

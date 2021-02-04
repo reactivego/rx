@@ -201,25 +201,34 @@ func EmptyFoo() ObservableFoo {
 // channel will be seen as completion.
 func FromChanFoo(ch <-chan foo) ObservableFoo {
 	observable := func(observe FooObserver, scheduler Scheduler, subscriber Subscriber) {
+		cancel := make(chan struct{})
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if !subscriber.Subscribed() {
 				return
 			}
-			next, ok := <-ch
-			if !subscriber.Subscribed() {
+			select {
+			case next, ok := <-ch:
+				if !subscriber.Subscribed() {
+					return
+				}
+				if ok {
+					observe(next, nil, false)
+					if !subscriber.Subscribed() {
+						return
+					}
+					self()
+				} else {
+					var zero foo
+					observe(zero, nil, true)
+				}
+			case <-cancel:
 				return
 			}
-			if ok {
-				observe(next, nil, false)
-				if subscriber.Subscribed() {
-					self()
-				}
-			} else {
-				var zero foo
-				observe(zero, nil, true)
-			}
 		})
-		subscriber.OnUnsubscribe(runner.Cancel)
+		subscriber.OnUnsubscribe(func() {
+			runner.Cancel()
+			close(cancel)
+		})
 	}
 	return observable
 }
@@ -235,29 +244,38 @@ func FromChanFoo(ch <-chan foo) ObservableFoo {
 // indicate termination with error.
 func FromChan(ch <-chan interface{}) Observable {
 	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
+		cancel := make(chan struct{})
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if !subscriber.Subscribed() {
 				return
 			}
-			next, ok := <-ch
-			if !subscriber.Subscribed() {
-				return
-			}
-			if ok {
-				err, ok := next.(error)
-				if !ok {
-					observe(next, nil, false)
-					if subscriber.Subscribed() {
+			select {
+			case next, ok := <-ch:
+				if !subscriber.Subscribed() {
+					return
+				}
+				if ok {
+					err, ok := next.(error)
+					if !ok {
+						observe(next, nil, false)
+						if !subscriber.Subscribed() {
+							return
+						}
 						self()
+					} else {
+						observe(nil, err, true)
 					}
 				} else {
-					observe(nil, err, true)
+					observe(nil, nil, true)
 				}
-			} else {
-				observe(nil, nil, true)
+			case <-cancel:
+				return
 			}
 		})
-		subscriber.OnUnsubscribe(runner.Cancel)
+		subscriber.OnUnsubscribe(func() {
+			runner.Cancel()
+			close(cancel)
+		})
 	}
 	return observable
 }
