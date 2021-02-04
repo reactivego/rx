@@ -132,7 +132,6 @@ Currently 98 operators have been implemented:
 
 ## All
 [![](../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc#Observable.All)
-[![](../assets/godoc.svg?raw=true)](https://godoc.org/github.com/reactivego/rx#Observable.All)
 [![](../assets/rx.svg?raw=true)](http://reactivex.io/documentation/operators/all.html)
 
 **All** determines whether all items emitted by an Observable meet some
@@ -170,7 +169,6 @@ All values less than 5? true <nil>
 ```
 ## AsObservable
 [![](../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc#Observable.AsObservable)
-[![](../assets/godoc.svg?raw=true)](https://godoc.org/github.com/reactivego/rx#Observable.AsObservable)
 
 `AsObservableInt` or `AsObservableBool` type asserts an `Observable` to an observable of type `int` or `bool`.
 Also `AsObservable` can be called on an `ObservableInt` and `ObservableBool` to convert to an observable of type `interface{}`.
@@ -178,7 +176,6 @@ Also `AsObservable` can be called on an `ObservableInt` and `ObservableBool` to 
 
 ## AuditTime
 [![](../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc#Observable.AuditTime)
-[![](../assets/godoc.svg?raw=true)](https://godoc.org/github.com/reactivego/rx#Observable.AuditTime)
 [![](../assets/rx.svg?raw=true)](https://rxjs.dev/api/operators/auditTime)
 
 **AuditTime** waits until the source emits and then starts a timer. When the timer
@@ -481,7 +478,6 @@ time period when the timer was active.
 
 ## StartWith
 [![](../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc#Observable.StartWith)
-[![](../assets/godoc.svg?raw=true)](https://godoc.org/github.com/reactivego/rx#Observable.StartWith)
 [![](../assets/rx.svg?raw=true)](http://reactivex.io/documentation/operators/startwith.html)
 
 **StartWith** returns an observable that, at the moment of subscription, will
@@ -510,7 +506,6 @@ Output:
 
 ## SubscribeOn
 [![](../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc#Observable.SubscribeOn)
-[![](../assets/godoc.svg?raw=true)](https://godoc.org/github.com/reactivego/rx#Observable.SubscribeOn)
 [![](../assets/rx.svg?raw=true)](http://reactivex.io/documentation/operators/subscribeon.html)
 
 **SubscribeOn** specifies which [scheduler](https://github.com/reactivego/scheduler) an Observable should use when it is subscribed to.
@@ -654,7 +649,6 @@ Goroutine{ tasks = 0 } DONE
 
 ## WithLatestFrom
 [![](../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc#Observable.WithLatestFrom)
-[![](../assets/godoc.svg?raw=true)](https://godoc.org/github.com/reactivego/rx#Observable.WithLatestFrom)
 [![](../assets/rx.svg?raw=true)](https://rxjs-dev.firebaseapp.com/api/operators/withLatestFrom)
 
 **WithLatestFrom** will subscribe to all Observables and wait for all of them to emit before emitting
@@ -684,7 +678,6 @@ Output:
 ```
 ## WithLatestFromAll
 [![](../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc#ObservableObservable.WithLatestFromAll)
-[![](../assets/godoc.svg?raw=true)](https://godoc.org/github.com/reactivego/rx#ObservableObservable.WithLatestFrom)
 [![](../assets/rx.svg?raw=true)](https://rxjs-dev.firebaseapp.com/api/operators/withLatestFrom)
 
 **WithLatestFromAll** flattens a higher order observable (e.g. ObservableObservable) by subscribing

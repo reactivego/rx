@@ -1,7 +1,6 @@
 # ThrottleTime
 
 [![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/ThrottleTime?tab=doc)
-[![](../../../assets/godoc.svg?raw=true)](https://godoc.org/github.com/reactivego/rx/test/ThrottleTime)
 [![](../../../assets/rx.svg?raw=true)](https://rxjs.dev/api/operators/throttleTime)
 
 **ThrottleTime** emits when the source emits and then starts a timer during

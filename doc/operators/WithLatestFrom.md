@@ -1,7 +1,6 @@
 # WithLatestFrom
 
 [![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/WithLatestFrom?tab=doc)
-[![](../../../assets/godoc.svg?raw=true)](https://godoc.org/github.com/reactivego/rx/test/WithLatestFrom)
 [![](../../../assets/rx.svg?raw=true)](https://rxjs-dev.firebaseapp.com/api/operators/withLatestFrom)
 
 **WithLatestFrom** will subscribe to all Observables and wait for all of them to emit before emitting

@@ -1,7 +1,6 @@
 # PublishReplay
 
 [![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/PublishReplay?tab=doc)
-[![](../../../assets/godoc.svg?raw=true)](https://godoc.org/github.com/reactivego/rx/test/PublishReplay)
 [![](../../../assets/rx.svg?raw=true)](http://reactivex.io/documentation/operators/replay.html)
 
 **PublishReplay** returns a Multicaster for a ReplaySubject to an underlying

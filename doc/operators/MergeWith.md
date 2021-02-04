@@ -1,7 +1,6 @@
 # MergeWith
 
 [![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/MergeWith?tab=doc)
-[![](../../../assets/godoc.svg?raw=true)](http://godoc.org/github.com/reactivego/rx/test/MergeWith)
 [![](../../../assets/rx.svg?raw=true)](http://reactivex.io/documentation/operators/merge.html)
 
 **MergeWith** combines multiple Observables into one by merging their emissions.

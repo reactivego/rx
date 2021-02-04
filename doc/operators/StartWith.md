@@ -1,7 +1,6 @@
 # StartWith
 
 [![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/StartWith?tab=doc)
-[![](../../../assets/godoc.svg?raw=true)](https://godoc.org/github.com/reactivego/rx/test/StartWith)
 [![](../../../assets/rx.svg?raw=true)](http://reactivex.io/documentation/operators/startwith.html)
 
 **StartWith** returns an observable that, at the moment of subscription, will

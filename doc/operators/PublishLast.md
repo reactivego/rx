@@ -1,7 +1,6 @@
 # PublishLast
 
 [![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/PublishLast?tab=doc)
-[![](../../../assets/godoc.svg?raw=true)](https://godoc.org/github.com/reactivego/rx/test/PublishLast)
 [![](../../../assets/rx.svg?raw=true)](http://reactivex.io/documentation/operators/publish.html)
 
 **PublishLast** returns a Multicaster that shares a single subscription to the
