@@ -14,7 +14,6 @@ func (o ObservableFoo) WithLatestFrom(other ...ObservableFoo) ObservableFooSlice
 	return FromObservableFoo(append([]ObservableFoo{o}, other...)...).WithLatestFromAll()
 }
 
-
 //jig:template ObservableObservable<Foo> WithLatestFromAll
 //jig:needs <Foo>Slice
 
@@ -31,13 +30,13 @@ func (o ObservableObservableFoo) WithLatestFromAll() ObservableFooSlice {
 			assigned    []bool
 			values      []foo
 			initialized int
-			active      int
+			done        bool
 		}
 		makeObserver := func(index int) FooObserver {
 			observer := func(next foo, err error, done bool) {
 				observers.Lock()
 				defer observers.Unlock()
-				if observers.active > 0 {
+				if !observers.done {
 					switch {
 					case !done:
 						if !observers.assigned[index] {
@@ -45,15 +44,16 @@ func (o ObservableObservableFoo) WithLatestFromAll() ObservableFooSlice {
 							observers.initialized++
 						}
 						observers.values[index] = next
-						if index == 0 && observers.initialized == len(observers.values){
+						if index == 0 && observers.initialized == len(observers.values) {
 							observe(observers.values, nil, false)
 						}
 					case err != nil:
-						observers.active = 0
+						observers.done = true
 						var zero []foo
 						observe(zero, err, true)
 					default:
-						if observers.active--; observers.active == 0 {
+						if index == 0 {
+							observers.done = true
 							var zero []foo
 							observe(zero, nil, true)
 						}
@@ -76,7 +76,6 @@ func (o ObservableObservableFoo) WithLatestFromAll() ObservableFooSlice {
 						numObservables := len(observables)
 						observers.assigned = make([]bool, numObservables)
 						observers.values = make([]foo, numObservables)
-						observers.active = numObservables
 						for i, v := range observables {
 							if !subscriber.Subscribed() {
 								return

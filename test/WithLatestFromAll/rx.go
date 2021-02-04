@@ -208,13 +208,13 @@ func (o ObservableObservable) WithLatestFromAll() ObservableSlice {
 			assigned	[]bool
 			values		[]interface{}
 			initialized	int
-			active		int
+			done		bool
 		}
 		makeObserver := func(index int) Observer {
 			observer := func(next interface{}, err error, done bool) {
 				observers.Lock()
 				defer observers.Unlock()
-				if observers.active > 0 {
+				if !observers.done {
 					switch {
 					case !done:
 						if !observers.assigned[index] {
@@ -226,11 +226,12 @@ func (o ObservableObservable) WithLatestFromAll() ObservableSlice {
 							observe(observers.values, nil, false)
 						}
 					case err != nil:
-						observers.active = 0
+						observers.done = true
 						var zero []interface{}
 						observe(zero, err, true)
 					default:
-						if observers.active--; observers.active == 0 {
+						if index == 0 {
+							observers.done = true
 							var zero []interface{}
 							observe(zero, nil, true)
 						}
@@ -253,7 +254,6 @@ func (o ObservableObservable) WithLatestFromAll() ObservableSlice {
 						numObservables := len(observables)
 						observers.assigned = make([]bool, numObservables)
 						observers.values = make([]interface{}, numObservables)
-						observers.active = numObservables
 						for i, v := range observables {
 							if !subscriber.Subscribed() {
 								return
