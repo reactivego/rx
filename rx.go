@@ -4033,3 +4033,14 @@ func (o Observable) AsObservableSlice() ObservableSlice {
 	}
 	return observable
 }
+
+//jig:name Println
+
+func Println(a ...interface{}) Observer {
+	observer := func(next interface{}, err error, done bool) {
+		if !done {
+			fmt.Println(append(a, next)...)
+		}
+	}
+	return observer
+}
