@@ -4044,3 +4044,11 @@ func Println(a ...interface{}) Observer {
 	}
 	return observer
 }
+
+//jig:name Observable_MapTo
+
+// MapTo transforms the items emitted by an Observable. Emitted values
+// are mapped to the same value every time.
+func (o Observable) MapTo(value interface{}) Observable {
+	return o.Map(func(interface{}) interface{} { return value })
+}

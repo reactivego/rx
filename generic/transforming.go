@@ -18,6 +18,14 @@ func (o ObservableFoo) MapBar(project func(foo) bar) ObservableBar {
 	return observable
 }
 
+//jig:template Observable<Foo> MapTo<Bar>
+
+// MapToBar transforms the items emitted by an ObservableFoo. Emitted values
+// are mapped to the same value every time.
+func (o ObservableFoo) MapToBar(value bar) ObservableBar {
+	return o.MapBar(func(foo) bar { return value })
+}
+
 //jig:template Observable<Foo> Scan<Bar>
 
 // ScanBar applies a accumulator function to each item emitted by an

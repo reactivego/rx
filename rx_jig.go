@@ -111,6 +111,7 @@ func require() {
 	o.Last()
 	o.Map(func(interface{}) interface{} { return nil })
 	i.MapObservable(func(int) Observable { return nil })
+	o.MapTo(nil)
 	i.Max()
 	i.Min()
 	o.ObserveOn(func(task func()) { task() })
