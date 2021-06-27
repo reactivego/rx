@@ -18,6 +18,24 @@ func (o ObservableFoo) MapBar(project func(foo) bar) ObservableBar {
 	return observable
 }
 
+//jig:template Observable<Foo> MapAs<Bar>
+
+// MapAsBar transforms the items emitted by an ObservableFoo by applying a
+// function to each item.
+func (o ObservableFoo) MapAsBar(project func(foo) bar) ObservableBar {
+	observable := func(observe BarObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next foo, err error, done bool) {
+			var mapped bar
+			if !done {
+				mapped = project(next)
+			}
+			observe(mapped, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:template Observable<Foo> MapTo<Bar>
 
 // MapToBar transforms the items emitted by an ObservableFoo. Emitted values
