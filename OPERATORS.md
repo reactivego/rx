@@ -283,6 +283,8 @@ time period when the timer was active.
 
 ## Distinct
 
+![Distinct](../assets/Distinct.svg?raw=true)
+
 #### TBD
 
 ## Do
