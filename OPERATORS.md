@@ -1,29 +1,29 @@
 # Operators
 
-Currently 99 operators have been implemented:
+Currently 100 operators have been implemented:
     
-| A … C                   | D … L                 | M … P                  | R … S              | T … W                   |
-|:------------------------|:----------------------|:-----------------------|:-------------------|:------------------------|
-| [All]                   | [DebounceTime] :star: | [Map] :star:           | [Range]            | [Take]                  |
-| [AsObservable]          | [Defer]               | [MapTo]                | [Reduce]           | [TakeLast]              |
-| [AsyncSubject]          | [Delay]               | [Max]                  | [RefCount]         | [TakeUntil]             |
-| [AuditTime]             | [Distinct]            | [Merge] :star:         | [Repeat]           | [TakeWhile]             |
-| [AutoConnect]           | [Do] :star:           | [MergeAll]             | [ReplaySubject]    | [ThrottleTime]          |
-| [Average]               | [DoOnComplete]        | [MergeDelayError]      | [Retry]            | [Throw]                 |
-| [BehaviorSubject]       | [DoOnError]           | [MergeDelayErrorWith]  | [Sample]           | [Ticker]                |
-| [Catch] :star:          | [ElementAt]           | [MergeMap] :star:      | [Scan] :star:      | [TimeInterval]          |
-| [CatchError] :star:     | [Empty]               | [MergeMapTo]           | [Serialize]        | [Timeout]               |
-| [CombineLatest] :star:  | [Filter] :star:       | [MergeWith] :star:     | [Single]           | [Timer]                 |
-| [CombineLatestAll]      | [Finally]             | [Min]                  | [Skip]             | [Timestamp]             |
-| [CombineLatestMap]      | [First]               | [Never]                | [SkipLast]         | [ToChan]                |
-| [CombineLatestMapTo]    | [From] :star:         | [ObserveOn]            | [Start]            | [ToSingle]              |
-| [CombineLatestWith]     | [FromChan]            | [Of] :star:            | [StartWith] :star: | [ToSlice]               |
-| [Concat] :star:         | [IgnoreCompletion]    | [Only]                 | [Subject]          | [Wait]                  |
-| [ConcatAll]             | [IgnoreElements]      | [Passthrough]          | [Subscribe]        | [WithLatestFrom] :star: |
-| [ConcatMap] :star:      | [Interval]            | [Println]              | [SubscribeOn]      | [WithLatestFromAll]     |
-| [ConcatMapTo]           | [Just] :star:         | [Publish] :star:       | [Sum]              |
-| [ConcatWith] :star:     | [Last]                | [PublishReplay] :star: | [SwitchAll]        |
-| [Connect]               |                       |                        | [SwitchMap] :star: 
+| A … C                   | D … L                         | M … P                  | R … S              | T … W                   |
+|:------------------------|:------------------------------|:-----------------------|:-------------------|:------------------------|
+| [All]                   | [DebounceTime] :star:         | [Map] :star:           | [Range]            | [Take]                  |
+| [AsObservable]          | [Defer]                       | [MapTo]                | [Reduce]           | [TakeLast]              |
+| [AsyncSubject]          | [Delay]                       | [Max]                  | [RefCount]         | [TakeUntil]             |
+| [AuditTime]             | [Distinct]                    | [Merge] :star:         | [Repeat]           | [TakeWhile]             |
+| [AutoConnect]           | [DistinctUntilChanged] :star: | [MergeAll]             | [ReplaySubject]    | [ThrottleTime]          |
+| [Average]               | [Do] :star:                   | [MergeDelayError]      | [Retry]            | [Throw]                 |
+| [BehaviorSubject]       | [DoOnComplete]                | [MergeDelayErrorWith]  | [Sample]           | [Ticker]                |
+| [Catch] :star:          | [DoOnError]                   | [MergeMap] :star:      | [Scan] :star:      | [TimeInterval]          |
+| [CatchError] :star:     | [ElementAt]                   | [MergeMapTo]           | [Serialize]        | [Timeout]               |
+| [CombineLatest] :star:  | [Empty]                       | [MergeWith] :star:     | [Single]           | [Timer]                 |
+| [CombineLatestAll]      | [Filter] :star:               | [Min]                  | [Skip]             | [Timestamp]             |
+| [CombineLatestMap]      | [Finally]                     | [Never]                | [SkipLast]         | [ToChan]                |
+| [CombineLatestMapTo]    | [First]                       | [ObserveOn]            | [Start]            | [ToSingle]              |
+| [CombineLatestWith]     | [From] :star:                 | [Of] :star:            | [StartWith] :star: | [ToSlice]               |
+| [Concat] :star:         | [FromChan]                    | [Only]                 | [Subject]          | [Wait]                  |
+| [ConcatAll]             | [IgnoreCompletion]            | [Passthrough]          | [Subscribe]        | [WithLatestFrom] :star: |
+| [ConcatMap] :star:      | [IgnoreElements]              | [Println]              | [SubscribeOn]      | [WithLatestFromAll]     |
+| [ConcatMapTo]           | [Interval]                    | [Publish] :star:       | [Sum]              |
+| [ConcatWith] :star:     | [Just] :star:                 | [PublishReplay] :star: | [SwitchAll]        |
+| [Connect]               | [Last]                        |                        | [SwitchMap] :star: 
 | [Count]                 |
 | [Create] :star:         |
 | [CreateFutureRecursive] |
@@ -59,6 +59,7 @@ Currently 99 operators have been implemented:
 [Defer]: #defer
 [Delay]: #delay
 [Distinct]: #distinct
+[DistinctUntilChanged]: #distinctuntilchanged
 [Do]: #do
 [DoOnComplete]: #dooncomplete
 [DoOnError]: #doonerror
@@ -284,6 +285,12 @@ time period when the timer was active.
 ## Distinct
 
 ![Distinct](../assets/Distinct.svg?raw=true)
+
+#### TBD
+
+## DistinctUntilChanged
+
+![DistinctUntilChanged](../assets/DistinctUntilChanged.svg?raw=true)
 
 #### TBD
 

@@ -196,7 +196,9 @@ particular timespan has passed without it emitting another item.
 </details>
 <details><summary>DistinctUntilChanged</summary>
 
-#### TBD
+only emits when the current value is different from the last.
+
+![DistinctUntilChanged](../assets/DistinctUntilChanged.svg?raw=true)
 
 </details>
 <details><summary>Do</summary>
