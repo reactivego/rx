@@ -297,9 +297,13 @@ immediate predecessor for distinctness, thereby filtering only consecutive dupli
 
 Code:
 ```go
+rx.From(1, 2, 2, 1, 3).Distinct().Println()
 ```
 Output:
 ```
+1
+2
+3
 ```
 ## DistinctUntilChanged
 [![](../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc#Observable.DistinctUntilChanged)
@@ -314,9 +318,14 @@ predecessors in order to determine whether or not they are distinct.
 
 Code:
 ```go
+rx.From(1, 2, 2, 1, 3).DistinctUntilChanged().Println()
 ```
 Output:
 ```
+1
+2
+1
+3
 ```
 #### TBD
 
