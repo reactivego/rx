@@ -1,6 +1,6 @@
 // This file guides regeneration of the heterogeneous rx package in this folder.
 // The [jig tool](https://github.com/reactivego/jig) will generate rx.go guided
-// by the code used in the require function.
+// by the code used in the generate function.
 
 // +build ignore
 
@@ -8,7 +8,7 @@ package rx
 
 import "time"
 
-func require() {
+func generate() {
 	_ = NewSubscriber()
 	_ = GoroutineScheduler()
 	t := MakeTrampolineScheduler()
