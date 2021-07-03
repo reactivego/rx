@@ -205,9 +205,14 @@ predecessors in order to determine whether or not they are distinct.
 
 Code:
 ```go
+rx.From(1, 2, 2, 1, 3).DistinctUntilChanged().Println()
 ```
 Output:
 ```
+1
+2
+1
+3
 ```
 
 </details>
