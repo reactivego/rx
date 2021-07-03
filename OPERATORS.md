@@ -283,15 +283,41 @@ time period when the timer was active.
 #### TBD
 
 ## Distinct
+[![](../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc#Observable.Distinct)
+[![](../assets/rx.svg?raw=true)](http://reactivex.io/documentation/operators/distinct.html)
+
+**Distinct** suppress duplicate items emitted by an Observable.
+
+The operator filters an Observable by only allowing items through that have not already been emitted.
+In some implementations there are variants that allow you to adjust the criteria by which two items are
+considered “distinct.” In some, there is a variant of the operator that only compares an item against its
+immediate predecessor for distinctness, thereby filtering only consecutive duplicate items from the sequence.
 
 ![Distinct](../assets/Distinct.svg?raw=true)
 
-#### TBD
-
+Code:
+```go
+```
+Output:
+```
+```
 ## DistinctUntilChanged
+[![](../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc#Observable.DistinctUntilChanged)
+[![](../assets/rx.svg?raw=true)](http://reactivex.io/documentation/operators/distinct.html)
+
+**DistinctUntilChanged** only emits when the current value is different from the last.
+
+The operator only compares emitted items from the source Observable against their immediate
+predecessors in order to determine whether or not they are distinct.
 
 ![DistinctUntilChanged](../assets/DistinctUntilChanged.svg?raw=true)
 
+Code:
+```go
+```
+Output:
+```
+```
 #### TBD
 
 ## Do

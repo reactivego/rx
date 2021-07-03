@@ -198,7 +198,17 @@ particular timespan has passed without it emitting another item.
 
 only emits when the current value is different from the last.
 
+The operator only compares emitted items from the source Observable against their immediate
+predecessors in order to determine whether or not they are distinct.
+
 ![DistinctUntilChanged](../assets/DistinctUntilChanged.svg?raw=true)
+
+Code:
+```go
+```
+Output:
+```
+```
 
 </details>
 <details><summary>Do</summary>
