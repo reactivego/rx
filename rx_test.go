@@ -155,6 +155,15 @@ func ExampleMerge() {
 	// 5
 }
 
+func ExampleObservable_Distinct() {
+	rx.From(1, 2, 2, 1, 3).Distinct().Println()
+
+	// Output:
+	// 1
+	// 2
+	// 3
+}
+
 func ExampleObservable_MergeDelayError() {
 	const ms = time.Millisecond
 	AddMul := func(add, mul int) func(interface{}) interface{} {
