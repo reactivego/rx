@@ -94,104 +94,33 @@ Currently 102 operators are implemented:
 :star: - commonly used
 
 [All]: ../test/All/README.md
-[AsObservable]: 
 [AsyncSubject]: ../test/AsyncSubject/README.md
 [AuditTime]: ../test/AuditTime/README.md
-[AutoConnect]:
-[Average]:
 [BehaviorSubject]: ../test/BehaviorSubject/README.md
 [Catch]: ../test/Catch/README.md
 [CatchError]: ../test/CatchError/README.md
-[CombineLatest]:
-[CombineLatestAll]:
-[CombineLatestMap]:
-[CombineLatestMapTo]:
-[CombineLatestWith]:
-[Concat]:
-[ConcatAll]:
-[ConcatMap]:
-[ConcatMapTo]:
 [ConcatWith]: ../test/ConcatWith/README.md
-[Connect]:
-[Count]:
-[Create]:
-[CreateFutureRecursive]:
-[CreateRecursive]:
 [DebounceTime]: ../test/DebounceTime/README.md
-[Defer]:
-[Delay]:
 [Distinct]: ../test/Distinct/README.md
 [DistinctUntilChanged]: ../test/DistinctUntilChanged/README.md
-[Do]:
-[DoOnComplete]:
-[DoOnError]:
-[ElementAt]:
-[Empty]:
-[Filter]:
-[Finally]:
-[First]:
-[From]:
-[FromChan]:
-[IgnoreCompletion]:
-[IgnoreElements]:
-[Interval]:
-[Just]:
-[Last]:
 [Map]: ../test/Map/README.md
 [MapTo]: ../test/MapTo/README.md
-[Max]:
 [Merge]: ../test/Merge/README.md
-[MergeAll]:
 [MergeDelayError]: ../test/MergeDelayError/README.md
 [MergeDelayErrorWith]: ../test/MergeDelayErrorWith/README.md
 [MergeMap]: ../test/MergeMap/README.md
 [MergeMapTo]: ../test/MergeMapTo/README.md
 [MergeWith]: ../test/MergeWith/README.md
-[Min]:
-[Never]:
-[ObserveOn]:
-[Of]:
-[Only]:
-[Passthrough]:
-[Println]:
 [Publish]: ../test/Publish/README.md
 [PublishBehavior]: ../test/PublishBehavior/README.md
 [PublishLast]: ../test/PublishLast/README.md
 [PublishReplay]: ../test/PublishReplay/README.md
-[Range]:
-[Reduce]:
-[RefCount]:
-[Repeat]:
 [ReplaySubject]: ../test/ReplaySubject/README.md
 [Retry]: ../test/Retry/README.md
 [SampleTime]: ../test/SampleTime/README.md
-[Scan]:
-[Serialize]:
-[Single]:
-[Skip]:
-[SkipLast]:
-[Start]:
 [StartWith]: ../test/StartWith/README.md
 [Subject]: ../test/Subject/README.md
-[Subscribe]:
-[SubscribeOn]:
-[Sum]:
-[SwitchAll]:
-[SwitchMap]:
-[Take]:
-[TakeLast]:
-[TakeUntil]:
-[TakeWhile]:
 [ThrottleTime]: ../test/ThrottleTime/README.md
-[Throw]:
-[Ticker]:
-[TimeInterval]:
-[Timeout]:
 [Timer]: ../test/Timer/README.md
-[Timestamp]:
-[ToChan]:
-[ToSingle]:
-[ToSlice]:
-[Wait]:
 [WithLatestFrom]: ../test/WithLatestFrom/README.md
 [WithLatestFromAll]: ../test/WithLatestFromAll/README.md
