@@ -62,7 +62,7 @@ An Observer subscribes to an Observable and **reacts** to whatever it emits.
 
 Operators work on one or more Observables to transform, filter and combine them into new Observables.
 
-Currently 100 operators are implemented:
+Currently 102 operators are implemented:
     
 | A … C                   | D … L                         | M … P                  | R … S              | T … W                   |
 |:------------------------|:------------------------------|:-----------------------|:-------------------|:------------------------|
@@ -72,7 +72,7 @@ Currently 100 operators are implemented:
 | [AuditTime]             | [Distinct]                    | [Merge] :star:         | [Repeat]           | [TakeWhile]             |
 | [AutoConnect]           | [DistinctUntilChanged] :star: | [MergeAll]             | [ReplaySubject]    | [ThrottleTime]          |
 | [Average]               | [Do] :star:                   | [MergeDelayError]      | [Retry]            | [Throw]                 |
-| [BehaviorSubject]       | [DoOnComplete]                | [MergeDelayErrorWith]  | [Sample]           | [Ticker]                |
+| [BehaviorSubject]       | [DoOnComplete]                | [MergeDelayErrorWith]  | [SampleTime]       | [Ticker]                |
 | [Catch] :star:          | [DoOnError]                   | [MergeMap] :star:      | [Scan] :star:      | [TimeInterval]          |
 | [CatchError] :star:     | [ElementAt]                   | [MergeMapTo]           | [Serialize]        | [Timeout]               |
 | [CombineLatest] :star:  | [Empty]                       | [MergeWith] :star:     | [Single]           | [Timer]                 |
@@ -84,9 +84,9 @@ Currently 100 operators are implemented:
 | [ConcatAll]             | [IgnoreCompletion]            | [Passthrough]          | [Subscribe]        | [WithLatestFrom] :star: |
 | [ConcatMap] :star:      | [IgnoreElements]              | [Println]              | [SubscribeOn]      | [WithLatestFromAll]     |
 | [ConcatMapTo]           | [Interval]                    | [Publish] :star:       | [Sum]              |
-| [ConcatWith] :star:     | [Just] :star:                 | [PublishReplay] :star: | [SwitchAll]        |
-| [Connect]               | [Last]                        |                        | [SwitchMap] :star: 
-| [Count]                 |
+| [ConcatWith] :star:     | [Just] :star:                 | [PublishBehavior]      | [SwitchAll]        |
+| [Connect]               | [Last]                        | [PublishLast]          | [SwitchMap] :star: 
+| [Count]                 |                               | [PublishReplay] :star: |
 | [Create] :star:         |
 | [CreateFutureRecursive] |
 | [CreateRecursive]       |
@@ -94,102 +94,104 @@ Currently 100 operators are implemented:
 :star: - commonly used
 
 [All]: ../test/All/README.md
-[AsObservable]: ../test/AsObservable/README.md
-[AuditTime]: ../test/AuditTime/README.md
+[AsObservable]: 
 [AsyncSubject]: ../test/AsyncSubject/README.md
-[AutoConnect]: ../test/AutoConnect/README.md
-[Average]: ../test/Average/README.md
+[AuditTime]: ../test/AuditTime/README.md
+[AutoConnect]:
+[Average]:
 [BehaviorSubject]: ../test/BehaviorSubject/README.md
 [Catch]: ../test/Catch/README.md
 [CatchError]: ../test/CatchError/README.md
-[CombineLatest]: ../test/CombineLatest/README.md
-[CombineLatestAll]: ../test/CombineLatestAll/README.md
-[CombineLatestMap]: ../test/CombineLatestMap/README.md
-[CombineLatestMapTo]: ../test/CombineLatestMapTo/README.md
-[CombineLatestWith]: ../test/CombineLatestWith/README.md
-[Concat]: ../test/Concat/README.md
-[ConcatAll]: ../test/ConcatAll/README.md
-[ConcatMap]: ../test/ConcatMap/README.md
-[ConcatMapTo]: ../test/ConcatMapTo/README.md
+[CombineLatest]:
+[CombineLatestAll]:
+[CombineLatestMap]:
+[CombineLatestMapTo]:
+[CombineLatestWith]:
+[Concat]:
+[ConcatAll]:
+[ConcatMap]:
+[ConcatMapTo]:
 [ConcatWith]: ../test/ConcatWith/README.md
-[Connect]: ../test/Connect/README.md
-[Count]: ../test/Count/README.md
-[Create]: ../test/Create/README.md
-[CreateFutureRecursive]: ../test/CreateFutureRecursive/README.md
-[CreateRecursive]: ../test/CreateRecursive/README.md
+[Connect]:
+[Count]:
+[Create]:
+[CreateFutureRecursive]:
+[CreateRecursive]:
 [DebounceTime]: ../test/DebounceTime/README.md
-[Defer]: ../test/Defer/README.md
-[Delay]: ../test/Delay/README.md
+[Defer]:
+[Delay]:
 [Distinct]: ../test/Distinct/README.md
 [DistinctUntilChanged]: ../test/DistinctUntilChanged/README.md
-[Do]: ../test/Do/README.md
-[DoOnComplete]: ../test/DoOnComplete/README.md
-[DoOnError]: ../test/DoOnError/README.md
-[ElementAt]: ../test/ElementAt/README.md
-[Empty]: ../test/Empty/README.md
-[Filter]: ../test/Filter/README.md
-[Finally]: ../test/Finally/README.md
-[First]: ../test/First/README.md
-[From]: ../test/From/README.md
-[FromChan]: ../test/FromChan/README.md
-[IgnoreCompletion]: ../test/IgnoreCompletion/README.md
-[IgnoreElements]: ../test/IgnoreElements/README.md
-[Interval]: ../test/Interval/README.md
-[Just]: ../test/Just/README.md
-[Last]: ../test/Last/README.md
+[Do]:
+[DoOnComplete]:
+[DoOnError]:
+[ElementAt]:
+[Empty]:
+[Filter]:
+[Finally]:
+[First]:
+[From]:
+[FromChan]:
+[IgnoreCompletion]:
+[IgnoreElements]:
+[Interval]:
+[Just]:
+[Last]:
 [Map]: ../test/Map/README.md
 [MapTo]: ../test/MapTo/README.md
-[Max]: ../test/Max/README.md
+[Max]:
 [Merge]: ../test/Merge/README.md
-[MergeAll]: ../test/MergeAll/README.md
+[MergeAll]:
 [MergeDelayError]: ../test/MergeDelayError/README.md
 [MergeDelayErrorWith]: ../test/MergeDelayErrorWith/README.md
 [MergeMap]: ../test/MergeMap/README.md
 [MergeMapTo]: ../test/MergeMapTo/README.md
 [MergeWith]: ../test/MergeWith/README.md
-[Min]: ../test/Min/README.md
-[Never]: ../test/Never/README.md
-[ObserveOn]: ../test/ObserveOn/README.md
-[Of]: ../test/Of/README.md
-[Only]: ../test/Only/README.md
-[Passthrough]: ../test/Passthrough/README.md
-[Println]: ../test/Println/README.md
+[Min]:
+[Never]:
+[ObserveOn]:
+[Of]:
+[Only]:
+[Passthrough]:
+[Println]:
 [Publish]: ../test/Publish/README.md
+[PublishBehavior]: ../test/PublishBehavior/README.md
+[PublishLast]: ../test/PublishLast/README.md
 [PublishReplay]: ../test/PublishReplay/README.md
-[Range]: ../test/Range/README.md
-[Reduce]: ../test/Reduce/README.md
-[RefCount]: ../test/RefCount/README.md
-[Repeat]: ../test/Repeat/README.md
+[Range]:
+[Reduce]:
+[RefCount]:
+[Repeat]:
 [ReplaySubject]: ../test/ReplaySubject/README.md
 [Retry]: ../test/Retry/README.md
-[Sample]: ../test/Sample/README.md
-[Scan]: ../test/Scan/README.md
-[Serialize]: ../test/Serialize/README.md
-[Single]: ../test/Single/README.md
-[Skip]: ../test/Skip/README.md
-[SkipLast]: ../test/SkipLast/README.md
-[Start]: ../test/Start/README.md
+[SampleTime]: ../test/SampleTime/README.md
+[Scan]:
+[Serialize]:
+[Single]:
+[Skip]:
+[SkipLast]:
+[Start]:
 [StartWith]: ../test/StartWith/README.md
 [Subject]: ../test/Subject/README.md
-[Subscribe]: ../test/Subscribe/README.md
-[SubscribeOn]: ../test/SubscribeOn/README.md
-[Sum]: ../test/Sum/README.md
-[SwitchAll]: ../test/SwitchAll/README.md
-[SwitchMap]: ../test/SwitchMap/README.md
-[Take]: ../test/Take/README.md
-[TakeLast]: ../test/TakeLast/README.md
-[TakeUntil]: ../test/TakeUntil/README.md
-[TakeWhile]: ../test/TakeWhile/README.md
+[Subscribe]:
+[SubscribeOn]:
+[Sum]:
+[SwitchAll]:
+[SwitchMap]:
+[Take]:
+[TakeLast]:
+[TakeUntil]:
+[TakeWhile]:
 [ThrottleTime]: ../test/ThrottleTime/README.md
-[Throw]: ../test/Throw/README.md
-[Ticker]: ../test/Ticker/README.md
-[TimeInterval]: ../test/TimeInterval/README.md
-[Timeout]: ../test/Timeout/README.md
+[Throw]:
+[Ticker]:
+[TimeInterval]:
+[Timeout]:
 [Timer]: ../test/Timer/README.md
-[Timestamp]: ../test/Timestamp/README.md
-[ToChan]: ../test/ToChan/README.md
-[ToSingle]: ../test/ToSingle/README.md
-[ToSlice]: ../test/ToSlice/README.md
-[Wait]: ../test/Wait/README.md
+[Timestamp]:
+[ToChan]:
+[ToSingle]:
+[ToSlice]:
+[Wait]:
 [WithLatestFrom]: ../test/WithLatestFrom/README.md
 [WithLatestFromAll]: ../test/WithLatestFromAll/README.md
