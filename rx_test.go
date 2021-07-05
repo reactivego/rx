@@ -175,20 +175,21 @@ func ExampleObservable_DistinctUntilChanged() {
 }
 
 func ExampleObservable_MergeDelayError() {
+	type any = interface{}
 	const ms = time.Millisecond
-	AddMul := func(add, mul int) func(interface{}) interface{} {
-		return func(i interface{}) interface{} {
+	AddMul := func(add, mul int) func(any) any {
+		return func(i any) any {
 			return mul * (i.(int) + add)
 		}
 	}
-	To := func(to int) func(interface{}) interface{} {
-		return func(interface{}) interface{} {
+	To := func(to int) func(any) any {
+		return func(any) any {
 			return to
 		}
 	}
 
-	a := rx.Interval(20 * ms).AsObservable().Map(AddMul(1, 20)).Take(4).ConcatWith(rx.Throw(rx.RxError("boom")))
-	b := rx.Timer(70*ms, 20*ms).AsObservable().Map(To(1)).Take(2)
+	a := rx.Interval(20 * ms).Map(AddMul(1, 20)).Take(4).ConcatWith(rx.Throw(rx.RxError("boom")))
+	b := rx.Timer(70*ms, 20*ms).Map(To(1)).Take(2)
 	err := rx.MergeDelayError(a, b).Println()
 	fmt.Println(err)
 	// Output:
@@ -202,20 +203,21 @@ func ExampleObservable_MergeDelayError() {
 }
 
 func ExampleObservable_MergeDelayErrorWith() {
+	type any = interface{}
 	const ms = time.Millisecond
-	AddMul := func(add, mul int) func(interface{}) interface{} {
-		return func(i interface{}) interface{} {
+	AddMul := func(add, mul int) func(any) any {
+		return func(i any) any {
 			return mul * (i.(int) + add)
 		}
 	}
-	To := func(to int) func(interface{}) interface{} {
-		return func(interface{}) interface{} {
+	To := func(to int) func(any) any {
+		return func(any) any {
 			return to
 		}
 	}
 
-	a := rx.Interval(20 * ms).AsObservable().Map(AddMul(1, 20)).Take(4).ConcatWith(rx.Throw(rx.RxError("boom")))
-	b := rx.Timer(70*ms, 20*ms).AsObservable().Map(To(1)).Take(2)
+	a := rx.Interval(20 * ms).Map(AddMul(1, 20)).Take(4).ConcatWith(rx.Throw(rx.RxError("boom")))
+	b := rx.Timer(70*ms, 20*ms).Map(To(1)).Take(2)
 
 	fmt.Println(a.MergeDelayErrorWith(b).Println())
 	// Output:
@@ -282,18 +284,18 @@ func ExampleObservable_StartWith() {
 }
 
 func ExampleObservableObservable_SwitchAll() {
-	// intToObs creates a new observable that emits an integer starting after and then repeated every 20 milliseconds
-	// in the range starting at 0 and incrementing by 1. It takes only the first 10 emitted values and then uses
-	// AsObservable to convert the IntObservable back to an untyped Observable.
-	intToObs := func(i int) rx.Observable {
-		return rx.Interval(20 * time.Millisecond).
-			Take(10).
-			AsObservable()
+	type any = interface{}
+	const ms = time.Millisecond
+
+	// toObservable creates a new observable that emits an integer starting after 20ms and then repeated
+	// every 20ms in the range starting at 0 and incrementing by 1. It takes only the first 10 emitted values.
+	toObservable := func(i any) rx.Observable {
+		return rx.Interval(20 * ms).Take(10)
 	}
 
-	rx.Interval(100 * time.Millisecond).
+	rx.Interval(100 * ms).
 		Take(3).
-		MapObservable(intToObs).
+		MapObservable(toObservable).
 		SwitchAll().
 		Println()
 

@@ -41,17 +41,18 @@ type IntObserver func(next int, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableInt func(IntObserver, Scheduler, Subscriber)
 
-//jig:name Interval
+//jig:name IntervalInt
 
-// Interval creates an ObservableInt that emits a sequence of integers spaced
+// IntervalInt creates an ObservableInt that emits a sequence of integers spaced
 // by a particular time interval. First integer is not emitted immediately, but
-// only after the first time interval has passed.
-func Interval(interval time.Duration) ObservableInt {
+// only after the first time interval has passed. The generated code will do a type
+// conversion from int to int.
+func IntervalInt(interval time.Duration) ObservableInt {
 	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := subscribeOn.ScheduleFutureRecursive(interval, func(self func(time.Duration)) {
 			if subscriber.Subscribed() {
-				observe(i, nil, false)
+				observe(int(i), nil, false)
 				i++
 				if subscriber.Subscribed() {
 					self(interval)
@@ -298,43 +299,6 @@ func (o ObservableInt) AsObservable() Observable {
 	return observable
 }
 
-//jig:name RxError
-
-type RxError string
-
-func (e RxError) Error() string	{ return string(e) }
-
-//jig:name TypecastFailed
-
-// ErrTypecast is delivered to an observer if the generic value cannot be
-// typecast to a specific type.
-const TypecastFailed = RxError("typecast failed")
-
-//jig:name Observable_AsObservableInt
-
-// AsObservableInt turns an Observable of interface{} into an ObservableInt.
-// If during observing a typecast fails, the error ErrTypecastToInt will be
-// emitted.
-func (o Observable) AsObservableInt() ObservableInt {
-	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				if nextInt, ok := next.(int); ok {
-					observe(nextInt, err, done)
-				} else {
-					var zero int
-					observe(zero, TypecastFailed, true)
-				}
-			} else {
-				var zero int
-				observe(zero, err, true)
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name ObservableObservableInt_ConcatAll
 
 // ConcatAll flattens a higher order observable by concattenating the observables it emits.
@@ -395,6 +359,43 @@ func (o ObservableObservableInt) ConcatAll() ObservableInt {
 		}
 		source.subscriber = subscriber.Add()
 		o(source.observer, subscribeOn, source.subscriber)
+	}
+	return observable
+}
+
+//jig:name RxError
+
+type RxError string
+
+func (e RxError) Error() string	{ return string(e) }
+
+//jig:name TypecastFailed
+
+// ErrTypecast is delivered to an observer if the generic value cannot be
+// typecast to a specific type.
+const TypecastFailed = RxError("typecast failed")
+
+//jig:name Observable_AsObservableInt
+
+// AsObservableInt turns an Observable of interface{} into an ObservableInt.
+// If during observing a typecast fails, the error ErrTypecastToInt will be
+// emitted.
+func (o Observable) AsObservableInt() ObservableInt {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				if nextInt, ok := next.(int); ok {
+					observe(nextInt, err, done)
+				} else {
+					var zero int
+					observe(zero, TypecastFailed, true)
+				}
+			} else {
+				var zero int
+				observe(zero, err, true)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
 	}
 	return observable
 }

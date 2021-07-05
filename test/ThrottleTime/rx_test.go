@@ -9,7 +9,7 @@ import (
 func Example_throttleTime() {
 	const ms = time.Millisecond
 
-	Interval(1 * ms).ThrottleTime(10 * ms).Take(5).Println()
+	IntervalInt(1 * ms).ThrottleTime(10 * ms).Take(5).Println()
 	// Output:
 	// 0
 	// 10

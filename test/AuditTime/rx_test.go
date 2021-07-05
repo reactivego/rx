@@ -23,18 +23,18 @@ func Example_auditTimeBursts() {
 	const ms = time.Millisecond
 
 	burst20ms := func(i int) ObservableInt {
-		return Interval(5 * ms).Take(4).MapInt(func(j int) int {
+		return IntervalInt(5 * ms).Take(4).MapInt(func(j int) int {
 			return i*100 + j
 		})
 	}
 
 	fmt.Println("-1-")
 
-	Interval(25 * ms).Take(4).MergeMapInt(burst20ms).AuditTime(21 * ms).Println()
+	IntervalInt(25 * ms).Take(4).MergeMapInt(burst20ms).AuditTime(21 * ms).Println()
 
 	fmt.Println("-2-")
 
-	Interval(50 * ms).Take(4).MergeMapInt(burst20ms).AuditTime(14 * ms).Println()
+	IntervalInt(50 * ms).Take(4).MergeMapInt(burst20ms).AuditTime(14 * ms).Println()
 	// Output:
 	// -1-
 	// 3

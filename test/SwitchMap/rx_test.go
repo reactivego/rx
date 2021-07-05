@@ -8,6 +8,8 @@ import (
 )
 
 func Example_switchMap() {
+	const ms = time.Millisecond
+
 	delay := func(duration time.Duration, value Observable) Observable {
 		return Never().Timeout(duration).Catch(value)
 	}
@@ -16,11 +18,11 @@ func Example_switchMap() {
 		return delay(duration, From(request+" result")).AsObservableString()
 	}
 
-	first := webreq("first", 50*time.Millisecond)
-	second := webreq("second", 10*time.Millisecond)
-	latest := webreq("latest", 50*time.Millisecond)
+	first := webreq("first", 50*ms)
+	second := webreq("second", 10*ms)
+	latest := webreq("latest", 50*ms)
 
-	err := Interval(20 * time.Millisecond).Take(3).SwitchMapString(func(i int) ObservableString {
+	err := IntervalInt(20 * ms).Take(3).SwitchMapString(func(i int) ObservableString {
 		switch i {
 		case 0:
 			return first

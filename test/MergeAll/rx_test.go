@@ -33,9 +33,9 @@ func Example_mergeAll() {
 func Example_mergeAllInterval() {
 	const ms = time.Millisecond
 
-	intv1ms := Interval(1*ms).Take(2)
-	intv10ms := Interval(10*ms).Take(2)
-	intv100ms := Interval(100*ms).Take(2)
+	intv1ms := IntervalInt(1 * ms).Take(2)
+	intv10ms := IntervalInt(10 * ms).Take(2)
+	intv100ms := IntervalInt(100 * ms).Take(2)
 
 	FromObservableInt(intv1ms, intv10ms, intv100ms).MergeAll().Println()
 

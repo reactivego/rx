@@ -191,18 +191,19 @@ func (o ObservableFoo) Delay(duration time.Duration) ObservableFoo {
 	return o.AsObservable().Delay(duration).AsObservableFoo()
 }
 
-//jig:template Interval
-//jig:needs ObservableInt
+//jig:template Interval<Foo>
+//jig:needs Observable<Foo>
 
-// Interval creates an ObservableInt that emits a sequence of integers spaced
+// IntervalFoo creates an ObservableFoo that emits a sequence of integers spaced
 // by a particular time interval. First integer is not emitted immediately, but
-// only after the first time interval has passed.
-func Interval(interval time.Duration) ObservableInt {
-	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
+// only after the first time interval has passed. The generated code will do a type
+// conversion from int to foo.
+func IntervalFoo(interval time.Duration) ObservableFoo {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := subscribeOn.ScheduleFutureRecursive(interval, func(self func(time.Duration)) {
 			if subscriber.Subscribed() {
-				observe(i, nil, false)
+				observe(foo(i), nil, false)
 				i++
 				if subscriber.Subscribed() {
 					self(interval)

@@ -9,7 +9,7 @@ import (
 )
 
 func Example_concatAll() {
-	Interval(time.Millisecond).Take(3).MapObservableInt(func(next int) ObservableInt {
+	IntervalInt(time.Millisecond).Take(3).MapObservableInt(func(next int) ObservableInt {
 		return RangeInt(next, 2)
 	}).ConcatAll().Println()
 
@@ -91,7 +91,7 @@ func TestObservable(e *testing.T) {
 						}
 					}
 
-					Interval(10 * ms).Take(3).DoOnComplete(c).MapObservableInt(f).ConcatAll().Do(n).Wait()
+					IntervalInt(10 * ms).Take(3).DoOnComplete(c).MapObservableInt(f).ConcatAll().Do(n).Wait()
 
 					Asser(t).Not(complete.IsZero(), "complete time is zero")
 					Asser(t).False(next.IsZero(), "next time is zero")
@@ -103,7 +103,7 @@ func TestObservable(e *testing.T) {
 						return JustInt(i)
 					}
 					expect := []int{0, 1, 2}
-					actual, err := Interval(10 * ms).Take(3).MapObservableInt(f).ConcatAll().ToSlice()
+					actual, err := IntervalInt(10 * ms).Take(3).MapObservableInt(f).ConcatAll().ToSlice()
 
 					Asser(t).NoError(err)
 					Asser(t).Equal(actual, expect)

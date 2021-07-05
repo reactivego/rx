@@ -8,11 +8,11 @@ import (
 )
 
 func Example_goroutine() {
-	err := Interval(42 * time.Millisecond).
+	type any = interface{}
+	const ms = time.Millisecond
+	err := Interval(42 * ms).
 		Take(4).
-		MapObservableInt(func(i int) ObservableInt {
-			return Interval(16 * time.Millisecond).Take(4)
-		}).
+		MapObservable(func(i any) Observable { return Interval(16 * ms).Take(4) }).
 		SwitchAll().
 		SubscribeOn(GoroutineScheduler()).
 		Println()
@@ -35,11 +35,10 @@ func Example_goroutine() {
 }
 
 func Example_trampoline() {
-	err := Interval(42 * time.Millisecond).
+	const ms = time.Millisecond
+	err := IntervalInt(42 * ms).
 		Take(4).
-		MapObservableInt(func(i int) ObservableInt {
-			return Interval(16 * time.Millisecond).Take(4)
-		}).
+		MapObservableInt(func(i int) ObservableInt { return IntervalInt(16 * ms).Take(4) }).
 		SwitchAll().
 		Println()
 

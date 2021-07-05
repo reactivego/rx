@@ -16,7 +16,7 @@ func Example_introToRx() {
 
 	concurrent := GoroutineScheduler()
 
-	observable := Interval(50 * ms)
+	observable := IntervalInt(50 * ms)
 
 	// Print when a value is published.
 	observable = observable.Do(func(next int) { fmt.Printf("published: %d\n", next) })

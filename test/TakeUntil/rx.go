@@ -92,17 +92,18 @@ type IntObserver func(next int, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableInt func(IntObserver, Scheduler, Subscriber)
 
-//jig:name Interval
+//jig:name IntervalInt
 
-// Interval creates an ObservableInt that emits a sequence of integers spaced
+// IntervalInt creates an ObservableInt that emits a sequence of integers spaced
 // by a particular time interval. First integer is not emitted immediately, but
-// only after the first time interval has passed.
-func Interval(interval time.Duration) ObservableInt {
+// only after the first time interval has passed. The generated code will do a type
+// conversion from int to int.
+func IntervalInt(interval time.Duration) ObservableInt {
 	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := subscribeOn.ScheduleFutureRecursive(interval, func(self func(time.Duration)) {
 			if subscriber.Subscribed() {
-				observe(i, nil, false)
+				observe(int(i), nil, false)
 				i++
 				if subscriber.Subscribed() {
 					self(interval)
@@ -283,6 +284,22 @@ func (o ObservableInt) Println(a ...interface{}) error {
 	return subscriber.Wait()
 }
 
+//jig:name Observable_SubscribeOn
+
+// SubscribeOn specifies the scheduler an Observable should use when it is
+// subscribed to.
+func (o Observable) SubscribeOn(scheduler Scheduler) Observable {
+	observable := func(observe Observer, _ Scheduler, subscriber Subscriber) {
+		if scheduler.IsConcurrent() {
+			subscriber.OnWait(nil)
+		} else {
+			subscriber.OnWait(scheduler.Wait)
+		}
+		o(observe, scheduler, subscriber)
+	}
+	return observable
+}
+
 //jig:name TypecastFailed
 
 // ErrTypecast is delivered to an observer if the generic value cannot be
@@ -310,22 +327,6 @@ func (o Observable) AsObservableInt() ObservableInt {
 			}
 		}
 		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name Observable_SubscribeOn
-
-// SubscribeOn specifies the scheduler an Observable should use when it is
-// subscribed to.
-func (o Observable) SubscribeOn(scheduler Scheduler) Observable {
-	observable := func(observe Observer, _ Scheduler, subscriber Subscriber) {
-		if scheduler.IsConcurrent() {
-			subscriber.OnWait(nil)
-		} else {
-			subscriber.OnWait(scheduler.Wait)
-		}
-		o(observe, scheduler, subscriber)
 	}
 	return observable
 }

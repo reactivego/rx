@@ -26,6 +26,51 @@ type Scheduler = scheduler.Scheduler
 // from a single subscriber at the root of the subscription tree.
 type Subscriber = subscriber.Subscriber
 
+//jig:name Observer
+
+// Observer is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
+// completed normally.
+type Observer func(next interface{}, err error, done bool)
+
+//jig:name Observable
+
+// Observable is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type Observable func(Observer, Scheduler, Subscriber)
+
+//jig:name Interval
+
+// Interval creates an Observable that emits a sequence of integers spaced
+// by a particular time interval. First integer is not emitted immediately, but
+// only after the first time interval has passed. The generated code will do a type
+// conversion from int to interface{}.
+func Interval(interval time.Duration) Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		i := 0
+		runner := subscribeOn.ScheduleFutureRecursive(interval, func(self func(time.Duration)) {
+			if subscriber.Subscribed() {
+				observe(interface{}(i), nil, false)
+				i++
+				if subscriber.Subscribed() {
+					self(interval)
+				}
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
+}
+
+//jig:name GoroutineScheduler
+
+func GoroutineScheduler() Scheduler {
+	return scheduler.Goroutine
+}
+
 //jig:name IntObserver
 
 // IntObserver is a function that gets called whenever the Observable has
@@ -42,17 +87,18 @@ type IntObserver func(next int, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableInt func(IntObserver, Scheduler, Subscriber)
 
-//jig:name Interval
+//jig:name IntervalInt
 
-// Interval creates an ObservableInt that emits a sequence of integers spaced
+// IntervalInt creates an ObservableInt that emits a sequence of integers spaced
 // by a particular time interval. First integer is not emitted immediately, but
-// only after the first time interval has passed.
-func Interval(interval time.Duration) ObservableInt {
+// only after the first time interval has passed. The generated code will do a type
+// conversion from int to int.
+func IntervalInt(interval time.Duration) ObservableInt {
 	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := subscribeOn.ScheduleFutureRecursive(interval, func(self func(time.Duration)) {
 			if subscriber.Subscribed() {
-				observe(i, nil, false)
+				observe(int(i), nil, false)
 				i++
 				if subscriber.Subscribed() {
 					self(interval)
@@ -62,12 +108,6 @@ func Interval(interval time.Duration) ObservableInt {
 		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
-}
-
-//jig:name GoroutineScheduler
-
-func GoroutineScheduler() Scheduler {
-	return scheduler.Goroutine
 }
 
 //jig:name Observable_Take
@@ -99,22 +139,6 @@ func (o ObservableInt) Take(n int) ObservableInt {
 	return o.AsObservable().Take(n).AsObservableInt()
 }
 
-//jig:name Observer
-
-// Observer is a function that gets called whenever the Observable has
-// something to report. The next argument is the item value that is only
-// valid when the done argument is false. When done is true and the err
-// argument is not nil, then the Observable has terminated with an error.
-// When done is true and the err argument is nil, then the Observable has
-// completed normally.
-type Observer func(next interface{}, err error, done bool)
-
-//jig:name Observable
-
-// Observable is a function taking an Observer, Scheduler and Subscriber.
-// Calling it will subscribe the Observer to events from the Observable.
-type Observable func(Observer, Scheduler, Subscriber)
-
 //jig:name ObservableInt_AsObservable
 
 // AsObservable turns a typed ObservableInt into an Observable of interface{}.
@@ -122,6 +146,24 @@ func (o ObservableInt) AsObservable() Observable {
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
 		observer := func(next int, err error, done bool) {
 			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name Observable_MapObservable
+
+// MapObservable transforms the items emitted by an Observable by applying a
+// function to each item.
+func (o Observable) MapObservable(project func(interface{}) Observable) ObservableObservable {
+	observable := func(observe ObservableObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			var mapped Observable
+			if !done {
+				mapped = project(next)
+			}
+			observe(mapped, err, done)
 		}
 		o(observer, subscribeOn, subscriber)
 	}
@@ -145,6 +187,22 @@ func (o ObservableInt) MapObservableInt(project func(int) ObservableInt) Observa
 	}
 	return observable
 }
+
+//jig:name ObservableObserver
+
+// ObservableObserver is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
+// completed normally.
+type ObservableObserver func(next Observable, err error, done bool)
+
+//jig:name ObservableObservable
+
+// ObservableObservable is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type ObservableObservable func(ObservableObserver, Scheduler, Subscriber)
 
 //jig:name ObservableIntObserver
 
@@ -235,6 +293,164 @@ const (
 	linkCallbackOnComplete	= iota
 	linkCancelOrCompleted
 )
+
+//jig:name link
+
+type linkObserver func(*link, interface{}, error, bool)
+
+type link struct {
+	observe		linkObserver
+	state		int32
+	callbackState	int32
+	callbackKind	int
+	callback	func()
+	subscriber	Subscriber
+}
+
+func newInitialLink() *link {
+	return &link{state: linkCompleting, subscriber: subscriber.New()}
+}
+
+func newLink(observe linkObserver, subscriber Subscriber) *link {
+	return &link{
+		observe:	observe,
+		subscriber:	subscriber.Add(),
+	}
+}
+
+func (o *link) Observe(next interface{}, err error, done bool) error {
+	if !atomic.CompareAndSwapInt32(&o.state, linkIdle, linkBusy) {
+		if atomic.LoadInt32(&o.state) > linkBusy {
+			return AlreadyDone
+		}
+		return RecursionNotAllowed
+	}
+	o.observe(o, next, err, done)
+	if done {
+		if err != nil {
+			if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkError) {
+				return StateTransitionFailed
+			}
+		} else {
+			if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkCompleting) {
+				return StateTransitionFailed
+			}
+		}
+	} else {
+		if !atomic.CompareAndSwapInt32(&o.state, linkBusy, linkIdle) {
+			return StateTransitionFailed
+		}
+	}
+	if atomic.LoadInt32(&o.callbackState) != callbackSet {
+		return nil
+	}
+	if atomic.CompareAndSwapInt32(&o.state, linkCompleting, linkComplete) {
+		o.callback()
+	}
+	if o.callbackKind == linkCancelOrCompleted {
+		if atomic.CompareAndSwapInt32(&o.state, linkIdle, linkCanceled) {
+			o.callback()
+		}
+	}
+	return nil
+}
+
+func (o *link) SubscribeTo(observable Observable, scheduler Scheduler) error {
+	if !atomic.CompareAndSwapInt32(&o.state, linkUnsubscribed, linkSubscribing) {
+		return AlreadySubscribed
+	}
+	observer := func(next interface{}, err error, done bool) {
+		o.Observe(next, err, done)
+	}
+	observable(observer, scheduler, o.subscriber)
+	if !atomic.CompareAndSwapInt32(&o.state, linkSubscribing, linkIdle) {
+		return StateTransitionFailed
+	}
+	return nil
+}
+
+func (o *link) Cancel(callback func()) error {
+	if !atomic.CompareAndSwapInt32(&o.callbackState, callbackNil, settingCallback) {
+		return AlreadyWaiting
+	}
+	o.callbackKind = linkCancelOrCompleted
+	o.callback = callback
+	if !atomic.CompareAndSwapInt32(&o.callbackState, settingCallback, callbackSet) {
+		return StateTransitionFailed
+	}
+	o.subscriber.Unsubscribe()
+	if atomic.CompareAndSwapInt32(&o.state, linkCompleting, linkComplete) {
+		o.callback()
+	}
+	if atomic.CompareAndSwapInt32(&o.state, linkIdle, linkCanceled) {
+		o.callback()
+	}
+	return nil
+}
+
+func (o *link) OnComplete(callback func()) error {
+	if !atomic.CompareAndSwapInt32(&o.callbackState, callbackNil, settingCallback) {
+		return AlreadyWaiting
+	}
+	o.callbackKind = linkCallbackOnComplete
+	o.callback = callback
+	if !atomic.CompareAndSwapInt32(&o.callbackState, settingCallback, callbackSet) {
+		return StateTransitionFailed
+	}
+	if atomic.CompareAndSwapInt32(&o.state, linkCompleting, linkComplete) {
+		o.callback()
+	}
+	return nil
+}
+
+//jig:name ObservableObservable_SwitchAll
+
+// SwitchAll converts an Observable that emits Observables into a single Observable
+// that emits the items emitted by the most-recently-emitted of those Observables.
+func (o ObservableObservable) SwitchAll() Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(link *link, next interface{}, err error, done bool) {
+			if !done || err != nil {
+				observe(next, err, done)
+			} else {
+				link.subscriber.Unsubscribe()
+			}
+		}
+		currentLink := newInitialLink()
+		var switcherMutex sync.Mutex
+		switcherSubscriber := subscriber.Add()
+		switcher := func(next Observable, err error, done bool) {
+			switch {
+			case !done:
+				previousLink := currentLink
+				func() {
+					switcherMutex.Lock()
+					defer switcherMutex.Unlock()
+					currentLink = newLink(observer, subscriber)
+				}()
+				previousLink.Cancel(func() {
+					switcherMutex.Lock()
+					defer switcherMutex.Unlock()
+					currentLink.SubscribeTo(next, subscribeOn)
+				})
+			case err != nil:
+				currentLink.Cancel(func() {
+					var zero interface{}
+					observe(zero, err, true)
+				})
+				switcherSubscriber.Unsubscribe()
+			default:
+				currentLink.OnComplete(func() {
+					var zero interface{}
+					observe(zero, nil, true)
+				})
+				switcherSubscriber.Unsubscribe()
+			}
+		}
+		o(switcher, subscribeOn, switcherSubscriber)
+	}
+	return observable
+}
 
 //jig:name linkInt
 
@@ -394,12 +610,12 @@ func (o ObservableObservableInt) SwitchAll() ObservableInt {
 	return observable
 }
 
-//jig:name ObservableInt_SubscribeOn
+//jig:name Observable_SubscribeOn
 
-// SubscribeOn specifies the scheduler an ObservableInt should use when it is
+// SubscribeOn specifies the scheduler an Observable should use when it is
 // subscribed to.
-func (o ObservableInt) SubscribeOn(scheduler Scheduler) ObservableInt {
-	observable := func(observe IntObserver, _ Scheduler, subscriber Subscriber) {
+func (o Observable) SubscribeOn(scheduler Scheduler) Observable {
+	observable := func(observe Observer, _ Scheduler, subscriber Subscriber) {
 		if scheduler.IsConcurrent() {
 			subscriber.OnWait(nil)
 		} else {
@@ -420,6 +636,27 @@ func (o ObservableInt) Println(a ...interface{}) error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
 	observer := func(next int, err error, done bool) {
+		if !done {
+			fmt.Println(append(a, next)...)
+		} else {
+			subscriber.Done(err)
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	return subscriber.Wait()
+}
+
+//jig:name Observable_Println
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o Observable) Println(a ...interface{}) error {
+	subscriber := subscriber.New()
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next interface{}, err error, done bool) {
 		if !done {
 			fmt.Println(append(a, next)...)
 		} else {

@@ -24,6 +24,90 @@ type Scheduler = scheduler.Scheduler
 // from a single subscriber at the root of the subscription tree.
 type Subscriber = subscriber.Subscriber
 
+//jig:name Float32Observer
+
+// Float32Observer is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
+// completed normally.
+type Float32Observer func(next float32, err error, done bool)
+
+//jig:name ObservableFloat32
+
+// ObservableFloat32 is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type ObservableFloat32 func(Float32Observer, Scheduler, Subscriber)
+
+//jig:name IntervalFloat32
+
+// IntervalFloat32 creates an ObservableFloat32 that emits a sequence of integers spaced
+// by a particular time interval. First integer is not emitted immediately, but
+// only after the first time interval has passed. The generated code will do a type
+// conversion from int to float32.
+func IntervalFloat32(interval time.Duration) ObservableFloat32 {
+	observable := func(observe Float32Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		i := 0
+		runner := subscribeOn.ScheduleFutureRecursive(interval, func(self func(time.Duration)) {
+			if subscriber.Subscribed() {
+				observe(float32(i), nil, false)
+				i++
+				if subscriber.Subscribed() {
+					self(interval)
+				}
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
+}
+
+//jig:name GoroutineScheduler
+
+func GoroutineScheduler() Scheduler {
+	return scheduler.Goroutine
+}
+
+//jig:name Observer
+
+// Observer is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
+// completed normally.
+type Observer func(next interface{}, err error, done bool)
+
+//jig:name Observable
+
+// Observable is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type Observable func(Observer, Scheduler, Subscriber)
+
+//jig:name Interval
+
+// Interval creates an Observable that emits a sequence of integers spaced
+// by a particular time interval. First integer is not emitted immediately, but
+// only after the first time interval has passed. The generated code will do a type
+// conversion from int to interface{}.
+func Interval(interval time.Duration) Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		i := 0
+		runner := subscribeOn.ScheduleFutureRecursive(interval, func(self func(time.Duration)) {
+			if subscriber.Subscribed() {
+				observe(interface{}(i), nil, false)
+				i++
+				if subscriber.Subscribed() {
+					self(interval)
+				}
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
+}
+
 //jig:name IntObserver
 
 // IntObserver is a function that gets called whenever the Observable has
@@ -40,17 +124,18 @@ type IntObserver func(next int, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableInt func(IntObserver, Scheduler, Subscriber)
 
-//jig:name Interval
+//jig:name IntervalInt
 
-// Interval creates an ObservableInt that emits a sequence of integers spaced
+// IntervalInt creates an ObservableInt that emits a sequence of integers spaced
 // by a particular time interval. First integer is not emitted immediately, but
-// only after the first time interval has passed.
-func Interval(interval time.Duration) ObservableInt {
+// only after the first time interval has passed. The generated code will do a type
+// conversion from int to int.
+func IntervalInt(interval time.Duration) ObservableInt {
 	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := subscribeOn.ScheduleFutureRecursive(interval, func(self func(time.Duration)) {
 			if subscriber.Subscribed() {
-				observe(i, nil, false)
+				observe(int(i), nil, false)
 				i++
 				if subscriber.Subscribed() {
 					self(interval)
@@ -60,12 +145,6 @@ func Interval(interval time.Duration) ObservableInt {
 		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
-}
-
-//jig:name GoroutineScheduler
-
-func GoroutineScheduler() Scheduler {
-	return scheduler.Goroutine
 }
 
 //jig:name Observable_Take
@@ -90,19 +169,19 @@ func (o Observable) Take(n int) Observable {
 	return observable
 }
 
-//jig:name ObservableInt_Take
+//jig:name ObservableFloat32_Take
 
-// Take emits only the first n items emitted by an ObservableInt.
-func (o ObservableInt) Take(n int) ObservableInt {
-	return o.AsObservable().Take(n).AsObservableInt()
+// Take emits only the first n items emitted by an ObservableFloat32.
+func (o ObservableFloat32) Take(n int) ObservableFloat32 {
+	return o.AsObservable().Take(n).AsObservableFloat32()
 }
 
-//jig:name ObservableInt_SubscribeOn
+//jig:name Observable_SubscribeOn
 
-// SubscribeOn specifies the scheduler an ObservableInt should use when it is
+// SubscribeOn specifies the scheduler an Observable should use when it is
 // subscribed to.
-func (o ObservableInt) SubscribeOn(scheduler Scheduler) ObservableInt {
-	observable := func(observe IntObserver, _ Scheduler, subscriber Subscriber) {
+func (o Observable) SubscribeOn(scheduler Scheduler) Observable {
+	observable := func(observe Observer, _ Scheduler, subscriber Subscriber) {
 		if scheduler.IsConcurrent() {
 			subscriber.OnWait(nil)
 		} else {
@@ -113,21 +192,25 @@ func (o ObservableInt) SubscribeOn(scheduler Scheduler) ObservableInt {
 	return observable
 }
 
-//jig:name Observer
+//jig:name ObservableInt_Take
 
-// Observer is a function that gets called whenever the Observable has
-// something to report. The next argument is the item value that is only
-// valid when the done argument is false. When done is true and the err
-// argument is not nil, then the Observable has terminated with an error.
-// When done is true and the err argument is nil, then the Observable has
-// completed normally.
-type Observer func(next interface{}, err error, done bool)
+// Take emits only the first n items emitted by an ObservableInt.
+func (o ObservableInt) Take(n int) ObservableInt {
+	return o.AsObservable().Take(n).AsObservableInt()
+}
 
-//jig:name Observable
+//jig:name ObservableFloat32_AsObservable
 
-// Observable is a function taking an Observer, Scheduler and Subscriber.
-// Calling it will subscribe the Observer to events from the Observable.
-type Observable func(Observer, Scheduler, Subscriber)
+// AsObservable turns a typed ObservableFloat32 into an Observable of interface{}.
+func (o ObservableFloat32) AsObservable() Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next float32, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
 
 //jig:name ObservableInt_AsObservable
 
@@ -142,15 +225,15 @@ func (o ObservableInt) AsObservable() Observable {
 	return observable
 }
 
-//jig:name ObservableInt_Wait
+//jig:name ObservableFloat32_Wait
 
 // Wait subscribes to the Observable and waits for completion or error.
 // Returns either the error or nil when the Observable completed normally.
 // Wait uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) Wait() error {
+func (o ObservableFloat32) Wait() error {
 	subscriber := subscriber.New()
 	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, err error, done bool) {
+	observer := func(next float32, err error, done bool) {
 		if done {
 			subscriber.Done(err)
 		}
@@ -165,19 +248,19 @@ func (o ObservableInt) Wait() error {
 // Subscription is an alias for the subscriber.Subscription interface type.
 type Subscription = subscriber.Subscription
 
-//jig:name ObservableInt_Subscribe
+//jig:name Observable_Subscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
 // Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) Subscribe(observe IntObserver, schedulers ...Scheduler) Subscription {
+func (o Observable) Subscribe(observe Observer, schedulers ...Scheduler) Subscription {
 	subscriber := subscriber.New()
 	schedulers = append(schedulers, scheduler.MakeTrampoline())
-	observer := func(next int, err error, done bool) {
+	observer := func(next interface{}, err error, done bool) {
 		if !done {
 			observe(next, err, done)
 		} else {
-			var zero int
+			var zero interface{}
 			observe(zero, err, true)
 			subscriber.Done(err)
 		}
@@ -234,6 +317,31 @@ func (e RxError) Error() string	{ return string(e) }
 // ErrTypecast is delivered to an observer if the generic value cannot be
 // typecast to a specific type.
 const TypecastFailed = RxError("typecast failed")
+
+//jig:name Observable_AsObservableFloat32
+
+// AsObservableFloat32 turns an Observable of interface{} into an ObservableFloat32.
+// If during observing a typecast fails, the error ErrTypecastToFloat32 will be
+// emitted.
+func (o Observable) AsObservableFloat32() ObservableFloat32 {
+	observable := func(observe Float32Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				if nextFloat32, ok := next.(float32); ok {
+					observe(nextFloat32, err, done)
+				} else {
+					var zero float32
+					observe(zero, TypecastFailed, true)
+				}
+			} else {
+				var zero float32
+				observe(zero, err, true)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
 
 //jig:name Observable_AsObservableInt
 
