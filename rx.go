@@ -754,6 +754,17 @@ func MergeDelayError(observables ...Observable) Observable {
 	return observables[0].MergeDelayErrorWith(observables[1:]...)
 }
 
+//jig:name Println
+
+func Println(a ...interface{}) Observer {
+	observer := func(next interface{}, err error, done bool) {
+		if !done {
+			fmt.Println(append(a, next)...)
+		}
+	}
+	return observer
+}
+
 //jig:name Subscription
 
 // Subscription is an alias for the subscriber.Subscription interface type.
@@ -1763,6 +1774,36 @@ func (o Observable) Distinct() Observable {
 	return observable
 }
 
+//jig:name Observable_DistinctUntilChanged
+
+// DistinctUntilChanged only emits when the current value is different from the last.
+func (o Observable) DistinctUntilChanged(getters ...func(interface{}) interface{}) Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		if len(getters) == 0 {
+			getters = append(getters, func(next interface{}) interface{} { return next })
+		}
+		seen := make([]interface{}, len(getters))
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				same := true
+				for i, get := range getters {
+					got := get(next)
+					if seen[i] != got {
+						same = false
+						seen[i] = got
+					}
+				}
+				if same {
+					return
+				}
+			}
+			observe(next, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name Observable_Do
 
 // Do calls a function for each next value passing through the observable.
@@ -1964,6 +2005,14 @@ func (o ObservableInt) MapObservable(project func(int) Observable) ObservableObs
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
+}
+
+//jig:name Observable_MapTo
+
+// MapTo transforms the items emitted by an Observable. Emitted values
+// are mapped to the same value every time.
+func (o Observable) MapTo(value interface{}) Observable {
+	return o.Map(func(interface{}) interface{} { return value })
 }
 
 //jig:name ObservableInt_Max
@@ -4032,23 +4081,4 @@ func (o Observable) AsObservableSlice() ObservableSlice {
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
-}
-
-//jig:name Println
-
-func Println(a ...interface{}) Observer {
-	observer := func(next interface{}, err error, done bool) {
-		if !done {
-			fmt.Println(append(a, next)...)
-		}
-	}
-	return observer
-}
-
-//jig:name Observable_MapTo
-
-// MapTo transforms the items emitted by an Observable. Emitted values
-// are mapped to the same value every time.
-func (o Observable) MapTo(value interface{}) Observable {
-	return o.Map(func(interface{}) interface{} { return value })
 }

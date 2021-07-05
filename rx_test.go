@@ -164,6 +164,16 @@ func ExampleObservable_Distinct() {
 	// 3
 }
 
+func ExampleObservable_DistinctUntilChanged() {
+	rx.From(1, 2, 2, 1, 3).DistinctUntilChanged().Println()
+
+	// Output:
+	// 1
+	// 2
+	// 1
+	// 3
+}
+
 func ExampleObservable_MergeDelayError() {
 	const ms = time.Millisecond
 	AddMul := func(add, mul int) func(interface{}) interface{} {

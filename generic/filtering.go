@@ -1,5 +1,47 @@
 package rx
 
+//jig:template Observable DistinctUntilChanged
+
+// DistinctUntilChanged only emits when the current value is different from the last.
+func (o Observable) DistinctUntilChanged(getters ...func(interface{}) interface{}) Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		if len(getters) == 0 {
+			getters = append(getters, func(next interface{}) interface{} { return next })
+		}
+		seen := make([]interface{}, len(getters))
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				same := true
+				for i, get := range getters {
+					got := get(next)
+					if seen[i] != got {
+						same = false
+						seen[i] = got
+					}
+				}
+				if same {
+					return
+				}
+			}
+			observe(next, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:template Observable<Foo> DistinctUntilChanged
+//jig:needs Observable DistinctUntilChanged
+
+// DistinctUntilChanged only emits when the current value is different from the last.
+func (o ObservableFoo) DistinctUntilChanged(getters ...func(foo) interface{}) ObservableFoo {
+	var g []func(interface{}) interface{}
+	for i := range getters {
+		g = append(g, func(next interface{}) interface{} { return getters[i](next.(foo)) })
+	}
+	return o.AsObservable().DistinctUntilChanged(g...).AsObservableFoo()
+}
+
 //jig:template Observable Distinct
 
 // Distinct suppress duplicate items emitted by an Observable
@@ -174,7 +216,7 @@ func (o ObservableFoo) Last() ObservableFoo {
 //jig:needs RxError
 
 const DidNotEmitValue = RxError("expected one value, got none")
-const EmittedMultipleValues =  RxError("expected one value, got multiple")
+const EmittedMultipleValues = RxError("expected one value, got multiple")
 
 //jig:template Observable Single
 //jig:needs ErrSingle
