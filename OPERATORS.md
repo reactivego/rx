@@ -1,6 +1,6 @@
 # Operators
 
-Currently 100 operators have been implemented:
+Currently 102 operators have been implemented:
     
 | A … C                   | D … L                         | M … P                  | R … S              | T … W                   |
 |:------------------------|:------------------------------|:-----------------------|:-------------------|:------------------------|
@@ -10,7 +10,7 @@ Currently 100 operators have been implemented:
 | [AuditTime]             | [Distinct]                    | [Merge] :star:         | [Repeat]           | [TakeWhile]             |
 | [AutoConnect]           | [DistinctUntilChanged] :star: | [MergeAll]             | [ReplaySubject]    | [ThrottleTime]          |
 | [Average]               | [Do] :star:                   | [MergeDelayError]      | [Retry]            | [Throw]                 |
-| [BehaviorSubject]       | [DoOnComplete]                | [MergeDelayErrorWith]  | [Sample]           | [Ticker]                |
+| [BehaviorSubject]       | [DoOnComplete]                | [MergeDelayErrorWith]  | [SampleTime]       | [Ticker]                |
 | [Catch] :star:          | [DoOnError]                   | [MergeMap] :star:      | [Scan] :star:      | [TimeInterval]          |
 | [CatchError] :star:     | [ElementAt]                   | [MergeMapTo]           | [Serialize]        | [Timeout]               |
 | [CombineLatest] :star:  | [Empty]                       | [MergeWith] :star:     | [Single]           | [Timer]                 |
@@ -22,9 +22,9 @@ Currently 100 operators have been implemented:
 | [ConcatAll]             | [IgnoreCompletion]            | [Passthrough]          | [Subscribe]        | [WithLatestFrom] :star: |
 | [ConcatMap] :star:      | [IgnoreElements]              | [Println]              | [SubscribeOn]      | [WithLatestFromAll]     |
 | [ConcatMapTo]           | [Interval]                    | [Publish] :star:       | [Sum]              |
-| [ConcatWith] :star:     | [Just] :star:                 | [PublishReplay] :star: | [SwitchAll]        |
-| [Connect]               | [Last]                        |                        | [SwitchMap] :star: 
-| [Count]                 |
+| [ConcatWith] :star:     | [Just] :star:                 | [PublishBehavior]      | [SwitchAll]        |
+| [Connect]               | [Last]                        | [PublishLast]          | [SwitchMap] :star: 
+| [Count]                 |                               | [PublishReplay] :star: |
 | [Create] :star:         |
 | [CreateFutureRecursive] |
 | [CreateRecursive]       |
@@ -93,6 +93,8 @@ Currently 100 operators have been implemented:
 [Passthrough]: #passthrough
 [Println]: #println
 [Publish]: #publish
+[PublishBehavior]: #publishbehavior
+[PublishLast]: #publishlast
 [PublishReplay]: #publishreplay
 [Range]: #range
 [Reduce]: #reduce
@@ -100,7 +102,7 @@ Currently 100 operators have been implemented:
 [Repeat]: #repeat
 [ReplaySubject]: #replaysubject
 [Retry]: #retry
-[Sample]: #sample
+[SampleTime]: #sampletime
 [Scan]: #scan
 [Serialize]: #serialize
 [Single]: #single
@@ -464,6 +466,14 @@ Output:
 #### TBD
 
 ## Publish
+
+#### TBD
+
+## PublishBehavior
+
+#### TBD
+
+## PublishLast
 
 #### TBD
 

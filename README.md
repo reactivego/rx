@@ -122,8 +122,9 @@ concurrently running process that pushes out values.
 ## Operators 
 Operators form a language in which programs featuring Observables can be expressed.
 They work on one or more Observables to transform, filter and combine them into new Observables.
+A complete list of operators is available in a separate [document](OPERATORS.md).
 
-Following are the most commonly used operators:
+Below is a selection of the most commonly used ones:
 
 <details><summary>BufferTime</summary>
 
@@ -413,8 +414,6 @@ Output:
 [5 D]
 ```
 </details>
-
-There is also a complete list of supported [operators](OPERATORS.md).
 
 ## Concurency
 
