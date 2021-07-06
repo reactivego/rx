@@ -66,9 +66,9 @@ Currently 102 operators are implemented:
     
 | A … C                   | D … L                         | M … P                  | R … S              | T … W                   |
 |:------------------------|:------------------------------|:-----------------------|:-------------------|:------------------------|
-| [All]                   | [DebounceTime] :star:         | [Map] :star:           | [Range]            | [Take]                  |
+| [All]                   | [DebounceTime] :star:         | [Map] :star:           | [Range]            | [Take] :star:           |
 | [AsObservable]          | [Defer]                       | [MapTo]                | [Reduce]           | [TakeLast]              |
-| [AsyncSubject]          | [Delay]                       | [Max]                  | [RefCount]         | [TakeUntil]             |
+| [AsyncSubject]          | [Delay]                       | [Max]                  | [RefCount]         | [TakeUntil] :star:      |
 | [AuditTime]             | [Distinct]                    | [Merge] :star:         | [Repeat]           | [TakeWhile]             |
 | [AutoConnect]           | [DistinctUntilChanged] :star: | [MergeAll]             | [ReplaySubject]    | [ThrottleTime]          |
 | [Average]               | [Do] :star:                   | [MergeDelayError]      | [Retry]            | [Throw]                 |
@@ -85,7 +85,7 @@ Currently 102 operators are implemented:
 | [ConcatMap] :star:      | [IgnoreElements]              | [Println]              | [SubscribeOn]      | [WithLatestFromAll]     |
 | [ConcatMapTo]           | [Interval]                    | [Publish] :star:       | [Sum]              |
 | [ConcatWith] :star:     | [Just] :star:                 | [PublishBehavior]      | [SwitchAll]        |
-| [Connect]               | [Last]                        | [PublishLast]          | [SwitchMap] :star: 
+| [Connect]               | [Last]                        | [PublishLast]          | [SwitchMap] :star: |
 | [Count]                 |                               | [PublishReplay] :star: |
 | [Create] :star:         |
 | [CreateFutureRecursive] |
