@@ -9,13 +9,20 @@ import (
 func Example_takeUntil() {
 	const ms = time.Millisecond
 
-	// emit "stop" after 250ms
-	interrupt := Never().Timeout(250 * ms).Catch(Just("stop")).SubscribeOn(GoroutineScheduler())
+	// produce a single value after 550ms
+	interrupted := Timer(550 * ms)
 
-	// produce a number starting at 0 every 100ms until interrupted
-	IntervalInt(100 * ms).TakeUntil(interrupt).Println()
+	// produce a number starting at 0ms every 100ms
+	source := Timer(0*ms, 100*ms)
+
+	// print numbers from source until interrupted
+	source.TakeUntil(interrupted).Println()
 
 	// Output:
 	// 0
 	// 1
+	// 2
+	// 3
+	// 4
+	// 5
 }
