@@ -1,6 +1,8 @@
 package rx
 
-import "sync/atomic"
+import (
+	"sync"
+)
 
 //jig:template Observable All
 //jig:needs ObservableBool
@@ -24,7 +26,7 @@ func (o Observable) All(predicate func(next interface{}) bool) ObservableBool {
 					observe(false, nil, false)
 					observe(false, nil, true)
 				}
-			case err!=nil:
+			case err != nil:
 				observe(false, err, true)
 			default:
 				observe(true, nil, false)
@@ -85,7 +87,7 @@ func (o Observable) TakeWhile(condition func(next interface{}) bool) Observable 
 // becomes false, at which point TakeWhile stops mirroring the source Observable and terminates
 // its own Observable.
 func (o ObservableFoo) TakeWhile(condition func(next foo) bool) ObservableFoo {
-	predecate := func (next interface{}) bool {
+	predecate := func(next interface{}) bool {
 		return condition(next.(foo))
 	}
 	return o.AsObservable().TakeWhile(predecate).AsObservableFoo()
@@ -96,23 +98,27 @@ func (o ObservableFoo) TakeWhile(condition func(next foo) bool) ObservableFoo {
 // TakeUntil emits items emitted by an Observable until another Observable emits an item.
 func (o Observable) TakeUntil(other Observable) Observable {
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		var watcherNext int32
-		watcherSubscriber := subscriber.Add()
-		watcher := func (next interface{}, err error, done bool) {
-			if !done {
-				atomic.StoreInt32(&watcherNext, 1)
-			}
-			watcherSubscriber.Unsubscribe()
+		var serializer struct {
+			sync.Mutex
+			done bool
 		}
-		other(watcher, subscribeOn, watcherSubscriber)
-		
 		observer := func(next interface{}, err error, done bool) {
-			if done || atomic.LoadInt32(&watcherNext) != 1 {
+			serializer.Lock()
+			defer serializer.Unlock()
+			if !serializer.done {
+				serializer.done = done
 				observe(next, err, done)
-			} else {
-				observe(nil, nil, true)
 			}
 		}
+		triggerSubscriber := subscriber.Add()
+		trigger := func(next interface{}, err error, done bool) {
+			if !done {
+				observer(nil, nil, true)
+			} else {
+				triggerSubscriber.Unsubscribe()
+			}
+		}
+		other(trigger, subscribeOn, triggerSubscriber)
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable

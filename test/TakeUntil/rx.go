@@ -6,7 +6,7 @@ package TakeUntil
 
 import (
 	"fmt"
-	"sync/atomic"
+	"sync"
 	"time"
 
 	"github.com/reactivego/scheduler"
@@ -80,23 +80,27 @@ func Timer(initialDelay time.Duration, intervals ...time.Duration) Observable {
 // TakeUntil emits items emitted by an Observable until another Observable emits an item.
 func (o Observable) TakeUntil(other Observable) Observable {
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		var watcherNext int32
-		watcherSubscriber := subscriber.Add()
-		watcher := func(next interface{}, err error, done bool) {
-			if !done {
-				atomic.StoreInt32(&watcherNext, 1)
-			}
-			watcherSubscriber.Unsubscribe()
+		var serializer struct {
+			sync.Mutex
+			done	bool
 		}
-		other(watcher, subscribeOn, watcherSubscriber)
-
 		observer := func(next interface{}, err error, done bool) {
-			if done || atomic.LoadInt32(&watcherNext) != 1 {
+			serializer.Lock()
+			defer serializer.Unlock()
+			if !serializer.done {
+				serializer.done = done
 				observe(next, err, done)
-			} else {
-				observe(nil, nil, true)
 			}
 		}
+		triggerSubscriber := subscriber.Add()
+		trigger := func(next interface{}, err error, done bool) {
+			if !done {
+				observer(nil, nil, true)
+			} else {
+				triggerSubscriber.Unsubscribe()
+			}
+		}
+		other(trigger, subscribeOn, triggerSubscriber)
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
