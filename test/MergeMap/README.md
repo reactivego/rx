@@ -1,6 +1,6 @@
 # MergeMap
 
-[![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/MergeMap?tab=doc)
+[![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/MergeMap#section-documentation)
 [![](../../../assets/rx.svg?raw=true)](http://reactivex.io/documentation/operators/flatmap.html)
 
 **MergeMap** transforms the items emitted by an Observable by applying a

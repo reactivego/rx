@@ -1,6 +1,6 @@
 # MergeDelayErrorWith
 
-[![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/MergeDelayErrorWith?tab=doc)
+[![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/MergeDelayErrorWith#section-documentation)
 [![](../../../assets/rx.svg?raw=true)](http://reactivex.io/documentation/operators/merge.html)
 
 **MergeDelayErrorWith** combines multiple Observables into one by merging their emissions.

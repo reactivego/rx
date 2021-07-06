@@ -1,6 +1,6 @@
 # PublishBehavior
 
-[![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/PublishBehavior?tab=doc)
+[![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/PublishBehavior#section-documentation)
 [![](../../../assets/rx.svg?raw=true)](http://reactivex.io/documentation/operators/publish.html)
 
 **PublishBehavior** returns a Multicaster that shares a single subscription

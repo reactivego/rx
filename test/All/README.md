@@ -1,6 +1,6 @@
 # All
 
-[![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/All?tab=doc)
+[![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/All#section-documentation)
 [![](../../../assets/rx.svg?raw=true)](http://reactivex.io/documentation/operators/all.html)
 
 **All** determines whether all items emitted by an Observable meet some

@@ -1,6 +1,6 @@
 # AsyncSubject
 
-[![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/AsyncSubject?tab=doc)
+[![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/AsyncSubject#section-documentation)
 [![](../../../assets/rx.svg?raw=true)](http://reactivex.io/documentation/subject.html)
 
 **AsyncSubject** emits the last value (and only the last value) emitted by the

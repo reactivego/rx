@@ -2,7 +2,7 @@
 
     import "github.com/reactivego/rx"
 
-[![](../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx?tab=doc)
+[![](../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx#section-documentation)
 [![](../assets/rx.svg?raw=true)](http://reactivex.io/intro.html)
 
 Package `rx` provides *Reactive Extensions* for Go, an API for asynchronous programming with [observables](#observables) and [operators](#operators).
@@ -44,7 +44,7 @@ func main() {
     rx.From(1,2,"hello").Println()
 }
 ```
-For more information see the [Go Package Documentation](https://pkg.go.dev/github.com/reactivego/rx?tab=doc). In this document there is a [selection](#operators) of the most used operators and there is also a complete list of operators in a separate [document](OPERATORS.md).
+For more information see the [Go Package Documentation](https://pkg.go.dev/github.com/reactivego/rx#section-documentation). In this document there is a [selection](#operators) of the most used operators and there is also a complete list of operators in a separate [document](OPERATORS.md).
 
 ### Generics Library
 To use it as a *Generics Library* for *Go 1*, import the `rx/generic` package.

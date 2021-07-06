@@ -1,6 +1,6 @@
 ## DistinctUntilChanged
 
-[![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/DistinctUntilChanged?tab=doc)
+[![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/DistinctUntilChanged#section-documentation)
 [![](../../../assets/rx.svg?raw=true)](http://reactivex.io/documentation/operators/distinct.html)
 
 **DistinctUntilChanged** only emits when the current value is different from the last.

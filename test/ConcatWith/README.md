@@ -1,6 +1,6 @@
 # ConcatWith
 
-[![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/ConcatWith?tab=doc)
+[![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/ConcatWith#section-documentation)
 [![](../../../assets/rx.svg?raw=true)](http://reactivex.io/documentation/operators/concat.html)
 
 **ConcatWith** emits the emissions from two or more observables without interleaving them.

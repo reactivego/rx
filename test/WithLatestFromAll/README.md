@@ -1,6 +1,6 @@
 # WithLatestFromAll
 
-[![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/WithLatestFromAll?tab=doc)
+[![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/WithLatestFromAll#section-documentation)
 [![](../../../assets/rx.svg?raw=true)](https://rxjs-dev.firebaseapp.com/api/operators/withLatestFrom)
 
 **WithLatestFromAll** flattens a higher order observable (e.g. ObservableObservable)

@@ -1,6 +1,6 @@
 # BehaviorSubject
 
-[![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/BehaviorSubject?tab=doc)
+[![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/BehaviorSubject#section-documentation)
 [![](../../../assets/rx.svg?raw=true)](http://reactivex.io/documentation/subject.html)
 
 When an observer subscribes to a `BehaviorSubject`, it begins by emitting the item most

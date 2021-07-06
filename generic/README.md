@@ -2,7 +2,7 @@
 
     import _ "github.com/reactivego/rx/generic"
 
-[![](../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/generic?tab=doc)
+[![](../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/generic#section-documentation)
 [![](../../assets/rx.svg?raw=true)](http://reactivex.io/intro.html)
 
 Package `rx` provides *Reactive Extensions* for Go, an API for asynchronous programming with [Observables](#observables) and [Operators](#operators).

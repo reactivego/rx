@@ -1,6 +1,6 @@
 # ReplaySubject
 
-[![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/ReplaySubject?tab=doc)
+[![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/ReplaySubject#section-documentation)
 [![](../../../assets/rx.svg?raw=true)](http://reactivex.io/documentation/subject.html)
 
 **ReplaySubject** ensures that all observers see the same sequence of emitted items,

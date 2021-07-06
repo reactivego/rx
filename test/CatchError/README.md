@@ -1,6 +1,6 @@
 # CatchError
 
-[![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/CatchError?tab=doc)
+[![](../../../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx/test/CatchError#section-documentation)
 [![](../../../assets/rx.svg?raw=true)](https://rxjs-dev.firebaseapp.com/api/operators/catchError)
 
 **CatchError** catches errors on the Observable to be handled by returning a
