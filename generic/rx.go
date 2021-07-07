@@ -12,6 +12,22 @@ import (
 	"github.com/reactivego/subscriber"
 )
 
+//jig:name BarObserver
+
+// BarObserver is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
+// completed normally.
+type BarObserver func(next bar, err error, done bool)
+
+//jig:name ObservableBar
+
+// ObservableBar is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type ObservableBar func(BarObserver, Scheduler, Subscriber)
+
 //jig:name Observer
 
 // Observer is a function that gets called whenever the Observable has
@@ -28,21 +44,21 @@ type Observer func(next interface{}, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type Observable func(Observer, Scheduler, Subscriber)
 
-//jig:name IntObserver
+//jig:name ObservableFooObserver
 
-// IntObserver is a function that gets called whenever the Observable has
+// ObservableFooObserver is a function that gets called whenever the Observable has
 // something to report. The next argument is the item value that is only
 // valid when the done argument is false. When done is true and the err
 // argument is not nil, then the Observable has terminated with an error.
 // When done is true and the err argument is nil, then the Observable has
 // completed normally.
-type IntObserver func(next int, err error, done bool)
+type ObservableFooObserver func(next ObservableFoo, err error, done bool)
 
-//jig:name ObservableInt
+//jig:name ObservableObservableFoo
 
-// ObservableInt is a function taking an Observer, Scheduler and Subscriber.
+// ObservableObservableFoo is a function taking an Observer, Scheduler and Subscriber.
 // Calling it will subscribe the Observer to events from the Observable.
-type ObservableInt func(IntObserver, Scheduler, Subscriber)
+type ObservableObservableFoo func(ObservableFooObserver, Scheduler, Subscriber)
 
 //jig:name TimeObserver
 
@@ -92,21 +108,37 @@ type TimeIntervalFooObserver func(next TimeIntervalFoo, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableTimeIntervalFoo func(TimeIntervalFooObserver, Scheduler, Subscriber)
 
-//jig:name BarObserver
+//jig:name BoolObserver
 
-// BarObserver is a function that gets called whenever the Observable has
+// BoolObserver is a function that gets called whenever the Observable has
 // something to report. The next argument is the item value that is only
 // valid when the done argument is false. When done is true and the err
 // argument is not nil, then the Observable has terminated with an error.
 // When done is true and the err argument is nil, then the Observable has
 // completed normally.
-type BarObserver func(next bar, err error, done bool)
+type BoolObserver func(next bool, err error, done bool)
 
-//jig:name ObservableBar
+//jig:name ObservableBool
 
-// ObservableBar is a function taking an Observer, Scheduler and Subscriber.
+// ObservableBool is a function taking an Observer, Scheduler and Subscriber.
 // Calling it will subscribe the Observer to events from the Observable.
-type ObservableBar func(BarObserver, Scheduler, Subscriber)
+type ObservableBool func(BoolObserver, Scheduler, Subscriber)
+
+//jig:name SliceObserver
+
+// SliceObserver is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
+// completed normally.
+type SliceObserver func(next Slice, err error, done bool)
+
+//jig:name ObservableSlice
+
+// ObservableSlice is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type ObservableSlice func(SliceObserver, Scheduler, Subscriber)
 
 //jig:name FooSliceObserver
 
@@ -124,21 +156,21 @@ type FooSliceObserver func(next FooSlice, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableFooSlice func(FooSliceObserver, Scheduler, Subscriber)
 
-//jig:name ObservableFooObserver
+//jig:name IntObserver
 
-// ObservableFooObserver is a function that gets called whenever the Observable has
+// IntObserver is a function that gets called whenever the Observable has
 // something to report. The next argument is the item value that is only
 // valid when the done argument is false. When done is true and the err
 // argument is not nil, then the Observable has terminated with an error.
 // When done is true and the err argument is nil, then the Observable has
 // completed normally.
-type ObservableFooObserver func(next ObservableFoo, err error, done bool)
+type IntObserver func(next int, err error, done bool)
 
-//jig:name ObservableObservableFoo
+//jig:name ObservableInt
 
-// ObservableObservableFoo is a function taking an Observer, Scheduler and Subscriber.
+// ObservableInt is a function taking an Observer, Scheduler and Subscriber.
 // Calling it will subscribe the Observer to events from the Observable.
-type ObservableObservableFoo func(ObservableFooObserver, Scheduler, Subscriber)
+type ObservableInt func(IntObserver, Scheduler, Subscriber)
 
 //jig:name BarSliceObserver
 
@@ -156,21 +188,21 @@ type BarSliceObserver func(next BarSlice, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableBarSlice func(BarSliceObserver, Scheduler, Subscriber)
 
-//jig:name BoolObserver
+//jig:name Empty
 
-// BoolObserver is a function that gets called whenever the Observable has
-// something to report. The next argument is the item value that is only
-// valid when the done argument is false. When done is true and the err
-// argument is not nil, then the Observable has terminated with an error.
-// When done is true and the err argument is nil, then the Observable has
-// completed normally.
-type BoolObserver func(next bool, err error, done bool)
-
-//jig:name ObservableBool
-
-// ObservableBool is a function taking an Observer, Scheduler and Subscriber.
-// Calling it will subscribe the Observer to events from the Observable.
-type ObservableBool func(BoolObserver, Scheduler, Subscriber)
+// Empty creates an Observable that emits no items but terminates normally.
+func Empty() Observable {
+	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
+		runner := scheduler.Schedule(func() {
+			if subscriber.Subscribed() {
+				var zero interface{}
+				observe(zero, nil, true)
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
+	}
+	return observable
+}
 
 //jig:name ObservableFoo_AsObservable
 
@@ -181,6 +213,51 @@ func (o ObservableFoo) AsObservable() Observable {
 			observe(interface{}(next), err, done)
 		}
 		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableFoo_MapObservableBar
+
+// MapObservableBar transforms the items emitted by an ObservableFoo by applying a
+// function to each item.
+func (o ObservableFoo) MapObservableBar(project func(foo) ObservableBar) ObservableObservableBar {
+	observable := func(observe ObservableBarObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next foo, err error, done bool) {
+			var mapped ObservableBar
+			if !done {
+				mapped = project(next)
+			}
+			observe(mapped, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name Slice
+
+type Slice = []interface{}
+
+//jig:name Interval
+
+// Interval creates an Observable that emits a sequence of integers spaced
+// by a particular time interval. First integer is not emitted immediately, but
+// only after the first time interval has passed. The generated code will do a type
+// conversion from int to interface{}.
+func Interval(interval time.Duration) Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		i := 0
+		runner := subscribeOn.ScheduleFutureRecursive(interval, func(self func(time.Duration)) {
+			if subscriber.Subscribed() {
+				observe(interface{}(i), nil, false)
+				i++
+				if subscriber.Subscribed() {
+					self(interval)
+				}
+			}
+		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }
@@ -210,40 +287,6 @@ func FromObservableFoo(slice ...ObservableFoo) ObservableObservableFoo {
 	return observable
 }
 
-//jig:name ObservableFoo_MapObservableBar
-
-// MapObservableBar transforms the items emitted by an ObservableFoo by applying a
-// function to each item.
-func (o ObservableFoo) MapObservableBar(project func(foo) ObservableBar) ObservableObservableBar {
-	observable := func(observe ObservableBarObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next foo, err error, done bool) {
-			var mapped ObservableBar
-			if !done {
-				mapped = project(next)
-			}
-			observe(mapped, err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name Empty
-
-// Empty creates an Observable that emits no items but terminates normally.
-func Empty() Observable {
-	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
-		runner := scheduler.Schedule(func() {
-			if subscriber.Subscribed() {
-				var zero interface{}
-				observe(zero, nil, true)
-			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
-	}
-	return observable
-}
-
 //jig:name BarSlice
 
 type BarSlice = []bar
@@ -264,6 +307,24 @@ type ObservableBarObserver func(next ObservableBar, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableObservableBar func(ObservableBarObserver, Scheduler, Subscriber)
 
+//jig:name ObservableSlice_MapFooSlice
+
+// MapFooSlice transforms the items emitted by an ObservableSlice by applying a
+// function to each item.
+func (o ObservableSlice) MapFooSlice(project func(Slice) FooSlice) ObservableFooSlice {
+	observable := func(observe FooSliceObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next Slice, err error, done bool) {
+			var mapped FooSlice
+			if !done {
+				mapped = project(next)
+			}
+			observe(mapped, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name ObservableBar_AsObservable
 
 // AsObservable turns a typed ObservableBar into an Observable of interface{}.
@@ -273,6 +334,148 @@ func (o ObservableBar) AsObservable() Observable {
 			observe(interface{}(next), err, done)
 		}
 		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableObservableBar_CombineLatestAll
+
+// CombineLatestAll flattens a higher order observable
+// (e.g. ObservableObservableBar) by subscribing to
+// all emitted observables (ie. ObservableBar entries) until the source
+// completes. It will then wait for all of the subscribed ObservableBars
+// to emit before emitting the first slice. Whenever any of the subscribed
+// observables emits, a new slice will be emitted containing all the latest
+// value.
+func (o ObservableObservableBar) CombineLatestAll() ObservableBarSlice {
+	observable := func(observe BarSliceObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		observables := []ObservableBar(nil)
+		var observers struct {
+			sync.Mutex
+			assigned	[]bool
+			values		[]bar
+			initialized	int
+			active		int
+		}
+		makeObserver := func(index int) BarObserver {
+			observer := func(next bar, err error, done bool) {
+				observers.Lock()
+				defer observers.Unlock()
+				if observers.active > 0 {
+					switch {
+					case !done:
+						if !observers.assigned[index] {
+							observers.assigned[index] = true
+							observers.initialized++
+						}
+						observers.values[index] = next
+						if observers.initialized == len(observers.values) {
+							observe(observers.values, nil, false)
+						}
+					case err != nil:
+						observers.active = 0
+						var zero []bar
+						observe(zero, err, true)
+					default:
+						if observers.active--; observers.active == 0 {
+							var zero []bar
+							observe(zero, nil, true)
+						}
+					}
+				}
+			}
+			return observer
+		}
+
+		observer := func(next ObservableBar, err error, done bool) {
+			switch {
+			case !done:
+				observables = append(observables, next)
+			case err != nil:
+				var zero []bar
+				observe(zero, err, true)
+			default:
+				subscribeOn.Schedule(func() {
+					if subscriber.Subscribed() {
+						numObservables := len(observables)
+						observers.assigned = make([]bool, numObservables)
+						observers.values = make([]bar, numObservables)
+						observers.active = numObservables
+						for i, v := range observables {
+							if !subscriber.Subscribed() {
+								return
+							}
+							v(makeObserver(i), subscribeOn, subscriber)
+						}
+					}
+				})
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableObservableBar_ConcatAll
+
+// ConcatAll flattens a higher order observable by concattenating the observables it emits.
+func (o ObservableObservableBar) ConcatAll() ObservableBar {
+	observable := func(observe BarObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		var concat struct {
+			sync.Mutex
+			observables	[]ObservableBar
+			observer	BarObserver
+			subscriber	Subscriber
+		}
+
+		var source struct {
+			observer	ObservableBarObserver
+			subscriber	Subscriber
+		}
+
+		concat.observer = func(next bar, err error, done bool) {
+			concat.Lock()
+			if !done || err != nil {
+				observe(next, err, done)
+			} else {
+				if len(concat.observables) == 0 {
+					if !source.subscriber.Subscribed() {
+						var zero bar
+						observe(zero, nil, true)
+					}
+					concat.observables = nil
+				} else {
+					observable := concat.observables[0]
+					concat.observables = concat.observables[1:]
+					observable(concat.observer, subscribeOn, subscriber)
+				}
+			}
+			concat.Unlock()
+		}
+
+		source.observer = func(next ObservableBar, err error, done bool) {
+			if !done {
+				concat.Lock()
+				initial := concat.observables == nil
+				concat.observables = append(concat.observables, next)
+				concat.Unlock()
+				if initial {
+					var zero bar
+					concat.observer(zero, nil, true)
+				}
+			} else {
+				concat.Lock()
+				initial := concat.observables == nil
+				source.subscriber.Done(err)
+				concat.Unlock()
+				if initial || err != nil {
+					var zero bar
+					concat.observer(zero, err, true)
+				}
+			}
+		}
+		source.subscriber = subscriber.Add()
+		o(source.observer, subscribeOn, source.subscriber)
 	}
 	return observable
 }
@@ -479,148 +682,6 @@ func (o ObservableObservableBar) SwitchAll() ObservableBar {
 			}
 		}
 		o(switcher, subscribeOn, switcherSubscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableObservableBar_CombineLatestAll
-
-// CombineLatestAll flattens a higher order observable
-// (e.g. ObservableObservableBar) by subscribing to
-// all emitted observables (ie. ObservableBar entries) until the source
-// completes. It will then wait for all of the subscribed ObservableBars
-// to emit before emitting the first slice. Whenever any of the subscribed
-// observables emits, a new slice will be emitted containing all the latest
-// value.
-func (o ObservableObservableBar) CombineLatestAll() ObservableBarSlice {
-	observable := func(observe BarSliceObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		observables := []ObservableBar(nil)
-		var observers struct {
-			sync.Mutex
-			assigned	[]bool
-			values		[]bar
-			initialized	int
-			active		int
-		}
-		makeObserver := func(index int) BarObserver {
-			observer := func(next bar, err error, done bool) {
-				observers.Lock()
-				defer observers.Unlock()
-				if observers.active > 0 {
-					switch {
-					case !done:
-						if !observers.assigned[index] {
-							observers.assigned[index] = true
-							observers.initialized++
-						}
-						observers.values[index] = next
-						if observers.initialized == len(observers.values) {
-							observe(observers.values, nil, false)
-						}
-					case err != nil:
-						observers.active = 0
-						var zero []bar
-						observe(zero, err, true)
-					default:
-						if observers.active--; observers.active == 0 {
-							var zero []bar
-							observe(zero, nil, true)
-						}
-					}
-				}
-			}
-			return observer
-		}
-
-		observer := func(next ObservableBar, err error, done bool) {
-			switch {
-			case !done:
-				observables = append(observables, next)
-			case err != nil:
-				var zero []bar
-				observe(zero, err, true)
-			default:
-				subscribeOn.Schedule(func() {
-					if subscriber.Subscribed() {
-						numObservables := len(observables)
-						observers.assigned = make([]bool, numObservables)
-						observers.values = make([]bar, numObservables)
-						observers.active = numObservables
-						for i, v := range observables {
-							if !subscriber.Subscribed() {
-								return
-							}
-							v(makeObserver(i), subscribeOn, subscriber)
-						}
-					}
-				})
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableObservableBar_ConcatAll
-
-// ConcatAll flattens a higher order observable by concattenating the observables it emits.
-func (o ObservableObservableBar) ConcatAll() ObservableBar {
-	observable := func(observe BarObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		var concat struct {
-			sync.Mutex
-			observables	[]ObservableBar
-			observer	BarObserver
-			subscriber	Subscriber
-		}
-
-		var source struct {
-			observer	ObservableBarObserver
-			subscriber	Subscriber
-		}
-
-		concat.observer = func(next bar, err error, done bool) {
-			concat.Lock()
-			if !done || err != nil {
-				observe(next, err, done)
-			} else {
-				if len(concat.observables) == 0 {
-					if !source.subscriber.Subscribed() {
-						var zero bar
-						observe(zero, nil, true)
-					}
-					concat.observables = nil
-				} else {
-					observable := concat.observables[0]
-					concat.observables = concat.observables[1:]
-					observable(concat.observer, subscribeOn, subscriber)
-				}
-			}
-			concat.Unlock()
-		}
-
-		source.observer = func(next ObservableBar, err error, done bool) {
-			if !done {
-				concat.Lock()
-				initial := concat.observables == nil
-				concat.observables = append(concat.observables, next)
-				concat.Unlock()
-				if initial {
-					var zero bar
-					concat.observer(zero, nil, true)
-				}
-			} else {
-				concat.Lock()
-				initial := concat.observables == nil
-				source.subscriber.Done(err)
-				concat.Unlock()
-				if initial || err != nil {
-					var zero bar
-					concat.observer(zero, err, true)
-				}
-			}
-		}
-		source.subscriber = subscriber.Add()
-		o(source.observer, subscribeOn, source.subscriber)
 	}
 	return observable
 }

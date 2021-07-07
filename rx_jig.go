@@ -93,6 +93,8 @@ func generate() {
 	i.AsObservable()
 	o.AuditTime(time.Millisecond)
 	i.Average()
+	o.Buffer(o)
+	o.BufferTime(time.Millisecond)
 	o.Catch(o)
 	o.CatchError(func(error, Observable) Observable { return o })
 	o.Count()

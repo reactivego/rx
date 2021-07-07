@@ -1567,6 +1567,70 @@ func (o ObservableInt) Average() ObservableInt {
 	return observable
 }
 
+//jig:name Observable_Buffer
+
+// Buffer emits a sequence of Observables that emit what the source has emitted until the
+// closingNotifier Observable emitted.
+func (o Observable) Buffer(closingNotifier Observable) ObservableSlice {
+	observable := func(observe SliceObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		var serializer struct {
+			sync.Mutex
+			next	[]interface{}
+			done	bool
+		}
+
+		notifier := func(next interface{}, err error, done bool) {
+			serializer.Lock()
+			defer serializer.Unlock()
+			if !serializer.done {
+				serializer.done = done
+				switch {
+				case !done:
+					observe(serializer.next, nil, false)
+					serializer.next = serializer.next[:0]
+				case err != nil:
+					observe(nil, err, true)
+					serializer.next = nil
+				default:
+					observe(serializer.next, nil, false)
+					observe(nil, nil, true)
+					serializer.next = nil
+				}
+			}
+		}
+		closingNotifier(notifier, subscribeOn, subscriber)
+
+		observer := func(next interface{}, err error, done bool) {
+			serializer.Lock()
+			defer serializer.Unlock()
+			if !serializer.done {
+				serializer.done = done
+				switch {
+				case !done:
+					serializer.next = append(serializer.next, next)
+				case err != nil:
+					observe(nil, err, true)
+					serializer.next = nil
+				default:
+					observe(serializer.next, nil, false)
+					observe(nil, nil, true)
+					serializer.next = nil
+				}
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name Observable_BufferTime
+
+// BufferTime buffers the source Observable values for a specific time period
+// and emits those as a slice periodically in time.
+func (o Observable) BufferTime(period time.Duration) ObservableSlice {
+	return o.Buffer(Interval(period))
+}
+
 //jig:name Observable_Catch
 
 // Catch recovers from an error notification by continuing the sequence without
@@ -2503,23 +2567,27 @@ func (o Observable) TakeLast(n int) Observable {
 // TakeUntil emits items emitted by an Observable until another Observable emits an item.
 func (o Observable) TakeUntil(other Observable) Observable {
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		var watcherNext int32
-		watcherSubscriber := subscriber.Add()
-		watcher := func(next interface{}, err error, done bool) {
-			if !done {
-				atomic.StoreInt32(&watcherNext, 1)
-			}
-			watcherSubscriber.Unsubscribe()
+		var serializer struct {
+			sync.Mutex
+			done	bool
 		}
-		other(watcher, subscribeOn, watcherSubscriber)
-
 		observer := func(next interface{}, err error, done bool) {
-			if done || atomic.LoadInt32(&watcherNext) != 1 {
+			serializer.Lock()
+			defer serializer.Unlock()
+			if !serializer.done {
+				serializer.done = done
 				observe(next, err, done)
-			} else {
-				observe(nil, nil, true)
 			}
 		}
+		triggerSubscriber := subscriber.Add()
+		trigger := func(next interface{}, err error, done bool) {
+			if !done {
+				observer(nil, nil, true)
+			} else {
+				triggerSubscriber.Unsubscribe()
+			}
+		}
+		other(trigger, subscribeOn, triggerSubscriber)
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable

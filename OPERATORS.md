@@ -1,6 +1,6 @@
 # Operators
 
-Currently 102 operators have been implemented:
+Currently 104 operators have been implemented:
     
 | A … C                   | D … L                         | M … P                  | R … S              | T … W                   |
 |:------------------------|:------------------------------|:-----------------------|:-------------------|:------------------------|
@@ -11,23 +11,26 @@ Currently 102 operators have been implemented:
 | [AutoConnect]           | [DistinctUntilChanged] :star: | [MergeAll]             | [ReplaySubject]    | [ThrottleTime]          |
 | [Average]               | [Do] :star:                   | [MergeDelayError]      | [Retry]            | [Throw]                 |
 | [BehaviorSubject]       | [DoOnComplete]                | [MergeDelayErrorWith]  | [SampleTime]       | [Ticker]                |
-| [Catch] :star:          | [DoOnError]                   | [MergeMap] :star:      | [Scan] :star:      | [TimeInterval]          |
-| [CatchError] :star:     | [ElementAt]                   | [MergeMapTo]           | [Serialize]        | [Timeout]               |
-| [CombineLatest] :star:  | [Empty]                       | [MergeWith] :star:     | [Single]           | [Timer]                 |
-| [CombineLatestAll]      | [Filter] :star:               | [Min]                  | [Skip]             | [Timestamp]             |
-| [CombineLatestMap]      | [Finally]                     | [Never]                | [SkipLast]         | [ToChan]                |
-| [CombineLatestMapTo]    | [First]                       | [ObserveOn]            | [Start]            | [ToSingle]              |
-| [CombineLatestWith]     | [From] :star:                 | [Of] :star:            | [StartWith] :star: | [ToSlice]               |
-| [Concat] :star:         | [FromChan]                    | [Only]                 | [Subject]          | [Wait]                  |
-| [ConcatAll]             | [IgnoreCompletion]            | [Passthrough]          | [Subscribe]        | [WithLatestFrom] :star: |
-| [ConcatMap] :star:      | [IgnoreElements]              | [Println]              | [SubscribeOn]      | [WithLatestFromAll]     |
-| [ConcatMapTo]           | [Interval]                    | [Publish] :star:       | [Sum]              |
-| [ConcatWith] :star:     | [Just] :star:                 | [PublishBehavior]      | [SwitchAll]        |
-| [Connect]               | [Last]                        | [PublishLast]          | [SwitchMap] :star: |
-| [Count]                 |                               | [PublishReplay] :star: |
+| [Buffer]                | [DoOnError]                   | [MergeMap] :star:      | [Scan] :star:      | [TimeInterval]          |
+| [BufferTime] :star:     | [ElementAt]                   | [MergeMapTo]           | [Serialize]        | [Timeout]               |
+| [Catch] :star:          | [Empty]                       | [MergeWith] :star:     | [Single]           | [Timer]                 |
+| [CatchError] :star:     | [Filter] :star:               | [Min]                  | [Skip]             | [Timestamp]             |
+| [CombineLatest] :star:  | [Finally]                     | [Never]                | [SkipLast]         | [ToChan]                |
+| [CombineLatestAll]      | [First]                       | [ObserveOn]            | [Start]            | [ToSingle]              |
+| [CombineLatestMap]      | [From] :star:                 | [Of] :star:            | [StartWith] :star: | [ToSlice]               |
+| [CombineLatestMapTo]    | [FromChan]                    | [Only]                 | [Subject]          | [Wait]                  |
+| [CombineLatestWith]     | [IgnoreCompletion]            | [Passthrough]          | [Subscribe]        | [WithLatestFrom] :star: |
+| [Concat] :star:         | [IgnoreElements]              | [Println]              | [SubscribeOn]      | [WithLatestFromAll]     |
+| [ConcatAll]             | [Interval]                    | [Publish] :star:       | [Sum]              |
+| [ConcatMap] :star:      | [Just] :star:                 | [PublishBehavior]      | [SwitchAll]        |
+| [ConcatMapTo]           | [Last]                        | [PublishLast]          | [SwitchMap] :star: |
+| [ConcatWith] :star:     |                               | [PublishReplay] :star: |
+| [Connect]               |
+| [Count]                 |
 | [Create] :star:         |
 | [CreateFutureRecursive] |
 | [CreateRecursive]       |
+
 
 :star: - commonly used
 
@@ -38,6 +41,8 @@ Currently 102 operators have been implemented:
 [AutoConnect]: #autoconnect
 [Average]: #average
 [BehaviorSubject]: #behaviorsubject
+[Buffer]: #buffer
+[BufferTime]: #buffertime
 [Catch]: #catch
 [CatchError]: #catcherror
 [CombineLatest]: #combinelatest
@@ -199,6 +204,14 @@ time period when the timer was active.
 #### TBD
 
 ## BehaviorSubject
+
+#### TBD
+
+## Buffer
+
+#### TBD
+
+## BufferTime
 
 #### TBD
 
