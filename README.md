@@ -66,10 +66,10 @@ Generate statically typed code by running the [jig](http://github.com/reactivego
 
 ```bash
 $ jig -v
-found 149 templates in package "rx" (github.com/reactivego/rx/generic)
+found 169 templates in package "rx" (github.com/reactivego/rx/generic)
 ...
 ```
-Details on how to use generics can be found in the [doc](doc) folder.
+Details on how to use generics can be found in the [generic](generic) folder.
 
 ## Observables
 The main focus of `rx` is [Observables](http://reactivex.io/documentation/observable.html).
