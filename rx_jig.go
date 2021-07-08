@@ -55,7 +55,7 @@ func generate() {
 
 	Concat(o)
 	o.ConcatWith()
-	// o.ConcatMap
+	o.ConcatMap(nil)
 	// o.ConcatMapTo
 	// o.ConcatScan
 	// o.ConcatReduce

@@ -25,6 +25,49 @@ func ExampleObservable_All() {
 	// All values less than 5? true <nil>
 }
 
+func ExampleObservable_Buffer() {
+	const ms = time.Millisecond
+	source := rx.Timer(0*ms, 100*ms).Take(4).ConcatMap(func(i interface{}) rx.Observable {
+		switch i.(int) {
+		case 0:
+			return rx.From("a", "b")
+		case 1:
+			return rx.From("c", "d", "e")
+		case 3:
+			return rx.From("f", "g")
+		}
+		return rx.Empty()
+	})
+	closingNotifier := rx.Interval(100 * ms)
+	source.Buffer(closingNotifier).Println()
+	// Output:
+	// [a b]
+	// [c d e]
+	// []
+	// [f g]
+}
+
+func ExampleObservable_BufferTime() {
+	const ms = time.Millisecond
+	source := rx.Timer(0*ms, 100*ms).Take(4).ConcatMap(func(i interface{}) rx.Observable {
+		switch i.(int) {
+		case 0:
+			return rx.From("a", "b")
+		case 1:
+			return rx.From("c", "d", "e")
+		case 3:
+			return rx.From("f", "g")
+		}
+		return rx.Empty()
+	})
+	source.BufferTime(100 * ms).Println()
+	// Output:
+	// [a b]
+	// [c d e]
+	// []
+	// [f g]
+}
+
 func ExampleObservable_ConcatWith() {
 	oa := rx.From(0, 1, 2, 3)
 	ob := rx.From(4, 5)

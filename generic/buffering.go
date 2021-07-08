@@ -7,8 +7,7 @@ import (
 
 //jig:template Observable Buffer
 
-// Buffer emits a sequence of Observables that emit what the source has emitted until the
-// closingNotifier Observable emitted.
+// Buffer buffers the source Observable values until closingNotifier emits.
 func (o Observable) Buffer(closingNotifier Observable) ObservableSlice {
 	observable := func(observe SliceObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		var serializer struct {
@@ -64,8 +63,7 @@ func (o Observable) Buffer(closingNotifier Observable) ObservableSlice {
 //jig:template Observable<Foo> Buffer
 //jig:needs Observable Buffer
 
-// Buffer emits a sequence of Observables that emit what the source has emitted until the
-// closingNotifier Observable emitted.
+// Buffer buffers the source Observable values until closingNotifier emits.
 func (o ObservableFoo) Buffer(closingNotifier Observable) ObservableFooSlice {
 	project := func(next Slice) FooSlice {
 		foos := make(FooSlice, len(next))
@@ -80,8 +78,7 @@ func (o ObservableFoo) Buffer(closingNotifier Observable) ObservableFooSlice {
 //jig:template Observable<Foo> Buffer<Bar>
 //jig:needs Observable<Foo> Buffer
 
-// Buffer emits a sequence of Observables that emit what the source has emitted until the
-// closingNotifier Observable emitted.
+// Buffer buffers the source Observable values until closingNotifier emits.
 func (o ObservableFoo) BufferBar(closingNotifier ObservableBar) ObservableFooSlice {
 	return o.Buffer(closingNotifier.AsObservable())
 }
