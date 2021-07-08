@@ -208,13 +208,72 @@ time period when the timer was active.
 #### TBD
 
 ## Buffer
+[![](../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx#Observable.Buffer)
+[![](../assets/rx.svg?raw=true)](http://reactivex.io/documentation/operators/buffer.html)
 
-#### TBD
+**Buffer** buffers the source Observable values until closingNotifier emits.
 
+![Buffer](../assets/Buffer.svg?raw=true)
+
+## Example
+```go
+import _ "github.com/reactivego/rx/generic"
+```
+Code:
+```go
+source := rx.Timer(0*ms, 100*ms).Take(4).ConcatMap(func(i interface{}) rx.Observable {
+    switch i.(int) {
+    case 0:
+        return rx.From("a", "b")
+    case 1:
+        return rx.From("c", "d", "e")
+    case 3:
+        return rx.From("f", "g")
+    }
+    return rx.Empty()
+})
+closingNotifier := rx.Interval(100 * ms)
+source.Buffer(closingNotifier).Println()
+```
+Output:
+```
+[a b]
+[c d e]
+[]
+[f g]
+```
 ## BufferTime
+[![](../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx#Observable.BufferTime)
+[![](../assets/rx.svg?raw=true)](http://reactivex.io/documentation/operators/buffer.html)
 
-#### TBD
+**BufferTime** buffers the source Observable values for a specific time period and emits those as a
+slice periodically in time.
 
+![BufferTime](../assets/BufferTime.svg?raw=true)
+
+Code:
+```go
+const ms = time.Millisecond
+source := rx.Timer(0*ms, 100*ms).Take(4).ConcatMap(func(i interface{}) rx.Observable {
+    switch i.(int) {
+    case 0:
+        return rx.From("a", "b")
+    case 1:
+        return rx.From("c", "d", "e")
+    case 3:
+        return rx.From("f", "g")
+    }
+    return rx.Empty()
+})
+source.BufferTime(100 * ms).Println()
+```
+Output:
+```
+[a b]
+[c d e]
+[]
+[f g]
+```
 ## Catch
 
 #### TBD
