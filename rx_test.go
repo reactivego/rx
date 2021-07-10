@@ -68,6 +68,17 @@ func ExampleObservable_BufferTime() {
 	// [f g]
 }
 
+func ExampleObservable_Catch() {
+	throw := rx.Throw(rx.RxError("error"))
+	rx.From(1, 2, 3).ConcatWith(throw).Catch(rx.From(4, 5)).Println()
+	// Output:
+	// 1
+	// 2
+	// 3
+	// 4
+	// 5
+}
+
 func ExampleObservable_ConcatWith() {
 	oa := rx.From(0, 1, 2, 3)
 	ob := rx.From(4, 5)
