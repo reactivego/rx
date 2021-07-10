@@ -7,11 +7,8 @@ import (
 )
 
 func Example_catch() {
-	o123 := FromInt(1, 2, 3)
-	o45 := FromInt(4, 5)
-	oThrowError := ThrowInt(RxError("error"))
-
-	err := o123.ConcatWith(oThrowError).Catch(o45).Println()
+	throw := ThrowInt(RxError("error"))
+	err := FromInt(1, 2, 3).ConcatWith(throw).Catch(FromInt(4, 5)).Println()
 	fmt.Println(err)
 	// Output:
 	// 1
