@@ -275,9 +275,28 @@ Output:
 [f g]
 ```
 ## Catch
+[![](../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx#Observable.Catch)
+[![](../assets/rx.svg?raw=true)](http://reactivex.io/documentation/operators/catch.html)
 
-#### TBD
+**Catch** recovers from an error notification by continuing the sequence without
+emitting the error but by switching to the catch ObservableInt to provide
+items.
 
+![Catch](../assets/Catch.svg?raw=true)
+
+Code:
+```go
+throw := rx.Throw(rx.RxError("error"))
+rx.From(1, 2, 3).ConcatWith(throw).Catch(rx.From(4, 5)).Println()
+```
+Output:
+```
+1
+2
+3
+4
+5
+```
 ## CatchError
 
 #### TBD
