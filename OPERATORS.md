@@ -286,8 +286,9 @@ items.
 
 Code:
 ```go
-throw := rx.Throw(rx.RxError("error"))
-rx.From(1, 2, 3).ConcatWith(throw).Catch(rx.From(4, 5)).Println()
+const problem = rx.RxError("problem")
+
+rx.From(1, 2, 3).ConcatWith(rx.Throw(problem)).Catch(rx.From(4, 5)).Println()
 ```
 Output:
 ```
@@ -298,9 +299,40 @@ Output:
 5
 ```
 ## CatchError
+[![](../assets/godev.svg?raw=true)](https://pkg.go.dev/github.com/reactivego/rx#Observable.CatchError)
+[![](../assets/rx.svg?raw=true)](http://reactivex.io/documentation/operators/catch.html)
 
-#### TBD
+**CatchError** catches errors on the Observable to be handled by returning a
+new Observable or throwing an error. It is passed a selector function 
+that takes as arguments err, which is the error, and caught, which is the
+source observable, in case you'd like to "retry" that observable by
+returning it again. Whatever observable is returned by the selector will be
+used to continue the observable chain.
 
+![CatchError](../assets/CatchError.svg?raw=true)
+
+Code:
+```go
+const problem = rx.RxError("problem")
+
+catcher := func(err error, caught rx.Observable) rx.Observable {
+    if err == problem {
+        return rx.From(4, 5)
+    } else {
+        return caught
+    }
+}
+
+rx.From(1, 2, 3).ConcatWith(rx.Throw(problem)).CatchError(catcher).Println()
+```
+Output:
+```
+1
+2
+3
+4
+5
+```
 ## CombineLatest
 
 #### TBD

@@ -11,6 +11,12 @@ import (
 	"github.com/reactivego/subscriber"
 )
 
+//jig:name RxError
+
+type RxError string
+
+func (e RxError) Error() string	{ return string(e) }
+
 //jig:name Scheduler
 
 // Scheduler is used to schedule tasks to support subscribing and observing.
@@ -80,12 +86,6 @@ func ThrowInt(err error) ObservableInt {
 	}
 	return observable
 }
-
-//jig:name RxError
-
-type RxError string
-
-func (e RxError) Error() string	{ return string(e) }
 
 //jig:name ObservableInt_ConcatWith
 

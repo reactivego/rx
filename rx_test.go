@@ -69,8 +69,29 @@ func ExampleObservable_BufferTime() {
 }
 
 func ExampleObservable_Catch() {
-	throw := rx.Throw(rx.RxError("error"))
-	rx.From(1, 2, 3).ConcatWith(throw).Catch(rx.From(4, 5)).Println()
+	const problem = rx.RxError("problem")
+
+	rx.From(1, 2, 3).ConcatWith(rx.Throw(problem)).Catch(rx.From(4, 5)).Println()
+	// Output:
+	// 1
+	// 2
+	// 3
+	// 4
+	// 5
+}
+
+func ExampleObservable_CatchError() {
+	const problem = rx.RxError("problem")
+
+	catcher := func(err error, caught rx.Observable) rx.Observable {
+		if err == problem {
+			return rx.From(4, 5)
+		} else {
+			return caught
+		}
+	}
+
+	rx.From(1, 2, 3).ConcatWith(rx.Throw(problem)).CatchError(catcher).Println()
 	// Output:
 	// 1
 	// 2

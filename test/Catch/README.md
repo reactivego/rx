@@ -13,8 +13,10 @@ import _ "github.com/reactivego/rx/generic"
 ```
 Code:
 ```go
-throw := ThrowInt(RxError("error"))
-err := FromInt(1, 2, 3).ConcatWith(throw).Catch(FromInt(4, 5)).Println()
+const problem = RxError("problem")
+
+err := FromInt(1, 2, 3).ConcatWith(ThrowInt(problem)).Catch(FromInt(4, 5)).Println()
+
 fmt.Println(err)
 ```
 Output:

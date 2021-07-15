@@ -7,16 +7,18 @@ import (
 )
 
 func Example_catchError() {
-	o123 := FromInt(1, 2, 3)
-	o45 := FromInt(4, 5)
-	oThrowError := ThrowInt(RxError("error"))
-	err := o123.ConcatWith(oThrowError).CatchError(func(err error, caught ObservableInt) ObservableInt {
-		if err == RxError("error") {
-			return o45
+	const problem = RxError("problem")
+
+	catcher := func(err error, caught ObservableInt) ObservableInt {
+		if err == problem {
+			return FromInt(4, 5)
 		} else {
 			return caught
 		}
-	}).Println()
+	}
+
+	err := FromInt(1, 2, 3).ConcatWith(ThrowInt(problem)).CatchError(catcher).Println()
+
 	fmt.Println(err)
 	// Output:
 	// 1
