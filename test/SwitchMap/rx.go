@@ -26,31 +26,6 @@ type Scheduler = scheduler.Scheduler
 // from a single subscriber at the root of the subscription tree.
 type Subscriber = subscriber.Subscriber
 
-//jig:name Observer
-
-// Observer is a function that gets called whenever the Observable has
-// something to report. The next argument is the item value that is only
-// valid when the done argument is false. When done is true and the err
-// argument is not nil, then the Observable has terminated with an error.
-// When done is true and the err argument is nil, then the Observable has
-// completed normally.
-type Observer func(next interface{}, err error, done bool)
-
-//jig:name Observable
-
-// Observable is a function taking an Observer, Scheduler and Subscriber.
-// Calling it will subscribe the Observer to events from the Observable.
-type Observable func(Observer, Scheduler, Subscriber)
-
-//jig:name Never
-
-// Never creates an Observable that emits no items and does't terminate.
-func Never() Observable {
-	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
-	}
-	return observable
-}
-
 //jig:name StringObserver
 
 // StringObserver is a function that gets called whenever the Observable has
@@ -67,11 +42,11 @@ type StringObserver func(next string, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableString func(StringObserver, Scheduler, Subscriber)
 
-//jig:name From
+//jig:name FromString
 
-// From creates an Observable from multiple interface{} values passed in.
-func From(slice ...interface{}) Observable {
-	observable := func(observe Observer, scheduler Scheduler, subscriber Subscriber) {
+// FromString creates an ObservableString from multiple string values passed in.
+func FromString(slice ...string) ObservableString {
+	observable := func(observe StringObserver, scheduler Scheduler, subscriber Subscriber) {
 		i := 0
 		runner := scheduler.ScheduleRecursive(func(self func()) {
 			if subscriber.Subscribed() {
@@ -82,7 +57,7 @@ func From(slice ...interface{}) Observable {
 						self()
 					}
 				} else {
-					var zero interface{}
+					var zero string
 					observe(zero, nil, true)
 				}
 			}
@@ -147,117 +122,60 @@ func EmptyString() ObservableString {
 	return observable
 }
 
-//jig:name RxError
+//jig:name Observable_Delay
 
-type RxError string
-
-func (e RxError) Error() string	{ return string(e) }
-
-//jig:name Observable_Serialize
-
-// Serialize forces an Observable to make serialized calls and to be
-// well-behaved.
-func (o Observable) Serialize() Observable {
+// Delay shifts an emission from an Observable forward in time by a particular
+// amount of time. The relative time intervals between emissions are preserved.
+func (o Observable) Delay(duration time.Duration) Observable {
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		var observer struct {
-			sync.Mutex
+		type emission struct {
+			at	time.Time
+			next	interface{}
+			err	error
 			done	bool
 		}
-		serializer := func(next interface{}, err error, done bool) {
-			observer.Lock()
-			defer observer.Unlock()
-			if !observer.done {
-				observer.done = done
-				observe(next, err, done)
-			}
-		}
-		o(serializer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name Observable_Timeout
-
-// TimeoutOccured is delivered to an observer if the stream times out.
-const TimeoutOccured = RxError("timeout occured")
-
-// Timeout mirrors the source Observable, but issues an error notification if a
-// particular period of time elapses without any emitted items.
-// Timeout schedules a task on the scheduler passed to it during subscription.
-func (o Observable) Timeout(due time.Duration) Observable {
-	observable := Observable(func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		var timeout struct {
+		var delay struct {
 			sync.Mutex
-			at		time.Time
-			occurred	bool
+			emissions	[]emission
 		}
-		timeout.at = subscribeOn.Now().Add(due)
-		timer := subscribeOn.ScheduleFutureRecursive(due, func(self func(time.Duration)) {
+		delayer := subscribeOn.ScheduleFutureRecursive(duration, func(self func(time.Duration)) {
 			if subscriber.Subscribed() {
-				timeout.Lock()
-				if !timeout.occurred {
-					due := timeout.at.Sub(subscribeOn.Now())
+				delay.Lock()
+				for _, entry := range delay.emissions {
+					delay.Unlock()
+					due := entry.at.Sub(subscribeOn.Now())
 					if due > 0 {
 						self(due)
-					} else {
-						timeout.occurred = true
-						timeout.Unlock()
-						observe(nil, TimeoutOccured, true)
-						timeout.Lock()
+						return
 					}
+					observe(entry.next, entry.err, entry.done)
+					if entry.done || !subscriber.Subscribed() {
+						return
+					}
+					delay.Lock()
+					delay.emissions = delay.emissions[1:]
 				}
-				timeout.Unlock()
+				delay.Unlock()
+				self(duration)
 			}
 		})
-		subscriber.OnUnsubscribe(timer.Cancel)
+		subscriber.OnUnsubscribe(delayer.Cancel)
 		observer := func(next interface{}, err error, done bool) {
-			if subscriber.Subscribed() {
-				timeout.Lock()
-				if !timeout.occurred {
-					now := subscribeOn.Now()
-					if now.Before(timeout.at) {
-						timeout.at = now.Add(due)
-						timeout.occurred = done
-						observe(next, err, done)
-					}
-				}
-				timeout.Unlock()
-			}
-		}
-		o(observer, subscribeOn, subscriber)
-	})
-	return observable
-}
-
-//jig:name TypecastFailed
-
-// ErrTypecast is delivered to an observer if the generic value cannot be
-// typecast to a specific type.
-const TypecastFailed = RxError("typecast failed")
-
-//jig:name Observable_AsObservableString
-
-// AsObservableString turns an Observable of interface{} into an ObservableString.
-// If during observing a typecast fails, the error ErrTypecastToString will be
-// emitted.
-func (o Observable) AsObservableString() ObservableString {
-	observable := func(observe StringObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if !done {
-				if nextString, ok := next.(string); ok {
-					observe(nextString, err, done)
-				} else {
-					var zero string
-					observe(zero, TypecastFailed, true)
-				}
-			} else {
-				var zero string
-				observe(zero, err, true)
-			}
+			delay.Lock()
+			delay.emissions = append(delay.emissions, emission{subscribeOn.Now().Add(duration), next, err, done})
+			delay.Unlock()
 		}
 		o(observer, subscribeOn, subscriber)
 	}
 	return observable
+}
+
+//jig:name ObservableString_Delay
+
+// Delay shifts an emission from an Observable forward in time by a particular
+// amount of time. The relative time intervals between emissions are preserved.
+func (o ObservableString) Delay(duration time.Duration) ObservableString {
+	return o.AsObservable().Delay(duration).AsObservableString()
 }
 
 //jig:name Observable_Take
@@ -289,12 +207,28 @@ func (o ObservableInt) Take(n int) ObservableInt {
 	return o.AsObservable().Take(n).AsObservableInt()
 }
 
-//jig:name ObservableInt_AsObservable
+//jig:name Observer
 
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
+// Observer is a function that gets called whenever the Observable has
+// something to report. The next argument is the item value that is only
+// valid when the done argument is false. When done is true and the err
+// argument is not nil, then the Observable has terminated with an error.
+// When done is true and the err argument is nil, then the Observable has
+// completed normally.
+type Observer func(next interface{}, err error, done bool)
+
+//jig:name Observable
+
+// Observable is a function taking an Observer, Scheduler and Subscriber.
+// Calling it will subscribe the Observer to events from the Observable.
+type Observable func(Observer, Scheduler, Subscriber)
+
+//jig:name ObservableString_AsObservable
+
+// AsObservable turns a typed ObservableString into an Observable of interface{}.
+func (o ObservableString) AsObservable() Observable {
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
+		observer := func(next string, err error, done bool) {
 			observe(interface{}(next), err, done)
 		}
 		o(observer, subscribeOn, subscriber)
@@ -302,19 +236,13 @@ func (o ObservableInt) AsObservable() Observable {
 	return observable
 }
 
-//jig:name Observable_Catch
+//jig:name ObservableInt_AsObservable
 
-// Catch recovers from an error notification by continuing the sequence without
-// emitting the error but by switching to the catch Observable to provide
-// items.
-func (o Observable) Catch(catch Observable) Observable {
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			if err != nil {
-				catch(observe, subscribeOn, subscriber)
-			} else {
-				observe(next, err, done)
-			}
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
 		}
 		o(observer, subscribeOn, subscriber)
 	}
@@ -330,6 +258,43 @@ func (o Observable) Catch(catch Observable) Observable {
 // from the newly emitted one.
 func (o ObservableInt) SwitchMapString(project func(int) ObservableString) ObservableString {
 	return o.MapObservableString(project).SwitchAll()
+}
+
+//jig:name RxError
+
+type RxError string
+
+func (e RxError) Error() string	{ return string(e) }
+
+//jig:name TypecastFailed
+
+// ErrTypecast is delivered to an observer if the generic value cannot be
+// typecast to a specific type.
+const TypecastFailed = RxError("typecast failed")
+
+//jig:name Observable_AsObservableString
+
+// AsObservableString turns an Observable of interface{} into an ObservableString.
+// If during observing a typecast fails, the error ErrTypecastToString will be
+// emitted.
+func (o Observable) AsObservableString() ObservableString {
+	observable := func(observe StringObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			if !done {
+				if nextString, ok := next.(string); ok {
+					observe(nextString, err, done)
+				} else {
+					var zero string
+					observe(zero, TypecastFailed, true)
+				}
+			} else {
+				var zero string
+				observe(zero, err, true)
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
 }
 
 //jig:name Observable_AsObservableInt

@@ -10,12 +10,8 @@ import (
 func Example_switchMap() {
 	const ms = time.Millisecond
 
-	delay := func(duration time.Duration, value Observable) Observable {
-		return Never().Timeout(duration).Catch(value)
-	}
-
 	webreq := func(request string, duration time.Duration) ObservableString {
-		return delay(duration, From(request+" result")).AsObservableString()
+		return FromString(request + " result").Delay(duration)
 	}
 
 	first := webreq("first", 50*ms)

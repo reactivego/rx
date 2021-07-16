@@ -11,7 +11,7 @@ import (
 
 // SwitchMapBar transforms the items emitted by an ObservableFoo by applying a
 // function to each item an returning an ObservableBar. In doing so, it behaves much like
-// MergeMap (previously FlatMap), except that whenever a new ObservableBar is emitted
+// what used to be called FlatMap, except that whenever a new ObservableBar is emitted
 // SwitchMap will unsubscribe from the previous ObservableBar and begin emitting items
 // from the newly emitted one.
 func (o ObservableFoo) SwitchMapBar(project func(foo) ObservableBar) ObservableBar {
@@ -21,10 +21,10 @@ func (o ObservableFoo) SwitchMapBar(project func(foo) ObservableBar) ObservableB
 //jig:template LinkErrors
 
 const (
-	AlreadyDone = RxError("already done")
-	AlreadySubscribed = RxError("already subscribed")
-	AlreadyWaiting = RxError("already waiting")
-	RecursionNotAllowed = RxError("recursion not allowed")
+	AlreadyDone           = RxError("already done")
+	AlreadySubscribed     = RxError("already subscribed")
+	AlreadyWaiting        = RxError("already waiting")
+	RecursionNotAllowed   = RxError("recursion not allowed")
 	StateTransitionFailed = RxError("state transition faled")
 )
 
