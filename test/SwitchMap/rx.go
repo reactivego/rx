@@ -253,7 +253,7 @@ func (o ObservableInt) AsObservable() Observable {
 
 // SwitchMapString transforms the items emitted by an ObservableInt by applying a
 // function to each item an returning an ObservableString. In doing so, it behaves much like
-// MergeMap (previously FlatMap), except that whenever a new ObservableString is emitted
+// what used to be called FlatMap, except that whenever a new ObservableString is emitted
 // SwitchMap will unsubscribe from the previous ObservableString and begin emitting items
 // from the newly emitted one.
 func (o ObservableInt) SwitchMapString(project func(int) ObservableString) ObservableString {
