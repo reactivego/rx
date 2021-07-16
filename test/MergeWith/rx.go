@@ -117,7 +117,7 @@ func (o ObservableInt) MergeWith(other ...ObservableInt) ObservableInt {
 				}
 			}
 		}
-		subscribeOn.Schedule(func() {
+		runner := subscribeOn.Schedule(func() {
 			if subscriber.Subscribed() {
 				observers.len = 1 + len(other)
 				o(observer, subscribeOn, subscriber)
@@ -129,6 +129,7 @@ func (o ObservableInt) MergeWith(other ...ObservableInt) ObservableInt {
 				}
 			}
 		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }

@@ -50,7 +50,7 @@ func (o ObservableFoo) MergeWith(other ...ObservableFoo) ObservableFoo {
 				}
 			}
 		}
-		subscribeOn.Schedule(func() {
+		runner := subscribeOn.Schedule(func() {
 			if subscriber.Subscribed() {
 				observers.len = 1 + len(other)
 				o(observer, subscribeOn, subscriber)
@@ -62,6 +62,7 @@ func (o ObservableFoo) MergeWith(other ...ObservableFoo) ObservableFoo {
 				}
 			}
 		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }
@@ -132,12 +133,13 @@ func (o ObservableObservableFoo) MergeAll() ObservableFoo {
 				observer(zero, err, true)
 			}
 		}
-		subscribeOn.Schedule(func() {
+		runner := subscribeOn.Schedule(func() {
 			if subscriber.Subscribed() {
 				observers.len = 1
 				o(merger, subscribeOn, subscriber)
 			}
 		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }
@@ -183,7 +185,7 @@ func (o ObservableFoo) MergeDelayErrorWith(other ...ObservableFoo) ObservableFoo
 				}
 			}
 		}
-		subscribeOn.Schedule(func() {
+		runner := subscribeOn.Schedule(func() {
 			if subscriber.Subscribed() {
 				observers.len = 1 + len(other)
 				o(observer, subscribeOn, subscriber)
@@ -195,6 +197,7 @@ func (o ObservableFoo) MergeDelayErrorWith(other ...ObservableFoo) ObservableFoo
 				}
 			}
 		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }

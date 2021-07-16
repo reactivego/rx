@@ -778,6 +778,24 @@ func (o Observable) MergeMapTo(inner Observable) Observable {
 	return o.MapObservable(project).MergeAll()
 }
 
+//jig:name Observable_MapObservable
+
+// MapObservable transforms the items emitted by an Observable by applying a
+// function to each item.
+func (o Observable) MapObservable(project func(interface{}) Observable) ObservableObservable {
+	observable := func(observe ObservableObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next interface{}, err error, done bool) {
+			var mapped Observable
+			if !done {
+				mapped = project(next)
+			}
+			observe(mapped, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name Observable_Println
 
 // Println subscribes to the Observable and prints every item to os.Stdout
@@ -875,24 +893,6 @@ func (o Observable) Timeout(due time.Duration) Observable {
 	return observable
 }
 
-//jig:name Observable_MapObservable
-
-// MapObservable transforms the items emitted by an Observable by applying a
-// function to each item.
-func (o Observable) MapObservable(project func(interface{}) Observable) ObservableObservable {
-	observable := func(observe ObservableObserver, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next interface{}, err error, done bool) {
-			var mapped Observable
-			if !done {
-				mapped = project(next)
-			}
-			observe(mapped, err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
 //jig:name ObservableObserver
 
 // ObservableObserver is a function that gets called whenever the Observable has
@@ -947,12 +947,13 @@ func (o ObservableObservable) MergeAll() Observable {
 				observer(zero, err, true)
 			}
 		}
-		subscribeOn.Schedule(func() {
+		runner := subscribeOn.Schedule(func() {
 			if subscriber.Subscribed() {
 				observers.len = 1
 				o(merger, subscribeOn, subscriber)
 			}
 		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }

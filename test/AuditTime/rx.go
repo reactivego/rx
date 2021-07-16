@@ -387,12 +387,13 @@ func (o ObservableObservableInt) MergeAll() ObservableInt {
 				observer(zero, err, true)
 			}
 		}
-		subscribeOn.Schedule(func() {
+		runner := subscribeOn.Schedule(func() {
 			if subscriber.Subscribed() {
 				observers.len = 1
 				o(merger, subscribeOn, subscriber)
 			}
 		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }

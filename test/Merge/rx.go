@@ -76,27 +76,6 @@ func MergeInt(observables ...ObservableInt) ObservableInt {
 	return observables[0].MergeWith(observables[1:]...)
 }
 
-//jig:name ObservableInt_Println
-
-// Println subscribes to the Observable and prints every item to os.Stdout
-// while it waits for completion or error. Returns either the error or nil
-// when the Observable completed normally.
-// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
-func (o ObservableInt) Println(a ...interface{}) error {
-	subscriber := subscriber.New()
-	scheduler := scheduler.MakeTrampoline()
-	observer := func(next int, err error, done bool) {
-		if !done {
-			fmt.Println(append(a, next)...)
-		} else {
-			subscriber.Done(err)
-		}
-	}
-	subscriber.OnWait(scheduler.Wait)
-	o(observer, scheduler, subscriber)
-	return subscriber.Wait()
-}
-
 //jig:name EmptyInt
 
 // EmptyInt creates an Observable that emits no items but terminates normally.
@@ -146,7 +125,7 @@ func (o ObservableInt) MergeWith(other ...ObservableInt) ObservableInt {
 				}
 			}
 		}
-		subscribeOn.Schedule(func() {
+		runner := subscribeOn.Schedule(func() {
 			if subscriber.Subscribed() {
 				observers.len = 1 + len(other)
 				o(observer, subscribeOn, subscriber)
@@ -158,6 +137,28 @@ func (o ObservableInt) MergeWith(other ...ObservableInt) ObservableInt {
 				}
 			}
 		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
+}
+
+//jig:name ObservableInt_Println
+
+// Println subscribes to the Observable and prints every item to os.Stdout
+// while it waits for completion or error. Returns either the error or nil
+// when the Observable completed normally.
+// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
+func (o ObservableInt) Println(a ...interface{}) error {
+	subscriber := subscriber.New()
+	scheduler := scheduler.MakeTrampoline()
+	observer := func(next int, err error, done bool) {
+		if !done {
+			fmt.Println(append(a, next)...)
+		} else {
+			subscriber.Done(err)
+		}
+	}
+	subscriber.OnWait(scheduler.Wait)
+	o(observer, scheduler, subscriber)
+	return subscriber.Wait()
 }

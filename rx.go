@@ -889,7 +889,7 @@ func (o Observable) MergeWith(other ...Observable) Observable {
 				}
 			}
 		}
-		subscribeOn.Schedule(func() {
+		runner := subscribeOn.Schedule(func() {
 			if subscriber.Subscribed() {
 				observers.len = 1 + len(other)
 				o(observer, subscribeOn, subscriber)
@@ -901,6 +901,7 @@ func (o Observable) MergeWith(other ...Observable) Observable {
 				}
 			}
 		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }
@@ -934,7 +935,7 @@ func (o Observable) MergeDelayErrorWith(other ...Observable) Observable {
 				}
 			}
 		}
-		subscribeOn.Schedule(func() {
+		runner := subscribeOn.Schedule(func() {
 			if subscriber.Subscribed() {
 				observers.len = 1 + len(other)
 				o(observer, subscribeOn, subscriber)
@@ -946,6 +947,7 @@ func (o Observable) MergeDelayErrorWith(other ...Observable) Observable {
 				}
 			}
 		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }
@@ -1063,7 +1065,7 @@ func (o ObservableObservable) ConcatAll() Observable {
 
 // SwitchMap transforms the items emitted by an Observable by applying a
 // function to each item an returning an Observable. In doing so, it behaves much like
-// MergeMap (previously FlatMap), except that whenever a new Observable is emitted
+// what used to be called FlatMap, except that whenever a new Observable is emitted
 // SwitchMap will unsubscribe from the previous Observable and begin emitting items
 // from the newly emitted one.
 func (o Observable) SwitchMap(project func(interface{}) Observable) Observable {
@@ -1312,12 +1314,13 @@ func (o ObservableObservable) MergeAll() Observable {
 				observer(zero, err, true)
 			}
 		}
-		subscribeOn.Schedule(func() {
+		runner := subscribeOn.Schedule(func() {
 			if subscriber.Subscribed() {
 				observers.len = 1
 				o(merger, subscribeOn, subscriber)
 			}
 		})
+		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 	return observable
 }
