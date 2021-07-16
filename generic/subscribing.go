@@ -28,6 +28,26 @@ func NewSubscriber() Subscriber {
 	return subscriber.New()
 }
 
+//jig:template Observable<Foo> AutoUnsubscribe<Foo>
+
+// AutoUnsubscribe will subscribe to the source Observable using a separate subscriber
+// created by calling Add on the subscriber that was passed in during subscription.
+// When the source observable subsequently signals it is done, the separate subscriber will
+// be Unsubscribed. This then prevents the source Observable from emitting.
+func (o ObservableFoo) AutoUnsubscribe() ObservableFoo {
+	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		subscriber = subscriber.Add()
+		observer := func(next foo, err error, done bool) {
+			observe(next, err, done)
+			if done {
+				subscriber.Unsubscribe()
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:template Observable<Foo> Println
 //jig:needs Scheduler, Subscriber
 
@@ -249,7 +269,7 @@ func (o ObservableFoo) Subscribe(observe FooObserver, schedulers ...Scheduler) S
 			subscriber.Done(err)
 		}
 	}
-	if !schedulers[0].IsConcurrent()  {
+	if !schedulers[0].IsConcurrent() {
 		subscriber.OnWait(schedulers[0].Wait)
 	}
 	o(observer, schedulers[0], subscriber)
