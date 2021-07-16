@@ -30,9 +30,9 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 	)
 
 	type subscription struct {
-		cursor    uint64
-		state     uint64    // active, canceled, closed
-		activated time.Time // track activity to deterime backoff
+		cursor      uint64
+		state       uint64    // active, canceled, closed
+		activated   time.Time // track activity to deterime backoff
 		subscribeOn Scheduler
 	}
 
@@ -225,7 +225,6 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 			}
 			sub = nil
 			err = OutOfSubscriptions
-			return
 		})
 		return
 	}
@@ -453,8 +452,8 @@ func NewAsyncSubjectFoo() SubjectFoo {
 	observer, observable := MakeObserverObservable(0, 1)
 	var async struct {
 		subject SubjectFoo
-		set  bool
-		last foo
+		set     bool
+		last    foo
 	}
 	async.subject.FooObserver = func(next foo, err error, done bool) {
 		if !done {
