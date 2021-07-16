@@ -30,10 +30,9 @@ func NewSubscriber() Subscriber {
 
 //jig:template Observable<Foo> AutoUnsubscribe<Foo>
 
-// AutoUnsubscribe will subscribe to the source Observable using a separate subscriber
-// created by calling Add on the subscriber that was passed in during subscription.
-// When the source observable subsequently signals it is done, the separate subscriber will
-// be Unsubscribed. This then prevents the source Observable from emitting.
+// AutoUnsubscribe will automatically unsubscribe from the source when it signals it is done.
+// This Operator subscribes to the source Observable using a separate subscriber. When the source
+// observable subsequently signals it is done, the separate subscriber will be Unsubscribed.
 func (o ObservableFoo) AutoUnsubscribe() ObservableFoo {
 	observable := func(observe FooObserver, subscribeOn Scheduler, subscriber Subscriber) {
 		subscriber = subscriber.Add()
