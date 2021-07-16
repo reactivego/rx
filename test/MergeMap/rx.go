@@ -164,19 +164,52 @@ func (o ObservableObservableInt) MergeAll() ObservableInt {
 		merger := func(next ObservableInt, err error, done bool) {
 			if !done {
 				atomic.AddInt32(&observers.len, 1)
-				next(observer, subscribeOn, subscriber)
+				next.AutoUnsubscribe()(observer, subscribeOn, subscriber)
 			} else {
 				var zero int
 				observer(zero, err, true)
 			}
 		}
-		runner := subscribeOn.Schedule(func() {
-			if subscriber.Subscribed() {
-				observers.len = 1
-				o(merger, subscribeOn, subscriber)
+		observers.len += 1
+		o.AutoUnsubscribe()(merger, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableInt_AutoUnsubscribeInt
+
+// AutoUnsubscribe will automatically unsubscribe from the source when it signals it is done.
+// This Operator subscribes to the source Observable using a separate subscriber. When the source
+// observable subsequently signals it is done, the separate subscriber will be Unsubscribed.
+func (o ObservableInt) AutoUnsubscribe() ObservableInt {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		subscriber = subscriber.Add()
+		observer := func(next int, err error, done bool) {
+			observe(next, err, done)
+			if done {
+				subscriber.Unsubscribe()
 			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableObservableInt_AutoUnsubscribeObservableInt
+
+// AutoUnsubscribe will automatically unsubscribe from the source when it signals it is done.
+// This Operator subscribes to the source Observable using a separate subscriber. When the source
+// observable subsequently signals it is done, the separate subscriber will be Unsubscribed.
+func (o ObservableObservableInt) AutoUnsubscribe() ObservableObservableInt {
+	observable := func(observe ObservableIntObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		subscriber = subscriber.Add()
+		observer := func(next ObservableInt, err error, done bool) {
+			observe(next, err, done)
+			if done {
+				subscriber.Unsubscribe()
+			}
+		}
+		o(observer, subscribeOn, subscriber)
 	}
 	return observable
 }

@@ -50,19 +50,13 @@ func (o ObservableFoo) MergeWith(other ...ObservableFoo) ObservableFoo {
 				}
 			}
 		}
-		runner := subscribeOn.Schedule(func() {
+		observers.len = 1 + len(other)
+		o.AutoUnsubscribe()(observer, subscribeOn, subscriber)
+		for _, o := range other {
 			if subscriber.Subscribed() {
-				observers.len = 1 + len(other)
-				o(observer, subscribeOn, subscriber)
-				for _, o := range other {
-					if !subscriber.Subscribed() {
-						return
-					}
-					o(observer, subscribeOn, subscriber)
-				}
+				o.AutoUnsubscribe()(observer, subscribeOn, subscriber)
 			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
+		}
 	}
 	return observable
 }
@@ -127,19 +121,14 @@ func (o ObservableObservableFoo) MergeAll() ObservableFoo {
 		merger := func(next ObservableFoo, err error, done bool) {
 			if !done {
 				atomic.AddInt32(&observers.len, 1)
-				next(observer, subscribeOn, subscriber)
+				next.AutoUnsubscribe()(observer, subscribeOn, subscriber)
 			} else {
 				var zero foo
 				observer(zero, err, true)
 			}
 		}
-		runner := subscribeOn.Schedule(func() {
-			if subscriber.Subscribed() {
-				observers.len = 1
-				o(merger, subscribeOn, subscriber)
-			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
+		observers.len += 1
+		o.AutoUnsubscribe()(merger, subscribeOn, subscriber)
 	}
 	return observable
 }
@@ -185,19 +174,13 @@ func (o ObservableFoo) MergeDelayErrorWith(other ...ObservableFoo) ObservableFoo
 				}
 			}
 		}
-		runner := subscribeOn.Schedule(func() {
+		observers.len = 1 + len(other)
+		o.AutoUnsubscribe()(observer, subscribeOn, subscriber)
+		for _, o := range other {
 			if subscriber.Subscribed() {
-				observers.len = 1 + len(other)
-				o(observer, subscribeOn, subscriber)
-				for _, o := range other {
-					if !subscriber.Subscribed() {
-						return
-					}
-					o(observer, subscribeOn, subscriber)
-				}
+				o.AutoUnsubscribe()(observer, subscribeOn, subscriber)
 			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
+		}
 	}
 	return observable
 }

@@ -889,19 +889,13 @@ func (o Observable) MergeWith(other ...Observable) Observable {
 				}
 			}
 		}
-		runner := subscribeOn.Schedule(func() {
+		observers.len = 1 + len(other)
+		o.AutoUnsubscribe()(observer, subscribeOn, subscriber)
+		for _, o := range other {
 			if subscriber.Subscribed() {
-				observers.len = 1 + len(other)
-				o(observer, subscribeOn, subscriber)
-				for _, o := range other {
-					if !subscriber.Subscribed() {
-						return
-					}
-					o(observer, subscribeOn, subscriber)
-				}
+				o.AutoUnsubscribe()(observer, subscribeOn, subscriber)
 			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
+		}
 	}
 	return observable
 }
@@ -935,19 +929,13 @@ func (o Observable) MergeDelayErrorWith(other ...Observable) Observable {
 				}
 			}
 		}
-		runner := subscribeOn.Schedule(func() {
+		observers.len = 1 + len(other)
+		o.AutoUnsubscribe()(observer, subscribeOn, subscriber)
+		for _, o := range other {
 			if subscriber.Subscribed() {
-				observers.len = 1 + len(other)
-				o(observer, subscribeOn, subscriber)
-				for _, o := range other {
-					if !subscriber.Subscribed() {
-						return
-					}
-					o(observer, subscribeOn, subscriber)
-				}
+				o.AutoUnsubscribe()(observer, subscribeOn, subscriber)
 			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
+		}
 	}
 	return observable
 }
@@ -1308,19 +1296,14 @@ func (o ObservableObservable) MergeAll() Observable {
 		merger := func(next Observable, err error, done bool) {
 			if !done {
 				atomic.AddInt32(&observers.len, 1)
-				next(observer, subscribeOn, subscriber)
+				next.AutoUnsubscribe()(observer, subscribeOn, subscriber)
 			} else {
 				var zero interface{}
 				observer(zero, err, true)
 			}
 		}
-		runner := subscribeOn.Schedule(func() {
-			if subscriber.Subscribed() {
-				observers.len = 1
-				o(merger, subscribeOn, subscriber)
-			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
+		observers.len += 1
+		o.AutoUnsubscribe()(merger, subscribeOn, subscriber)
 	}
 	return observable
 }
@@ -4081,6 +4064,25 @@ type TimestampObserver func(next Timestamp, err error, done bool)
 // Calling it will subscribe the Observer to events from the Observable.
 type ObservableTimestamp func(TimestampObserver, Scheduler, Subscriber)
 
+//jig:name Observable_AutoUnsubscribe
+
+// AutoUnsubscribe will automatically unsubscribe from the source when it signals it is done.
+// This Operator subscribes to the source Observable using a separate subscriber. When the source
+// observable subsequently signals it is done, the separate subscriber will be Unsubscribed.
+func (o Observable) AutoUnsubscribe() Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		subscriber = subscriber.Add()
+		observer := func(next interface{}, err error, done bool) {
+			observe(next, err, done)
+			if done {
+				subscriber.Unsubscribe()
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name Observable_MapObservable
 
 // MapObservable transforms the items emitted by an Observable by applying a
@@ -4093,6 +4095,25 @@ func (o Observable) MapObservable(project func(interface{}) Observable) Observab
 				mapped = project(next)
 			}
 			observe(mapped, err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableObservable_AutoUnsubscribeObservable
+
+// AutoUnsubscribe will automatically unsubscribe from the source when it signals it is done.
+// This Operator subscribes to the source Observable using a separate subscriber. When the source
+// observable subsequently signals it is done, the separate subscriber will be Unsubscribed.
+func (o ObservableObservable) AutoUnsubscribe() ObservableObservable {
+	observable := func(observe ObservableObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		subscriber = subscriber.Add()
+		observer := func(next Observable, err error, done bool) {
+			observe(next, err, done)
+			if done {
+				subscriber.Unsubscribe()
+			}
 		}
 		o(observer, subscribeOn, subscriber)
 	}

@@ -251,19 +251,14 @@ func (o ObservableObservableString) MergeAll() ObservableString {
 		merger := func(next ObservableString, err error, done bool) {
 			if !done {
 				atomic.AddInt32(&observers.len, 1)
-				next(observer, subscribeOn, subscriber)
+				next.AutoUnsubscribe()(observer, subscribeOn, subscriber)
 			} else {
 				var zero string
 				observer(zero, err, true)
 			}
 		}
-		runner := subscribeOn.Schedule(func() {
-			if subscriber.Subscribed() {
-				observers.len = 1
-				o(merger, subscribeOn, subscriber)
-			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
+		observers.len += 1
+		o.AutoUnsubscribe()(merger, subscribeOn, subscriber)
 	}
 	return observable
 }
@@ -329,19 +324,14 @@ func (o ObservableObservableInt) MergeAll() ObservableInt {
 		merger := func(next ObservableInt, err error, done bool) {
 			if !done {
 				atomic.AddInt32(&observers.len, 1)
-				next(observer, subscribeOn, subscriber)
+				next.AutoUnsubscribe()(observer, subscribeOn, subscriber)
 			} else {
 				var zero int
 				observer(zero, err, true)
 			}
 		}
-		runner := subscribeOn.Schedule(func() {
-			if subscriber.Subscribed() {
-				observers.len = 1
-				o(merger, subscribeOn, subscriber)
-			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
+		observers.len += 1
+		o.AutoUnsubscribe()(merger, subscribeOn, subscriber)
 	}
 	return observable
 }
@@ -361,6 +351,95 @@ type Observer func(next interface{}, err error, done bool)
 // Observable is a function taking an Observer, Scheduler and Subscriber.
 // Calling it will subscribe the Observer to events from the Observable.
 type Observable func(Observer, Scheduler, Subscriber)
+
+//jig:name ObservableString_AutoUnsubscribeString
+
+// AutoUnsubscribe will automatically unsubscribe from the source when it signals it is done.
+// This Operator subscribes to the source Observable using a separate subscriber. When the source
+// observable subsequently signals it is done, the separate subscriber will be Unsubscribed.
+func (o ObservableString) AutoUnsubscribe() ObservableString {
+	observable := func(observe StringObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		subscriber = subscriber.Add()
+		observer := func(next string, err error, done bool) {
+			observe(next, err, done)
+			if done {
+				subscriber.Unsubscribe()
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableObservableString_AutoUnsubscribeObservableString
+
+// AutoUnsubscribe will automatically unsubscribe from the source when it signals it is done.
+// This Operator subscribes to the source Observable using a separate subscriber. When the source
+// observable subsequently signals it is done, the separate subscriber will be Unsubscribed.
+func (o ObservableObservableString) AutoUnsubscribe() ObservableObservableString {
+	observable := func(observe ObservableStringObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		subscriber = subscriber.Add()
+		observer := func(next ObservableString, err error, done bool) {
+			observe(next, err, done)
+			if done {
+				subscriber.Unsubscribe()
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableInt_AsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableInt_AutoUnsubscribeInt
+
+// AutoUnsubscribe will automatically unsubscribe from the source when it signals it is done.
+// This Operator subscribes to the source Observable using a separate subscriber. When the source
+// observable subsequently signals it is done, the separate subscriber will be Unsubscribed.
+func (o ObservableInt) AutoUnsubscribe() ObservableInt {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		subscriber = subscriber.Add()
+		observer := func(next int, err error, done bool) {
+			observe(next, err, done)
+			if done {
+				subscriber.Unsubscribe()
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableObservableInt_AutoUnsubscribeObservableInt
+
+// AutoUnsubscribe will automatically unsubscribe from the source when it signals it is done.
+// This Operator subscribes to the source Observable using a separate subscriber. When the source
+// observable subsequently signals it is done, the separate subscriber will be Unsubscribed.
+func (o ObservableObservableInt) AutoUnsubscribe() ObservableObservableInt {
+	observable := func(observe ObservableIntObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		subscriber = subscriber.Add()
+		observer := func(next ObservableInt, err error, done bool) {
+			observe(next, err, done)
+			if done {
+				subscriber.Unsubscribe()
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
 
 //jig:name ObservableString_Println
 
@@ -402,19 +481,6 @@ func (o ObservableInt) Println(a ...interface{}) error {
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
 	return subscriber.Wait()
-}
-
-//jig:name ObservableInt_AsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
 }
 
 //jig:name RxError

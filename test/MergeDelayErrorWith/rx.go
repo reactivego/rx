@@ -136,19 +136,32 @@ func (o ObservableInt) MergeDelayErrorWith(other ...ObservableInt) ObservableInt
 				}
 			}
 		}
-		runner := subscribeOn.Schedule(func() {
+		observers.len = 1 + len(other)
+		o.AutoUnsubscribe()(observer, subscribeOn, subscriber)
+		for _, o := range other {
 			if subscriber.Subscribed() {
-				observers.len = 1 + len(other)
-				o(observer, subscribeOn, subscriber)
-				for _, o := range other {
-					if !subscriber.Subscribed() {
-						return
-					}
-					o(observer, subscribeOn, subscriber)
-				}
+				o.AutoUnsubscribe()(observer, subscribeOn, subscriber)
 			}
-		})
-		subscriber.OnUnsubscribe(runner.Cancel)
+		}
+	}
+	return observable
+}
+
+//jig:name ObservableInt_AutoUnsubscribeInt
+
+// AutoUnsubscribe will automatically unsubscribe from the source when it signals it is done.
+// This Operator subscribes to the source Observable using a separate subscriber. When the source
+// observable subsequently signals it is done, the separate subscriber will be Unsubscribed.
+func (o ObservableInt) AutoUnsubscribe() ObservableInt {
+	observable := func(observe IntObserver, subscribeOn Scheduler, subscriber Subscriber) {
+		subscriber = subscriber.Add()
+		observer := func(next int, err error, done bool) {
+			observe(next, err, done)
+			if done {
+				subscriber.Unsubscribe()
+			}
+		}
+		o(observer, subscribeOn, subscriber)
 	}
 	return observable
 }
