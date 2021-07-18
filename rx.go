@@ -1837,24 +1837,22 @@ func (o Observable) Distinct() Observable {
 //jig:name Observable_DistinctUntilChanged
 
 // DistinctUntilChanged only emits when the current value is different from the last.
-func (o Observable) DistinctUntilChanged(getters ...func(interface{}) interface{}) Observable {
+func (o Observable) DistinctUntilChanged(equal ...func(interface{}, interface{}) bool) Observable {
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		if len(getters) == 0 {
-			getters = append(getters, func(next interface{}) interface{} { return next })
+		if len(equal) == 0 {
+			equal = append(equal, func(prev, curr interface{}) bool { return prev == curr })
 		}
-		seen := make([]interface{}, len(getters))
+		var seen struct {
+			initialized	bool
+			value		interface{}
+		}
 		observer := func(next interface{}, err error, done bool) {
 			if !done {
-				same := true
-				for i, get := range getters {
-					got := get(next)
-					if seen[i] != got {
-						same = false
-						seen[i] = got
-					}
-				}
-				if same {
+				if seen.initialized && equal[0](seen.value, next) {
 					return
+				} else {
+					seen.initialized = true
+					seen.value = next
 				}
 			}
 			observe(next, err, done)
@@ -3808,7 +3806,6 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 			}
 			sub = nil
 			err = OutOfSubscriptions
-			return
 		})
 		return
 	}

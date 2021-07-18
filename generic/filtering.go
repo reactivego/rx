@@ -3,24 +3,22 @@ package rx
 //jig:template Observable DistinctUntilChanged
 
 // DistinctUntilChanged only emits when the current value is different from the last.
-func (o Observable) DistinctUntilChanged(getters ...func(interface{}) interface{}) Observable {
+func (o Observable) DistinctUntilChanged(equal ...func(interface{}, interface{}) bool) Observable {
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		if len(getters) == 0 {
-			getters = append(getters, func(next interface{}) interface{} { return next })
+		if len(equal) == 0 {
+			equal = append(equal, func(prev, curr interface{}) bool { return prev == curr })
 		}
-		seen := make([]interface{}, len(getters))
+		var seen struct {
+			initialized bool
+			value       interface{}
+		}
 		observer := func(next interface{}, err error, done bool) {
 			if !done {
-				same := true
-				for i, get := range getters {
-					got := get(next)
-					if seen[i] != got {
-						same = false
-						seen[i] = got
-					}
-				}
-				if same {
-					return
+				if seen.initialized && equal[0](seen.value, next) {
+					return // skip equal
+				} else {
+					seen.initialized = true
+					seen.value = next
 				}
 			}
 			observe(next, err, done)
@@ -34,12 +32,12 @@ func (o Observable) DistinctUntilChanged(getters ...func(interface{}) interface{
 //jig:needs Observable DistinctUntilChanged
 
 // DistinctUntilChanged only emits when the current value is different from the last.
-func (o ObservableFoo) DistinctUntilChanged(getters ...func(foo) interface{}) ObservableFoo {
-	var g []func(interface{}) interface{}
-	for i := range getters {
-		g = append(g, func(next interface{}) interface{} { return getters[i](next.(foo)) })
+func (o ObservableFoo) DistinctUntilChanged(equal ...func(foo, foo) bool) ObservableFoo {
+	var same []func(interface{}, interface{}) bool
+	if len(equal) != 0 {
+		same = append(same, func(prev, curr interface{}) bool { return equal[0](prev.(foo), curr.(foo)) })
 	}
-	return o.AsObservable().DistinctUntilChanged(g...).AsObservableFoo()
+	return o.AsObservable().DistinctUntilChanged(same...).AsObservableFoo()
 }
 
 //jig:template Observable Distinct

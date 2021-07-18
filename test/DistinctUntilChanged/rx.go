@@ -109,24 +109,22 @@ func FromRGBA(slice ...color.RGBA) ObservableRGBA {
 //jig:name Observable_DistinctUntilChanged
 
 // DistinctUntilChanged only emits when the current value is different from the last.
-func (o Observable) DistinctUntilChanged(getters ...func(interface{}) interface{}) Observable {
+func (o Observable) DistinctUntilChanged(equal ...func(interface{}, interface{}) bool) Observable {
 	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		if len(getters) == 0 {
-			getters = append(getters, func(next interface{}) interface{} { return next })
+		if len(equal) == 0 {
+			equal = append(equal, func(prev, curr interface{}) bool { return prev == curr })
 		}
-		seen := make([]interface{}, len(getters))
+		var seen struct {
+			initialized	bool
+			value		interface{}
+		}
 		observer := func(next interface{}, err error, done bool) {
 			if !done {
-				same := true
-				for i, get := range getters {
-					got := get(next)
-					if seen[i] != got {
-						same = false
-						seen[i] = got
-					}
-				}
-				if same {
+				if seen.initialized && equal[0](seen.value, next) {
 					return
+				} else {
+					seen.initialized = true
+					seen.value = next
 				}
 			}
 			observe(next, err, done)
@@ -139,23 +137,23 @@ func (o Observable) DistinctUntilChanged(getters ...func(interface{}) interface{
 //jig:name ObservableInt_DistinctUntilChanged
 
 // DistinctUntilChanged only emits when the current value is different from the last.
-func (o ObservableInt) DistinctUntilChanged(getters ...func(int) interface{}) ObservableInt {
-	var g []func(interface{}) interface{}
-	for i := range getters {
-		g = append(g, func(next interface{}) interface{} { return getters[i](next.(int)) })
+func (o ObservableInt) DistinctUntilChanged(equal ...func(int, int) bool) ObservableInt {
+	var same []func(interface{}, interface{}) bool
+	if len(equal) != 0 {
+		same = append(same, func(prev, curr interface{}) bool { return equal[0](prev.(int), curr.(int)) })
 	}
-	return o.AsObservable().DistinctUntilChanged(g...).AsObservableInt()
+	return o.AsObservable().DistinctUntilChanged(same...).AsObservableInt()
 }
 
 //jig:name ObservableRGBA_DistinctUntilChanged
 
 // DistinctUntilChanged only emits when the current value is different from the last.
-func (o ObservableRGBA) DistinctUntilChanged(getters ...func(color.RGBA) interface{}) ObservableRGBA {
-	var g []func(interface{}) interface{}
-	for i := range getters {
-		g = append(g, func(next interface{}) interface{} { return getters[i](next.(color.RGBA)) })
+func (o ObservableRGBA) DistinctUntilChanged(equal ...func(color.RGBA, color.RGBA) bool) ObservableRGBA {
+	var same []func(interface{}, interface{}) bool
+	if len(equal) != 0 {
+		same = append(same, func(prev, curr interface{}) bool { return equal[0](prev.(color.RGBA), curr.(color.RGBA)) })
 	}
-	return o.AsObservable().DistinctUntilChanged(g...).AsObservableRGBA()
+	return o.AsObservable().DistinctUntilChanged(same...).AsObservableRGBA()
 }
 
 //jig:name Observer
@@ -173,32 +171,6 @@ type Observer func(next interface{}, err error, done bool)
 // Observable is a function taking an Observer, Scheduler and Subscriber.
 // Calling it will subscribe the Observer to events from the Observable.
 type Observable func(Observer, Scheduler, Subscriber)
-
-//jig:name ObservableInt_AsObservable
-
-// AsObservable turns a typed ObservableInt into an Observable of interface{}.
-func (o ObservableInt) AsObservable() Observable {
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next int, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
-
-//jig:name ObservableRGBA_AsObservable
-
-// AsObservable turns a typed ObservableRGBA into an Observable of interface{}.
-func (o ObservableRGBA) AsObservable() Observable {
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		observer := func(next color.RGBA, err error, done bool) {
-			observe(interface{}(next), err, done)
-		}
-		o(observer, subscribeOn, subscriber)
-	}
-	return observable
-}
 
 //jig:name ObservableInt_Println
 
@@ -240,6 +212,32 @@ func (o ObservableRGBA) Println(a ...interface{}) error {
 	subscriber.OnWait(scheduler.Wait)
 	o(observer, scheduler, subscriber)
 	return subscriber.Wait()
+}
+
+//jig:name ObservableInt_AsObservable
+
+// AsObservable turns a typed ObservableInt into an Observable of interface{}.
+func (o ObservableInt) AsObservable() Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next int, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
+//jig:name ObservableRGBA_AsObservable
+
+// AsObservable turns a typed ObservableRGBA into an Observable of interface{}.
+func (o ObservableRGBA) AsObservable() Observable {
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		observer := func(next color.RGBA, err error, done bool) {
+			observe(interface{}(next), err, done)
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
 }
 
 //jig:name RxError
