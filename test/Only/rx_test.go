@@ -6,12 +6,6 @@ import (
 	_ "github.com/reactivego/rx"
 )
 
-// Size is recognized by jig directly because refer type and actual type are both "Size"
-type Size struct{ width, height float64 }
-
-// point will be used in a []point
-type point struct{ x, y float64 }
-
 // Point is how we refer to the type []point. Jig must be told since it can't know that.
 //jig:type Point []point
 

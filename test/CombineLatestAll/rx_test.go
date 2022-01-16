@@ -2,8 +2,6 @@ package CombineLatestAll
 
 import _ "github.com/reactivego/rx/generic"
 
-type Vector struct{ x, y int }
-
 func Example_combineLatestAll() {
 	a := FromInt(1, 2, 3)
 	b := FromInt(4, 5, 6)
