@@ -2,6 +2,7 @@ package ObserveOn
 
 import (
 	"fmt"
+	"time"
 
 	_ "github.com/reactivego/rx"
 )
@@ -35,7 +36,10 @@ func Example_observeOn() {
 			fmt.Println("complete")
 		}
 	})
-	go subscription.Unsubscribe()
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		subscription.Unsubscribe()
+	}()
 	subscription.Wait()
 
 	// Source ran to completion but nothing happended yet, all tasks have been

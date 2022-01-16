@@ -79,7 +79,7 @@ func TestRetryPublishLatest(e *testing.T) {
 					return From(1, 2, 3)
 				})
 				observable := source.PublishLast().RefCount().Retry(3)
-				expected := []interface{}{3}
+				var expected interface{} = 3
 
 				Expect := Expec(t)
 				observable.Subscribe(Expect.MakeObservation("1"), scheduler)

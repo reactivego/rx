@@ -9,14 +9,20 @@ import (
 func Example_ticker() {
 	const ms = time.Millisecond
 
+	year := time.Now().Format("2006")
+
 	project := func(t time.Time) string {
-		return t.Format("2006")
+		if year == t.Format("2006") {
+			return "OK"
+		} else {
+			return "FAILURE"
+		}
 	}
 	Ticker(10*ms, 100*ms).MapString(project).Take(5).Println()
 	// Output:
-	// 2020
-	// 2020
-	// 2020
-	// 2020
-	// 2020
+	// OK
+	// OK
+	// OK
+	// OK
+	// OK
 }
