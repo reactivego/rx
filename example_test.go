@@ -331,3 +331,26 @@ func Example_switchMap() {
 	// latest result
 	// success
 }
+
+func Example_retry() {
+	var first error = Error("error")
+	a := Create(func(index int) (next int, err error, done bool) {
+		if index < 3 {
+			return index, nil, false
+		}
+		err, first = first, nil
+		return 0, err, true
+	})
+	err := a.Retry().Println()
+	fmt.Println(first == nil)
+	fmt.Println(err)
+	// Output:
+	// 0
+	// 1
+	// 2
+	// 0
+	// 1
+	// 2
+	// true
+	// <nil>
+}
