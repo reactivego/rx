@@ -5,17 +5,14 @@ func (observable Observable[T]) Subscribe(observe Observer[T], schedulers ...Sch
 		schedulers = []Scheduler{NewScheduler()}
 	}
 	scheduler := schedulers[0]
-	subscription := newSubscription(scheduler.Wait)
-	if scheduler.IsConcurrent() {
-		subscription.wait = nil
-	}
+	subscription := newSubscription(scheduler)
 	observer := func(next T, err error, done bool) {
 		if !done {
 			observe(next, err, done)
 		} else {
 			var zero T
 			observe(zero, err, true)
-			subscription.done(err)
+			subscription.Done(err)
 		}
 	}
 	observable(observer, scheduler, subscription)

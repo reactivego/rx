@@ -30,13 +30,17 @@ type subscription struct {
 // called on an active subscription.
 const SubscriptionCanceled = Error("subscription canceled")
 
-func newSubscription(wait func()) *subscription {
-	return &subscription{wait: wait, err: SubscriptionCanceled}
+func newSubscription(scheduler Scheduler) *subscription {
+	s := &subscription{err: SubscriptionCanceled}
+	if !scheduler.IsConcurrent() {
+		s.wait = scheduler.Wait
+	}
+	return s
 }
 
-// done will set the error internally and then cancel the subscription by
+// Done will set the error internally and then cancel the subscription by
 // calling the Unsubscribe method. A nil value for error indicates success.
-func (s *subscription) done(err error) {
+func (s *subscription) Done(err error) {
 	s.Lock()
 	s.err = err
 	s.Unlock()
