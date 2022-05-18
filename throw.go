@@ -12,7 +12,3 @@ func Throw[T any](err error) Observable[T] {
 		subscriber.OnUnsubscribe(runner.Cancel)
 	}
 }
-
-func Throww[T any](err error) Observable[T] {
-	return Throw[T](Errorw(err))
-}
