@@ -1,4 +1,4 @@
-package observable
+package x
 
 func (observable Observable[T]) Wait(schedulers ...Scheduler) error {
 	return observable.Subscribe(Wait[T](), schedulers...).Wait()

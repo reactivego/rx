@@ -1,4 +1,4 @@
-package observable
+package x
 
 func Collect[T any](slice *[]T) Observer[T] {
 	return func(next T, err error, done bool) {

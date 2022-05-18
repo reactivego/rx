@@ -1,4 +1,4 @@
-package observable
+package x
 
 func Reduce[T, U any](observable Observable[T], seed U, accumulator func(acc U, next T) U) Observable[U] {
 	return func(observe Observer[U], scheduler Scheduler, subscriber Subscriber) {

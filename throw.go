@@ -1,4 +1,4 @@
-package observable
+package x
 
 func Throw[T any](err error) Observable[T] {
 	return func(observe Observer[T], scheduler Scheduler, subscriber Subscriber) {

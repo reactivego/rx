@@ -1,4 +1,4 @@
-package observable
+package x
 
 func Create[T any](create Creator[T]) Observable[T] {
 	return func(observe Observer[T], scheduler Scheduler, subscriber Subscriber) {

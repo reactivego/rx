@@ -1,4 +1,4 @@
-package observable
+package x
 
 import (
 	"github.com/reactivego/scheduler"

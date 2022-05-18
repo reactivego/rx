@@ -1,4 +1,4 @@
-package observable
+package x
 
 func Map[T, U any](observable Observable[T], project func(T) U) Observable[U] {
 	return func(observe Observer[U], scheduler Scheduler, subscriber Subscriber) {

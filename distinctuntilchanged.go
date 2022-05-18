@@ -1,4 +1,4 @@
-package observable
+package x
 
 func DistinctUntilChanged[T comparable](observable Observable[T]) Observable[T] {
 	return observable.DistinctUntilChanged(Equal[T]())

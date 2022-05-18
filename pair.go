@@ -1,4 +1,4 @@
-package observable
+package x
 
 type Pair[T, U any] struct {
 	First  T

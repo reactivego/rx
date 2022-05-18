@@ -1,4 +1,4 @@
-package observable
+package x
 
 func Assign[T any](value *T) Observer[T] {
 	return func(next T, err error, done bool) {

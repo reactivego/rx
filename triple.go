@@ -1,4 +1,4 @@
-package observable
+package x
 
 type Triple[T, U, V any] struct {
 	First  T

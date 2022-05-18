@@ -1,4 +1,4 @@
-package observable
+package x
 
 func (observable Observable[T]) Marshal(marshal func(any) ([]byte, error)) Observable[[]byte] {
 	return func(observe Observer[[]byte], scheduler Scheduler, subscriber Subscriber) {

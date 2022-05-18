@@ -1,4 +1,4 @@
-package observable
+package x
 
 func Race[T any](observables ...Observable[T]) Observable[T] {
 	if len(observables) == 0 {

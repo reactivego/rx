@@ -1,4 +1,4 @@
-package observable
+package x
 
 func BufferCount[T any](observable Observable[T], bufferSize, startBufferEvery int) Observable[[]T] {
 	return func(observe Observer[[]T], scheduler Scheduler, subscriber Subscriber) {

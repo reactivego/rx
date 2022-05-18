@@ -1,4 +1,4 @@
-package observable_test
+package x_test
 
 import (
 	"encoding/json"
@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	. "github.com/reactivego/observable"
+	. "github.com/reactivego/x"
 )
 
 func Example_subject() {

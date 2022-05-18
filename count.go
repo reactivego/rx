@@ -1,4 +1,4 @@
-package observable
+package x
 
 func (observable Observable[T]) Count() Observable[int] {
 	return func(observe Observer[int], scheduler Scheduler, subscriber Subscriber) {

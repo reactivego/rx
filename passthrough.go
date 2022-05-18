@@ -1,4 +1,4 @@
-package observable
+package x
 
 func (observable Observable[T]) Passthrough() Observable[T] {
 	// Operator scope

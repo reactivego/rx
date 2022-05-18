@@ -1,4 +1,4 @@
-package observable
+package x
 
 func (observable Observable[T]) Subscribe(observe Observer[T], schedulers ...Scheduler) Subscription {
 	if len(schedulers) == 0 {

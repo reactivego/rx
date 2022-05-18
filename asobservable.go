@@ -1,4 +1,4 @@
-package observable
+package x
 
 const TypecastFailed = Error("typecast failed")
 

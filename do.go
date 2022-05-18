@@ -1,4 +1,4 @@
-package observable
+package x
 
 func (observable Observable[T]) Do(f func(next T)) Observable[T] {
 	return func(observe Observer[T], scheduler Scheduler, subscriber Subscriber) {

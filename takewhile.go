@@ -1,4 +1,4 @@
-package observable
+package x
 
 func (observable Observable[T]) TakeWhile(condition func(next T) bool) Observable[T] {
 	return func(observe Observer[T], scheduler Scheduler, subscriber Subscriber) {

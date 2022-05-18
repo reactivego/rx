@@ -1,4 +1,4 @@
-package observable
+package x
 
 func WithLatestFrom[T any](observables ...Observable[T]) Observable[[]T] {
 	return WithLatestFromAll(From(observables...))
