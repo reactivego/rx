@@ -1,17 +1,17 @@
-# rx
+# x
 
     import "github.com/reactivego/x"
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/reactivego/x.svg)](https://pkg.go.dev/github.com/reactivego/x)
 
-Package `reactivego/x` provides *Reactive Extensions* for Go, an API for asynchronous programming with [observables](#observables) and [operators](#operators).
+Package `x` provides *Reactive Extensions* for Go, an API for asynchronous programming with [observables](#observables) and [operators](#operators).
 
 ## Prerequisites
 
 A version of [Go](https://golang.org/dl/) that supports generics.
 
 ## Observables
-The main focus of `reativego/x` is [Observables](http://reactivex.io/documentation/observable.html). Observables are dynamic and active at their core, because they are defined as values that change over time. Observables are combined into compound observables with the help of many different operators. This means that at the program level you don't have to deal explicitly with dynamic nature of the observable, but with more tangible static relations between observables as declared by using operators.
+The main focus of `x` is [Observables](http://reactivex.io/documentation/observable.html). Observables are dynamic and active at their core. They are defined as values that change over time. Observables are combined into compound observables with the help of many different operators. This means, that at the program level you don't have to deal explicitly with the dynamic nature of observables, but only with the more tangible static relations defined in terms of operators combining observables.
 
 An Observable:
 
@@ -32,15 +32,14 @@ func main() {
     x.From[any](1,"hi",2.3).Println()
 }
 ```
+> Note the program creates a mixed type `any` observable from an int, string and a float64.
+
 Output
 ```
 1
 hi
 2.3
 ```
-> Note the program creates a mixed type `any` observable from an int, string and a float64.
-
-
 Example
 ```go
 package main
@@ -51,15 +50,16 @@ func main() {
     x.From(1,2,3).Println()
 }
 ```
+> Note the program uses inferred type `int` for the observable.
+
 Output
 ```
 1
 2
 3
 ```
-> Note the program uses inferred type int for the observable.
 
-Observables in `reactivego/x` are somewhat similar to Go channels but have much richer
+Observables in `x` are somewhat similar to Go channels but have much richer
 semantics:
 
 Observables can be hot or cold. A hot observable will try to emit values even
