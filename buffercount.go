@@ -10,7 +10,8 @@ func BufferCount[T any](observable Observable[T], bufferSize, startBufferEvery i
 				n := len(buffer)
 				if n >= bufferSize {
 					if n == bufferSize {
-						observe(buffer[:n:n], nil, false)
+						clone := append(make([]T, 0, n), buffer...)
+						observe(clone, nil, false)
 					}
 					if n >= startBufferEvery {
 						n = copy(buffer, buffer[startBufferEvery:])
@@ -22,7 +23,7 @@ func BufferCount[T any](observable Observable[T], bufferSize, startBufferEvery i
 			default:
 				n := len(buffer)
 				if 0 < n && n <= bufferSize {
-					Of(buffer[:n:n])(observe, scheduler, subscriber)
+					Of(buffer)(observe, scheduler, subscriber)
 				} else {
 					observe(nil, nil, true)
 				}
