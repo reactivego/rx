@@ -6,14 +6,36 @@ import (
 	"strconv"
 	"time"
 
-	. "github.com/reactivego/x"
+	"github.com/reactivego/x"
 )
 
+func Example_share() {
+	serial := x.NewScheduler()
+
+	shared := x.From(1, 2, 3).Share()
+
+	shared.Subscribe(x.Println[int](), serial)
+	shared.Subscribe(x.Println[int](), serial)
+	shared.Subscribe(x.Println[int](), serial)
+
+	serial.Wait()
+	// Output:
+	// 1
+	// 1
+	// 1
+	// 2
+	// 2
+	// 2
+	// 3
+	// 3
+	// 3
+}
+
 func Example_subject() {
-	serial := NewScheduler()
+	serial := x.NewScheduler()
 
 	// subject collects emits when there are no subscriptions active.
-	in, out := Subject[int](0, 1)
+	in, out := x.Subject[int](0, 1)
 
 	// ignore everything before any subscriptions, except the last because buffer size is 1
 	in.Next(-2)
@@ -22,8 +44,8 @@ func Example_subject() {
 	in.Next(1)
 
 	// add a couple of subscriptions
-	sub1 := out.Subscribe(Println[int](), serial)
-	sub2 := out.Subscribe(Println[int](), serial)
+	sub1 := out.Subscribe(x.Println[int](), serial)
+	sub2 := out.Subscribe(x.Println[int](), serial)
 
 	// schedule the subsequent emits on the serial scheduler otherwise these calls
 	// will block because the buffer is full.
@@ -32,7 +54,7 @@ func Example_subject() {
 	serial.Schedule(func() {
 		in.Next(2)
 		in.Next(3)
-		in.Error(Error("foo"))
+		in.Error(x.Error("foo"))
 	})
 
 	serial.Wait()
@@ -50,9 +72,9 @@ func Example_subject() {
 }
 
 func Example_multicast() {
-	serial := NewScheduler()
+	serial := x.NewScheduler()
 
-	in, out := Multicast[int](1)
+	in, out := x.Multicast[int](1)
 
 	// ignore everything before any subscriptions, including the last!
 	in.Next(-2)
@@ -61,14 +83,14 @@ func Example_multicast() {
 	in.Next(1)
 
 	// add a couple of subscriptions
-	sub1 := out.Subscribe(Println[int](), serial)
-	sub2 := out.Subscribe(Println[int](), serial)
+	sub1 := out.Subscribe(x.Println[int](), serial)
+	sub2 := out.Subscribe(x.Println[int](), serial)
 
 	// schedule the subsequent emits on a separate goroutine, otherwise they'll block
 	go func() {
 		in.Next(2)
 		in.Next(3)
-		in.Error(Error("foo"))
+		in.Error(x.Error("foo"))
 	}()
 
 	serial.Wait()
@@ -84,13 +106,13 @@ func Example_multicast() {
 }
 
 func Example_multicastDrop() {
-	serial := NewScheduler()
+	serial := x.NewScheduler()
 
 	const onBackpressureDrop = -1
 
 	// multicast with backpressure handling set to dropping incoming
 	// items that don't fit in the buffer once it has filled up.
-	in, out := Multicast[int](1 * onBackpressureDrop)
+	in, out := x.Multicast[int](1 * onBackpressureDrop)
 
 	// ignore everything before any subscriptions, including the last!
 	in.Next(-2)
@@ -99,12 +121,12 @@ func Example_multicastDrop() {
 	in.Next(1)
 
 	// add a couple of subscriptions
-	sub1 := out.Subscribe(Println[int](), serial)
-	sub2 := out.Subscribe(Println[int](), serial)
+	sub1 := out.Subscribe(x.Println[int](), serial)
+	sub2 := out.Subscribe(x.Println[int](), serial)
 
-	in.Next(2)             // accepted: buffer not full
-	in.Next(3)             // dropped: buffer full
-	in.Error(Error("foo")) // dropped: buffer full
+	in.Next(2)               // accepted: buffer not full
+	in.Next(3)               // dropped: buffer full
+	in.Error(x.Error("foo")) // dropped: buffer full
 
 	serial.Wait()
 	fmt.Println(sub1.Wait())
@@ -117,14 +139,14 @@ func Example_multicastDrop() {
 }
 
 func Example_concatAll() {
-	source := Empty[Observable[string]]()
-	ConcatAll(source).Wait()
+	source := x.Empty[x.Observable[string]]()
+	x.ConcatAll(source).Wait()
 
-	source = Of(Empty[string]())
-	ConcatAll(source).Wait()
+	source = x.Of(x.Empty[string]())
+	x.ConcatAll(source).Wait()
 
-	req := func(request string, duration time.Duration) Observable[string] {
-		req := From(request + " response")
+	req := func(request string, duration time.Duration) x.Observable[string] {
+		req := x.From(request + " response")
 		if duration == 0 {
 			return req
 		}
@@ -138,8 +160,8 @@ func Example_concatAll() {
 	req3 := req("third", 0*ms)
 	req4 := req("fourth", 60*ms)
 
-	source = From(req1).ConcatWith(From(req2, req3, req4).Delay(100 * ms))
-	ConcatAll(source).Println()
+	source = x.From(req1).ConcatWith(x.From(req2, req3, req4).Delay(100 * ms))
+	x.ConcatAll(source).Println()
 
 	fmt.Println("OK")
 	// Output:
@@ -153,25 +175,25 @@ func Example_concatAll() {
 func Example_race() {
 	const ms = time.Millisecond
 
-	req := func(request string, duration time.Duration) Observable[string] {
-		return From(request + " response").Delay(duration)
+	req := func(request string, duration time.Duration) x.Observable[string] {
+		return x.From(request + " response").Delay(duration)
 	}
 
 	req1 := req("first", 50*ms)
 	req2 := req("second", 10*ms)
 	req3 := req("third", 60*ms)
 
-	Race(req1, req2, req3).Println()
+	x.Race(req1, req2, req3).Println()
 
-	err := func(text string, duration time.Duration) Observable[int] {
-		return Throw[int](Error(text + " error")).Delay(duration)
+	err := func(text string, duration time.Duration) x.Observable[int] {
+		return x.Throw[int](x.Error(text + " error")).Delay(duration)
 	}
 
 	err1 := err("first", 10*ms)
 	err2 := err("second", 20*ms)
 	err3 := err("third", 30*ms)
 
-	fmt.Println(Race(err1, err2, err3).Wait(Goroutine))
+	fmt.Println(x.Race(err1, err2, err3).Wait(x.Goroutine))
 	// Output:
 	// second response
 	// first error
@@ -185,13 +207,13 @@ func Example_marshal() {
 
 	b2s := func(data []byte) string { return string(data) }
 
-	Map(Of(R{"Hello", "World"}).Marshal(json.Marshal), b2s).Println()
+	x.Map(x.Of(R{"Hello", "World"}).Marshal(json.Marshal), b2s).Println()
 	// Output:
 	// {"a":"Hello","b":"World"}
 }
 
 func Example_elementAt() {
-	From(0, 1, 2, 3, 4).ElementAt(2).Println()
+	x.From(0, 1, 2, 3, 4).ElementAt(2).Println()
 	// Output:
 	// 2
 }
@@ -199,24 +221,24 @@ func Example_elementAt() {
 func Example_exhaustAll() {
 	const ms = time.Millisecond
 
-	stream := func(name string, duration time.Duration, count int) Observable[string] {
-		return Map(Timer[int](0*ms, duration), func(next int) string {
+	stream := func(name string, duration time.Duration, count int) x.Observable[string] {
+		return x.Map(x.Timer[int](0*ms, duration), func(next int) string {
 			return name + "-" + strconv.Itoa(next)
 		}).Take(count)
 	}
 
-	streams := []Observable[string]{
+	streams := []x.Observable[string]{
 		stream("a", 20*ms, 3),
 		stream("b", 20*ms, 3),
 		stream("c", 20*ms, 3),
-		Empty[string](),
+		x.Empty[string](),
 	}
 
-	streamofstreams := Map(Timer[int](20*ms, 30*ms, 250*ms, 100*ms).Take(4), func(next int) Observable[string] {
+	streamofstreams := x.Map(x.Timer[int](20*ms, 30*ms, 250*ms, 100*ms).Take(4), func(next int) x.Observable[string] {
 		return streams[next]
 	})
 
-	err := ExhaustAll(streamofstreams).Println()
+	err := x.ExhaustAll(streamofstreams).Println()
 
 	if err == nil {
 		fmt.Println("success")
@@ -232,26 +254,25 @@ func Example_exhaustAll() {
 }
 
 func Example_bufferCount() {
-	source := From(0, 1, 2, 3)
+	source := x.From(0, 1, 2, 3)
 
 	fmt.Println("BufferCount(From(0, 1, 2, 3), 2, 1)")
-	BufferCount(source, 2, 1).Println()
+	x.BufferCount(source, 2, 1).Println()
 
 	fmt.Println("BufferCount(From(0, 1, 2, 3), 2, 2)")
-	BufferCount(source, 2, 2).Println()
+	x.BufferCount(source, 2, 2).Println()
 
 	fmt.Println("BufferCount(From(0, 1, 2, 3), 2, 3)")
-	BufferCount(source, 2, 3).Println()
+	x.BufferCount(source, 2, 3).Println()
 
 	fmt.Println("BufferCount(From(0, 1, 2, 3), 3, 2)")
-	BufferCount(source, 3, 2).Println()
+	x.BufferCount(source, 3, 2).Println()
 
 	fmt.Println("BufferCount(From(0, 1, 2, 3), 6, 6)")
-	BufferCount(source, 6, 6).Println()
+	x.BufferCount(source, 6, 6).Println()
 
 	fmt.Println("BufferCount(From(0, 1, 2, 3), 2, 0)")
-	BufferCount(source, 2, 0).Println()
-
+	x.BufferCount(source, 2, 0).Println()
 	// Output:
 	// BufferCount(From(0, 1, 2, 3), 2, 1)
 	// [0 1]
@@ -276,10 +297,10 @@ func Example_bufferCount() {
 func Example_switchAll() {
 	const ms = time.Millisecond
 
-	interval42x4 := Interval[int](42 * ms).Take(4)
-	interval16x4 := Interval[int](16 * ms).Take(4)
+	interval42x4 := x.Interval[int](42 * ms).Take(4)
+	interval16x4 := x.Interval[int](16 * ms).Take(4)
 
-	err := SwitchAll(Map(interval42x4, func(next int) Observable[int] { return interval16x4 })).Println(Goroutine)
+	err := x.SwitchAll(x.Map(interval42x4, func(next int) x.Observable[int] { return interval16x4 })).Println(x.Goroutine)
 
 	if err == nil {
 		fmt.Println("success")
@@ -301,15 +322,15 @@ func Example_switchAll() {
 func Example_switchMap() {
 	const ms = time.Millisecond
 
-	webreq := func(request string, duration time.Duration) Observable[string] {
-		return From(request + " result").Delay(duration)
+	webreq := func(request string, duration time.Duration) x.Observable[string] {
+		return x.From(request + " result").Delay(duration)
 	}
 
 	first := webreq("first", 50*ms)
 	second := webreq("second", 10*ms)
 	latest := webreq("latest", 50*ms)
 
-	switchmap := SwitchMap(Interval[int](20*ms).Take(3), func(i int) Observable[string] {
+	switchmap := x.SwitchMap(x.Interval[int](20*ms).Take(3), func(i int) x.Observable[string] {
 		switch i {
 		case 0:
 			return first
@@ -318,7 +339,7 @@ func Example_switchMap() {
 		case 2:
 			return latest
 		default:
-			return Empty[string]()
+			return x.Empty[string]()
 		}
 	})
 
@@ -333,8 +354,8 @@ func Example_switchMap() {
 }
 
 func Example_retry() {
-	var first error = Error("error")
-	a := Create(func(index int) (next int, err error, done bool) {
+	var first error = x.Error("error")
+	a := x.Create(func(index int) (next int, err error, done bool) {
 		if index < 3 {
 			return index, nil, false
 		}
