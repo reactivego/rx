@@ -4,7 +4,7 @@ import "sync"
 
 // Multicast returns both an Observer and and Observable. The returned Observer is
 // used to send items into the Multicast. The returned Observable is used to subscribe
-// to the Multicast. The Muklticast multicasts items send through the Observer to every
+// to the Multicast. The Multicast multicasts items send through the Observer to every
 // Subscriber of the Observable.
 //
 //	size  size of the item buffer, number of items kept to replay to a new Subscriber.
