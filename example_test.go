@@ -76,23 +76,28 @@ func Example_multicast() {
 
 	in, out := x.Multicast[int](1)
 
-	// ignore everything before any subscriptions, including the last!
+	// Ignore everything before any subscriptions, including the last!
 	in.Next(-2)
 	in.Next(-1)
 	in.Next(0)
 	in.Next(1)
 
-	// add a couple of subscriptions
+	// Schedule the subsequent emits in a loop. This will be the first task to
+	// run on the serial scheduler after the subscriptions have been added.
+	serial.ScheduleLoop(2, func(index int, again func(next int)) {
+		if index < 4 {
+			in.Next(index)
+			again(index + 1)
+		} else {
+			in.Error(x.Error("foo"))
+		}
+	})
+
+	// Add a couple of subscriptions
 	sub1 := out.Subscribe(x.Println[int](), serial)
 	sub2 := out.Subscribe(x.Println[int](), serial)
 
-	// schedule the subsequent emits on a separate goroutine, otherwise they'll block
-	go func() {
-		in.Next(2)
-		in.Next(3)
-		in.Error(x.Error("foo"))
-	}()
-
+	// Let the scheduler run and wait for all of its scheduled tasks to finish.
 	serial.Wait()
 	fmt.Println(sub1.Wait())
 	fmt.Println(sub2.Wait())
