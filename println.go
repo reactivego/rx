@@ -1,9 +1,22 @@
 package x
 
 import (
-	"os"
+	"fmt"
 )
 
-func (observable Observable[T]) Println(schedulers ...Scheduler) error {
-	return observable.Pipe(Fprintln[T](os.Stdout)).Wait(schedulers...)
+func Println[T any]() Pipe[T] {
+	return func(observable Observable[T]) Observable[T] {
+		return func(observe Observer[T], scheduler Scheduler, subscriber Subscriber) {
+			observable(func(next T, err error, done bool) {
+				if !done {
+					fmt.Println(next)
+				}
+				observe(next, err, done)
+			}, scheduler, subscriber)
+		}
+	}
+}
+
+func (observable Observable[T]) Println() Observable[T] {
+	return observable.Pipe(Println[T]())
 }

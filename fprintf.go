@@ -5,12 +5,12 @@ import (
 	"io"
 )
 
-func Fprintln[T any](out io.Writer) Pipe[T] {
+func Fprintf[T any](out io.Writer, format string) Pipe[T] {
 	return func(observable Observable[T]) Observable[T] {
 		return func(observe Observer[T], scheduler Scheduler, subscriber Subscriber) {
 			observable(func(next T, err error, done bool) {
 				if !done {
-					fmt.Fprintln(out, next)
+					fmt.Fprintf(out, format, next)
 				}
 				observe(next, err, done)
 			}, scheduler, subscriber)
@@ -18,6 +18,6 @@ func Fprintln[T any](out io.Writer) Pipe[T] {
 	}
 }
 
-func (observable Observable[T]) Fprintln(out io.Writer) Observable[T] {
-	return observable.Pipe(Fprintln[T](out))
+func (observable Observable[T]) Fprintf(out io.Writer, format string) Observable[T] {
+	return observable.Pipe(Fprintf[T](out, format))
 }

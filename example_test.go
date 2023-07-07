@@ -14,9 +14,9 @@ func Example_share() {
 
 	shared := x.From(1, 2, 3).Share()
 
-	shared.Subscribe(x.Println[int](), serial)
-	shared.Subscribe(x.Println[int](), serial)
-	shared.Subscribe(x.Println[int](), serial)
+	shared.Println().Go(serial)
+	shared.Println().Go(serial)
+	shared.Println().Go(serial)
 
 	serial.Wait()
 	// Output:
@@ -44,8 +44,8 @@ func Example_subject() {
 	in.Next(1)
 
 	// add a couple of subscriptions
-	sub1 := out.Subscribe(x.Println[int](), serial)
-	sub2 := out.Subscribe(x.Println[int](), serial)
+	sub1 := out.Println().Go(serial)
+	sub2 := out.Println().Go(serial)
 
 	// schedule the subsequent emits on the serial scheduler otherwise these calls
 	// will block because the buffer is full.
@@ -94,8 +94,8 @@ func Example_multicast() {
 	})
 
 	// Add a couple of subscriptions
-	sub1 := out.Subscribe(x.Println[int](), serial)
-	sub2 := out.Subscribe(x.Println[int](), serial)
+	sub1 := out.Println().Go(serial)
+	sub2 := out.Println().Go(serial)
 
 	// Let the scheduler run and wait for all of its scheduled tasks to finish.
 	serial.Wait()
@@ -126,8 +126,8 @@ func Example_multicastDrop() {
 	in.Next(1)
 
 	// add a couple of subscriptions
-	sub1 := out.Subscribe(x.Println[int](), serial)
-	sub2 := out.Subscribe(x.Println[int](), serial)
+	sub1 := out.Println().Go(serial)
+	sub2 := out.Println().Go(serial)
 
 	in.Next(2)               // accepted: buffer not full
 	in.Next(3)               // dropped: buffer full
@@ -166,7 +166,7 @@ func Example_concatAll() {
 	req4 := req("fourth", 60*ms)
 
 	source = x.From(req1).ConcatWith(x.From(req2, req3, req4).Delay(100 * ms))
-	x.ConcatAll(source).Println()
+	x.ConcatAll(source).Println().Wait()
 
 	fmt.Println("OK")
 	// Output:
@@ -188,7 +188,7 @@ func Example_race() {
 	req2 := req("second", 10*ms)
 	req3 := req("third", 60*ms)
 
-	x.Race(req1, req2, req3).Println()
+	x.Race(req1, req2, req3).Println().Wait()
 
 	err := func(text string, duration time.Duration) x.Observable[int] {
 		return x.Throw[int](x.Error(text + " error")).Delay(duration)
@@ -212,13 +212,13 @@ func Example_marshal() {
 
 	b2s := func(data []byte) string { return string(data) }
 
-	x.Map(x.Of(R{"Hello", "World"}).Marshal(json.Marshal), b2s).Println()
+	x.Map(x.Of(R{"Hello", "World"}).Marshal(json.Marshal), b2s).Println().Wait()
 	// Output:
 	// {"a":"Hello","b":"World"}
 }
 
 func Example_elementAt() {
-	x.From(0, 1, 2, 3, 4).ElementAt(2).Println()
+	x.From(0, 1, 2, 3, 4).ElementAt(2).Println().Wait()
 	// Output:
 	// 2
 }
@@ -243,7 +243,7 @@ func Example_exhaustAll() {
 		return streams[next]
 	})
 
-	err := x.ExhaustAll(streamofstreams).Println()
+	err := x.ExhaustAll(streamofstreams).Println().Wait()
 
 	if err == nil {
 		fmt.Println("success")
@@ -262,22 +262,22 @@ func Example_bufferCount() {
 	source := x.From(0, 1, 2, 3)
 
 	fmt.Println("BufferCount(From(0, 1, 2, 3), 2, 1)")
-	x.BufferCount(source, 2, 1).Println()
+	x.BufferCount(source, 2, 1).Println().Wait()
 
 	fmt.Println("BufferCount(From(0, 1, 2, 3), 2, 2)")
-	x.BufferCount(source, 2, 2).Println()
+	x.BufferCount(source, 2, 2).Println().Wait()
 
 	fmt.Println("BufferCount(From(0, 1, 2, 3), 2, 3)")
-	x.BufferCount(source, 2, 3).Println()
+	x.BufferCount(source, 2, 3).Println().Wait()
 
 	fmt.Println("BufferCount(From(0, 1, 2, 3), 3, 2)")
-	x.BufferCount(source, 3, 2).Println()
+	x.BufferCount(source, 3, 2).Println().Wait()
 
 	fmt.Println("BufferCount(From(0, 1, 2, 3), 6, 6)")
-	x.BufferCount(source, 6, 6).Println()
+	x.BufferCount(source, 6, 6).Println().Wait()
 
 	fmt.Println("BufferCount(From(0, 1, 2, 3), 2, 0)")
-	x.BufferCount(source, 2, 0).Println()
+	x.BufferCount(source, 2, 0).Println().Wait()
 	// Output:
 	// BufferCount(From(0, 1, 2, 3), 2, 1)
 	// [0 1]
@@ -305,7 +305,7 @@ func Example_switchAll() {
 	interval42x4 := x.Interval[int](42 * ms).Take(4)
 	interval16x4 := x.Interval[int](16 * ms).Take(4)
 
-	err := x.SwitchAll(x.Map(interval42x4, func(next int) x.Observable[int] { return interval16x4 })).Println(x.Goroutine)
+	err := x.SwitchAll(x.Map(interval42x4, func(next int) x.Observable[int] { return interval16x4 })).Println().Wait(x.Goroutine)
 
 	if err == nil {
 		fmt.Println("success")
@@ -348,7 +348,7 @@ func Example_switchMap() {
 		}
 	})
 
-	err := switchmap.Println()
+	err := switchmap.Println().Wait()
 	if err == nil {
 		fmt.Println("success")
 	}
@@ -367,7 +367,7 @@ func Example_retry() {
 		err, first = first, nil
 		return 0, err, true
 	})
-	err := a.Retry().Println()
+	err := a.Retry().Println().Wait()
 	fmt.Println(first == nil)
 	fmt.Println(err)
 	// Output:

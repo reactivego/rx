@@ -1,10 +1,6 @@
 package x
 
-func (observable Observable[T]) Subscribe(observe Observer[T], schedulers ...Scheduler) Subscription {
-	if len(schedulers) == 0 {
-		schedulers = []Scheduler{NewScheduler()}
-	}
-	scheduler := schedulers[0]
+func (observable Observable[T]) Subscribe(observe Observer[T], scheduler Scheduler) Subscription {
 	subscription := newSubscription(scheduler)
 	observer := func(next T, err error, done bool) {
 		if !done {
