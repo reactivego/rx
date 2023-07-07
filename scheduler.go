@@ -1,8 +1,6 @@
 package x
 
-import (
-	"github.com/reactivego/scheduler"
-)
+import "github.com/reactivego/scheduler"
 
 type Scheduler = scheduler.Scheduler
 

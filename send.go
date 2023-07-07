@@ -1,11 +1,11 @@
 package x
 
-func Collect[T any](slice *[]T) Pipe[T] {
+func Send[T any](ch chan<- T) Pipe[T] {
 	return func(observable Observable[T]) Observable[T] {
 		return func(observe Observer[T], scheduler Scheduler, subscriber Subscriber) {
 			observable(func(next T, err error, done bool) {
 				if !done {
-					*slice = append(*slice, next)
+					ch <- next
 				}
 				observe(next, err, done)
 			}, scheduler, subscriber)

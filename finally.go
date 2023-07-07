@@ -1,13 +1,18 @@
 package x
 
-func (observable Observable[T]) Finally(f func(error)) Observable[T] {
-	return func(observe Observer[T], scheduler Scheduler, subscriber Subscriber) {
-		observer := func(next T, err error, done bool) {
-			if done {
-				f(err)
-			}
-			observe(next, err, done)
+func Finally[T any](f func(error)) Pipe[T] {
+	return func(observable Observable[T]) Observable[T] {
+		return func(observe Observer[T], scheduler Scheduler, subscriber Subscriber) {
+			observable(func(next T, err error, done bool) {
+				if done {
+					f(err)
+				}
+				observe(next, err, done)
+			}, scheduler, subscriber)
 		}
-		observable(observer, scheduler, subscriber)
 	}
+}
+
+func (observable Observable[T]) Finally(f func(error)) Observable[T] {
+	return observable.Pipe(Finally[T](f))
 }
