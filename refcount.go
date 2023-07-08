@@ -16,14 +16,6 @@ func (connectable Connectable[T]) RefCount() Observable[T] {
 		subscription *subscription
 	}
 	observable := func(observe Observer[T], scheduler Scheduler, subscriber Subscriber) {
-		source.Lock()
-		if atomic.AddInt32(&source.refcount, 1) == 1 {
-			source.subscription = newSubscription(scheduler)
-			source.Unlock()
-			connectable.Connect(scheduler, source.subscription)
-			source.Lock()
-		}
-		source.Unlock()
 		subscriber.OnUnsubscribe(func() {
 			source.Lock()
 			if atomic.AddInt32(&source.refcount, -1) == 0 {
@@ -32,6 +24,14 @@ func (connectable Connectable[T]) RefCount() Observable[T] {
 			source.Unlock()
 		})
 		connectable.Observable(observe, scheduler, subscriber)
+		source.Lock()
+		if atomic.AddInt32(&source.refcount, 1) == 1 {
+			source.subscription = newSubscription(scheduler)
+			source.Unlock()
+			connectable.Connect(scheduler, source.subscription)
+			source.Lock()
+		}
+		source.Unlock()
 	}
 	return observable
 }
