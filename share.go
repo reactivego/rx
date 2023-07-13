@@ -12,9 +12,5 @@ package x
 // creating multiple instances of the Observable and ensure that all
 // subscribers receive the same data.
 func (observable Observable[T]) Share() Observable[T] {
-	observe, multicaster := Multicast[T](1)
-	connect := func(scheduler Scheduler, subscriber Subscriber) {
-		observable(observe, scheduler, subscriber)
-	}
-	return Connectable[T]{multicaster, connect}.RefCount()
+	return observable.Publish().RefCount()
 }
