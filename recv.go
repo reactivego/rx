@@ -1,6 +1,6 @@
 package x
 
-func FromChan[T any](ch <-chan T) Observable[T] {
+func Recv[T any](ch <-chan T) Observable[T] {
 	return func(observe Observer[T], scheduler Scheduler, subscriber Subscriber) {
 		cancel := make(chan struct{})
 		runner := scheduler.ScheduleRecursive(func(again func()) {

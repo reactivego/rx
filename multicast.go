@@ -96,7 +96,7 @@ func Multicast[T any](size int) (Observer[T], Observable[T]) {
 				}
 			}
 		}
-		FromChan(channel)(observer, scheduler, subscriber)
+		Recv(channel)(observer, scheduler, subscriber)
 		subscriber.OnUnsubscribe(func() { remove() })
 	}
 	return observer, observable
