@@ -14,5 +14,5 @@ func Do[T any](f func(T)) Pipe[T] {
 }
 
 func (observable Observable[T]) Do(f func(next T)) Observable[T] {
-	return observable.Pipe(Do[T](f))
+	return Do[T](f)(observable)
 }

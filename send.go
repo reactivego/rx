@@ -12,3 +12,7 @@ func Send[T any](ch chan<- T) Pipe[T] {
 		}
 	}
 }
+
+func (observable Observable[T]) Send(ch chan<- T) Observable[T] {
+	return Send(ch)(observable)
+}

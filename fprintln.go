@@ -19,5 +19,5 @@ func Fprintln[T any](out io.Writer) Pipe[T] {
 }
 
 func (observable Observable[T]) Fprintln(out io.Writer) Observable[T] {
-	return observable.Pipe(Fprintln[T](out))
+	return Fprintln[T](out)(observable)
 }

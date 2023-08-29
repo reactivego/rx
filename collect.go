@@ -12,3 +12,7 @@ func Collect[T any](slice *[]T) Pipe[T] {
 		}
 	}
 }
+
+func (observable Observable[T]) Collect(slice *[]T) Observable[T] {
+	return Collect[T](slice)(observable)
+}

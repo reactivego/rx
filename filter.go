@@ -13,5 +13,5 @@ func Filter[T any](predicate func(T) bool) Pipe[T] {
 }
 
 func (observable Observable[T]) Filter(predicate func(T) bool) Observable[T] {
-	return observable.Pipe(Filter[T](predicate))
+	return Filter[T](predicate)(observable)
 }

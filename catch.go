@@ -15,5 +15,5 @@ func Catch[T any](other Observable[T]) Pipe[T] {
 }
 
 func (observable Observable[T]) Catch(other Observable[T]) Observable[T] {
-	return observable.Pipe(Catch[T](other))
+	return Catch[T](other)(observable)
 }

@@ -19,5 +19,5 @@ func Fprintf[T any](out io.Writer, format string) Pipe[T] {
 }
 
 func (observable Observable[T]) Fprintf(out io.Writer, format string) Observable[T] {
-	return observable.Pipe(Fprintf[T](out, format))
+	return Fprintf[T](out, format)(observable)
 }

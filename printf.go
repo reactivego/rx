@@ -18,5 +18,5 @@ func Printf[T any](format string) Pipe[T] {
 }
 
 func (observable Observable[T]) Printf(format string) Observable[T] {
-	return observable.Pipe(Printf[T](format))
+	return Printf[T](format)(observable)
 }

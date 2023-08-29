@@ -15,5 +15,5 @@ func Passthrough[T any]() Pipe[T] {
 }
 
 func (observable Observable[T]) Passthrough() Observable[T] {
-	return observable.Pipe(Passthrough[T]())
+	return Passthrough[T]()(observable)
 }

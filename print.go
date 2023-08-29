@@ -18,5 +18,5 @@ func Print[T any]() Pipe[T] {
 }
 
 func (observable Observable[T]) Print() Observable[T] {
-	return observable.Pipe(Print[T]())
+	return Print[T]()(observable)
 }

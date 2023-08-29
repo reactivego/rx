@@ -14,5 +14,5 @@ func Finally[T any](f func(error)) Pipe[T] {
 }
 
 func (observable Observable[T]) Finally(f func(error)) Observable[T] {
-	return observable.Pipe(Finally[T](f))
+	return Finally[T](f)(observable)
 }

@@ -15,5 +15,5 @@ func CatchError[T any](selector func(err error, caught Observable[T]) Observable
 }
 
 func (observable Observable[T]) CatchError(selector func(err error, caught Observable[T]) Observable[T]) Observable[T] {
-	return observable.Pipe(CatchError[T](selector))
+	return CatchError[T](selector)(observable)
 }

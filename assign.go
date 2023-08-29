@@ -12,3 +12,7 @@ func Assign[T any](value *T) Pipe[T] {
 		}
 	}
 }
+
+func (observable Observable[T]) Assign(value *T) Observable[T] {
+	return Assign[T](value)(observable)
+}
