@@ -84,7 +84,7 @@ import (
   "fmt"
 
   "github.com/reactivego/scheduler"
-  "github.com/reactivego/subscriber"
+  "github.com/reactivego/rx/subscriber"
 )
 
 type Scheduler = scheduler.Scheduler

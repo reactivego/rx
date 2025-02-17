@@ -1,8 +1,8 @@
 # subscriber
 
-    import "github.com/reactivego/subscriber"
+    import "github.com/reactivego/rx/subscriber"
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/reactivego/subscriber.svg)](https://pkg.go.dev/github.com/reactivego/subscriber#section-documentation)
+[![Go Reference](https://pkg.go.dev/badge/github.com/reactivego/rx/subscriber.svg)](https://pkg.go.dev/github.com/reactivego/rx/subscriber#section-documentation)
 
 Package `subscriber` provides a subscription tree implementation.
 

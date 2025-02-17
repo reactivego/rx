@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/reactivego/subscriber"
+	"github.com/reactivego/rx/subscriber"
 )
 
 //jig:name BarObserver

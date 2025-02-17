@@ -4,7 +4,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/reactivego/subscriber"
+	"github.com/reactivego/rx/subscriber"
 )
 
 //jig:template Observable<Foo> SwitchMap<Bar>

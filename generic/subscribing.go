@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 
 	"github.com/reactivego/scheduler"
-	"github.com/reactivego/subscriber"
+	"github.com/reactivego/rx/subscriber"
 )
 
 //jig:template Subscription

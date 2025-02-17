@@ -249,7 +249,7 @@ func ExampleObservable_DistinctUntilChanged() {
 	// 3
 }
 
-func ExampleObservable_MergeDelayError() {
+func ExampleObservable_mergeDelayError() {
 	type any = interface{}
 	const ms = time.Millisecond
 	AddMul := func(add, mul int) func(any) any {

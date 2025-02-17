@@ -6,17 +6,7 @@ import (
 	_ "github.com/reactivego/rx"
 )
 
-func Example() {
-	subject := NewAsyncSubjectString()
-	subject.Next("a")
-	subscription := subject.Timeout(time.Millisecond).Subscribe(PrintlnString())
-	subject.Next("b")
-	subject.Next("c")
-	subscription.Wait()
-	// Output:
-}
-
-func Example1() {
+func Example_asyncSubject() {
 	subject := NewAsyncSubjectString()
 	subject.Next("a")
 	subscription := subject.Subscribe(PrintlnString())
@@ -25,4 +15,14 @@ func Example1() {
 	subject.Complete()
 	subscription.Wait()
 	// Output: c
+}
+
+func Example_asyncSubjectTimeout() {
+	subject := NewAsyncSubjectString()
+	subject.Next("a")
+	subscription := subject.Timeout(time.Millisecond).Subscribe(PrintlnString())
+	subject.Next("b")
+	subject.Next("c")
+	subscription.Wait()
+	// Output:
 }

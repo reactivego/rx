@@ -9,7 +9,7 @@ import (
 	"image/color"
 
 	"github.com/reactivego/scheduler"
-	"github.com/reactivego/subscriber"
+	"github.com/reactivego/rx/subscriber"
 )
 
 //jig:name Scheduler
