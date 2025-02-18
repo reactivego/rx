@@ -1,4 +1,2 @@
-github.com/reactivego/scheduler v0.0.8 h1:V6/srdN8PBfhbRLWZGmPhmjADdHCIO90KAPKhCmJjK8=
-github.com/reactivego/scheduler v0.0.8/go.mod h1:g/J0uvK7dtH46yE0W8M0s6ldH4f6KtyOX6+kc2cJJcU=
-github.com/reactivego/rx/subscriber v0.0.1 h1:4JpRv4HRBZr/HC2Qi+gvD3PxzlugFA0BIV/BmfpuOcw=
-github.com/reactivego/rx/subscriber v0.0.1/go.mod h1:mKLQ4QiHayUQFXBCeWLyeMF15LuJm3VgWus2mUrOzEU=
+github.com/reactivego/scheduler v0.0.9 h1:po7rvEKfOv8lhvG1aKf976aMIR0W0Bqwq53GtFgR2+M=
+github.com/reactivego/scheduler v0.0.9/go.mod h1:kmiQUquA8FriEm/9NQXGWZCkH2hyYhu4bpGkyySORiA=
