@@ -395,23 +395,23 @@ func ExampleObservableObservable_SwitchAll() {
 	// 9
 }
 
-func ExampleObservable_SubscribeOn_trampoline() {
-	trampoline := rx.MakeTrampolineScheduler()
+func ExampleObservable_SubscribeOn_serial() {
+	serial := rx.NewScheduler()
 	observer := func(next interface{}, err error, done bool) {
 		switch {
 		case !done:
-			fmt.Println(trampoline.Count(), "print", next)
+			fmt.Println(serial.Count(), "print", next)
 		case err != nil:
-			fmt.Println(trampoline.Count(), "print", err)
+			fmt.Println(serial.Count(), "print", err)
 		default:
-			fmt.Println(trampoline.Count(), "print", "complete")
+			fmt.Println(serial.Count(), "print", "complete")
 		}
 	}
-	fmt.Println(trampoline.Count(), "SUBSCRIBING...")
-	subscription := rx.From(1, 2, 3).SubscribeOn(trampoline).Subscribe(observer)
-	fmt.Println(trampoline.Count(), "WAITING...")
+	fmt.Println(serial.Count(), "SUBSCRIBING...")
+	subscription := rx.From(1, 2, 3).SubscribeOn(serial).Subscribe(observer)
+	fmt.Println(serial.Count(), "WAITING...")
 	subscription.Wait()
-	fmt.Println(trampoline.Count(), "DONE")
+	fmt.Println(serial.Count(), "DONE")
 
 	// Output:
 	// 0 SUBSCRIBING...

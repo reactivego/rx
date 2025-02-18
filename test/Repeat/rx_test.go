@@ -3,7 +3,7 @@ package Repeat
 import (
 	"fmt"
 
-	_ "github.com/reactivego/rx"
+	_ "github.com/reactivego/rx/generic"
 )
 
 func Example_basic() {
@@ -34,7 +34,7 @@ func Example_trampoline() {
 		C()
 	})
 
-	scheduler := MakeTrampolineScheduler()
+	scheduler := NewScheduler()
 	slice, err := source.Repeat(_1M).TakeLast(9).SubscribeOn(scheduler).ToSlice()
 
 	fmt.Println("tasks =", scheduler.Count())

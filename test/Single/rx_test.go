@@ -3,7 +3,7 @@ package Single
 import (
 	"fmt"
 
-	_ "github.com/reactivego/rx"
+	_ "github.com/reactivego/rx/generic"
 )
 
 // Single is used to make sure only a single value was produced by the

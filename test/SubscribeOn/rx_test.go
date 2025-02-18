@@ -3,7 +3,7 @@ package SubscribeOn
 import (
 	"fmt"
 
-	_ "github.com/reactivego/rx"
+	_ "github.com/reactivego/rx/generic"
 )
 
 // SubscribeOn selects the scheduler to use for running the subscription task.

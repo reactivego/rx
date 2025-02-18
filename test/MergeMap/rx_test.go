@@ -1,6 +1,6 @@
 package MergeMap
 
-import _ "github.com/reactivego/rx"
+import _ "github.com/reactivego/rx/generic"
 
 func Example_basic() {
 	RangeInt(1, 2).MergeMapInt(func(n int) ObservableInt { return RangeInt(n, 2) }).Println()

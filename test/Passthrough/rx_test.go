@@ -1,6 +1,6 @@
 package Passthrough
 
-import _ "github.com/reactivego/rx"
+import _ "github.com/reactivego/rx/generic"
 
 func Example_passthrough() {
 	Range(1, 3).Passthrough().Println()

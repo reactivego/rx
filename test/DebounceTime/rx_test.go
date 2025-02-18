@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	_ "github.com/reactivego/rx"
+	_ "github.com/reactivego/rx/generic"
 )
 
 // DebounceTime sees 100 emissions [0..99] at 1ms intervals.

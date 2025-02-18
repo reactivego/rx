@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	_ "github.com/reactivego/rx"
+	_ "github.com/reactivego/rx/generic"
 )
 
 // ReplaySubject is both an observer and an observable. The maximum buffersize

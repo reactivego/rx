@@ -12,7 +12,7 @@ import (
 
 	"github.com/reactivego/scheduler"
 
-	_ "github.com/reactivego/rx"
+	_ "github.com/reactivego/rx/generic"
 )
 
 func Example() {

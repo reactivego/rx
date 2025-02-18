@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	_ "github.com/reactivego/rx"
+	_ "github.com/reactivego/rx/generic"
 )
 
 // This example is a variant of the example in the book "Introduction to Rx"

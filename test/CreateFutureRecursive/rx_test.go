@@ -3,7 +3,7 @@ package CreateFutureRecursive
 import (
 	"time"
 
-	_ "github.com/reactivego/rx"
+	_ "github.com/reactivego/rx/generic"
 )
 
 func Example_createFutureRecursiveInt() {

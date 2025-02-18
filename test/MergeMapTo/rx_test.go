@@ -1,6 +1,6 @@
 package MergeMapTo
 
-import _ "github.com/reactivego/rx"
+import _ "github.com/reactivego/rx/generic"
 
 func Example_basic() {
 	Range(1, 2).MergeMapTo(Range(3, 2)).Println()

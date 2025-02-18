@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/reactivego/rx"
+	_ "github.com/reactivego/rx/generic"
 	. "github.com/reactivego/rx/test"
 )
 
@@ -23,7 +23,7 @@ func TestPublishLast(e *testing.T) {
 
 	Describ(e, "operator", func(t T) {
 		I(t, "should emit last notification of a simple source Observable", func(t T) {
-			schedulers := []Scheduler{MakeTrampolineScheduler(), GoroutineScheduler()}
+			schedulers := []Scheduler{NewScheduler(), GoroutineScheduler()}
 			for _, scheduler := range schedulers {
 				published := FromInt(1, 2, 3, 4, 5).PublishLast()
 				published.Subscribe(Expec(t).MakeIntObservation("actual"), scheduler)
@@ -33,7 +33,7 @@ func TestPublishLast(e *testing.T) {
 			}
 		})
 		I(t, "should do nothing if connect is not called despite subscriptions", func(t T) {
-			schedulers := []Scheduler{MakeTrampolineScheduler(), GoroutineScheduler()}
+			schedulers := []Scheduler{NewScheduler(), GoroutineScheduler()}
 			for _, scheduler := range schedulers {
 				published := From(1, 2, 3, 4, 5).PublishLast()
 				published.Timeout(1*ms).Subscribe(Expec(t).MakeObservation("actual"), scheduler)
@@ -42,7 +42,7 @@ func TestPublishLast(e *testing.T) {
 			}
 		})
 		I(t, "should multicast the same values to multiple observers", func(t T) {
-			schedulers := []Scheduler{MakeTrampolineScheduler(), GoroutineScheduler()}
+			schedulers := []Scheduler{NewScheduler(), GoroutineScheduler()}
 			for _, scheduler := range schedulers {
 				source := Concat(Just(1), Timer(5*ms), From(2, 3), Timer(50*ms), Just(4))
 				published := source.PublishLast()
@@ -58,7 +58,7 @@ func TestPublishLast(e *testing.T) {
 			}
 		})
 		I(t, "should multicast an error from the source to multiple observers", func(t T) {
-			schedulers := []Scheduler{MakeTrampolineScheduler(), GoroutineScheduler()}
+			schedulers := []Scheduler{NewScheduler(), GoroutineScheduler()}
 			for _, scheduler := range schedulers {
 				bazinga := RxError("bazinga")
 				source := Concat(From(1, 2, 3), Timer(110*ms), Just(4), Throw(bazinga))
@@ -74,7 +74,7 @@ func TestPublishLast(e *testing.T) {
 			}
 		})
 		I(t, "should not cast any values to multiple observers, when source is unsubscribed explicitly and early", func(t T) {
-			schedulers := []Scheduler{MakeTrampolineScheduler(), GoroutineScheduler()}
+			schedulers := []Scheduler{NewScheduler(), GoroutineScheduler()}
 			for _, scheduler := range schedulers {
 				source := Concat(From(1, 2, 3), Timer(110*ms), Just(4))
 				published := source.PublishLast()
@@ -92,7 +92,7 @@ func TestPublishLast(e *testing.T) {
 			}
 		})
 		I(t, "should not break unsubscription chains when result is unsubscribed explicitly", func(t T) {
-			schedulers := []Scheduler{MakeTrampolineScheduler() /*, GoroutineScheduler()*/}
+			schedulers := []Scheduler{NewScheduler() /*, GoroutineScheduler()*/}
 			for _, scheduler := range schedulers {
 				source := Concat(From(1, 2, 3), Timer(110*ms), Just(4))
 				published := source.MergeMap(func(x interface{}) Observable {
@@ -114,7 +114,7 @@ func TestPublishLast(e *testing.T) {
 		})
 		Contex(t, "with refCount()", func(t T) {
 			I(t, "should connect when first subscriber subscribes", func(t T) {
-				schedulers := []Scheduler{MakeTrampolineScheduler(), GoroutineScheduler()}
+				schedulers := []Scheduler{NewScheduler(), GoroutineScheduler()}
 				for _, scheduler := range schedulers {
 					subscriptions := 0
 					empty := Defer(func() Observable {
@@ -138,7 +138,7 @@ func TestPublishLast(e *testing.T) {
 				}
 			})
 			I(t, "should disconnect when last subscriber unsubscribes", func(t T) {
-				schedulers := []Scheduler{MakeTrampolineScheduler() /*, GoroutineScheduler()*/}
+				schedulers := []Scheduler{NewScheduler() /*, GoroutineScheduler()*/}
 				for _, scheduler := range schedulers {
 					subscriptions := 0
 					empty := Defer(func() Observable {
@@ -170,7 +170,7 @@ func TestPublishLast(e *testing.T) {
 				}
 			})
 			I(t, "should be retryable unlike RxJS", func(t T) {
-				schedulers := []Scheduler{MakeTrampolineScheduler(), GoroutineScheduler()}
+				schedulers := []Scheduler{NewScheduler(), GoroutineScheduler()}
 				for _, scheduler := range schedulers {
 					bazinga := RxError("bazinga")
 					subscriptions := 0
@@ -195,7 +195,7 @@ func TestPublishLast(e *testing.T) {
 			})
 		})
 		I(t, "should multicast an empty source", func(t T) {
-			schedulers := []Scheduler{MakeTrampolineScheduler(), GoroutineScheduler()}
+			schedulers := []Scheduler{NewScheduler(), GoroutineScheduler()}
 			for _, scheduler := range schedulers {
 				subscriptions := 0
 				empty := Defer(func() Observable {
@@ -213,7 +213,7 @@ func TestPublishLast(e *testing.T) {
 			}
 		})
 		I(t, "should multicast a never source", func(t T) {
-			schedulers := []Scheduler{MakeTrampolineScheduler(), GoroutineScheduler()}
+			schedulers := []Scheduler{NewScheduler(), GoroutineScheduler()}
 			for _, scheduler := range schedulers {
 				subscribed := false
 				never := Defer(func() Observable {
@@ -231,7 +231,7 @@ func TestPublishLast(e *testing.T) {
 			}
 		})
 		I(t, "should multicast a throw source", func(t T) {
-			schedulers := []Scheduler{MakeTrampolineScheduler(), GoroutineScheduler()}
+			schedulers := []Scheduler{NewScheduler(), GoroutineScheduler()}
 			for _, scheduler := range schedulers {
 				bazinga := RxError("bazinga")
 				subscriptions := 0
@@ -250,7 +250,7 @@ func TestPublishLast(e *testing.T) {
 			}
 		})
 		I(t, "should multicast one observable to multiple observers", func(t T) {
-			schedulers := []Scheduler{MakeTrampolineScheduler(), GoroutineScheduler()}
+			schedulers := []Scheduler{NewScheduler(), GoroutineScheduler()}
 			for _, scheduler := range schedulers {
 				subscriptions := 0
 				source := Defer(func() Observable {

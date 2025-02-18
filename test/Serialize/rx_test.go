@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	_ "github.com/reactivego/rx"
+	_ "github.com/reactivego/rx/generic"
 )
 
 // In this example we deliberately create a badly behaved observable that

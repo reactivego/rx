@@ -4,9 +4,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/reactivego/scheduler"
-	"github.com/reactivego/rx/subscriber"
 )
 
 //jig:template Connectable
@@ -19,8 +16,8 @@ type Connectable func(Scheduler, Subscriber)
 // multicasting items to its subscribers. Connect accepts an optional
 // scheduler argument.
 func (c Connectable) Connect(schedulers ...Scheduler) Subscription {
-	subscriber := subscriber.New()
-	schedulers = append(schedulers, scheduler.MakeTrampoline())
+	subscriber := NewSubscriber()
+	schedulers = append(schedulers, NewScheduler())
 	if !schedulers[0].IsConcurrent() {
 		subscriber.OnWait(schedulers[0].Wait)
 	}
@@ -209,7 +206,7 @@ func (o FooMulticaster) RefCount() ObservableFoo {
 		o.ObservableFoo(observe, subscribeOn, withSubscriber)
 		source.Lock()
 		if atomic.AddInt32(&source.refcount, 1) == 1 {
-			source.subscriber = subscriber.New()
+			source.subscriber = NewSubscriber()
 			source.Unlock()
 			o.Connectable(subscribeOn, source.subscriber)
 			source.Lock()
@@ -264,7 +261,7 @@ func (o FooMulticaster) AutoConnect(count int) ObservableFoo {
 		source.Lock()
 		if atomic.AddInt32(&source.refcount, 1) == int32(count) {
 			if source.subscriber == nil || source.subscriber.Error() != nil {
-				source.subscriber = subscriber.New()
+				source.subscriber = NewSubscriber()
 				source.Unlock()
 				o.Connectable(subscribeOn, source.subscriber)
 				source.Lock()

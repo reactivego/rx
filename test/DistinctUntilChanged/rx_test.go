@@ -3,7 +3,7 @@ package DistinctUntilChanged
 import (
 	"image/color"
 
-	_ "github.com/reactivego/rx"
+	_ "github.com/reactivego/rx/generic"
 )
 
 func Example_distinctUntilChanged() {

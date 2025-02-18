@@ -1,6 +1,6 @@
 package Concat
 
-import _ "github.com/reactivego/rx"
+import _ "github.com/reactivego/rx/generic"
 
 func Example_concatInt() {
 	oa := FromInt(0, 1, 2, 3)

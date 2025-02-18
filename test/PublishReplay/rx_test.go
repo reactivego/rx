@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	_ "github.com/reactivego/rx"
+	_ "github.com/reactivego/rx/generic"
 )
 
 // Basic example with the maximum buffer capacity of approx. 32000 items where
@@ -133,7 +133,7 @@ func Example_replayWithExpiryAndSubscribe() {
 	source := FromChanInt(ch).PublishReplay(0, 500*time.Millisecond)
 
 	concurrent := GoroutineScheduler()
-	concurrent.Schedule(func(){
+	concurrent.Schedule(func() {
 		if err := source.Wait(); err != nil {
 			fmt.Println(err)
 		}

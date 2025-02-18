@@ -1,6 +1,6 @@
 package Reduce
 
-import _ "github.com/reactivego/rx"
+import _ "github.com/reactivego/rx/generic"
 
 func Example_reduce() {
 	add := func(acc float32, value int) float32 {

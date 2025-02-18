@@ -3,7 +3,7 @@ package Only
 import (
 	"fmt"
 
-	_ "github.com/reactivego/rx"
+	_ "github.com/reactivego/rx/generic"
 )
 
 // Point is how we refer to the type []point. Jig must be told since it can't know that.

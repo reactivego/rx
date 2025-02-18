@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	_ "github.com/reactivego/rx"
+	_ "github.com/reactivego/rx/generic"
 	. "github.com/reactivego/rx/test"
 )
 
@@ -67,7 +67,7 @@ func Example_retryConcurrent() {
 func TestRetryPublishLatest(e *testing.T) {
 	Describ(e, "Retry", func(t T) {
 		I(t, "can retry a published source", func(t T) {
-			schedulers := []Scheduler{MakeTrampolineScheduler(), GoroutineScheduler()}
+			schedulers := []Scheduler{NewScheduler(), GoroutineScheduler()}
 			for _, scheduler := range schedulers {
 
 				subscriptions := 0

@@ -8,8 +8,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/reactivego/rx/subscriber"
 )
 
 //jig:name BarObserver
@@ -557,7 +555,7 @@ type linkBar struct {
 }
 
 func newInitialLinkBar() *linkBar {
-	return &linkBar{state: linkCompleting, subscriber: subscriber.New()}
+	return &linkBar{state: linkCompleting, subscriber: NewSubscriber()}
 }
 
 func newLinkBar(observe linkBarObserver, subscriber Subscriber) *linkBar {

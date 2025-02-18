@@ -3,8 +3,6 @@ package rx
 import (
 	"sync"
 	"sync/atomic"
-
-	"github.com/reactivego/rx/subscriber"
 )
 
 //jig:template Observable<Foo> SwitchMap<Bar>
@@ -70,7 +68,7 @@ type linkFoo struct {
 }
 
 func newInitialLinkFoo() *linkFoo {
-	return &linkFoo{state: linkCompleting, subscriber: subscriber.New()}
+	return &linkFoo{state: linkCompleting, subscriber: NewSubscriber()}
 }
 
 func newLinkFoo(observe linkFooObserver, subscriber Subscriber) *linkFoo {

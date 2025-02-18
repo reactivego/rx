@@ -130,8 +130,8 @@ func (o ObservableString) MapString(project func(string) string) ObservableStrin
 }
 
 func (o ObservableString) Println(a ...interface{}) (err error) {
-  subscriber := subscriber.New()
-  scheduler := scheduler.MakeTrampoline()
+  subscriber := NewSubscriber()
+  scheduler := NewScheduler()
   observer := func(next string, e error, done bool) {
     if !done {
       fmt.Println(append(a, next)...)

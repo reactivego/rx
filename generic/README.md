@@ -8,7 +8,7 @@
 Package `rx` provides *Reactive Extensions* for Go, an API for asynchronous programming with [Observables](#observables) and [Operators](#operators).
 
 ## Install
-In order to use the package as a generic programming library for *Go 1*, first install the [*jig*](https://github.com/reactivego/jig) generator tool. It will generate source code from a generics library.
+In order to use the package as a generic programming library for *Go  < v1.18*, first install the [*jig*](https://github.com/reactivego/jig) generator tool. It will generate source code from a generics library.
 
 ```bash
 $ go get github.com/reactivego/jig
@@ -22,7 +22,7 @@ import _ "github.com/reactivego/rx/generic"
 ```
 The `_` prefix stops Go from complaining about the imported package not being used. However, [*jig*](https://github.com/reactivego/jig) will be able to use the generics from the library via this import.
 
-```go	
+```go
 package main
 
 import _ "github.com/reactivego/rx/generic"
@@ -63,7 +63,7 @@ An Observer subscribes to an Observable and **reacts** to whatever it emits.
 Operators work on one or more Observables to transform, filter and combine them into new Observables.
 
 Currently 104 operators are implemented:
-    
+
 | A … C                   | D … L                         | M … P                  | R … S              | T … W                   |
 |:------------------------|:------------------------------|:-----------------------|:-------------------|:------------------------|
 | [All]                   | [DebounceTime] :star:         | [Map] :star:           | [Range]            | [Take] :star:           |

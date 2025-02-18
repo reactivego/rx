@@ -5,7 +5,7 @@ import (
 	"sort"
 	"sync"
 
-	_ "github.com/reactivego/rx"
+	_ "github.com/reactivego/rx/generic"
 )
 
 // Subject is both an observer and an observable.

@@ -1,6 +1,6 @@
 package Average
 
-import _ "github.com/reactivego/rx"
+import _ "github.com/reactivego/rx/generic"
 
 func Example_averageInt() {
 	FromInt(1, 2, 3, 4, 5).Average().Println()

@@ -4,10 +4,7 @@
 
 package Observable
 
-import (
-	"github.com/reactivego/scheduler"
-	"github.com/reactivego/rx/subscriber"
-)
+import "github.com/reactivego/scheduler"
 
 //jig:name Observer
 
@@ -32,13 +29,67 @@ type Scheduler = scheduler.Scheduler
 
 //jig:name Subscriber
 
-// Subscriber is an interface that can be passed in when subscribing to an
-// Observable. It allows a set of observable subscriptions to be canceled
-// from a single subscriber at the root of the subscription tree.
-type Subscriber = subscriber.Subscriber
+// Subscriber is a Subscription with management functionality.
+type Subscriber interface {
+	// A Subscriber is also a Subscription.
+	Subscription
+
+	// Add will create and return a new child Subscriber setup in such a way that
+	// calling Unsubscribe on the parent will also call Unsubscribe on the child.
+	// Calling the Unsubscribe method on the child will NOT propagate to the
+	// parent!
+	Add() Subscriber
+
+	// OnUnsubscribe will add the given callback function to the subscriber.
+	// The callback will be called when either the Unsubscribe of the parent
+	// or of the subscriber itself is called. If the subscription was already
+	// canceled, then the callback function will just be called immediately.
+	OnUnsubscribe(callback func())
+
+	// OnWait will register a callback to  call when subscription Wait is called.
+	OnWait(callback func())
+
+	// Done will set the error internally and then cancel the subscription by
+	// calling the Unsubscribe method. A nil value for error indicates success.
+	Done(err error)
+
+	// Error returns the error set by calling the Done(err) method. As long as
+	// the subscriber is still subscribed Error will return nil.
+	Error() error
+}
 
 //jig:name Observable
 
 // Observable is a function taking an Observer, Scheduler and Subscriber.
 // Calling it will subscribe the Observer to events from the Observable.
 type Observable func(Observer, Scheduler, Subscriber)
+
+//jig:name Subscription
+
+// Subscription is an interface that allows code to monitor and control a
+// subscription it received.
+type Subscription interface {
+	// Subscribed returns true when the subscription is currently active.
+	Subscribed() bool
+
+	// Unsubscribe will do nothing if the subscription is not active. If the
+	// state is still active however, it will be changed to canceled.
+	// Subsequently, it will call Unsubscribe on all child subscriptions added
+	// through Add, along with all methods added through OnUnsubscribe. When the
+	// subscription is canceled by calling Unsubscribe a call to the Wait method
+	// will return the error ErrUnsubscribed.
+	Unsubscribe()
+
+	// Canceled returns true when the subscription state is canceled.
+	Canceled() bool
+
+	// Wait will by default block the calling goroutine and wait for the
+	// Unsubscribe method to be called on this subscription.
+	// However, when OnWait was called with a callback wait function it will
+	// call that instead. Calling Wait on a subscription that has already been
+	// canceled will return immediately. If the subscriber was canceled by
+	// calling Unsubscribe, then the error returned is ErrUnsubscribed.
+	// If the subscriber was terminated by calling Done, then the error
+	// returned here is the one passed to Done.
+	Wait() error
+}

@@ -3,7 +3,7 @@ package Observable
 import (
 	"fmt"
 
-	_ "github.com/reactivego/rx"
+	_ "github.com/reactivego/rx/generic"
 )
 
 // An Observer is just a callback function meant to be passed to an Observable.

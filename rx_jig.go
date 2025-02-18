@@ -6,12 +6,14 @@
 
 package rx
 
-import "time"
+import (
+	"time"
+	_ "github.com/reactivego/rx/generic"
+)
 
 func generate() {
-	_ = NewSubscriber()
 	_ = GoroutineScheduler()
-	t := MakeTrampolineScheduler()
+	t := NewScheduler()
 
 	/*
 		Observable Types

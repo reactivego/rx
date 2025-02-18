@@ -7,11 +7,11 @@ import "github.com/reactivego/scheduler"
 // Scheduler is used to schedule tasks to support subscribing and observing.
 type Scheduler = scheduler.Scheduler
 
-//jig:template MakeTrampolineScheduler
+//jig:template NewScheduler
 //jig:needs Scheduler
 
-func MakeTrampolineScheduler() Scheduler {
-	return scheduler.MakeTrampoline()
+func NewScheduler() Scheduler {
+	return scheduler.New()
 }
 
 //jig:template GoroutineScheduler

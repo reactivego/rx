@@ -3,7 +3,7 @@ package AsObservable
 import (
 	"fmt"
 
-	_ "github.com/reactivego/rx"
+	_ "github.com/reactivego/rx/generic"
 )
 
 func Example_asObservable() {

@@ -1,6 +1,6 @@
 package TakeWhile
 
-import _ "github.com/reactivego/rx"
+import _ "github.com/reactivego/rx/generic"
 
 type predicate func(int) bool
 

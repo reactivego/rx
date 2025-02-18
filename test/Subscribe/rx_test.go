@@ -3,7 +3,7 @@ package Subscribe
 import (
 	"fmt"
 
-	_ "github.com/reactivego/rx"
+	_ "github.com/reactivego/rx/generic"
 )
 
 // Shows how to correctly subscribe to an observable by calling the Subscribe
@@ -63,7 +63,7 @@ func Example_direct() {
 
 	// Non standard way of subscribing to an observable. But it does illustrate
 	// that an observable is just a function that can be called directly.
-	scheduler := MakeTrampolineScheduler()
+	scheduler := NewScheduler()
 	subscriber := NewSubscriber()
 
 	// Observe function. Note that done is true for both an error as well as

@@ -1,6 +1,6 @@
 package Take
 
-import _ "github.com/reactivego/rx"
+import _ "github.com/reactivego/rx/generic"
 
 func Example_basic() {
 	source := FromInt(1, 2, 3, 4, 5)

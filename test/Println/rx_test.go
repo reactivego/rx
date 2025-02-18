@@ -1,6 +1,6 @@
 package Println
 
-import _ "github.com/reactivego/rx"
+import _ "github.com/reactivego/rx/generic"
 
 // Subscribe to an observable using Println and print all emitted values.
 func Example_println() {

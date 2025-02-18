@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/reactivego/scheduler"
-	"github.com/reactivego/rx/subscriber"
 )
 
 //jig:name Scheduler
@@ -23,10 +22,34 @@ type Scheduler = scheduler.Scheduler
 
 //jig:name Subscriber
 
-// Subscriber is an interface that can be passed in when subscribing to an
-// Observable. It allows a set of observable subscriptions to be canceled
-// from a single subscriber at the root of the subscription tree.
-type Subscriber = subscriber.Subscriber
+// Subscriber is a Subscription with management functionality.
+type Subscriber interface {
+	// A Subscriber is also a Subscription.
+	Subscription
+
+	// Add will create and return a new child Subscriber setup in such a way that
+	// calling Unsubscribe on the parent will also call Unsubscribe on the child.
+	// Calling the Unsubscribe method on the child will NOT propagate to the
+	// parent!
+	Add() Subscriber
+
+	// OnUnsubscribe will add the given callback function to the subscriber.
+	// The callback will be called when either the Unsubscribe of the parent
+	// or of the subscriber itself is called. If the subscription was already
+	// canceled, then the callback function will just be called immediately.
+	OnUnsubscribe(callback func())
+
+	// OnWait will register a callback to  call when subscription Wait is called.
+	OnWait(callback func())
+
+	// Done will set the error internally and then cancel the subscription by
+	// calling the Unsubscribe method. A nil value for error indicates success.
+	Done(err error)
+
+	// Error returns the error set by calling the Done(err) method. As long as
+	// the subscriber is still subscribed Error will return nil.
+	Error() error
+}
 
 //jig:name Observer
 
@@ -69,10 +92,10 @@ func From(slice ...interface{}) Observable {
 	return observable
 }
 
-//jig:name MakeTrampolineScheduler
+//jig:name NewScheduler
 
-func MakeTrampolineScheduler() Scheduler {
-	return scheduler.MakeTrampoline()
+func NewScheduler() Scheduler {
+	return scheduler.New()
 }
 
 //jig:name GoroutineScheduler
@@ -238,8 +261,33 @@ func Empty() Observable {
 
 //jig:name Subscription
 
-// Subscription is an alias for the subscriber.Subscription interface type.
-type Subscription = subscriber.Subscription
+// Subscription is an interface that allows code to monitor and control a
+// subscription it received.
+type Subscription interface {
+	// Subscribed returns true when the subscription is currently active.
+	Subscribed() bool
+
+	// Unsubscribe will do nothing if the subscription is not active. If the
+	// state is still active however, it will be changed to canceled.
+	// Subsequently, it will call Unsubscribe on all child subscriptions added
+	// through Add, along with all methods added through OnUnsubscribe. When the
+	// subscription is canceled by calling Unsubscribe a call to the Wait method
+	// will return the error ErrUnsubscribed.
+	Unsubscribe()
+
+	// Canceled returns true when the subscription state is canceled.
+	Canceled() bool
+
+	// Wait will by default block the calling goroutine and wait for the
+	// Unsubscribe method to be called on this subscription.
+	// However, when OnWait was called with a callback wait function it will
+	// call that instead. Calling Wait on a subscription that has already been
+	// canceled will return immediately. If the subscriber was canceled by
+	// calling Unsubscribe, then the error returned is ErrUnsubscribed.
+	// If the subscriber was terminated by calling Done, then the error
+	// returned here is the one passed to Done.
+	Wait() error
+}
 
 //jig:name Never
 
@@ -250,14 +298,45 @@ func Never() Observable {
 	return observable
 }
 
+//jig:name Observable_ConcatWith
+
+// ConcatWith emits the emissions from two or more Observables without interleaving them.
+func (o Observable) ConcatWith(other ...Observable) Observable {
+	if len(other) == 0 {
+		return o
+	}
+	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
+		var (
+			observables	= append([]Observable{}, other...)
+			observer	Observer
+		)
+		observer = func(next interface{}, err error, done bool) {
+			if !done || err != nil {
+				observe(next, err, done)
+			} else {
+				if len(observables) == 0 {
+					var zero interface{}
+					observe(zero, nil, true)
+				} else {
+					o := observables[0]
+					observables = observables[1:]
+					o(observer, subscribeOn, subscriber)
+				}
+			}
+		}
+		o(observer, subscribeOn, subscriber)
+	}
+	return observable
+}
+
 //jig:name Observable_Subscribe
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
-// Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
+// Subscribe uses a serial scheduler created with NewScheduler().
 func (o Observable) Subscribe(observe Observer, schedulers ...Scheduler) Subscription {
-	subscriber := subscriber.New()
-	schedulers = append(schedulers, scheduler.MakeTrampoline())
+	subscriber := NewSubscriber()
+	schedulers = append(schedulers, NewScheduler())
 	observer := func(next interface{}, err error, done bool) {
 		if !done {
 			observe(next, err, done)
@@ -283,8 +362,8 @@ type Connectable func(Scheduler, Subscriber)
 // multicasting items to its subscribers. Connect accepts an optional
 // scheduler argument.
 func (c Connectable) Connect(schedulers ...Scheduler) Subscription {
-	subscriber := subscriber.New()
-	schedulers = append(schedulers, scheduler.MakeTrampoline())
+	subscriber := NewSubscriber()
+	schedulers = append(schedulers, NewScheduler())
 	if !schedulers[0].IsConcurrent() {
 		subscriber.OnWait(schedulers[0].Wait)
 	}
@@ -597,7 +676,6 @@ func MakeObserverObservable(age time.Duration, length int, capacity ...int) (Obs
 			}
 			sub = nil
 			err = OutOfSubscriptions
-			return
 		})
 		return
 	}
@@ -800,10 +878,10 @@ func (o Observable) PublishLast() Multicaster {
 
 // Subscribe operates upon the emissions and notifications from an Observable.
 // This method returns a Subscription.
-// Subscribe uses a trampoline scheduler created with scheduler.MakeTrampoline().
+// Subscribe uses a serial scheduler created with NewScheduler().
 func (o ObservableInt) Subscribe(observe IntObserver, schedulers ...Scheduler) Subscription {
-	subscriber := subscriber.New()
-	schedulers = append(schedulers, scheduler.MakeTrampoline())
+	subscriber := NewSubscriber()
+	schedulers = append(schedulers, NewScheduler())
 	observer := func(next int, err error, done bool) {
 		if !done {
 			observe(next, err, done)
@@ -1056,35 +1134,112 @@ func (o Observable) MergeMap(project func(interface{}) Observable) Observable {
 	return o.MapObservable(project).MergeAll()
 }
 
-//jig:name Observable_ConcatWith
+//jig:name NewSubscriber
 
-// ConcatWith emits the emissions from two or more Observables without interleaving them.
-func (o Observable) ConcatWith(other ...Observable) Observable {
-	if len(other) == 0 {
-		return o
-	}
-	observable := func(observe Observer, subscribeOn Scheduler, subscriber Subscriber) {
-		var (
-			observables	= append([]Observable{}, other...)
-			observer	Observer
-		)
-		observer = func(next interface{}, err error, done bool) {
-			if !done || err != nil {
-				observe(next, err, done)
-			} else {
-				if len(observables) == 0 {
-					var zero interface{}
-					observe(zero, nil, true)
-				} else {
-					o := observables[0]
-					observables = observables[1:]
-					o(observer, subscribeOn, subscriber)
-				}
-			}
+// New will create and return a new Subscriber.
+func NewSubscriber() Subscriber {
+	return &subscriber{err: ErrUnsubscribed}
+}
+
+// Unsubscribed is the error returned by wait when the Unsubscribe method
+// is called on the subscription.
+const ErrUnsubscribed = RxError("subscriber unsubscribed")
+
+const (
+	subscribed	= iota
+	unsubscribed
+)
+
+type subscriber struct {
+	state	int32
+
+	sync.Mutex
+	callbacks	[]func()
+	onWait		func()
+	err		error
+}
+
+func (s *subscriber) Subscribed() bool {
+	return atomic.LoadInt32(&s.state) == subscribed
+}
+
+func (s *subscriber) Unsubscribe() {
+	if atomic.CompareAndSwapInt32(&s.state, subscribed, unsubscribed) {
+		s.Lock()
+		for _, cb := range s.callbacks {
+			cb()
 		}
-		o(observer, subscribeOn, subscriber)
+		s.callbacks = nil
+		s.Unlock()
 	}
-	return observable
+}
+
+func (s *subscriber) Canceled() bool {
+	return atomic.LoadInt32(&s.state) != subscribed
+}
+
+func (s *subscriber) Wait() error {
+	s.Lock()
+	wait := s.onWait
+	s.Unlock()
+	if wait != nil {
+		wait()
+	}
+	if atomic.LoadInt32(&s.state) == subscribed {
+		var wg sync.WaitGroup
+		wg.Add(1)
+		s.OnUnsubscribe(wg.Done)
+		wg.Wait()
+	}
+	return s.Error()
+}
+
+func (s *subscriber) Add() Subscriber {
+	child := NewSubscriber()
+	s.Lock()
+	if atomic.LoadInt32(&s.state) != subscribed {
+		child.Unsubscribe()
+	} else {
+		s.callbacks = append(s.callbacks, child.Unsubscribe)
+	}
+	s.Unlock()
+	return child
+}
+
+func (s *subscriber) OnUnsubscribe(callback func()) {
+	if callback == nil {
+		return
+	}
+	s.Lock()
+	if atomic.LoadInt32(&s.state) == subscribed {
+		s.callbacks = append(s.callbacks, callback)
+	} else {
+		callback()
+	}
+	s.Unlock()
+}
+
+func (s *subscriber) OnWait(callback func()) {
+	s.Lock()
+	s.onWait = callback
+	s.Unlock()
+}
+
+func (s *subscriber) Done(err error) {
+	s.Lock()
+	s.err = err
+	s.Unlock()
+	s.Unsubscribe()
+}
+
+func (s *subscriber) Error() error {
+	s.Lock()
+	err := s.err
+	s.Unlock()
+	if atomic.LoadInt32(&s.state) == subscribed {
+		err = nil
+	}
+	return err
 }
 
 //jig:name Observable_MapObservable
@@ -1110,10 +1265,10 @@ func (o Observable) MapObservable(project func(interface{}) Observable) Observab
 // Println subscribes to the Observable and prints every item to os.Stdout
 // while it waits for completion or error. Returns either the error or nil
 // when the Observable completed normally.
-// Println uses a trampoline scheduler created with scheduler.MakeTrampoline().
+// Println uses a serial scheduler created with NewScheduler().
 func (o Observable) Println(a ...interface{}) error {
-	subscriber := subscriber.New()
-	scheduler := scheduler.MakeTrampoline()
+	subscriber := NewSubscriber()
+	scheduler := NewScheduler()
 	observer := func(next interface{}, err error, done bool) {
 		if !done {
 			fmt.Println(append(a, next)...)
@@ -1225,7 +1380,7 @@ func (o Multicaster) RefCount() Observable {
 		o.Observable(observe, subscribeOn, withSubscriber)
 		source.Lock()
 		if atomic.AddInt32(&source.refcount, 1) == 1 {
-			source.subscriber = subscriber.New()
+			source.subscriber = NewSubscriber()
 			source.Unlock()
 			o.Connectable(subscribeOn, source.subscriber)
 			source.Lock()

@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"time"
 
-	_ "github.com/reactivego/rx"
+	_ "github.com/reactivego/rx/generic"
 )
 
 func Example_timeout() {
 	const ms = time.Millisecond
 
-	scheduler := MakeTrampolineScheduler()
+	scheduler := NewScheduler()
 	//scheduler := GoroutineScheduler()
 	start := scheduler.Now()
 
