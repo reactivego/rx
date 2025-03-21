@@ -1,8 +1,6 @@
 package x
 
-import (
-	"fmt"
-)
+import "fmt"
 
 func Println[T any]() Pipe[T] {
 	return func(observable Observable[T]) Observable[T] {
