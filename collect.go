@@ -1,4 +1,4 @@
-package x
+package rx
 
 func Collect[T any](slice *[]T) Pipe[T] {
 	return func(observable Observable[T]) Observable[T] {

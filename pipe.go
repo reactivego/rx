@@ -1,4 +1,4 @@
-package x
+package rx
 
 type Pipe[T any] func(Observable[T]) Observable[T]
 

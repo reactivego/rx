@@ -1,4 +1,4 @@
-package x
+package rx
 
 func From[T any](slice ...T) Observable[T] {
 	if len(slice) == 0 {

@@ -1,4 +1,4 @@
-package x
+package rx
 
 func Take[T any](n int) Pipe[T] {
 	return func(observable Observable[T]) Observable[T] {

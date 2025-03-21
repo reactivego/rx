@@ -1,4 +1,4 @@
-package x
+package rx
 
 func (observable Observable[T]) Go(schedulers ...Scheduler) Subscription {
 	if len(schedulers) == 0 {

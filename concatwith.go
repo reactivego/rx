@@ -1,4 +1,4 @@
-package x
+package rx
 
 func (observable Observable[T]) ConcatWith(others ...Observable[T]) Observable[T] {
 	if len(others) == 0 {

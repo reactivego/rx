@@ -1,4 +1,4 @@
-package x
+package rx
 
 func Passthrough[T any]() Pipe[T] {
 	// Pipe scope

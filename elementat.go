@@ -1,4 +1,4 @@
-package x
+package rx
 
 func (observable Observable[T]) ElementAt(n int) Observable[T] {
 	return func(observe Observer[T], scheduler Scheduler, subscriber Subscriber) {

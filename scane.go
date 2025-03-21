@@ -1,4 +1,4 @@
-package x
+package rx
 
 func ScanE[T, U any](observable Observable[T], seed U, accumulator func(acc U, next T) (U, error)) Observable[U] {
 	return func(observe Observer[U], scheduler Scheduler, subscriber Subscriber) {

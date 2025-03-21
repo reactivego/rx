@@ -1,4 +1,4 @@
-package x
+package rx
 
 const TypecastFailed = Error("typecast failed")
 

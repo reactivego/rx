@@ -1,4 +1,4 @@
-module github.com/reactivego/x
+module github.com/reactivego/rx
 
 go 1.23.0
 

@@ -1,4 +1,4 @@
-package x
+package rx
 
 type Triple[T, U, V any] struct {
 	First  T

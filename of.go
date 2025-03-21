@@ -1,4 +1,4 @@
-package x
+package rx
 
 func Of[T any](value T) Observable[T] {
 	return func(observe Observer[T], scheduler Scheduler, subscriber Subscriber) {

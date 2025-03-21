@@ -1,4 +1,4 @@
-package x
+package rx
 
 func Assign[T any](value *T) Pipe[T] {
 	return func(observable Observable[T]) Observable[T] {

@@ -1,4 +1,4 @@
-package x
+package rx
 
 func Combine[T any](observables ...Observable[T]) Observable[[]T] {
 	return CombineAll(From(observables...))

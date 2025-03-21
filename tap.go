@@ -1,4 +1,4 @@
-package x
+package rx
 
 func Tap[T any](tap Observer[T]) Pipe[T] {
 	return func(observable Observable[T]) Observable[T] {

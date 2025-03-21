@@ -1,4 +1,4 @@
-package x
+package rx
 
 func Do[T any](f func(T)) Pipe[T] {
 	return func(observable Observable[T]) Observable[T] {

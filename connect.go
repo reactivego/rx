@@ -1,4 +1,4 @@
-package x
+package rx
 
 // Connect provides the Connect method for a Connectable[T].
 type Connect func(Scheduler, Subscriber)

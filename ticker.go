@@ -1,4 +1,4 @@
-package x
+package rx
 
 import "time"
 

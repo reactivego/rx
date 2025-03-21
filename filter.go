@@ -1,4 +1,4 @@
-package x
+package rx
 
 func Filter[T any](predicate func(T) bool) Pipe[T] {
 	return func(observable Observable[T]) Observable[T] {

@@ -1,4 +1,4 @@
-package x
+package rx
 
 func Recv[T any](ch <-chan T) Observable[T] {
 	return func(observe Observer[T], scheduler Scheduler, subscriber Subscriber) {

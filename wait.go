@@ -1,4 +1,4 @@
-package x
+package rx
 
 func (observable Observable[T]) Wait(schedulers ...Scheduler) error {
 	if len(schedulers) == 0 {

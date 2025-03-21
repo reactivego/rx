@@ -1,4 +1,4 @@
-package x
+package rx
 
 // Connectable[T] is an Observable[T] with a Connect method. So it has a both a
 // Subscribe method and a Connect method. The Connect method is used to

@@ -1,4 +1,4 @@
-package x
+package rx
 
 const RepeatCountInvalid = Error("repeat count invalid")
 

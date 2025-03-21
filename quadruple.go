@@ -1,4 +1,4 @@
-package x
+package rx
 
 type Quadruple[T, U, V, W any] struct {
 	First  T

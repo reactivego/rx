@@ -1,4 +1,4 @@
-package x
+package rx
 
 func Finally[T any](f func(error)) Pipe[T] {
 	return func(observable Observable[T]) Observable[T] {

@@ -1,4 +1,4 @@
-package x
+package rx
 
 func (observable Observable[T]) Subscribe(observe Observer[T], scheduler Scheduler) Subscription {
 	subscription := newSubscription(scheduler)

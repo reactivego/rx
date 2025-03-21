@@ -1,4 +1,4 @@
-package x
+package rx
 
 func CatchError[T any](selector func(err error, caught Observable[T]) Observable[T]) Pipe[T] {
 	return func(observable Observable[T]) Observable[T] {

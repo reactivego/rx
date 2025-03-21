@@ -1,4 +1,4 @@
-package x
+package rx
 
 // Share returns a new Observable that multicasts (shares) the original
 // Observable. As long as there is at least one Subscriber this Observable

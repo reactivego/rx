@@ -1,4 +1,4 @@
-package x
+package rx
 
 func Send[T any](ch chan<- T) Pipe[T] {
 	return func(observable Observable[T]) Observable[T] {

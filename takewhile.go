@@ -1,4 +1,4 @@
-package x
+package rx
 
 func TakeWhile[T any](condition func(T) bool) Pipe[T] {
 	return func(observable Observable[T]) Observable[T] {

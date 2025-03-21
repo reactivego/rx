@@ -1,4 +1,4 @@
-package x
+package rx
 
 type Observer[T any] func(next T, err error, done bool)
 

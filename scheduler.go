@@ -1,4 +1,4 @@
-package x
+package rx
 
 import "github.com/reactivego/scheduler"
 

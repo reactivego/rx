@@ -1,4 +1,4 @@
-package x
+package rx
 
 // Subscribable is the interface shared by Subscription and Subscriber.
 type Subscribable interface {

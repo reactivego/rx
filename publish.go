@@ -1,4 +1,4 @@
-package x
+package rx
 
 func (observable Observable[T]) Publish() Connectable[T] {
 	observe, multicaster := Multicast[T](1)

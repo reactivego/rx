@@ -1,4 +1,4 @@
-package x
+package rx
 
 func Catch[T any](other Observable[T]) Pipe[T] {
 	return func(observable Observable[T]) Observable[T] {
