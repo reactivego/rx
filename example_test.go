@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/reactivego/scheduler"
 	"github.com/reactivego/x"
 )
 
@@ -379,4 +380,75 @@ func Example_retry() {
 	// 2
 	// true
 	// <nil>
+}
+
+func Example_count() {
+	source := x.From(1, 2, 3, 4, 5)
+
+	count := source.Count()
+	count.Println().Wait()
+
+	emptySource := x.Empty[int]()
+	emptyCount := emptySource.Count()
+	emptyCount.Println().Wait()
+
+	fmt.Println("OK")
+	// Output:
+	// 5
+	// 0
+	// OK
+}
+
+func Example_values() {
+	source := x.From(1, 3, 5)
+
+	// Why choose the Goroutine concurrent scheduler?
+	// An observable can actually be at the root of a tree
+	// of separately running observables that have their
+	// responses merged. The Goroutine scheduler allows
+	// these observables to run concurrently.
+
+	// run the observable on 1 or more goroutines
+	for i := range source.Values(scheduler.Goroutine) {
+		// This is called from a newly created goroutine
+		fmt.Println(i)
+	}
+
+	// run the observable on the current goroutine
+	for i := range source.Values(scheduler.New()) {
+		fmt.Println(i)
+	}
+
+	fmt.Println("OK")
+	// Output:
+	// 1
+	// 3
+	// 5
+	// 1
+	// 3
+	// 5
+	// OK
+}
+
+func Example_all() {
+	source := x.From("ZERO", "ONE", "TWO")
+
+	for k, v := range source.All() {
+		fmt.Println(k, v)
+	}
+
+	fmt.Println("OK")
+	// Output:
+	// 0 ZERO
+	// 1 ONE
+	// 2 TWO
+	// OK
+}
+
+func Example_skip() {
+	x.From(1, 2, 3, 4, 5).Skip(2).Println().Wait()
+	// Output:
+	// 3
+	// 4
+	// 5
 }
