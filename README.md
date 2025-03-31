@@ -4,10 +4,10 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/reactivego/rx.svg)](https://pkg.go.dev/github.com/reactivego/rx)
 
-Package `rx` delivers _**R**eactive E**x**tensions_, a powerful API for asynchronous programming in Go, built around [observables](#observables) and [operators](#operators) to handle data streams seamlessly.
+Package `rx` provides _**R**eactive E**x**tensions_, a powerful API for asynchronous programming in Go, built around [observables](#observables) and [operators](#operators) to process streams of data seamlessly.
 ## Prerequisites
 
-You’ll need [*Go 1.23*](https://golang.org/dl/) or later, as it includes support for generics and iterators.
+You’ll need [*Go 1.23*](https://golang.org/dl/) or later, as the implementation depends on language support for generics and iterators.
 
 ## Observables
 In `rx`, an [**Observables**](http://reactivex.io/documentation/observable.html) represents a stream of data that can emit items over time, while an **observer** subscribes to it to receive and react to those emissions. This reactive approach enables asynchronous and concurrent operations without blocking execution. Instead of waiting for values to become available, an observer passively listens and responds whenever the Observable emits data, errors, or a completion signal.
