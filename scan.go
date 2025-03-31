@@ -9,7 +9,7 @@ func Scan[T, U any](observable Observable[T], seed U, accumulator func(acc U, ne
 				observe(state, nil, false)
 			} else {
 				var zero U
-				observe(zero, err, done)
+				observe(zero, err, true)
 			}
 		}, scheduler, subscriber)
 	}
