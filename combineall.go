@@ -52,7 +52,7 @@ func CombineAll[T any](observable Observable[Observable[T]]) Observable[[]T] {
 				var zero []T
 				observe(zero, err, true)
 			default:
-				scheduler.Schedule(func() {
+				runner := scheduler.Schedule(func() {
 					if subscriber.Subscribed() {
 						numObservables := len(observables)
 						observers.assigned = make([]bool, numObservables)
@@ -66,6 +66,7 @@ func CombineAll[T any](observable Observable[Observable[T]]) Observable[[]T] {
 						}
 					}
 				})
+				subscriber.OnUnsubscribe(runner.Cancel)
 			}
 		}
 		observable(observer, scheduler, subscriber)

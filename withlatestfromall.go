@@ -53,7 +53,7 @@ func WithLatestFromAll[T any](observable Observable[Observable[T]]) Observable[[
 				var zero []T
 				observe(zero, err, true)
 			default:
-				scheduler.Schedule(func() {
+				runner := scheduler.Schedule(func() {
 					if subscriber.Subscribed() {
 						numObservables := len(observables)
 						observers.assigned = make([]bool, numObservables)
@@ -66,6 +66,7 @@ func WithLatestFromAll[T any](observable Observable[Observable[T]]) Observable[[
 						}
 					}
 				})
+				subscriber.OnUnsubscribe(runner.Cancel)
 			}
 		}
 		observable(observer, scheduler, subscriber)
