@@ -11,3 +11,7 @@ func Map[T, U any](observable Observable[T], project func(T) U) Observable[U] {
 		}, scheduler, subscriber)
 	}
 }
+
+func (observable Observable[T]) Map(project func(T) any) Observable[any] {
+	return Map(observable, project)
+}

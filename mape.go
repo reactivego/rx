@@ -11,3 +11,7 @@ func MapE[T, U any](observable Observable[T], project func(T) (U, error)) Observ
 		}, scheduler, subscriber)
 	}
 }
+
+func (observable Observable[T]) MapE(project func(T) (any, error)) Observable[any] {
+	return MapE(observable, project)
+}
