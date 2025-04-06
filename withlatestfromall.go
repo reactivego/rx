@@ -6,8 +6,8 @@ import (
 
 func WithLatestFromAll[T any](observable Observable[Observable[T]]) Observable[[]T] {
 	return func(observe Observer[[]T], scheduler Scheduler, subscriber Subscriber) {
-		sources := []Observable[T](nil)
-		var observers struct {
+		var sources []Observable[T]
+		var buffers struct {
 			sync.Mutex
 			assigned    []bool
 			values      []T
@@ -16,26 +16,26 @@ func WithLatestFromAll[T any](observable Observable[Observable[T]]) Observable[[
 		}
 		makeObserver := func(sourceIndex int) Observer[T] {
 			observer := func(next T, err error, done bool) {
-				observers.Lock()
-				defer observers.Unlock()
-				if !observers.done {
+				buffers.Lock()
+				defer buffers.Unlock()
+				if !buffers.done {
 					switch {
 					case !done:
-						if !observers.assigned[sourceIndex] {
-							observers.assigned[sourceIndex] = true
-							observers.initialized++
+						if !buffers.assigned[sourceIndex] {
+							buffers.assigned[sourceIndex] = true
+							buffers.initialized++
 						}
-						observers.values[sourceIndex] = next
-						if sourceIndex == 0 && observers.initialized == len(observers.values) {
-							observe(observers.values, nil, false)
+						buffers.values[sourceIndex] = next
+						if sourceIndex == 0 && buffers.initialized == len(buffers.values) {
+							observe(buffers.values, nil, false)
 						}
 					case err != nil:
-						observers.done = true
+						buffers.done = true
 						var zero []T
 						observe(zero, err, true)
 					default:
 						if sourceIndex == 0 {
-							observers.done = true
+							buffers.done = true
 							var zero []T
 							observe(zero, nil, true)
 						}
@@ -44,7 +44,6 @@ func WithLatestFromAll[T any](observable Observable[Observable[T]]) Observable[[
 			}
 			return observer
 		}
-
 		observer := func(next Observable[T], err error, done bool) {
 			switch {
 			case !done:
@@ -53,11 +52,16 @@ func WithLatestFromAll[T any](observable Observable[Observable[T]]) Observable[[
 				var zero []T
 				observe(zero, err, true)
 			default:
+				if len(sources) == 0 {
+					var zero []T
+					observe(zero, nil, true)
+					return
+				}
 				runner := scheduler.Schedule(func() {
 					if subscriber.Subscribed() {
 						numSources := len(sources)
-						observers.assigned = make([]bool, numSources)
-						observers.values = make([]T, numSources)
+						buffers.assigned = make([]bool, numSources)
+						buffers.values = make([]T, numSources)
 						for sourceIndex, source := range sources {
 							if !subscriber.Subscribed() {
 								return
