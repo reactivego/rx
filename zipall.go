@@ -2,94 +2,65 @@ package rx
 
 import "sync"
 
-func ZipAll[T any](observable Observable[Observable[T]]) Observable[[]T] {
+const ZipBufferOverflow = Error("zip buffer overflow")
+
+func ZipAll[T any](observable Observable[Observable[T]], options ...MaxBufferSizeOption) Observable[[]T] {
+	var maxBufferSize = 0
+	for _, option := range options {
+		option(&maxBufferSize)
+	}
 	return func(observe Observer[[]T], scheduler Scheduler, subscriber Subscriber) {
 		var sources []Observable[T]
 		var buffers struct {
 			sync.Mutex
-			values    [][]T  // Buffer of values for each source
+			values    [][]T  // Buffer for each source
 			completed []bool // Track which sources have completed
-			active    int    // Count of active sources
+			done      bool
 		}
-
 		makeObserver := func(sourceIndex int) Observer[T] {
 			return func(next T, err error, done bool) {
 				buffers.Lock()
 				defer buffers.Unlock()
-
-				if buffers.active <= 0 {
-					return // Already completed or errored
-				}
-
-				switch {
-				case !done:
-					// Add the value to this source's buffer
-					buffers.values[sourceIndex] = append(buffers.values[sourceIndex], next)
-
-					// Check if every buffer has at least one value
-					haveAllValues := true
-					for _, buffer := range buffers.values {
-						if len(buffer) == 0 {
-							haveAllValues = false
-							break
+				if !buffers.done {
+					switch {
+					case !done:
+						// Check if adding this item would exceed the buffer size limit
+						if maxBufferSize > 0 && len(buffers.values[sourceIndex]) >= maxBufferSize {
+							buffers.done = true
+							var zero []T
+							observe(zero, ZipBufferOverflow, true)
+							return
 						}
-					}
-
-					// If we have values from all sources, emit the next set
-					if haveAllValues {
+						buffers.values[sourceIndex] = append(buffers.values[sourceIndex], next)
 						result := make([]T, len(buffers.values))
+						for _, values := range buffers.values {
+							if len(values) == 0 {
+								return
+							}
+						}
 						for i := range buffers.values {
 							result[i] = buffers.values[i][0]
 							buffers.values[i] = buffers.values[i][1:] // Remove the used value
 						}
 						observe(result, nil, false)
-
-						// Check if we need to complete after emission
-						for i, buffer := range buffers.values {
-							if len(buffer) == 0 && buffers.completed[i] {
-								buffers.active = 0
+					case err != nil:
+						buffers.done = true
+						var zero []T
+						observe(zero, err, true)
+					default:
+						buffers.completed[sourceIndex] = true
+						for i, completed := range buffers.completed {
+							if completed && len(buffers.values[i]) == 0 {
+								buffers.done = true
 								var zero []T
 								observe(zero, nil, true)
 								return
 							}
 						}
 					}
-
-				case err != nil:
-					// Error terminates the entire observable
-					buffers.active = 0
-					buffers.values = nil
-					buffers.completed = nil
-					var zero []T
-					observe(zero, err, true)
-
-				default:
-					// Mark this source as completed
-					buffers.completed[sourceIndex] = true
-
-					// Check if this source has an empty buffer
-					if len(buffers.values[sourceIndex]) == 0 {
-						// If a source completes with no buffered values, we can't emit more values
-						buffers.active = 0
-						buffers.values = nil
-						buffers.completed = nil
-						var zero []T
-						observe(zero, nil, true)
-						return
-					}
-
-					// Otherwise decrement active count and check if all sources are done
-					buffers.active--
-					if buffers.active == 0 {
-						buffers.values = nil
-						buffers.completed = nil
-						var zero []T
-						observe(zero, nil, true)
-					}
 				}
 			}
 		}
-
 		observer := func(next Observable[T], err error, done bool) {
 			switch {
 			case !done:
@@ -98,29 +69,27 @@ func ZipAll[T any](observable Observable[Observable[T]]) Observable[[]T] {
 				var zero []T
 				observe(zero, err, true)
 			default:
-				scheduler.Schedule(func() {
+				if len(sources) == 0 {
+					var zero []T
+					observe(zero, nil, true)
+					return
+				}
+				runner := scheduler.Schedule(func() {
 					if subscriber.Subscribed() {
 						numSources := len(sources)
-						if numSources == 0 {
-							var zero []T
-							observe(zero, nil, true)
-							return
-						}
-
 						buffers.values = make([][]T, numSources)
 						buffers.completed = make([]bool, numSources)
-						buffers.active = numSources
-
-						for i, source := range sources {
+						for sourceIndex, source := range sources {
 							if !subscriber.Subscribed() {
 								return
 							}
-							source.AutoUnsubscribe()(makeObserver(i), scheduler, subscriber)
+							source.AutoUnsubscribe()(makeObserver(sourceIndex), scheduler, subscriber)
 						}
 					}
 				})
+				subscriber.OnUnsubscribe(runner.Cancel)
 			}
 		}
-		observable(observer, scheduler, subscriber)
+		observable.AutoUnsubscribe()(observer, scheduler, subscriber)
 	}
 }
