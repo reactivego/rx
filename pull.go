@@ -26,20 +26,20 @@ func Pull[T any](seq iter.Seq[T]) Observable[T] {
 	}
 }
 
-func Pull2[K, V any](seq iter.Seq2[K, V]) Observable[Tuple2[K, V]] {
-	return func(observe Observer[Tuple2[K, V]], scheduler Scheduler, subscriber Subscriber) {
+func Pull2[T, U any](seq iter.Seq2[T, U]) Observable[Tuple2[T, U]] {
+	return func(observe Observer[Tuple2[T, U]], scheduler Scheduler, subscriber Subscriber) {
 		next, stop := iter.Pull2(seq)
 		task := func(again func()) {
 			if subscriber.Subscribed() {
-				k, v, valid := next()
+				first, second, valid := next()
 				if subscriber.Subscribed() {
 					if valid {
-						observe(Tuple2[K, V]{k, v}, nil, false)
+						observe(Tuple2[T, U]{first, second}, nil, false)
 						if subscriber.Subscribed() {
 							again()
 						}
 					} else {
-						var zero Tuple2[K, V]
+						var zero Tuple2[T, U]
 						observe(zero, nil, true)
 					}
 				}
