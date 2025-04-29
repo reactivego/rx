@@ -1,5 +1,9 @@
 package rx
 
+func Zip[T any](observables ...Observable[T]) Observable[[]T] {
+	return ZipAll(From(observables...))
+}
+
 func Zip2[T, U any](first Observable[T], second Observable[U], options ...MaxBufferSizeOption) Observable[Tuple2[T, U]] {
 	return Map(ZipAll(From(first.AsObservable(), second.AsObservable()), options...), func(next []any) Tuple2[T, U] {
 		return Tuple2[T, U]{next[0].(T), next[1].(U)}
