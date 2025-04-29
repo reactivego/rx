@@ -1,6 +1,6 @@
 package rx
 
-func Collect[T any](slice *[]T) Pipe[T] {
+func Append[T any](slice *[]T) Pipe[T] {
 	return func(observable Observable[T]) Observable[T] {
 		return func(observe Observer[T], scheduler Scheduler, subscriber Subscriber) {
 			observable(func(next T, err error, done bool) {
@@ -14,5 +14,5 @@ func Collect[T any](slice *[]T) Pipe[T] {
 }
 
 func (observable Observable[T]) Collect(slice *[]T) Observable[T] {
-	return Collect[T](slice)(observable)
+	return Append[T](slice)(observable)
 }
