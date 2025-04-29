@@ -1,6 +1,6 @@
 package rx
 
-func (observable Observable[T]) Value(schedulers ...Scheduler) (value T, err error) {
+func (observable Observable[T]) First(schedulers ...Scheduler) (value T, err error) {
 	err = observable.Take(1).Assign(&value).Wait(schedulers...)
 	return
 }
