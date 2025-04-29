@@ -1,5 +1,7 @@
 package rx
 
+const TypecastFailed = Error("typecast failed")
+
 type Observer[T any] func(next T, err error, done bool)
 
 // Ignore creates an Observer that simply discards any emissions
@@ -45,6 +47,33 @@ func OnComplete[T any](onComplete func()) Observer[T] {
 	return func(next T, err error, done bool) {
 		if done && err == nil {
 			onComplete()
+		}
+	}
+}
+
+// AsObserver converts an Observer of any type to an Observer of a specific type T.
+// This allows adapting a generic Observer to a more specific type context.
+func AsObserver[T any](observe Observer[any]) Observer[T] {
+	return func(next T, err error, done bool) {
+		observe(next, err, done)
+	}
+}
+
+// AsObserver converts a typed Observer[T] to a generic Observer[any].
+// It handles type conversion from 'any' back to T, and sends a TypecastFailed error
+// when conversion fails.
+func (observe Observer[T]) AsObserver() Observer[any] {
+	return func(next any, err error, done bool) {
+		if !done {
+			if nextT, ok := next.(T); ok {
+				observe(nextT, err, done)
+			} else {
+				var zero T
+				observe(zero, TypecastFailed, true)
+			}
+		} else {
+			var zero T
+			observe(zero, err, true)
 		}
 	}
 }
