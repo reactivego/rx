@@ -1,8 +1,6 @@
 package rx
 
-import (
-	"sync"
-)
+import "sync"
 
 func RaceWith[T any](others ...Observable[T]) Pipe[T] {
 	return func(observable Observable[T]) Observable[T] {
