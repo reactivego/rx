@@ -11,46 +11,6 @@ func Ignore[T any]() Observer[T] {
 	return func(next T, err error, done bool) {}
 }
 
-// OnNext creates an Observer that only calls the provided function when a new
-// value is emitted. It ignores completion and error signals.
-func OnNext[T any](onNext func(T)) Observer[T] {
-	return func(next T, err error, done bool) {
-		if !done {
-			onNext(next)
-		}
-	}
-}
-
-// OnDone creates an Observer that only calls the provided function when the
-// Observable completes or errors. It passes any error that occurred to the callback.
-func OnDone[T any](onDone func(error)) Observer[T] {
-	return func(next T, err error, done bool) {
-		if done {
-			onDone(err)
-		}
-	}
-}
-
-// OnError creates an Observer that only calls the provided function when an
-// error occurs. It ignores normal values and completion signals.
-func OnError[T any](onError func(error)) Observer[T] {
-	return func(next T, err error, done bool) {
-		if done && err != nil {
-			onError(err)
-		}
-	}
-}
-
-// OnComplete creates an Observer that only calls the provided function when the
-// Observable completes. It ignores normal values and error signals.
-func OnComplete[T any](onComplete func()) Observer[T] {
-	return func(next T, err error, done bool) {
-		if done && err == nil {
-			onComplete()
-		}
-	}
-}
-
 // AsObserver converts an Observer of any type to an Observer of a specific type T.
 // This allows adapting a generic Observer to a more specific type context.
 func AsObserver[T any](observe Observer[any]) Observer[T] {
