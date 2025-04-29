@@ -49,16 +49,16 @@ func OnComplete[T any](onComplete func()) Observer[T] {
 	}
 }
 
+// Next sends a new value to the Observer.
+// It indicates that a new value has been emitted by the Observable.
 func (observe Observer[T]) Next(next T) {
 	observe(next, nil, false)
 }
 
-func (observe Observer[T]) Error(err error) {
+// Done signals that the Observable has completed emitting values,
+// optionally with an error. If err is nil, it indicates normal completion.
+// If err is non-nil, it indicates that the Observable terminated with an error.
+func (observe Observer[T]) Done(err error) {
 	var zero T
 	observe(zero, err, true)
-}
-
-func (observe Observer[T]) Complete() {
-	var zero T
-	observe(zero, nil, true)
 }

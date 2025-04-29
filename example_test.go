@@ -55,7 +55,7 @@ func Example_subject() {
 	serial.Schedule(func() {
 		in.Next(2)
 		in.Next(3)
-		in.Error(rx.Error("foo"))
+		in.Done(rx.Error("foo"))
 	})
 
 	serial.Wait()
@@ -90,7 +90,7 @@ func Example_multicast() {
 			in.Next(index)
 			again(index + 1)
 		} else {
-			in.Error(rx.Error("foo"))
+			in.Done(rx.Error("foo"))
 		}
 	})
 
@@ -130,9 +130,9 @@ func Example_multicastDrop() {
 	sub1 := out.Println().Go(serial)
 	sub2 := out.Println().Go(serial)
 
-	in.Next(2)                // accepted: buffer not full
-	in.Next(3)                // dropped: buffer full
-	in.Error(rx.Error("foo")) // dropped: buffer full
+	in.Next(2)               // accepted: buffer not full
+	in.Next(3)               // dropped: buffer full
+	in.Done(rx.Error("foo")) // dropped: buffer full
 
 	serial.Wait()
 	fmt.Println(sub1.Wait())
