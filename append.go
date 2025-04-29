@@ -13,6 +13,6 @@ func Append[T any](slice *[]T) Pipe[T] {
 	}
 }
 
-func (observable Observable[T]) Collect(slice *[]T) Observable[T] {
+func (observable Observable[T]) Append(slice *[]T) Observable[T] {
 	return Append[T](slice)(observable)
 }

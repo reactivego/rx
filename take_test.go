@@ -13,7 +13,7 @@ func TestTake(t *testing.T) {
 		taken := nums.Take(3)
 
 		var results []int
-		taken.Collect(&results).Wait()
+		taken.Append(&results).Wait()
 
 		expected := []int{1, 2, 3}
 		if len(results) != len(expected) {
@@ -32,7 +32,7 @@ func TestTake(t *testing.T) {
 		taken := nums.Take(5)
 
 		var results []int
-		taken.Collect(&results).Wait()
+		taken.Append(&results).Wait()
 
 		expected := []int{1, 2, 3}
 		if len(results) != len(expected) {
@@ -45,7 +45,7 @@ func TestTake(t *testing.T) {
 		taken := nums.Take(0)
 
 		var results []int
-		taken.Collect(&results).Wait()
+		taken.Append(&results).Wait()
 
 		if len(results) != 0 {
 			t.Errorf("Expected 0 items, got %v", len(results))
@@ -93,7 +93,7 @@ func TestTake(t *testing.T) {
 		observable := rx.Recv(ch)
 		var results []int
 
-		err := observable.Take(0).Collect(&results).Wait()
+		err := observable.Take(0).Append(&results).Wait()
 
 		if err != nil {
 			t.Errorf("Expected completion, got %v", err)
