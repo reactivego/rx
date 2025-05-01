@@ -2,7 +2,4 @@ module github.com/reactivego/rx
 
 go 1.23.0
 
-require (
-	github.com/reactivego/scheduler v0.0.8
-	golang.org/x/exp v0.0.0-20230801115018-d63ba01acd4b
-)
+require github.com/reactivego/scheduler v0.1.2

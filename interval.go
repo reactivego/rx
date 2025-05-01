@@ -1,12 +1,8 @@
 package rx
 
-import (
-	"time"
+import "time"
 
-	"golang.org/x/exp/constraints"
-)
-
-func Interval[T constraints.Integer | constraints.Float](interval time.Duration) Observable[T] {
+func Interval[T Integer | Float](interval time.Duration) Observable[T] {
 	return func(observe Observer[T], scheduler Scheduler, subscriber Subscriber) {
 		var i T
 		task := func(again func(due time.Duration)) {
