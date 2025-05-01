@@ -8,7 +8,7 @@ func (observable Observable[T]) Subscribe(observe Observer[T], scheduler Schedul
 		} else {
 			var zero T
 			observe(zero, err, true)
-			subscription.Done(err)
+			subscription.done(err)
 		}
 	}
 	observable(observer, scheduler, subscription)

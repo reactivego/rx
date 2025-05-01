@@ -5,21 +5,25 @@ import (
 	"sync/atomic"
 )
 
-// Subscriber is a Subscribable that allows construction of a Subscriber tree.
+// Subscriber is a subscribable entity that allows construction of a Subscriber tree.
 type Subscriber interface {
-	// A Subscriber is a Subscribable
-	Subscribable
+	// Subscribed returns true if the subscriber is in a subscribed state.
+	// Returns false once Unsubscribe has been called.
+	Subscribed() bool
 
-	// Add will create and return a new child Subscriber setup in such a way that
-	// calling Unsubscribe on the parent will also call Unsubscribe on the child.
-	// Calling the Unsubscribe method on the child will NOT propagate to the
-	// parent!
+	// Unsubscribe changes the state to unsubscribed and executes all registered
+	// callback functions. Does nothing if already unsubscribed.
+	Unsubscribe()
+
+	// Add creates and returns a new child Subscriber.
+	// If the parent is already unsubscribed, the child will be created in an
+	// unsubscribed state. Otherwise, the child will be unsubscribed when the parent
+	// is unsubscribed.
 	Add() Subscriber
 
-	// OnUnsubscribe will add the given callback function to the Subscriber.
-	// The callback will be called when either the Unsubscribe of the parent
-	// or of the Subscriber itself is called. If the subscription was already
-	// canceled, then the callback function will just be called immediately.
+	// OnUnsubscribe registers a callback function to be executed when Unsubscribe is called.
+	// If the subscriber is already unsubscribed, the callback is executed immediately.
+	// If callback is nil, this method does nothing.
 	OnUnsubscribe(callback func())
 }
 
@@ -29,18 +33,17 @@ const (
 )
 
 type subscriber struct {
-	state int32
-
+	state atomic.Int32
 	sync.Mutex
 	callbacks []func()
 }
 
 func (s *subscriber) Subscribed() bool {
-	return atomic.LoadInt32(&s.state) == subscribed
+	return s.state.Load() == subscribed
 }
 
 func (s *subscriber) Unsubscribe() {
-	if atomic.CompareAndSwapInt32(&s.state, subscribed, unsubscribed) {
+	if s.state.CompareAndSwap(subscribed, unsubscribed) {
 		s.Lock()
 		for _, cb := range s.callbacks {
 			cb()
@@ -50,14 +53,10 @@ func (s *subscriber) Unsubscribe() {
 	}
 }
 
-func (s *subscriber) Canceled() bool {
-	return atomic.LoadInt32(&s.state) != subscribed
-}
-
 func (s *subscriber) Add() Subscriber {
 	child := &subscriber{}
 	s.Lock()
-	if atomic.LoadInt32(&s.state) != subscribed {
+	if s.state.Load() != subscribed {
 		child.Unsubscribe()
 	} else {
 		s.callbacks = append(s.callbacks, child.Unsubscribe)
@@ -71,7 +70,7 @@ func (s *subscriber) OnUnsubscribe(callback func()) {
 		return
 	}
 	s.Lock()
-	if atomic.LoadInt32(&s.state) == subscribed {
+	if s.state.Load() == subscribed {
 		s.callbacks = append(s.callbacks, callback)
 	} else {
 		callback()
