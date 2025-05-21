@@ -10,7 +10,7 @@ func MergeAll[T any](observable Observable[Observable[T]]) Observable[T] {
 		var merge struct {
 			sync.Mutex
 			done  bool
-			count int32
+			count atomic.Int32
 		}
 		merger := func(next T, err error, done bool) {
 			merge.Lock()
@@ -24,7 +24,7 @@ func MergeAll[T any](observable Observable[Observable[T]]) Observable[T] {
 					var zero T
 					observe(zero, err, true)
 				default:
-					if atomic.AddInt32(&merge.count, -1) == 0 {
+					if merge.count.Add(-1) == 0 {
 						var zero T
 						observe(zero, nil, true)
 					}
@@ -33,14 +33,14 @@ func MergeAll[T any](observable Observable[Observable[T]]) Observable[T] {
 		}
 		appender := func(next Observable[T], err error, done bool) {
 			if !done {
-				atomic.AddInt32(&merge.count, 1)
+				merge.count.Add(1)
 				next.AutoUnsubscribe()(merger, scheduler, subscriber)
 			} else {
 				var zero T
 				merger(zero, err, true)
 			}
 		}
-		merge.count += 1
+		merge.count.Add(1)
 		observable.AutoUnsubscribe()(appender, scheduler, subscriber)
 	}
 }
