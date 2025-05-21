@@ -1,6 +1,9 @@
 package rx
 
-import "sync"
+import (
+	"errors"
+	"sync"
+)
 
 // Subscription is an interface that allows monitoring and controlling a subscription.
 // It provides methods for tracking the subscription's lifecycle.
@@ -39,18 +42,18 @@ type subscription struct {
 	err       error
 }
 
-// SubscriptionActive is the error returned by Err() when the
+// ErrSubscriptionActive is the error returned by Err() when the
 // subscription is still active and has not yet completed or been canceled.
-const SubscriptionActive = Error("subscription active")
+var ErrSubscriptionActive = errors.Join(Err, errors.New("subscription active"))
 
-// SubscriptionCanceled is the error returned by Wait() and Err() when the
+// ErrSubscriptionCanceled is the error returned by Wait() and Err() when the
 // subscription was canceled by calling Unsubscribe() on the Subscription.
 // This indicates the subscription was terminated by the subscriber rather than
 // by the observable completing normally or with an error.
-const SubscriptionCanceled = Error("subscription canceled")
+var ErrSubscriptionCanceled = errors.Join(Err, errors.New("subscription canceled"))
 
 func newSubscription(scheduler Scheduler) *subscription {
-	return &subscription{scheduler: scheduler, err: SubscriptionCanceled}
+	return &subscription{scheduler: scheduler, err: ErrSubscriptionCanceled}
 }
 
 func (s *subscription) done(err error) {
@@ -72,7 +75,7 @@ func (s *subscription) Done() <-chan struct{} {
 
 func (s *subscription) Err() (err error) {
 	if s.Subscribed() {
-		return SubscriptionActive
+		return ErrSubscriptionActive
 	}
 	s.Lock()
 	err = s.err

@@ -1,6 +1,8 @@
 package rx
 
-const TypecastFailed = Error("typecast failed")
+import "errors"
+
+var ErrTypecastFailed = errors.Join(Err, errors.New("typecast failed"))
 
 type Observer[T any] func(next T, err error, done bool)
 
@@ -29,7 +31,7 @@ func (observe Observer[T]) AsObserver() Observer[any] {
 				observe(nextT, err, done)
 			} else {
 				var zero T
-				observe(zero, TypecastFailed, true)
+				observe(zero, ErrTypecastFailed, true)
 			}
 		} else {
 			var zero T

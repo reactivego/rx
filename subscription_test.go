@@ -2,6 +2,7 @@ package rx_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -70,8 +71,8 @@ func TestSubscription(t *testing.T) {
 		select {
 		case <-s.Done():
 			// Success, the subscription completed after unsubscribing
-			if err := s.Err(); err != rx.SubscriptionCanceled {
-				t.Errorf("expected %v error, got: %v", rx.SubscriptionCanceled, err)
+			if err := s.Err(); err != rx.ErrSubscriptionCanceled {
+				t.Errorf("expected %v error, got: %v", rx.ErrSubscriptionCanceled, err)
 			}
 		case <-time.After(500 * msec):
 			t.Error("subscription did not complete in time after unsubscribing")
@@ -131,7 +132,7 @@ func TestSubscription(t *testing.T) {
 	})
 
 	t.Run("Err returns error from observable", func(t *testing.T) {
-		expectedErr := rx.Error("test error")
+		expectedErr := errors.New("test error")
 		s := rx.Throw[int](expectedErr).Go()
 
 		// Wait for completion
@@ -147,7 +148,7 @@ func TestSubscription(t *testing.T) {
 		s := rx.Recv(ch).Go()
 
 		// Subscription should be active
-		if err := s.Err(); err != rx.SubscriptionActive {
+		if err := s.Err(); err != rx.ErrSubscriptionActive {
 			t.Errorf("expected SubscriptionActive, got: %v", err)
 		}
 

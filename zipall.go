@@ -1,8 +1,11 @@
 package rx
 
-import "sync"
+import (
+	"errors"
+	"sync"
+)
 
-const ZipBufferOverflow = Error("zip buffer overflow")
+var ErrZipBufferOverflow = errors.Join(Err, errors.New("zip buffer overflow"))
 
 func ZipAll[T any](observable Observable[Observable[T]], options ...MaxBufferSizeOption) Observable[[]T] {
 	var maxBufferSize = 0
@@ -28,7 +31,7 @@ func ZipAll[T any](observable Observable[Observable[T]], options ...MaxBufferSiz
 						if maxBufferSize > 0 && len(buffers.values[sourceIndex]) >= maxBufferSize {
 							buffers.done = true
 							var zero []T
-							observe(zero, ZipBufferOverflow, true)
+							observe(zero, ErrZipBufferOverflow, true)
 							return
 						}
 						buffers.values[sourceIndex] = append(buffers.values[sourceIndex], next)

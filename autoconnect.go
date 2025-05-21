@@ -1,11 +1,12 @@
 package rx
 
 import (
+	"errors"
 	"sync"
 	"sync/atomic"
 )
 
-const InvalidCount = Error("invalid count")
+var ErrInvalidCount = errors.Join(Err, errors.New("invalid count"))
 
 // AutoConnect returns an Observable that automatically connects to the Connectable source when a specified
 // number of subscribers subscribe to it.
@@ -17,7 +18,7 @@ const InvalidCount = Error("invalid count")
 // If count is less than 1, it returns an Observable that emits an ErrInvalidCount error.
 func (connectable Connectable[T]) AutoConnect(count int) Observable[T] {
 	if count < 1 {
-		return Throw[T](InvalidCount)
+		return Throw[T](ErrInvalidCount)
 	}
 	var source struct {
 		sync.Mutex

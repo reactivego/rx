@@ -1,6 +1,8 @@
 package rx
 
-const RepeatCountInvalid = Error("repeat count invalid")
+import "errors"
+
+var ErrRepeatCountInvalid = errors.Join(Err, errors.New("repeat count invalid"))
 
 // Repeat creates an Observable that emits the entire source sequence multiple times.
 //
@@ -16,7 +18,7 @@ const RepeatCountInvalid = Error("repeat count invalid")
 func Repeat[T any](count ...int) Pipe[T] {
 	return func(observable Observable[T]) Observable[T] {
 		if len(count) == 1 && count[0] < 0 || len(count) > 1 {
-			return Throw[T](RepeatCountInvalid)
+			return Throw[T](ErrRepeatCountInvalid)
 		}
 		if len(count) == 1 && count[0] == 0 {
 			return Empty[T]()

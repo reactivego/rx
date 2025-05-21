@@ -2,6 +2,7 @@ package rx_test
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -55,7 +56,7 @@ func Example_subject() {
 	serial.Schedule(func() {
 		in.Next(2)
 		in.Next(3)
-		in.Done(rx.Error("foo"))
+		in.Done(rx.Err)
 	})
 
 	serial.Wait()
@@ -68,8 +69,8 @@ func Example_subject() {
 	// 2
 	// 3
 	// 3
-	// foo
-	// foo
+	// rx
+	// rx
 }
 
 func Example_multicast() {
@@ -90,7 +91,7 @@ func Example_multicast() {
 			in.Next(index)
 			again(index + 1)
 		} else {
-			in.Done(rx.Error("foo"))
+			in.Done(rx.Err)
 		}
 	})
 
@@ -107,8 +108,8 @@ func Example_multicast() {
 	// 2
 	// 3
 	// 3
-	// foo
-	// foo
+	// rx
+	// rx
 }
 
 func Example_multicastDrop() {
@@ -130,9 +131,9 @@ func Example_multicastDrop() {
 	sub1 := out.Println().Go(serial)
 	sub2 := out.Println().Go(serial)
 
-	in.Next(2)               // accepted: buffer not full
-	in.Next(3)               // dropped: buffer full
-	in.Done(rx.Error("foo")) // dropped: buffer full
+	in.Next(2)      // accepted: buffer not full
+	in.Next(3)      // dropped: buffer full
+	in.Done(rx.Err) // dropped: buffer full
 
 	serial.Wait()
 	fmt.Println(sub1.Wait())
@@ -192,7 +193,7 @@ func Example_race() {
 	rx.Race(req1, req2, req3).Println().Wait()
 
 	err := func(text string, duration time.Duration) rx.Observable[int] {
-		return rx.Throw[int](rx.Error(text + " error")).Delay(duration)
+		return rx.Throw[int](errors.New(text + " error")).Delay(duration)
 	}
 
 	err1 := err("first", 10*ms)
@@ -360,7 +361,7 @@ func Example_switchMap() {
 }
 
 func Example_retry() {
-	var first error = rx.Error("error")
+	var first error = rx.Err
 	a := rx.Create(func(index int) (next int, err error, done bool) {
 		if index < 3 {
 			return index, nil, false

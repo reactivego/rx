@@ -1,6 +1,7 @@
 package rx
 
 import (
+	"errors"
 	"math"
 	"runtime"
 	"sync"
@@ -8,7 +9,7 @@ import (
 	"time"
 )
 
-const OutOfSubjectSubscriptions = Error("out of subject subscriptions")
+var ErrOutOfSubjectSubscriptions = errors.Join(Err, errors.New("out of subject subscriptions"))
 
 // Subject returns both an Observer and and Observable. The returned Observer is
 // used to send items into the Subject. The returned Observable is used to subscribe
@@ -184,7 +185,7 @@ func Subject[T any](age time.Duration, capacity ...int) (Observer[T], Observable
 				}
 			}
 			sub = nil
-			err = OutOfSubjectSubscriptions
+			err = ErrOutOfSubjectSubscriptions
 		})
 		return
 	}
