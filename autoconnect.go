@@ -32,7 +32,7 @@ func (connectable Connectable[T]) AutoConnect(count int) Observable[T] {
 			if source.subscription == nil || source.subscription.err != nil {
 				source.subscription = newSubscription(scheduler)
 				source.Unlock()
-				connectable.Connect(scheduler, source.subscription)
+				connectable.Connector(scheduler, source.subscription)
 				source.Lock()
 			}
 		}

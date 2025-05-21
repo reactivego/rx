@@ -20,7 +20,7 @@ func (connectable Connectable[T]) RefCount() Observable[T] {
 		if atomic.AddInt32(&source.refcount, 1) == 1 {
 			source.subscription = newSubscription(scheduler)
 			source.Unlock()
-			connectable.Connect(scheduler, source.subscription)
+			connectable.Connector(scheduler, source.subscription)
 			source.Lock()
 		}
 		source.Unlock()

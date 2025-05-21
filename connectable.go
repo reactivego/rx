@@ -6,5 +6,5 @@ package rx
 // is used to subscribe to the Connectable[T] itself.
 type Connectable[T any] struct {
 	Observable[T]
-	Connect
+	Connector
 }
