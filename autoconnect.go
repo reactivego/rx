@@ -7,6 +7,14 @@ import (
 
 const InvalidCount = Error("invalid count")
 
+// AutoConnect returns an Observable that automatically connects to the Connectable source when a specified
+// number of subscribers subscribe to it.
+//
+// When the specified number of subscribers (count) is reached, the Connectable source is connected,
+// allowing it to start emitting items. The connection is shared among all subscribers.
+// When all subscribers unsubscribe, the connection is terminated.
+//
+// If count is less than 1, it returns an Observable that emits an ErrInvalidCount error.
 func (connectable Connectable[T]) AutoConnect(count int) Observable[T] {
 	if count < 1 {
 		return Throw[T](InvalidCount)

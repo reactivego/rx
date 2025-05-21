@@ -5,10 +5,17 @@ import (
 	"sync/atomic"
 )
 
-// RefCount makes a Connectable[T] behave like an ordinary Observable[T].
-// On first Subscribe it will call Connect on its Connectable[T] and when
-// its last subscriber is Unsubscribed it will cancel the source connection by
-// calling Unsubscribe on the subscription returned by the call to Connect.
+// RefCount converts a Connectable Observable into a standard Observable that automatically
+// connects when the first subscriber subscribes and disconnects when the last subscriber
+// unsubscribes.
+//
+// When the first subscriber subscribes to the resulting Observable, it automatically calls
+// Connect() on the source Connectable Observable. The connection is shared among all
+// subscribers. When the last subscriber unsubscribes, the connection is automatically
+// closed.
+//
+// This is useful for efficiently sharing expensive resources (like network connections)
+// among multiple subscribers.
 func (connectable Connectable[T]) RefCount() Observable[T] {
 	var source struct {
 		sync.Mutex
