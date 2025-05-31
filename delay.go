@@ -5,14 +5,14 @@ import (
 	"time"
 )
 
-type emission[T any] struct {
-	at   time.Time
-	next T
-	err  error
-	done bool
-}
-
 func Delay[T any](duration time.Duration) Pipe[T] {
+	type emission[T any] struct {
+		at   time.Time
+		next T
+		err  error
+		done bool
+	}
+
 	return func(observable Observable[T]) Observable[T] {
 		return func(observe Observer[T], scheduler Scheduler, subscriber Subscriber) {
 			var delay struct {
