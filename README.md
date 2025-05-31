@@ -5,14 +5,16 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/reactivego/rx.svg)](https://pkg.go.dev/github.com/reactivego/rx)
 
 Package `rx` provides _**R**eactive E**x**tensions_, a powerful API for asynchronous programming in Go, built around [observables](#observables) and [operators](#operators) to process streams of data seamlessly.
+
 ## Prerequisites
 
 You’ll need [*Go 1.23*](https://golang.org/dl/) or later, as the implementation depends on language support for generics and iterators.
 
 ## Observables
-In `rx`, an [**Observables**](http://reactivex.io/documentation/observable.html) represents a stream of data that can emit items over time, while an **observer** subscribes to it to receive and react to those emissions. This reactive approach enables asynchronous and concurrent operations without blocking execution. Instead of waiting for values to become available, an observer passively listens and responds whenever the Observable emits data, errors, or a completion signal.
 
-This page introduces the **reactive pattern**, explaining what **Observables** and **observers** are and how subscriptions work. Other sections explore the powerful set of **Observable operators** that allow you to transform, combine, and control data streams efficiently.
+In `rx`, an [**Observables**](http://reactivex.io/documentation/observable.html) represents a stream of data that can emit items over time, while an **Observer** subscribes to it to receive and react to those emissions. This reactive approach enables asynchronous and concurrent operations without blocking execution. Instead of waiting for values to become available, an observer passively listens and responds whenever the observable emits data, errors, or a completion signal.
+
+This page introduces the **reactive pattern**, explaining what **Observables** and **Observers** are and how subscriptions work. Other sections explore the powerful set of [**Operators**](https://reactivex.io/documentation/operators.html) that allow you to transform, combine, and control data streams efficiently.
 
 An Observable:
 
@@ -30,7 +32,7 @@ package main
 import "github.com/reactivego/x"
 
 func main() {
-    x.From[any](1,"hi",2.3).Println()
+    x.From[any](1,"hi",2.3).Println().Wait()
 }
 ```
 > Note the program creates a mixed type `any` observable from an int, string and a float64.
@@ -48,7 +50,7 @@ package main
 import "github.com/reactivego/rx"
 
 func main() {
-    rx.From(1,2,3).Println()
+    rx.From(1,2,3).Println().Wait()
 }
 ```
 > Note the program uses inferred type `int` for the observable.
@@ -60,29 +62,29 @@ Output
 3
 ```
 
-Observables in `x` are somewhat similar to Go channels but have much richer
-semantics:
+Observables in `rx` offer several advantages over standard Go channels:
 
-Observables can be hot or cold. A hot observable will try to emit values even
-when nobody is subscribed. Values emitted during that period will be lost.
-The position of a mouse pointer or the current time are examples of hot observables.
+### Hot vs Cold Observables
 
-A cold observable will only start emitting values after somebody subscribes.
-The contents of a file or a database are examples of cold observables.
+- **Hot Observables** emit values regardless of subscription status. Like a live broadcast, any values emitted when no subscribers are listening are permanently missed. Examples include system events, mouse movements, or real-time data feeds.
 
-An observable can complete normally or with an error, it uses subscriptions
-that can be canceled from the subscriber side. Where a normal variable is
-just a place where you read and write values from, an observable captures how
-the value of this variable changes over time.
+- **Cold Observables** begin emission only when subscribed to, ensuring subscribers receive the complete data sequence from the beginning. Examples include file contents, database queries, or HTTP requests that are executed on-demand.
 
-Concurrency flows naturally from the fact that an observable is an ever
-changing stream of values. Every Observable conceptually has at its core a
-concurrently running process that pushes out values.
+### Rich Lifecycle Management
+
+Observables offer comprehensive lifecycle handling. They can complete normally, terminate with errors, or continue indefinitely. Subscriptions provide fine-grained control, allowing subscribers to cancel at any point, preventing resource leaks and unwanted processing.
+
+### Time-Varying Data Model
+
+Unlike traditional variables that represent static values, Observables elegantly model how values evolve over time. They represent the entire progression of a value's state changes, not just its current state, making them ideal for reactive programming paradigms.
+
+### Native Concurrency Support
+
+Concurrency is built into the Observable paradigm. Each Observable conceptually operates as an independent process that asynchronously pushes values to subscribers. This approach naturally aligns with concurrent programming models while abstracting away much of the complexity typically associated with managing concurrent operations.
 
 ## Operators
-Operators form a language in which programs featuring Observables can be expressed.
-They work on one or more Observables to transform, filter and combine them into new Observables.
 
+Operators form a language for expressing programs with Observables. They transform, filter, and combine one or more Observables into new Observables, allowing for powerful data stream processing. Each operator performs a specific function in the reactive pipeline, enabling you to compose complex asynchronous workflows through method chaining.
 
 ### Index
 - __All__ determines whether all items emitted by an Observable meet some criteria.
