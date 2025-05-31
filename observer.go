@@ -23,7 +23,7 @@ func Ignore[T any]() Observer[T] {
 	return func(next T, err error, done bool) {}
 }
 
-// AsObserver converts an Observer of any type to an Observer of a specific type T.
+// AsObserver converts an Observer of type `any` to an Observer of a specific type T.
 // This allows adapting a generic Observer to a more specific type context.
 func AsObserver[T any](observe Observer[any]) Observer[T] {
 	return func(next T, err error, done bool) {

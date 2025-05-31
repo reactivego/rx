@@ -87,108 +87,229 @@ Concurrency is built into the Observable paradigm. Each Observable conceptually 
 Operators form a language for expressing programs with Observables. They transform, filter, and combine one or more Observables into new Observables, allowing for powerful data stream processing. Each operator performs a specific function in the reactive pipeline, enabling you to compose complex asynchronous workflows through method chaining.
 
 ### Index
-- __All__ determines whether all items emitted by an Observable meet some criteria.
-- __AsObservable__ when called on an Observable source will type assert the 'any' items of the source to 'bar' items.
-- __AsyncSubject__ emits the last value (and only the last value) emitted by the Observable part, and only after that Observable part completes.
-- __AuditTime__ waits until the source emits and then starts a timer.
-- __AutoConnect__ makes a Multicaster behave like an ordinary Observable that automatically connects the multicaster to its source when the specified number of observers have subscribed to it.
-- __Average__ calculates the average of numbers emitted by an Observable and emits this average.
-- __BehaviorSubject__ returns a new BehaviorSubject.
-- __Buffer__ buffers the source Observable values until closingNotifier emits.
-- __BufferTime__ buffers the source Observable values for a specific time period and emits those as a slice periodically in time.
-- __Catch__ recovers from an error notification by continuing the sequence without emitting the error but by switching to the catch ObservableInt to provide items.
-- __CatchError__ catches errors on the Observable to be handled by returning a new Observable or throwing an error.
-- __CombineLatest__ will subscribe to all Observables.
-- __CombineLatestAll__ flattens a higher order observable.
-- __CombineLatestMap__ maps every entry emitted by the Observable into an Observable, and then subscribe to it, until the source observable completes.
-- __CombineLatestMapTo__ maps every entry emitted by the Observable into a single Observable, and then subscribe to it, until the source observable completes.
-- __CombineLatestWith__ will subscribe to its Observable and all other Observables passed in.
-- __Concat__ emits the emissions from two or more observables without interleaving them.
-- __ConcatAll__ flattens a higher order observable by concattenating the observables it emits.
-- __ConcatMap__ transforms the items emitted by an Observable by applying a function to each item and returning an Observable.
-- __ConcatMapTo__ maps every entry emitted by the Observable into a single Observable.
-- __ConcatWith__ emits the emissions from two or more observables without interleaving them.
-- __Connect__ instructs a connectable Observable to begin emitting items to its subscribers.
-- __Count__ counts the number of items emitted by the source ObservableInt and emits only this value.
-- __Create__ provides a way of creating an Observable from scratch by calling observer methods programmatically.
-- __CreateFutureRecursive__ provides a way of creating an Observable from scratch by calling observer methods programmatically.
-- __CreateRecursive__ provides a way of creating an Observable from scratch by calling observer methods programmatically.
-- __DebounceTime__ only emits the last item of a burst from an Observable if a particular timespan has passed without it emitting another item.
-- __Defer__ does not create the Observable until the observer subscribes.
-- __Delay__ shifts the emission from an Observable forward in time by a particular amount of time.
-- __Distinct__ suppress duplicate items emitted by an Observable.
-- __DistinctUntilChanged__ only emits when the current value is different from the last.
-- __Do__ calls a function for each next value passing through the observable.
-- __DoOnComplete__ calls a function when the stream completes.
-- __DoOnError__ calls a function for any error on the stream.
-- __ElementAt__ emit only item n emitted by an Observable.
-- __Empty__ creates an Observable that emits no items but terminates normally.
-- __Filter__ emits only those items from an observable that pass a predicate test.
-- __Finally__ applies a function for any error or completion on the stream.
-- __First__ emits only the first item, or the first item that meets a condition, from an Observable.
-- __From__ creates an observable from multiple values passed in.
-- __FromChan__ creates an Observable from a Go channel.
-- __IgnoreCompletion__ only emits items and never completes, neither with Error nor with Complete.
-- __IgnoreElements__ does not emit any items from an Observable but mirrors its termination notification.
-- __Interval__ creates an ObservableInt that emits a sequence of integers spaced by a particular time interval.
-- __Just__ creates an observable that emits a particular item.
-- __Last__ emits only the last item emitted by an Observable.
-- __Map__ transforms the items emitted by an Observable by applying a function to each item.
-- __MapTo__ transforms the items emitted by an Observable.
-- __Max__ determines, and emits, the maximum-valued item emitted by an Observable.
-- __Merge__ combines multiple Observables into one by merging their emissions.
-- __MergeAll__ flattens a higher order observable by merging the observables it emits.
-- __MergeDelayError__ combines multiple Observables into one by merging their emissions.
-- __MergeDelayErrorWith__ combines multiple Observables into one by merging their emissions.
-- __MergeMap__ transforms the items emitted by an Observable by applying a function to each item an returning an Observable.
-- __MergeMapTo__ maps every entry emitted by the Observable into a single Observable.
-- __MergeWith__ combines multiple Observables into one by merging their emissions.
-- __Min__ determines, and emits, the minimum-valued item emitted by an Observable.
-- __Never__ creates an Observable that emits no items and does't terminate.
-- __ObserveOn__ specifies a schedule function to use for delivering values to the observer.
-- __ObserverObservable__ actually is an observer that is made observable.
-- __Of__ emits a variable amount of values in a sequence and then emits a complete notification.
-- __Only__ filters the value stream of an observable and lets only the values of a specific type pass.
-- __Passthrough__ just passes through all output from the Observable.
-- __Println__ subscribes to the Observable and prints every item to os.Stdout while it waits for completion or error.
-- __Publish__ returns a Multicaster for a Subject to an underlying Observable and turns the subject into a connnectable observable.
-- __PublishBehavior__ returns a Multicaster that shares a single subscription to the underlying Observable returning an initial value or the last value emitted by the underlying Observable.
-- __PublishLast__ returns a Multicaster that shares a single subscription to the underlying Observable containing only the last value emitted before it completes.
-- __PublishReplay__ returns a Multicaster for a ReplaySubject to an underlying Observable and turns the subject into a connectable observable.
-- __Range__ creates an Observable that emits a range of sequential int values.
-- __Reduce__ applies a reducer function to each item emitted by an Observable and the previous reducer result.
-- __RefCount__ makes a Connectable behave like an ordinary Observable.
-- __Repeat__ creates an observable that emits a sequence of items repeatedly.
-- __ReplaySubject__ ensures that all observers see the same sequence of emitted items, even if they subscribe after.
-- __Retry__ if a source Observable sends an error notification, resubscribe to it in the hopes that it will complete without error.
-- __SampleTime__ emits the most recent item emitted by an Observable within periodic time intervals.
-- __Scan__ applies a accumulator function to each item emitted by an Observable and the previous accumulator result.
-- __Serialize__ forces an observable to make serialized calls and to be well-behaved.
-- __Single__ enforces that the observable sends exactly one data item and then completes.
-- __Skip__ suppresses the first n items emitted by an Observable.
-- __SkipLast__ suppresses the last n items emitted by an Observable.
-- __Start__ creates an Observable that emits the return value of a function.
-- __StartWith__ returns an observable that, at the moment of subscription, will synchronously emit all values provided to this operator, then subscribe to the source and mirror all of its emissions to subscribers.
-- __Subject__ is a combination of an observer and observable.
-- __Subscribe__ operates upon the emissions and notifications from an Observable.
-- __SubscribeOn__ specifies the scheduler an Observable should use when it is subscribed to.
-- __Sum__ calculates the sum of numbers emitted by an Observable and emits this sum.
-- __SwitchAll__ converts an Observable that emits Observables into a single Observable that emits the items emitted by the most-recently-emitted of those Observables.
-- __SwitchMap__ transforms the items emitted by an Observable by applying a function to each item an returning an Observable.
-- __Take__ emits only the first n items emitted by an Observable.
-- __TakeLast__ emits only the last n items emitted by an Observable.
-- __TakeUntil__ emits items emitted by an Observable until another Observable emits an item.
-- __TakeWhile__ mirrors items emitted by an Observable until a specified condition becomes false.
-- __ThrottleTime__ emits when the source emits and then starts a timer during which all emissions from the source are ignored.
-- __Throw__ creates an observable that emits no items and terminates with an error.
-- __Ticker__ creates an ObservableTime that emits a sequence of timestamps after an initialDelay has passed.
-- __TimeInterval__ intercepts the items from the source Observable and emits in their place a struct that indicates the amount of time that elapsed between pairs of emissions.
-- __Timeout__ mirrors the source Observable, but issue an error notification if a particular period of time elapses without any emitted items.
-- __Timer__ creates an Observable that emits a sequence of integers (starting at zero) after an initialDelay has passed.
-- __Timestamp__ attaches a timestamp to each item emitted by an observable indicating when it was emitted.
-- __ToChan__ returns a channel that emits 'any' values.
-- __ToSingle__ blocks until the Observable emits exactly one value or an error.
-- __ToSlice__ collects all values from the Observable into an slice.
-- __Wait__ subscribes to the Observable and waits for completion or error.
-- __WithLatestFrom__ will subscribe to all Observables and wait for all of them to emit before emitting the first slice.
-- __WithLatestFromAll__ flattens a higher order observable.
+
+[__All__](https://pkg.go.dev/github.com/reactivego/rx#Observable.All) converts an Observable stream into a Go 1.22+ iterator sequence that provides each emitted value paired with its sequential zero-based index
+
+[__All2__](https://pkg.go.dev/github.com/reactivego/rx#All2)
+converts an Observable of Tuple2 pairs into a Go 1.22+ iterator sequence that yields each tuple's components (First, Second) as separate values.
+
+[__Append__](https://pkg.go.dev/github.com/reactivego/rx#Append)
+creates a pipe that appends emitted values to a provided slice while forwarding them to the next observer, with a method variant available for chaining.
+
+[__AsObservable__](https://pkg.go.dev/github.com/reactivego/rx#AsObservable)
+provides type conversion between observables, allowing you to safely cast an Observable of one type to another, and to convert a typed Observable to an Observable of 'any' type (and vice versa).
+
+[__AsObserver__](https://pkg.go.dev/github.com/reactivego/rx#AsObserver) converts an Observer of type `any` to an Observer of a specific type T.
+
+[__Assign__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Assign) stores each emitted value from an Observable into a provided pointer variable while passing all emissions through to the next observer, enabling value capture during stream processing.
+
+[__AutoConnect__](https://pkg.go.dev/github.com/reactivego/rx#Connectable.AutoConnect) makes a (Connectable) Multicaster behave like an ordinary Observable that automatically connects the mullticaster to its source when the specified number of observers have subscribed to it.
+
+[__AutoUnsubscribe__](https://pkg.go.dev/github.com/reactivego/rx#Observable.AutoUnsubscribe)
+
+[__BufferCount__](https://pkg.go.dev/github.com/reactivego/rx#BufferCount)
+
+[__Catch__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Catch) recovers from an error notification by continuing the sequence without emitting the error but switching to the catch ObservableInt to provide items.
+
+[__CatchError__](https://pkg.go.dev/github.com/reactivego/rx#Observable.CatchError)  catches errors on the Observable to be handled by returning a new Observable or throwing error.
+
+__CombineAll__
+
+__CombineLatest__ combines multiple Observables into one by emitting an array containing the latest values from each source whenever any input Observable emits a value, with variants (__CombineLatest2__, __CombineLatest3__, __CombineLatest4__, __CombineLatest5__) that return strongly-typed tuples for 2-5 input Observables respectively.
+
+__Concat__ combines multiple Observables sequentially by emitting all values from the first Observable before proceeding to the next one, ensuring emissions never overlap.
+
+__ConcatAll__ transforms a higher-order Observable (an Observable that emits other Observables) into a first-order Observable by subscribing to each inner Observable only after the previous one completes.
+
+__ConcatMap__ projects each source value to an Observable, subscribes to it, and emits its values, waiting for each one to complete before processing the next source value.
+
+__ConcatWith__ extends an Observable by appending additional Observables, ensuring that emissions from each Observable only begin after the previous one completes.
+
+__Connectable__ is an Observable with delayed connection to its source, combining both Observable and Connector interfaces. It separates the subscription process into two parts: observers can register via Subscribe, but the Observable won't subscribe to its source until Connect is explicitly called. This enables multiple observers to subscribe before any emissions begin (multicast behavior), allowing a single source Observable to be efficiently shared among multiple consumers. Besides inheriting all methods from Observable and Connector, Connectable provides the convenience methods __AutoConnect__ and __RefCount__ to manage connection behavior.
+
+__Connect__ establishes a connection to the source Observable and returns a Subscription that can be used to cancel the connection when no longer needed.
+
+__Connector__ provides a mechanism for controlling when a Connectable Observable subscribes to its source, allowing you to connect the Observable independently from when observers subscribe to it. This separation enables multiple subscribers to prepare their subscriptions before the source begins emitting items. It has a single method __Connect__.
+
+__Constraints__ type constraints __Signed__, __Unsigned__, __Integer__ and __Float__ copied verbatim from `golang.org/x/exp` so we could drop the dependency on that package.
+
+__Count__ returns an Observable that emits a single value representing the total number of items emitted by the source Observable before it completes.
+
+__Create__ constructs a new Observable from a Creator function, providing a bridge between imperative code and the reactive Observable pattern. The Observable will continue producing values until the Creator signals completion, the Observer unsubscribes, or the Creator returns an error.
+
+__Creator__ is a function type that generates values for an Observable stream. It receives a zero-based index for the current iteration and returns a tuple containing the next value to emit, any error that occurred, and a boolean flag indicating whether the sequence is complete.
+
+__Defer__
+
+__Delay__
+
+__DistinctUntilChanged__ only emits when the current value is different from the last.
+
+__Do__ calls a function for each next value passing through the observable.
+
+__ElementAt__ emit only item n emitted by an Observable.
+
+__Empty__ creates an Observable that emits no items but terminates normally.
+
+__EndWith__
+
+__Equal__
+
+__Err__
+
+__ExhaustAll__
+
+__ExhaustMap__
+
+__Filter__ emits only those items from an observable that pass a predicate test.
+
+__First__ emits only the first item from an Observable.
+
+__Fprint__
+
+__Fprintf__
+
+__Fprintln__
+
+__From__ creates an observable from multiple values passed in.
+
+__Go__ subscribes to the observable and starts execution on a separate goroutine, ignoring all emissions from the observable sequence. This makes it useful when you only care about side effects and not the actual values. Returns a Subscription that can be used to cancel the subscription when no longer needed.
+
+__Ignore[T]__ creates an Observer[T] that simply discards any emissions from an Observable. It is useful when you need to create an Observer but don't care about its values.
+
+__Interval__ creates an ObservableInt that emits a sequence of integers spaced by a particular time
+terval.
+
+__Last__ emits only the last item emitted by an Observable.
+
+__Map__ transforms the items emitted by an Observable by applying a function to each item.
+
+__MapE__
+
+__Marshal__
+
+__MaxBufferSizeOption__, __WithMaxBufferSize__
+
+__Merge__ combines multiple Observables into one by merging their emissions.
+
+__MergeAll__ flattens a higher order observable by merging the observables it emits.
+
+__MergeMap__ transforms the items emitted by an Observable by applying a function to each item an
+turning an Observable.
+
+__MergeWith__ combines multiple Observables into one by merging their emissions.
+
+__Multicast__
+
+__Must__
+
+__Never__ creates an Observable that emits no items and does't terminate.
+
+__Observable__
+
+__Observer__
+
+__Of__ emits a variable amount of values in a sequence and then emits a complete notification.
+
+__OnComplete__
+
+__OnDone__
+
+__OnError__
+
+__OnNext__
+
+__Passthrough__ just passes through all output from the Observable.
+
+__Pipe__
+
+__Print__
+
+__Printf__
+
+__Println__ subscribes to the Observable and prints every item to os.Stdout.
+
+__Publish__ returns a multicasting Observable[T] for an underlying Observable[T] as a Connectable[T] type.
+
+__Pull__
+
+__Pull2__
+
+__Race__
+
+__RaceWith__
+
+__Recv__
+
+__Reduce__ applies a reducer function to each item emitted by an Observable and the previous reducer
+sult.
+
+__ReduceE__
+
+__RefCount__ makes a Connectable behave like an ordinary Observable.
+
+__Repeat__ creates an observable that emits a sequence of items repeatedly.
+
+__Retry__ if a source Observable sends an error notification, resubscribe to it in the hopes that it
+ll complete without error.
+
+__RetryTime__
+
+__SampleTime__ emits the most recent item emitted by an Observable within periodic time intervals.
+
+__Scan__ applies a accumulator function to each item emitted by an Observable and the previous
+cumulator result.
+
+__ScanE__
+
+__Scheduler__
+
+__Send__
+
+__Share__
+
+__Skip__ suppresses the first n items emitted by an Observable.
+
+__Slice__
+
+__StartWith__ returns an observable that, at the moment of subscription, will synchronously emit all values provided to this operator, then subscribe to the source and mirror all of its emissions to subscribers.
+
+__Subject__ is a combination of an observer and observable.
+
+__Subscribe__ operates upon the emissions and notifications from an Observable.
+
+__SubscribeOn__ specifies the scheduler an Observable should use when it is subscribed to.
+
+__Subscriber__
+
+__Subscription__
+
+__SwitchAll__
+
+__SwitchMap__
+
+__Take__ emits only the first n items emitted by an Observable.
+
+__TakeWhile__ mirrors items emitted by an Observable until a specified condition becomes false.
+
+__Tap__
+
+__Throw__ creates an observable that emits no items and terminates with an error.
+
+__Ticker__ creates an ObservableTime that emits a sequence of timestamps after an initialDelay has passed.
+
+__Timer__ creates an Observable that emits a sequence of integers (starting at zero) after an initialDelay has passed.
+
+__Tuple__
+
+__Values__
+
+__Wait__ subscribes to the Observable and waits for completion or error.
+
+__WithLatestFrom__ will subscribe to all Observables and wait for all of them to emit before emitting the first slice.
+
+__WithLatestFromAll__ flattens a higher order observable.
+
+__Zip__
+
+__ZipAll__
