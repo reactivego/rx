@@ -453,3 +453,46 @@ func Example_skip() {
 	// 4
 	// 5
 }
+
+func Example_autoConnect() {
+	// Create a multicaster hot observable that will emit every 100 milliseconds
+	hot := rx.Interval[int](100 * time.Millisecond).Take(10).Publish()
+	hotsub := hot.Connect(rx.Goroutine)
+	defer hotsub.Unsubscribe()
+	fmt.Println("Hot observable created and emitting 0,1,2,3,4,5,6 ...")
+
+	// Publish the hot observable again but only Connect to it when 2
+	// subscribers have connected.
+	source := hot.Take(5).Publish().AutoConnect(2)
+
+	// First subscriber
+	sub1 := source.Printf("Subscriber 1: %d\n").Go()
+	fmt.Println("First subscriber connected, waiting a bit...")
+
+	// Wait a bit, nothing will emit yet
+	time.Sleep(525 * time.Millisecond)
+
+	fmt.Println("Second subscriber connecting, emissions begin!")
+	// Second subscriber triggers the connection
+	sub2 := source.Printf("Subscriber 2: %d\n").Go()
+
+	// Wait for emissions to complete
+	hotsub.Wait()
+	sub1.Wait()
+	sub2.Wait()
+
+	// Unordered output:
+	// Hot observable created and emitting 0,1,2,3,4,5,6 ...
+	// First subscriber connected, waiting a bit...
+	// Second subscriber connecting, emissions begin!
+	// Subscriber 1: 5
+	// Subscriber 2: 5
+	// Subscriber 1: 6
+	// Subscriber 2: 6
+	// Subscriber 1: 7
+	// Subscriber 2: 7
+	// Subscriber 1: 8
+	// Subscriber 2: 8
+	// Subscriber 1: 9
+	// Subscriber 2: 9
+}
