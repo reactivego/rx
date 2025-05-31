@@ -17,6 +17,8 @@ func Multicast[T any](size int) (Observer[T], Observable[T]) {
 	var multicast struct {
 		sync.Mutex
 		channels []chan any
+		err      error
+		done     bool
 	}
 	drop := (size < 0)
 	if size < 0 {
@@ -25,79 +27,71 @@ func Multicast[T any](size int) (Observer[T], Observable[T]) {
 	observer := func(next T, err error, done bool) {
 		multicast.Lock()
 		defer multicast.Unlock()
-		for _, c := range multicast.channels {
-			if c != nil {
+		if !multicast.done {
+			for _, ch := range multicast.channels {
 				switch {
 				case !done:
 					if drop {
 						select {
-						case c <- next:
+						case ch <- next:
 						default:
 							// dropping
 						}
 					} else {
-						c <- next
+						ch <- next
 					}
 				case err != nil:
 					if drop {
 						select {
-						case c <- err:
+						case ch <- err:
 						default:
 							// dropping
 						}
 					} else {
-						c <- err
+						ch <- err
 					}
-					close(c)
+					close(ch)
 				default:
-					close(c)
+					close(ch)
 				}
 			}
+			multicast.err = err
+			multicast.done = done
 		}
 	}
 	observable := func(observe Observer[T], scheduler Scheduler, subscriber Subscriber) {
-		multicast.Lock()
-		defer multicast.Unlock()
-		channel := make(chan any, size)
-		remove := func() bool {
-			for i, v := range multicast.channels {
-				if v == channel {
-					copy(multicast.channels[i:], multicast.channels[i+1:])
-					size := len(multicast.channels) - 1
-					multicast.channels[size] = nil
-					multicast.channels = multicast.channels[:size]
-					return true
-				}
+		addChannel := func() <-chan any {
+			multicast.Lock()
+			defer multicast.Unlock()
+			var ch chan any
+			if !multicast.done {
+				ch = make(chan any, size)
+				multicast.channels = append(multicast.channels, ch)
+			} else if multicast.err != nil {
+				ch = make(chan any, 1)
+				ch <- multicast.err
+				close(ch)
 			}
-			return false
+			return ch
 		}
-		multicast.channels = append(multicast.channels, channel)
-		observer := func(next any, err error, done bool) {
-			switch {
-			case !done:
-				switch n := next.(type) {
-				case error:
-					if remove() {
-						var zero T
-						observe(zero, n, true)
+		removeChannel := func(ch <-chan any) func() {
+			return func() {
+				multicast.Lock()
+				defer multicast.Unlock()
+				if !multicast.done && ch != nil {
+					channels := multicast.channels[:0]
+					for _, c := range multicast.channels {
+						if ch != c {
+							channels = append(channels, c)
+						}
 					}
-				case T:
-					observe(n, nil, false)
-				}
-			case err != nil:
-				if remove() {
-					var zero T
-					observe(zero, err, true)
-				}
-			default:
-				if remove() {
-					var zero T
-					observe(zero, nil, true)
+					multicast.channels = channels
 				}
 			}
 		}
-		Recv(channel)(observer, scheduler, subscriber)
-		subscriber.OnUnsubscribe(func() { remove() })
+		ch := addChannel()
+		Recv(ch)(observe.AsObserver(), scheduler, subscriber)
+		subscriber.OnUnsubscribe(removeChannel(ch))
 	}
 	return observer, observable
 }
