@@ -12,5 +12,5 @@ func Tap[T any](tap Observer[T]) Pipe[T] {
 }
 
 func (observable Observable[T]) Tap(tap Observer[T]) Observable[T] {
-	return Tap[T](tap)(observable)
+	return Tap(tap)(observable)
 }
