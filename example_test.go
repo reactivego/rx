@@ -496,3 +496,18 @@ func Example_autoConnect() {
 	// Subscriber 1: 9
 	// Subscriber 2: 9
 }
+
+func Example_mergeMap() {
+	source := rx.From("https://reactivego.io", "https://github.com/reactivego")
+
+	merged := rx.MergeMap(source, func(next string) rx.Observable[string] {
+		fakeFetchData := rx.Of(fmt.Sprintf("content of %q", next))
+		return fakeFetchData
+	})
+
+	merged.Println().Go().Wait()
+
+	// Output:
+	// content of "https://reactivego.io"
+	// content of "https://github.com/reactivego"
+}
