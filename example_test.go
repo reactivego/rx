@@ -542,3 +542,52 @@ func Example_mergeMapSubject() {
 	// content of "https://reactivego.io"
 	// content of "https://github.com/reactivego"
 }
+
+func Example_commandPattern() {
+	type Data struct {
+		Id  string
+		Val int
+	}
+
+	// collect is an example of a long running observable producing data.
+	collect := func(id string) rx.Observable[Data] {
+		take5 := rx.Interval[int](100 * time.Millisecond).Take(5)
+		// use rx.Defer to have a scope per subscription available.
+		return rx.Defer(func() rx.Observable[Data] {
+			// this scope is for storing data per subscription
+			// for example say you want to support retries,
+			// then this scope will be active per retry.
+			return rx.Map(take5, func(val int) Data {
+				return Data{Id: id, Val: val}
+			})
+		})
+	}
+
+	// setup a channel to push commands into, where a command is an rx.Observable[Data]
+	commands := make(chan rx.Observable[Data], 2)
+
+	// now user MergeAll to run all commands in parallel and merge their output
+	sub := rx.MergeAll(rx.Recv(commands)).Println().Go()
+
+	// launch a bunch of commands.
+	commands <- collect("hello")
+	commands <- collect("world")
+
+	// We need to make sure the command channel is closed.
+	close(commands)
+
+	// then wait for everything to play out
+	sub.Wait()
+
+	// Unordered output:
+	// {hello 0}
+	// {world 0}
+	// {hello 1}
+	// {world 1}
+	// {hello 2}
+	// {world 2}
+	// {hello 3}
+	// {world 3}
+	// {hello 4}
+	// {world 4}
+}
