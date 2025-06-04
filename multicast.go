@@ -71,6 +71,9 @@ func Multicast[T any](size int) (Observer[T], Observable[T]) {
 				ch = make(chan any, 1)
 				ch <- multicast.err
 				close(ch)
+			} else {
+				ch = make(chan any)
+				close(ch)
 			}
 			return ch
 		}
