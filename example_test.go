@@ -511,3 +511,34 @@ func Example_mergeMap() {
 	// content of "https://reactivego.io"
 	// content of "https://github.com/reactivego"
 }
+
+func Example_mergeMapSubject() {
+	source := rx.From("https://google.com", "https://reactivego.io", "https://github.com/reactivego")
+
+	merged := rx.MergeMap(source, func(next string) rx.Observable[string] {
+		fakeFetchData := rx.Of(fmt.Sprintf("content of %q", next))
+		return fakeFetchData
+	})
+
+	// subject remembers last 2 emits by the observer for an hour.
+	observer, subject := rx.Subject[string](time.Hour, 2)
+	merged.Tap(observer).Go()
+
+	// Sees all emits by the subject
+	subject.Println().Go().Wait()
+
+	// Sees only last 2 emits
+	subject.Println().Go().Wait()
+
+	// Sees only last 2 emits
+	subject.Println().Go().Wait()
+
+	// Output:
+	// content of "https://google.com"
+	// content of "https://reactivego.io"
+	// content of "https://github.com/reactivego"
+	// content of "https://reactivego.io"
+	// content of "https://github.com/reactivego"
+	// content of "https://reactivego.io"
+	// content of "https://github.com/reactivego"
+}
