@@ -19,17 +19,18 @@ func Background(scheduler Scheduler) context.Context {
 	return WithScheduler(context.Background(), scheduler)
 }
 
-// WithScheduler returns a new context with the given scheduler attached.
-// This allows passing a scheduler through the context from high-level calls
-// (like First, Last, Wait) down to observable implementations (like Recv).
+// WithScheduler returns a new context with the provided scheduler overriding
+// any currently attached ones.
 func WithScheduler(ctx context.Context, scheduler Scheduler) context.Context {
 	return context.WithValue(ctx, schedulerKey, scheduler)
 }
 
-// withScheduler returns a new context with the given scheduler attached.
-// If the context is nil, it returns a new context with a new scheduler.
-// If the context already has a scheduler attached, it returns the context as is.
-// When no scheduler is provided, a new scheduler is created using NewScheduler().
+// withScheduler returns a new context based on the provided context with
+// the provided scheduler attached (but only if none was already attached).
+// If the provided context already has a scheduler attached, it returns the
+// context as is.
+// If no context is provided, then context.Background() is used.
+// If no scheduler is provided, then NewScheduler() is used.
 func withScheduler(ctx []context.Context, scheduler ...Scheduler) context.Context {
 	if len(ctx) != 0 && ctx[0] != nil {
 		if _, ok := ctx[0].Value(schedulerKey).(Scheduler); ok {

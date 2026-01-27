@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/reactivego/rx"
-	"github.com/reactivego/scheduler"
 )
 
 func Example_share() {
@@ -37,6 +36,7 @@ func Example_share() {
 
 func Example_subject() {
 	serial := rx.NewScheduler()
+	ctx := rx.Background(serial)
 
 	// subject collects emits when there are no subscriptions active.
 	in, out := rx.Subject[int](0, 1)
@@ -48,7 +48,6 @@ func Example_subject() {
 	in.Next(1)
 
 	// add a couple of subscriptions
-	ctx := rx.Background(serial)
 	sub1 := out.Println().Go(ctx)
 	sub2 := out.Println().Go(ctx)
 
@@ -78,6 +77,7 @@ func Example_subject() {
 
 func Example_multicast() {
 	serial := rx.NewScheduler()
+	ctx := rx.Background(serial)
 
 	in, out := rx.Multicast[int](1)
 
@@ -99,7 +99,6 @@ func Example_multicast() {
 	})
 
 	// Add a couple of subscriptions
-	ctx := rx.Background(serial)
 	sub1 := out.Println().Go(ctx)
 	sub2 := out.Println().Go(ctx)
 
@@ -118,6 +117,7 @@ func Example_multicast() {
 
 func Example_multicastDrop() {
 	serial := rx.NewScheduler()
+	ctx := rx.Background(serial)
 
 	const onBackpressureDrop = -1
 
@@ -132,7 +132,6 @@ func Example_multicastDrop() {
 	in.Next(1)
 
 	// add a couple of subscriptions
-	ctx := rx.Background(serial)
 	sub1 := out.Println().Go(ctx)
 	sub2 := out.Println().Go(ctx)
 
@@ -309,10 +308,17 @@ func Example_bufferCount() {
 func Example_switchAll() {
 	const ms = time.Millisecond
 
+	// Emit 0,1,2,3 with 42ms in between
 	interval42x4 := rx.Interval[int](42 * ms).Take(4)
+
+	// Emit 0,1,2,3 with 16ms in between
 	interval16x4 := rx.Interval[int](16 * ms).Take(4)
 
-	err := rx.SwitchAll(rx.Map(interval42x4, func(next int) rx.Observable[int] { return interval16x4 })).Println().Wait(rx.BackgroundGoroutine)
+	overlapping := rx.Map(interval42x4, func(next int) rx.Observable[int] {
+		return interval16x4
+	})
+
+	err := rx.SwitchAll(overlapping).Println().Wait(rx.BackgroundGoroutine)
 
 	if err == nil {
 		fmt.Println("success")
@@ -415,13 +421,13 @@ func Example_values() {
 	// these observables to run concurrently.
 
 	// run the observable on 1 or more goroutines
-	for i := range source.Values(rx.WithScheduler(context.Background(), scheduler.Goroutine)) {
+	for i := range source.Values(rx.BackgroundGoroutine) {
 		// This is called from a newly created goroutine
 		fmt.Println(i)
 	}
 
 	// run the observable on the current goroutine
-	for i := range source.Values(rx.WithScheduler(context.Background(), scheduler.New())) {
+	for i := range source.Values() {
 		fmt.Println(i)
 	}
 

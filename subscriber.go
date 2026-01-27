@@ -72,10 +72,7 @@ func (s *subscriber) Add() Subscriber {
 }
 
 func (s *subscriber) Context() context.Context {
-	if s.ctx != nil {
-		return s.ctx
-	}
-	return context.Background()
+	return s.ctx
 }
 
 func (s *subscriber) OnUnsubscribe(callback func()) {
