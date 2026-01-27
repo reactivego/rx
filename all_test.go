@@ -1,6 +1,7 @@
 package rx_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/reactivego/rx"
@@ -165,6 +166,32 @@ func TestAll(t *testing.T) {
 		for i, v := range expectedValues {
 			if values[i] != v {
 				t.Errorf("Expected value %v at position %v, got %v", v, i, values[i])
+			}
+		}
+	})
+
+	t.Run("All iterator with transformation", func(t *testing.T) {
+		nums := rx.From("apple", "banana", "cherry")
+
+		// Use the iterator to create a formatted string
+		var formattedItems []string
+		for i, v := range nums.All() {
+			formattedItems = append(formattedItems, fmt.Sprintf("%d: %s", i, v))
+		}
+
+		expected := []string{
+			"0: apple",
+			"1: banana",
+			"2: cherry",
+		}
+
+		if len(formattedItems) != len(expected) {
+			t.Errorf("Expected %v items, got %v", len(expected), len(formattedItems))
+		}
+
+		for i, v := range expected {
+			if formattedItems[i] != v {
+				t.Errorf("Expected %v at index %v, got %v", v, i, formattedItems[i])
 			}
 		}
 	})

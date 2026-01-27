@@ -69,4 +69,38 @@ func TestValues(t *testing.T) {
 			t.Errorf("Expected %v items, got %v", len(expected), len(results))
 		}
 	})
+
+	t.Run("Pull to Values round trip", func(t *testing.T) {
+		// Create a sequence
+		seq := func(yield func(int) bool) {
+			for i := 1; i <= 5; i++ {
+				if !yield(i * 10) {
+					break
+				}
+			}
+		}
+
+		// Convert to Observable, then back to an iterator
+		obs := rx.Pull(seq)
+
+		// Check results by iterating with Values()
+		var results []int
+		for v, err := range obs.Values() {
+			if err != nil {
+				t.Errorf("Expected no error, got %v", err)
+			}
+			results = append(results, v)
+		}
+
+		expected := []int{10, 20, 30, 40, 50}
+		if len(results) != len(expected) {
+			t.Errorf("Expected %v items, got %v", len(expected), len(results))
+		}
+
+		for i, v := range expected {
+			if results[i] != v {
+				t.Errorf("Expected %v at index %v, got %v", v, i, results[i])
+			}
+		}
+	})
 }
