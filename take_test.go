@@ -60,13 +60,13 @@ func TestTake(t *testing.T) {
 		var results []int
 
 		// Use goroutine scheduler for async processing
-		s := observable.Take(1).Subscribe(func(next int, err error, done bool) {
+		s := observable.Take(1).Subscribe(rx.BackgroundGoroutine, func(next int, err error, done bool) {
 			if !done {
 				results = append(results, next)
 			} else if err == nil {
 				completed = true
 			}
-		}, rx.Goroutine)
+		})
 
 		// Send a value through the channel
 		ch <- 1
@@ -111,11 +111,11 @@ func TestTake(t *testing.T) {
 		var results []int
 
 		// Take only 3 values
-		s := observable.Take(3).Subscribe(func(next int, err error, done bool) {
+		s := observable.Take(3).Subscribe(rx.BackgroundGoroutine, func(next int, err error, done bool) {
 			if !done {
 				results = append(results, next)
 			}
-		}, rx.Goroutine)
+		})
 
 		// Send values
 		ch <- 10
@@ -150,13 +150,13 @@ func TestTake(t *testing.T) {
 		completed := false
 		var results []int
 
-		s := observable.Take(3).Subscribe(func(next int, err error, done bool) {
+		s := observable.Take(3).Subscribe(rx.BackgroundGoroutine, func(next int, err error, done bool) {
 			if !done {
 				results = append(results, next)
 			} else if err == nil {
 				completed = true
 			}
-		}, rx.Goroutine)
+		})
 
 		// Send one value and close the channel
 		ch <- 100
@@ -183,13 +183,13 @@ func TestTake(t *testing.T) {
 		var results []int
 
 		// Use Go method as in the provided main function
-		s := observable.Take(1).Subscribe(func(next int, err error, done bool) {
+		s := observable.Take(1).Subscribe(rx.BackgroundGoroutine, func(next int, err error, done bool) {
 			if !done {
 				results = append(results, next)
 			} else if err == nil {
 				completed = true
 			}
-		}, rx.Goroutine)
+		})
 
 		// Send a value through the channel
 		ch <- 1

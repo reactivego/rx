@@ -39,7 +39,8 @@ func (connectable Connectable[T]) AutoConnect(count int) Observable[T] {
 		source.Lock()
 		if atomic.AddInt32(&source.refcount, 1) == int32(count) {
 			if source.subscription == nil || source.subscription.err != nil {
-				source.subscription = newSubscription(scheduler)
+				ctx := WithScheduler(subscriber.Context(), scheduler)
+				source.subscription = newSubscription(ctx)
 				source.Unlock()
 				connectable.Connector(scheduler, source.subscription)
 				source.Lock()

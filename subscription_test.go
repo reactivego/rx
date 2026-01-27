@@ -24,7 +24,7 @@ func TestSubscription(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 500*msec)
 		defer cancel()
 
-		s := rx.ConcatMap(rx.Of(1).Filter(isOne).Take(1), maybeLongOperation).Go()
+		s := rx.ConcatMap(rx.Of(1).Filter(isOne).Take(1), maybeLongOperation).Go(context.Background())
 		defer s.Unsubscribe()
 
 		select {
@@ -47,7 +47,7 @@ func TestSubscription(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 2000*msec)
 		defer cancel()
 
-		s := rx.ConcatMap(rx.From(1).Filter(isOne).Take(1), maybeLongOperation).Go()
+		s := rx.ConcatMap(rx.From(1).Filter(isOne).Take(1), maybeLongOperation).Go(context.Background())
 		defer s.Unsubscribe()
 
 		select {
@@ -62,7 +62,7 @@ func TestSubscription(t *testing.T) {
 
 	t.Run("Unsubscribe terminates the subscription", func(t *testing.T) {
 		// Create a subscription that would take a long time
-		s := rx.Of(1).Delay(600 * msec).Go()
+		s := rx.Of(1).Delay(600 * msec).Go(context.Background())
 
 		// Immediately unsubscribe
 		s.Unsubscribe()
@@ -80,7 +80,7 @@ func TestSubscription(t *testing.T) {
 	})
 
 	t.Run("Done channel closes after normal completion", func(t *testing.T) {
-		s := rx.From(1, 2, 3).Take(3).Go()
+		s := rx.From(1, 2, 3).Take(3).Go(context.Background())
 
 		// Set a timeout to detect if Done channel doesn't close by itself.
 		select {
@@ -95,7 +95,7 @@ func TestSubscription(t *testing.T) {
 	})
 
 	t.Run("Wait blocks until completion", func(t *testing.T) {
-		s := rx.Of(1).Delay(350 * msec).Go()
+		s := rx.Of(1).Delay(350 * msec).Go(context.Background())
 
 		// Wait should block until the observable completes
 		start := time.Now()
@@ -112,7 +112,7 @@ func TestSubscription(t *testing.T) {
 	})
 
 	t.Run("Wait returns immediately if already completed", func(t *testing.T) {
-		s := rx.Of(1).Go()
+		s := rx.Of(1).Go(context.Background())
 
 		// Make sure it's done
 		<-s.Done()
@@ -133,7 +133,7 @@ func TestSubscription(t *testing.T) {
 
 	t.Run("Err returns error from observable", func(t *testing.T) {
 		expectedErr := errors.New("test error")
-		s := rx.Throw[int](expectedErr).Go()
+		s := rx.Throw[int](expectedErr).Go(context.Background())
 
 		// Wait for completion
 		<-s.Done()
@@ -145,7 +145,7 @@ func TestSubscription(t *testing.T) {
 
 	t.Run("Err returns SubscriptionActive while active", func(t *testing.T) {
 		ch := make(chan struct{})
-		s := rx.Recv(ch).Go()
+		s := rx.Recv(ch).Go(context.Background())
 
 		// Subscription should be active
 		if err := s.Err(); err != rx.ErrSubscriptionActive {
@@ -155,5 +155,68 @@ func TestSubscription(t *testing.T) {
 		// Complete the observable
 		close(ch)
 		<-s.Done()
+	})
+
+	t.Run("Context cancellation terminates subscription", func(t *testing.T) {
+		// Create a context that will be canceled
+		ctx, cancel := context.WithCancel(context.Background())
+
+		// Create a long-running subscription with the cancelable context
+		ch := make(chan int)
+		s := rx.Recv(ch).Go(ctx)
+
+		// Cancel the context
+		cancel()
+
+		// The subscription should terminate due to context cancellation
+		select {
+		case <-s.Done():
+			// Success - subscription terminated due to context cancellation
+			if err := s.Err(); err != rx.ErrSubscriptionCanceled {
+				t.Errorf("expected ErrSubscriptionCanceled, got: %v", err)
+			}
+		case <-time.After(500 * msec):
+			t.Error("subscription did not terminate after context cancellation")
+		}
+	})
+
+	t.Run("Unsubscribe cancels subscriber context", func(t *testing.T) {
+		// Channel to capture the subscriber's context
+		ctxChan := make(chan context.Context, 1)
+
+		// Create an observable that captures its subscriber's context and runs async
+		observable := func(observe rx.Observer[int], scheduler rx.Scheduler, subscriber rx.Subscriber) {
+			ctxChan <- subscriber.Context()
+			// Run the blocking work in a goroutine so Subscribe() returns
+			go func() {
+				<-subscriber.Context().Done()
+				var zero int
+				observe(zero, nil, true)
+			}()
+		}
+
+		s := rx.Observable[int](observable).Go(context.Background())
+
+		// Get the subscriber's context
+		subscriberCtx := <-ctxChan
+
+		// Context should not be done yet
+		select {
+		case <-subscriberCtx.Done():
+			t.Error("subscriber context should not be done before unsubscribe")
+		default:
+			// Good, context is not done
+		}
+
+		// Unsubscribe
+		s.Unsubscribe()
+
+		// Now the subscriber's context should be canceled
+		select {
+		case <-subscriberCtx.Done():
+			// Success - context was canceled by unsubscribe
+		case <-time.After(500 * msec):
+			t.Error("subscriber context was not canceled after unsubscribe")
+		}
 	})
 }

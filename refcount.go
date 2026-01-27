@@ -25,7 +25,8 @@ func (connectable Connectable[T]) RefCount() Observable[T] {
 	observable := func(observe Observer[T], scheduler Scheduler, subscriber Subscriber) {
 		source.Lock()
 		if atomic.AddInt32(&source.refcount, 1) == 1 {
-			source.subscription = newSubscription(scheduler)
+			ctx := WithScheduler(subscriber.Context(), scheduler)
+			source.subscription = newSubscription(ctx)
 			source.Unlock()
 			connectable.Connector(scheduler, source.subscription)
 			source.Lock()

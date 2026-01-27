@@ -1,6 +1,7 @@
 package rx_test
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"testing"
@@ -27,12 +28,11 @@ func TestZipAll(t *testing.T) {
 		var results [][]any
 
 		// Use non-concurrent scheduler for predictable test execution
-		scheduler := rx.NewScheduler()
-		zipped.Subscribe(func(next []any, err error, done bool) {
+		zipped.Subscribe(context.Background(), func(next []any, err error, done bool) {
 			if !done {
 				results = append(results, next)
 			}
-		}, scheduler).Wait()
+		}).Wait()
 
 		// Verify expected results
 		expected := [][]any{
@@ -59,12 +59,11 @@ func TestZipAll(t *testing.T) {
 		zipped := rx.ZipAll[any](sources)
 
 		var results [][]any
-		scheduler := rx.NewScheduler()
-		zipped.Subscribe(func(next []any, err error, done bool) {
+		zipped.Subscribe(context.Background(), func(next []any, err error, done bool) {
 			if !done {
 				results = append(results, next)
 			}
-		}, scheduler).Wait()
+		}).Wait()
 
 		// ZipAll should stop when the shortest source completes
 		expected := [][]any{
@@ -85,12 +84,11 @@ func TestZipAll(t *testing.T) {
 		zipped := rx.ZipAll[any](sources)
 
 		completed := false
-		scheduler := rx.NewScheduler()
-		zipped.Subscribe(func(next []any, err error, done bool) {
+		zipped.Subscribe(context.Background(), func(next []any, err error, done bool) {
 			if done && err == nil {
 				completed = true
 			}
-		}, scheduler).Wait()
+		}).Wait()
 
 		if !completed {
 			t.Error("Expected observable to complete when source is empty")
@@ -122,14 +120,13 @@ func TestZipAll(t *testing.T) {
 		var results [][]any
 		var receivedErr error
 
-		scheduler := rx.NewScheduler()
-		zipped.Subscribe(func(next []any, err error, done bool) {
+		zipped.Subscribe(context.Background(), func(next []any, err error, done bool) {
 			if !done {
 				results = append(results, next)
 			} else if err != nil {
 				receivedErr = err
 			}
-		}, scheduler).Wait()
+		}).Wait()
 
 		expected := [][]any{
 			{1, "a"},
@@ -167,12 +164,11 @@ func TestZipAll(t *testing.T) {
 
 		var results [][]any
 
-		scheduler := rx.NewScheduler()
-		zipped.Subscribe(func(next []any, err error, done bool) {
+		zipped.Subscribe(context.Background(), func(next []any, err error, done bool) {
 			if !done {
 				results = append(results, next)
 			}
-		}, scheduler).Wait()
+		}).Wait()
 
 		// Should only emit one pair, then complete
 		expected := [][]any{
@@ -200,12 +196,11 @@ func TestZipAll(t *testing.T) {
 
 		var results [][]any
 
-		scheduler := rx.NewScheduler()
-		zipped.Subscribe(func(next []any, err error, done bool) {
+		zipped.Subscribe(context.Background(), func(next []any, err error, done bool) {
 			if !done {
 				results = append(results, next)
 			}
-		}, scheduler).Wait()
+		}).Wait()
 
 		// Should only emit based on the shortest source (src1)
 		expected := [][]any{
@@ -233,8 +228,7 @@ func TestZipAll(t *testing.T) {
 		var results [][]any
 		var subscription rx.Subscription
 
-		scheduler := rx.NewScheduler()
-		subscription = zipped.Subscribe(func(next []any, err error, done bool) {
+		subscription = zipped.Subscribe(context.Background(), func(next []any, err error, done bool) {
 			if !done {
 				results = append(results, next)
 				// Unsubscribe after receiving 2 emissions
@@ -242,7 +236,7 @@ func TestZipAll(t *testing.T) {
 					subscription.Unsubscribe()
 				}
 			}
-		}, scheduler)
+		})
 
 		subscription.Wait()
 
@@ -274,12 +268,11 @@ func TestZipAll(t *testing.T) {
 		var results [][]any
 
 		// Use Goroutine scheduler for parallel execution
-		scheduler := rx.Goroutine
-		zipped.Subscribe(func(next []any, err error, done bool) {
+		zipped.Subscribe(rx.BackgroundGoroutine, func(next []any, err error, done bool) {
 			if !done {
 				results = append(results, next)
 			}
-		}, scheduler).Wait()
+		}).Wait()
 
 		// Results should still be zipped in order despite parallel execution
 		expected := [][]any{
@@ -324,12 +317,11 @@ func TestZipAll(t *testing.T) {
 
 		var results [][]any
 
-		scheduler := rx.NewScheduler()
-		zipped.Subscribe(func(next []any, err error, done bool) {
+		zipped.Subscribe(context.Background(), func(next []any, err error, done bool) {
 			if !done {
 				results = append(results, next)
 			}
-		}, scheduler).Wait()
+		}).Wait()
 
 		expected := [][]any{
 			{1, "a"},

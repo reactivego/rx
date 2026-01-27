@@ -1,14 +1,17 @@
 package rx
 
-import "iter"
+import (
+	"context"
+	"iter"
+)
 
-func (observable Observable[T]) Values(scheduler ...Scheduler) iter.Seq2[T, error] {
+func (observable Observable[T]) Values(ctx ...context.Context) iter.Seq2[T, error] {
 	return func(yield func(T, error) bool) {
 		// Wrap yield to match TakeWhile's expected signature
 		yielding := func(value T) bool {
 			return yield(value, nil)
 		}
-		err := observable.TakeWhile(yielding).Wait(scheduler...)
+		err := observable.TakeWhile(yielding).Wait(ctx...)
 		if err != nil {
 			var zero T
 			yield(zero, err)

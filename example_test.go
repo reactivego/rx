@@ -1,6 +1,7 @@
 package rx_test
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,9 +17,10 @@ func Example_share() {
 
 	shared := rx.From(1, 2, 3).Share()
 
-	shared.Println().Go(serial)
-	shared.Println().Go(serial)
-	shared.Println().Go(serial)
+	ctx := rx.Background(serial)
+	shared.Println().Go(ctx)
+	shared.Println().Go(ctx)
+	shared.Println().Go(ctx)
 
 	serial.Wait()
 	// Output:
@@ -46,8 +48,9 @@ func Example_subject() {
 	in.Next(1)
 
 	// add a couple of subscriptions
-	sub1 := out.Println().Go(serial)
-	sub2 := out.Println().Go(serial)
+	ctx := rx.Background(serial)
+	sub1 := out.Println().Go(ctx)
+	sub2 := out.Println().Go(ctx)
 
 	// schedule the subsequent emits on the serial scheduler otherwise these calls
 	// will block because the buffer is full.
@@ -96,8 +99,9 @@ func Example_multicast() {
 	})
 
 	// Add a couple of subscriptions
-	sub1 := out.Println().Go(serial)
-	sub2 := out.Println().Go(serial)
+	ctx := rx.Background(serial)
+	sub1 := out.Println().Go(ctx)
+	sub2 := out.Println().Go(ctx)
 
 	// Let the scheduler run and wait for all of its scheduled tasks to finish.
 	serial.Wait()
@@ -128,8 +132,9 @@ func Example_multicastDrop() {
 	in.Next(1)
 
 	// add a couple of subscriptions
-	sub1 := out.Println().Go(serial)
-	sub2 := out.Println().Go(serial)
+	ctx := rx.Background(serial)
+	sub1 := out.Println().Go(ctx)
+	sub2 := out.Println().Go(ctx)
 
 	in.Next(2)      // accepted: buffer not full
 	in.Next(3)      // dropped: buffer full
@@ -200,7 +205,7 @@ func Example_race() {
 	err2 := err("second", 20*ms)
 	err3 := err("third", 30*ms)
 
-	fmt.Println(rx.Race(err1, err2, err3).Wait(rx.Goroutine))
+	fmt.Println(rx.Race(err1, err2, err3).Wait(rx.BackgroundGoroutine))
 	// Output:
 	// second response
 	// first error
@@ -307,7 +312,7 @@ func Example_switchAll() {
 	interval42x4 := rx.Interval[int](42 * ms).Take(4)
 	interval16x4 := rx.Interval[int](16 * ms).Take(4)
 
-	err := rx.SwitchAll(rx.Map(interval42x4, func(next int) rx.Observable[int] { return interval16x4 })).Println().Wait(rx.Goroutine)
+	err := rx.SwitchAll(rx.Map(interval42x4, func(next int) rx.Observable[int] { return interval16x4 })).Println().Wait(rx.BackgroundGoroutine)
 
 	if err == nil {
 		fmt.Println("success")
@@ -410,13 +415,13 @@ func Example_values() {
 	// these observables to run concurrently.
 
 	// run the observable on 1 or more goroutines
-	for i := range source.Values(scheduler.Goroutine) {
+	for i := range source.Values(rx.WithScheduler(context.Background(), scheduler.Goroutine)) {
 		// This is called from a newly created goroutine
 		fmt.Println(i)
 	}
 
 	// run the observable on the current goroutine
-	for i := range source.Values(scheduler.New()) {
+	for i := range source.Values(rx.WithScheduler(context.Background(), scheduler.New())) {
 		fmt.Println(i)
 	}
 
@@ -457,7 +462,7 @@ func Example_skip() {
 func Example_autoConnect() {
 	// Create a multicaster hot observable that will emit every 100 milliseconds
 	hot := rx.Interval[int](100 * time.Millisecond).Take(10).Publish()
-	hotsub := hot.Connect(rx.Goroutine)
+	hotsub := hot.Connect(rx.BackgroundGoroutine)
 	defer hotsub.Unsubscribe()
 	fmt.Println("Hot observable created and emitting 0,1,2,3,4,5,6 ...")
 
@@ -505,7 +510,7 @@ func Example_mergeMap() {
 		return fakeFetchData
 	})
 
-	merged.Println().Go().Wait()
+	merged.Println().Go(context.Background()).Wait()
 
 	// Output:
 	// content of "https://reactivego.io"
@@ -522,10 +527,11 @@ func Example_mergeMapSubject() {
 
 	// subject remembers last 2 emits by the observer for an hour.
 	observer, subject := rx.Subject[string](time.Hour, 2)
-	merged.Tap(observer).Go()
 
-	// Sees all emits by the subject
-	subject.Println().Go().Wait()
+	// First subscriber starts before merged completes, so sees all emits live
+	wait := subject.Println().Go()
+	merged.Tap(observer).Go().Wait()
+	wait.Wait()
 
 	// Sees only last 2 emits
 	subject.Println().Go().Wait()

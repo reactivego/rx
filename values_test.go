@@ -1,6 +1,7 @@
 package rx_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/reactivego/rx"
@@ -10,7 +11,7 @@ func TestValues(t *testing.T) {
 	t.Run("Basic values extraction", func(t *testing.T) {
 		nums := rx.From(1, 2, 3, 4, 5)
 		var results []int
-		for v := range nums.Values() {
+		for v := range nums.Values(context.Background()) {
 			results = append(results, v)
 		}
 		expected := []int{1, 2, 3, 4, 5}
@@ -28,7 +29,7 @@ func TestValues(t *testing.T) {
 	t.Run("Empty observable", func(t *testing.T) {
 		nums := rx.Empty[int]()
 		count := 0
-		for range nums.Values() {
+		for range nums.Values(context.Background()) {
 			count++
 		}
 		if count != 0 {
@@ -42,7 +43,7 @@ func TestValues(t *testing.T) {
 			return i%2 == 0
 		})
 		var results []int
-		for v := range filtered.Values() {
+		for v := range filtered.Values(context.Background()) {
 			results = append(results, v)
 		}
 		expected := []int{2, 4, 6}
@@ -61,7 +62,7 @@ func TestValues(t *testing.T) {
 		nums := rx.From(1, 2, 3, 4, 5)
 		taken := nums.Take(3)
 		var results []int
-		for v := range taken.Values() {
+		for v := range taken.Values(context.Background()) {
 			results = append(results, v)
 		}
 		expected := []int{1, 2, 3}
@@ -85,7 +86,7 @@ func TestValues(t *testing.T) {
 
 		// Check results by iterating with Values()
 		var results []int
-		for v, err := range obs.Values() {
+		for v, err := range obs.Values(context.Background()) {
 			if err != nil {
 				t.Errorf("Expected no error, got %v", err)
 			}

@@ -2,7 +2,7 @@ package rx
 
 func Recv[T any](ch <-chan T) Observable[T] {
 	return func(observe Observer[T], scheduler Scheduler, subscriber Subscriber) {
-		cancel := make(chan struct{})
+		ctx := subscriber.Context()
 		runner := scheduler.ScheduleRecursive(func(again func()) {
 			if !subscriber.Subscribed() {
 				return
@@ -28,13 +28,12 @@ func Recv[T any](ch <-chan T) Observable[T] {
 					var zero T
 					observe(zero, nil, true)
 				}
-			case <-cancel:
+			case <-ctx.Done():
 				return
 			}
 		})
 		subscriber.OnUnsubscribe(func() {
 			runner.Cancel()
-			close(cancel)
 		})
 	}
 }

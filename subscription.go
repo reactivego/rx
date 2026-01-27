@@ -1,6 +1,7 @@
 package rx
 
 import (
+	"context"
 	"errors"
 	"sync"
 )
@@ -40,6 +41,7 @@ type subscription struct {
 	subscriber
 	scheduler Scheduler
 	err       error
+	doneChan  chan struct{}
 }
 
 // ErrSubscriptionActive is the error returned by Err() when the
@@ -52,8 +54,30 @@ var ErrSubscriptionActive = errors.Join(Err, errors.New("subscription active"))
 // by the observable completing normally or with an error.
 var ErrSubscriptionCanceled = errors.Join(Err, errors.New("subscription canceled"))
 
-func newSubscription(scheduler Scheduler) *subscription {
-	return &subscription{scheduler: scheduler, err: ErrSubscriptionCanceled}
+func newSubscription(ctx ...context.Context) *subscription {
+	// Get parent context (possibly with scheduler)
+	parentCtx := withScheduler(ctx)
+	// Create a derived context that will be canceled when the subscription ends
+	derivedCtx, cancel := context.WithCancel(parentCtx)
+
+	s := &subscription{
+		subscriber: subscriber{ctx: derivedCtx},
+		scheduler:  schedulerFromContext(parentCtx),
+		err:        ErrSubscriptionCanceled,
+		doneChan:   make(chan struct{}),
+	}
+
+	// Register callback to unsubscribe when parent context is canceled
+	stop := context.AfterFunc(parentCtx, s.Unsubscribe)
+
+	// When unsubscribed: clean up AfterFunc registration, cancel derived context, and signal done
+	s.OnUnsubscribe(func() {
+		stop()
+		cancel()
+		close(s.doneChan)
+	})
+
+	return s
 }
 
 func (s *subscription) done(err error) {
@@ -65,12 +89,10 @@ func (s *subscription) done(err error) {
 }
 
 func (s *subscription) Done() <-chan struct{} {
-	cancel := make(chan struct{})
-	s.OnUnsubscribe(func() { close(cancel) })
 	if !s.scheduler.IsConcurrent() {
 		go s.scheduler.Wait()
 	}
-	return cancel
+	return s.doneChan
 }
 
 func (s *subscription) Err() (err error) {

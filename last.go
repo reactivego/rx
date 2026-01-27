@@ -1,6 +1,8 @@
 package rx
 
-func (observable Observable[T]) Last(schedulers ...Scheduler) (value T, err error) {
-	err = observable.Assign(&value).Wait(schedulers...)
+import "context"
+
+func (observable Observable[T]) Last(ctx ...context.Context) (value T, err error) {
+	err = observable.Assign(&value).Wait(ctx...)
 	return
 }

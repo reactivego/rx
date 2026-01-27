@@ -1,6 +1,8 @@
 package rx
 
-func (observable Observable[T]) Slice(schedulers ...Scheduler) (slice []T, err error) {
-	err = observable.Append(&slice).Wait(schedulers...)
+import "context"
+
+func (observable Observable[T]) Slice(ctx ...context.Context) (slice []T, err error) {
+	err = observable.Append(&slice).Wait(ctx...)
 	return
 }

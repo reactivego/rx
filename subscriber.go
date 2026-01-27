@@ -1,6 +1,7 @@
 package rx
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 )
@@ -25,6 +26,10 @@ type Subscriber interface {
 	// If the subscriber is already unsubscribed, the callback is executed immediately.
 	// If callback is nil, this method does nothing.
 	OnUnsubscribe(callback func())
+
+	// Context returns the context associated with this subscriber.
+	// If no context was provided, returns context.Background().
+	Context() context.Context
 }
 
 const (
@@ -36,6 +41,7 @@ type subscriber struct {
 	state atomic.Int32
 	sync.Mutex
 	callbacks []func()
+	ctx       context.Context
 }
 
 func (s *subscriber) Subscribed() bool {
@@ -54,7 +60,7 @@ func (s *subscriber) Unsubscribe() {
 }
 
 func (s *subscriber) Add() Subscriber {
-	child := &subscriber{}
+	child := &subscriber{ctx: s.ctx}
 	s.Lock()
 	if s.state.Load() != subscribed {
 		child.Unsubscribe()
@@ -63,6 +69,13 @@ func (s *subscriber) Add() Subscriber {
 	}
 	s.Unlock()
 	return child
+}
+
+func (s *subscriber) Context() context.Context {
+	if s.ctx != nil {
+		return s.ctx
+	}
+	return context.Background()
 }
 
 func (s *subscriber) OnUnsubscribe(callback func()) {
