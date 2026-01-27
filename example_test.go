@@ -445,8 +445,11 @@ func Example_values() {
 func Example_all() {
 	source := rx.From("ZERO", "ONE", "TWO")
 
-	for k, v := range source.All() {
-		fmt.Println(k, v)
+	for next, err := range source.All() {
+		if err != nil {
+			fmt.Println("Unexpected error:", err)
+		}
+		fmt.Println(next.First, next.Second)
 	}
 
 	fmt.Println("OK")

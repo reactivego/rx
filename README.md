@@ -90,9 +90,6 @@ Operators form a language for expressing programs with Observables. They transfo
 
 [__All__](https://pkg.go.dev/github.com/reactivego/rx#Observable.All) converts an Observable stream into a Go 1.22+ iterator sequence that provides each emitted value paired with its sequential zero-based index
 
-[__All2__](https://pkg.go.dev/github.com/reactivego/rx#All2)
-converts an Observable of Tuple2 pairs into a Go 1.22+ iterator sequence that yields each tuple's components (First, Second) as separate values.
-
 [__Append__](https://pkg.go.dev/github.com/reactivego/rx#Append)
 creates a pipe that appends emitted values to a provided slice while forwarding them to the next observer, with a method variant available for chaining.
 
