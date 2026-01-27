@@ -119,7 +119,11 @@ func Subject[T any](age time.Duration, capacity ...int) (Observer[T], Observable
 					atomic.StoreUint64(&buf.end, slowest+buf.size)
 				} else {
 					if slowest == maxuint64 { // no subscriptions
-						atomic.AddUint64(&buf.begin, 1)
+						// Only advance begin if we already have keep items in the buffer
+						// to preserve replay capability for future subscribers
+						if buf.commit-atomic.LoadUint64(&buf.begin) >= buf.keep {
+							atomic.AddUint64(&buf.begin, 1)
+						}
 						atomic.AddUint64(&buf.end, 1)
 					} else {
 						full = true
