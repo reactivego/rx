@@ -268,7 +268,7 @@ func TestZipAll(t *testing.T) {
 		var results [][]any
 
 		// Use Goroutine scheduler for parallel execution
-		zipped.Subscribe(rx.BackgroundGoroutine, func(next []any, err error, done bool) {
+		zipped.Subscribe(rx.GoroutineContext(), func(next []any, err error, done bool) {
 			if !done {
 				results = append(results, next)
 			}

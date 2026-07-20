@@ -56,13 +56,14 @@ var ErrSubscriptionCanceled = errors.Join(Err, errors.New("subscription canceled
 
 func newSubscription(ctx ...context.Context) *subscription {
 	// Get parent context (possibly with scheduler)
-	parentCtx := withScheduler(ctx)
+	parentCtx := contextWithScheduler(ctx)
 	// Create a derived context that will be canceled when the subscription ends
 	derivedCtx, cancel := context.WithCancel(parentCtx)
 
+	scheduler, _ := SchedulerFromContext(parentCtx)
 	s := &subscription{
 		subscriber: subscriber{ctx: derivedCtx},
-		scheduler:  schedulerFromContext(parentCtx),
+		scheduler:  scheduler,
 		err:        ErrSubscriptionCanceled,
 		doneChan:   make(chan struct{}),
 	}

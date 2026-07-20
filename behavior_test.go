@@ -1,6 +1,7 @@
 package rx
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -42,7 +43,7 @@ func TestBehaviorReplaysSeedBeforeSourceEmits(t *testing.T) {
 	conn := src.Behavior(42)
 
 	got := make(chan int, 4)
-	sub := conn.Subscribe(BackgroundGoroutine, func(v int, err error, done bool) {
+	sub := conn.Subscribe(SchedulerContextWith(context.Background(), Goroutine), func(v int, err error, done bool) {
 		if !done && err == nil {
 			select {
 			case got <- v:
@@ -52,7 +53,7 @@ func TestBehaviorReplaysSeedBeforeSourceEmits(t *testing.T) {
 	})
 	defer sub.Unsubscribe()
 
-	connSub := conn.Connect(BackgroundGoroutine)
+	connSub := conn.Connect(SchedulerContextWith(context.Background(), Goroutine))
 	defer connSub.Unsubscribe()
 
 	select {
@@ -75,7 +76,7 @@ func TestBehaviorRefCountReplaysLatestToLateSubscriber(t *testing.T) {
 
 	// First subscriber triggers Connect (RefCount); drive the source to 300.
 	first := make(chan int, 8)
-	sub1 := shared.Subscribe(BackgroundGoroutine, func(v int, err error, done bool) {
+	sub1 := shared.Subscribe(SchedulerContextWith(context.Background(), Goroutine), func(v int, err error, done bool) {
 		if !done && err == nil {
 			select {
 			case first <- v:
@@ -91,7 +92,7 @@ func TestBehaviorRefCountReplaysLatestToLateSubscriber(t *testing.T) {
 	// Late subscriber must replay the latest (300) — not nothing (the RefCount
 	// failure), and not the construction seed (-1).
 	late := make(chan int, 4)
-	sub2 := shared.Subscribe(BackgroundGoroutine, func(v int, err error, done bool) {
+	sub2 := shared.Subscribe(SchedulerContextWith(context.Background(), Goroutine), func(v int, err error, done bool) {
 		if !done && err == nil {
 			select {
 			case late <- v:
@@ -117,7 +118,7 @@ func TestBehaviorForwardsUpdatesAfterReplay(t *testing.T) {
 	shared := idleSource(1, 2, 3).Behavior(0).RefCount()
 
 	got := make(chan int, 16)
-	sub := shared.Subscribe(BackgroundGoroutine, func(v int, err error, done bool) {
+	sub := shared.Subscribe(SchedulerContextWith(context.Background(), Goroutine), func(v int, err error, done bool) {
 		if !done && err == nil {
 			got <- v
 		}
@@ -137,7 +138,7 @@ func TestBehaviorStartWithComposes(t *testing.T) {
 	shared := idleSource(7, 8, 9).StartWith(5).Behavior(-1).RefCount()
 
 	got := make(chan int, 16)
-	sub := shared.Subscribe(BackgroundGoroutine, func(v int, err error, done bool) {
+	sub := shared.Subscribe(SchedulerContextWith(context.Background(), Goroutine), func(v int, err error, done bool) {
 		if !done && err == nil {
 			got <- v
 		}
@@ -158,7 +159,7 @@ func TestBehaviorStartWithComposes(t *testing.T) {
 // registration lock).
 func TestBehaviorNoGapOrReorderUnderConcurrency(t *testing.T) {
 	conn := idleSourceFast().Behavior(0)
-	connSub := conn.Connect(BackgroundGoroutine)
+	connSub := conn.Connect(SchedulerContextWith(context.Background(), Goroutine))
 	defer connSub.Unsubscribe()
 
 	stop := make(chan struct{})
@@ -171,7 +172,7 @@ func TestBehaviorNoGapOrReorderUnderConcurrency(t *testing.T) {
 			defer wg.Done()
 			first := true
 			var prev int
-			sub := conn.Subscribe(BackgroundGoroutine, func(v int, err error, d bool) {
+			sub := conn.Subscribe(SchedulerContextWith(context.Background(), Goroutine), func(v int, err error, d bool) {
 				if d || err != nil {
 					return
 				}
@@ -240,7 +241,7 @@ func TestBehaviorConcurrentConvergence(t *testing.T) {
 			defer wg.Done()
 			done := make(chan struct{})
 			last := 0
-			conn.Subscribe(BackgroundGoroutine, func(v int, err error, d bool) {
+			conn.Subscribe(SchedulerContextWith(context.Background(), Goroutine), func(v int, err error, d bool) {
 				if d {
 					if err == nil {
 						dones[i] = true
@@ -255,7 +256,7 @@ func TestBehaviorConcurrentConvergence(t *testing.T) {
 		}()
 	}
 
-	conn.Connect(BackgroundGoroutine)
+	conn.Connect(SchedulerContextWith(context.Background(), Goroutine))
 	wg.Wait()
 
 	for i := range subscribers {
@@ -284,7 +285,7 @@ func TestBehaviorConcurrentConvergence(t *testing.T) {
 // when no intermediate value was ever seen.
 func TestBehaviorSerialReplaysFinalValueAndCompletes(t *testing.T) {
 	serial := NewScheduler()
-	ctx := Background(serial)
+	ctx := SchedulerContextWith(context.Background(), serial)
 
 	// Finite cold source: emits 1,2,3 then completes.
 	source := Create(func(index int) (int, error, bool) {
@@ -335,7 +336,7 @@ func TestBehaviorSerialReplaysFinalValueAndCompletes(t *testing.T) {
 // the latest value (not the seed, not nothing) when it finally runs.
 func TestBehaviorSerialReplaysLatestToLateSubscriber(t *testing.T) {
 	serial := NewScheduler()
-	ctx := Background(serial)
+	ctx := SchedulerContextWith(context.Background(), serial)
 
 	source := Create(func(index int) (int, error, bool) {
 		if index < 3 {
@@ -385,7 +386,7 @@ func TestBehaviorSerialReplaysLatestToLateSubscriber(t *testing.T) {
 // delivered (after the latest value) on the serial path.
 func TestBehaviorSerialDeliversErrorTerminal(t *testing.T) {
 	serial := NewScheduler()
-	ctx := Background(serial)
+	ctx := SchedulerContextWith(context.Background(), serial)
 
 	boom := Err
 	source := Create(func(index int) (int, error, bool) {

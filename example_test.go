@@ -16,7 +16,7 @@ func Example_share() {
 
 	shared := rx.From(1, 2, 3).Share()
 
-	ctx := rx.Background(serial)
+	ctx := rx.SchedulerContextWith(context.Background(), serial)
 	shared.Println().Go(ctx)
 	shared.Println().Go(ctx)
 	shared.Println().Go(ctx)
@@ -36,7 +36,7 @@ func Example_share() {
 
 func Example_subject() {
 	serial := rx.NewScheduler()
-	ctx := rx.Background(serial)
+	ctx := rx.SchedulerContextWith(context.Background(), serial)
 
 	// subject collects emits when there are no subscriptions active.
 	in, out := rx.Subject[int](0, 1)
@@ -77,7 +77,7 @@ func Example_subject() {
 
 func Example_multicast() {
 	serial := rx.NewScheduler()
-	ctx := rx.Background(serial)
+	ctx := rx.SchedulerContextWith(context.Background(), serial)
 
 	in, out := rx.Multicast[int](1)
 
@@ -117,7 +117,7 @@ func Example_multicast() {
 
 func Example_multicastDrop() {
 	serial := rx.NewScheduler()
-	ctx := rx.Background(serial)
+	ctx := rx.SchedulerContextWith(context.Background(), serial)
 
 	const onBackpressureDrop = -1
 
@@ -204,7 +204,7 @@ func Example_race() {
 	err2 := err("second", 20*ms)
 	err3 := err("third", 30*ms)
 
-	fmt.Println(rx.Race(err1, err2, err3).Wait(rx.BackgroundGoroutine))
+	fmt.Println(rx.Race(err1, err2, err3).Wait(rx.GoroutineContext()))
 	// Output:
 	// second response
 	// first error
@@ -318,7 +318,7 @@ func Example_switchAll() {
 		return interval16x4
 	})
 
-	err := rx.SwitchAll(overlapping).Println().Wait(rx.BackgroundGoroutine)
+	err := rx.SwitchAll(overlapping).Println().Wait(rx.GoroutineContext())
 
 	if err == nil {
 		fmt.Println("success")
@@ -421,7 +421,7 @@ func Example_values() {
 	// these observables to run concurrently.
 
 	// run the observable on 1 or more goroutines
-	for i := range source.Values(rx.BackgroundGoroutine) {
+	for i := range source.Values(rx.GoroutineContext()) {
 		// This is called from a newly created goroutine
 		fmt.Println(i)
 	}
@@ -471,7 +471,7 @@ func Example_skip() {
 func Example_autoConnect() {
 	// Create a multicaster hot observable that will emit every 100 milliseconds
 	hot := rx.Interval[int](100 * time.Millisecond).Take(10).Publish()
-	hotsub := hot.Connect(rx.BackgroundGoroutine)
+	hotsub := hot.Connect(rx.GoroutineContext())
 	defer hotsub.Unsubscribe()
 	fmt.Println("Hot observable created and emitting 0,1,2,3,4,5,6 ...")
 
