@@ -39,7 +39,14 @@ func (connectable Connectable[T]) AutoConnect(count int) Observable[T] {
 		connectable.Observable(observe, scheduler, subscriber)
 		source.Lock()
 		if atomic.AddInt32(&source.refcount, 1) == int32(count) {
-			if source.subscription == nil || source.subscription.err != nil {
+			connect := source.subscription == nil
+			if !connect {
+				// Reconnect only when the previous connection ended in error or was
+				// canceled — never while it is still active or after it completed.
+				err := source.subscription.Err()
+				connect = err != nil && !errors.Is(err, ErrSubscriptionActive)
+			}
+			if connect {
 				// Detach from the triggering subscriber's cancellation: the shared
 				// connection must outlive it and is torn down explicitly at refcount 0.
 				source.subscription = newSubscription(SchedulerContextWith(context.WithoutCancel(subscriber.Context()), scheduler))
