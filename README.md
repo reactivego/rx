@@ -109,15 +109,17 @@ ctx := rx.GoroutineContext()
 ctx := rx.SchedulerContextWith(context.Background(), rx.NewScheduler())
 ```
 
-[`GoroutineContext`](https://pkg.go.dev/github.com/reactivego/rx#GoroutineContext) wraps an optional parent context, so cancellation composes with scheduler selection:
+Cancellation composes with scheduler selection: context values flow down, so a cancelable context derived from a scheduler context still carries the scheduler. Canceling it unsubscribes every subscription made with it:
 
 ```go
-ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+ctx, cancel := context.WithTimeout(rx.GoroutineContext(), time.Second)
 defer cancel()
 
-err := rx.Interval[int](100 * time.Millisecond).Println().Wait(rx.GoroutineContext(ctx))
+err := rx.Interval[int](100 * time.Millisecond).Println().Wait(ctx)
 // after one second: err is rx.ErrSubscriptionCanceled
 ```
+
+[`GoroutineContext`](https://pkg.go.dev/github.com/reactivego/rx#GoroutineContext) also accepts an optional parent, so `rx.GoroutineContext(ctx)` attaches the scheduler to an existing context instead.
 
 Convenience entry points choose sensible defaults when no scheduler is attached: [`Wait`](https://pkg.go.dev/github.com/reactivego/rx#Observable.Wait), [`First`](https://pkg.go.dev/github.com/reactivego/rx#Observable.First), [`Last`](https://pkg.go.dev/github.com/reactivego/rx#Observable.Last), and [`Slice`](https://pkg.go.dev/github.com/reactivego/rx#Observable.Slice) use a new serial scheduler, while [`Go`](https://pkg.go.dev/github.com/reactivego/rx#Observable.Go) uses the concurrent Goroutine scheduler.
 
