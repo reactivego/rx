@@ -1,6 +1,7 @@
 package rx
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"sync/atomic"
@@ -39,7 +40,9 @@ func (connectable Connectable[T]) AutoConnect(count int) Observable[T] {
 		source.Lock()
 		if atomic.AddInt32(&source.refcount, 1) == int32(count) {
 			if source.subscription == nil || source.subscription.err != nil {
-				source.subscription = newSubscription(WithScheduler(subscriber.Context(), scheduler))
+				// Detach from the triggering subscriber's cancellation: the shared
+				// connection must outlive it and is torn down explicitly at refcount 0.
+				source.subscription = newSubscription(SchedulerContextWith(context.WithoutCancel(subscriber.Context()), scheduler))
 				source.Unlock()
 				connectable.Connector(scheduler, source.subscription)
 				source.Lock()
