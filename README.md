@@ -4,309 +4,342 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/reactivego/rx.svg)](https://pkg.go.dev/github.com/reactivego/rx)
 
-Package `rx` provides _**R**eactive E**x**tensions_, a powerful API for asynchronous programming in Go, built around [observables](#observables) and [operators](#operators) to process streams of data seamlessly.
+Package `rx` provides _**R**eactive E**x**tensions_ for Go: an API for asynchronous programming built around [Observables](#observable-and-observer) — typed streams of data — and [Operators](#operators) that transform, filter, and combine them into pipelines.
 
 ## Prerequisites
 
-You’ll need [*Go 1.23*](https://golang.org/dl/) or later, as the implementation depends on language support for generics and iterators.
+You'll need [*Go 1.23*](https://golang.org/dl/) or later; the implementation depends on generics and on iterator (range-over-func) support.
 
-## Observables
+## Quick Start
 
-In `rx`, an [**Observables**](http://reactivex.io/documentation/observable.html) represents a stream of data that can emit items over time, while an **Observer** subscribes to it to receive and react to those emissions. This reactive approach enables asynchronous and concurrent operations without blocking execution. Instead of waiting for values to become available, an observer passively listens and responds whenever the observable emits data, errors, or a completion signal.
+Create an Observable from some values, print each one, and wait for completion:
 
-This page introduces the **reactive pattern**, explaining what **Observables** and **Observers** are and how subscriptions work. Other sections explore the powerful set of [**Operators**](https://reactivex.io/documentation/operators.html) that allow you to transform, combine, and control data streams efficiently.
-
-An Observable:
-
-- is a stream of events.
-- assumes zero to many values over time.
-- pushes values
-- can take any amount of time to complete (or may never)
-- is cancellable
-- is lazy (it doesn't do anything until you subscribe).
-
-Example
-```go
-package main
-
-import "github.com/reactivego/x"
-
-func main() {
-    x.From[any](1,"hi",2.3).Println().Wait()
-}
-```
-> Note the program creates a mixed type `any` observable from an int, string and a float64.
-
-Output
-```
-1
-hi
-2.3
-```
-Example
 ```go
 package main
 
 import "github.com/reactivego/rx"
 
 func main() {
-    rx.From(1,2,3).Println().Wait()
+    rx.From(1, 2, 3).Println().Wait()
 }
 ```
-> Note the program uses inferred type `int` for the observable.
-
-Output
 ```
 1
 2
 3
 ```
 
-Observables in `rx` offer several advantages over standard Go channels:
+The element type is inferred; use an explicit type parameter for mixed-type streams:
+
+```go
+rx.From[any](1, "hi", 2.3).Println().Wait()
+```
+```
+1
+hi
+2.3
+```
+
+## Core Concepts
+
+### Observable and Observer
+
+An [`Observable[T]`](https://pkg.go.dev/github.com/reactivego/rx#Observable) is a stream of values that are pushed to an [`Observer[T]`](https://pkg.go.dev/github.com/reactivego/rx#Observer) over time. Both are plain function types, so any function with the right signature works:
+
+```go
+type Observable[T any] func(Observer[T], Scheduler, Subscriber)
+
+type Observer[T any] func(next T, err error, done bool)
+```
+
+An Observable:
+
+- is a stream of events.
+- assumes zero to many values over time.
+- pushes values to its observers.
+- can take any amount of time to complete (or may never).
+- is cancellable.
+- is lazy: it does nothing until you subscribe.
+
+The observer receives each value with `done == false`. The stream terminates with exactly one final call where `done == true`: with `err == nil` for normal completion, or a non-nil `err` for failure.
+
+```go
+sub := rx.From("a", "b").Subscribe(rx.GoroutineContext(), func(next string, err error, done bool) {
+    switch {
+    case !done:
+        fmt.Println(next)
+    case err != nil:
+        fmt.Println("error:", err)
+    default:
+        fmt.Println("complete")
+    }
+})
+sub.Wait()
+```
+```
+a
+b
+complete
+```
+
+### Subscriptions
+
+[`Subscribe`](https://pkg.go.dev/github.com/reactivego/rx#Observable.Subscribe) returns a [`Subscription`](https://pkg.go.dev/github.com/reactivego/rx#Subscription) for observing and controlling the stream's lifecycle:
+
+- `Subscribed()` reports whether the subscription is still active.
+- `Unsubscribe()` cancels it.
+- `Done()` returns a channel that closes on termination, for use in `select`.
+- `Wait()` blocks until termination and returns the outcome.
+- `Err()` returns `nil` after normal completion, the stream's error after failure, [`ErrSubscriptionCanceled`](https://pkg.go.dev/github.com/reactivego/rx#ErrSubscriptionCanceled) after `Unsubscribe`, or [`ErrSubscriptionActive`](https://pkg.go.dev/github.com/reactivego/rx#ErrSubscriptionActive) while still running.
+
+Every error produced by this package wraps the base error [`Err`](https://pkg.go.dev/github.com/reactivego/rx#Err), so `errors.Is(err, rx.Err)` identifies package errors.
+
+### Context and Schedulers
+
+`Subscribe` takes a `context.Context` that serves two purposes:
+
+1. **Cancellation.** Canceling the context unsubscribes the subscription; conversely the context is available to source operators through the subscriber, so sources can stop producing when it is canceled.
+2. **Scheduler selection.** A [`Scheduler`](https://pkg.go.dev/github.com/reactivego/rx#Scheduler) controls where and when the stream runs, and is carried by the context:
+
+```go
+// Concurrent: every task runs on its own goroutine.
+ctx := rx.GoroutineContext()
+
+// Serial: tasks run sequentially on the calling goroutine (the default).
+ctx := rx.SchedulerContextWith(context.Background(), rx.NewScheduler())
+```
+
+[`GoroutineContext`](https://pkg.go.dev/github.com/reactivego/rx#GoroutineContext) wraps an optional parent context, so cancellation composes with scheduler selection:
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+defer cancel()
+
+err := rx.Interval[int](100 * time.Millisecond).Println().Wait(rx.GoroutineContext(ctx))
+// after one second: err is rx.ErrSubscriptionCanceled
+```
+
+Convenience entry points choose sensible defaults when no scheduler is attached: [`Wait`](https://pkg.go.dev/github.com/reactivego/rx#Observable.Wait), [`First`](https://pkg.go.dev/github.com/reactivego/rx#Observable.First), [`Last`](https://pkg.go.dev/github.com/reactivego/rx#Observable.Last), and [`Slice`](https://pkg.go.dev/github.com/reactivego/rx#Observable.Slice) use a new serial scheduler, while [`Go`](https://pkg.go.dev/github.com/reactivego/rx#Observable.Go) uses the concurrent Goroutine scheduler.
+
+### Iterators and Channels
+
+Observables interoperate with Go's native streaming constructs in both directions:
+
+- [`Values`](https://pkg.go.dev/github.com/reactivego/rx#Observable.Values) and [`All`](https://pkg.go.dev/github.com/reactivego/rx#Observable.All) expose an Observable as an iterator usable in a `range` loop; `All` pairs each value with its index.
+- [`Pull`](https://pkg.go.dev/github.com/reactivego/rx#Pull) and [`Pull2`](https://pkg.go.dev/github.com/reactivego/rx#Pull2) adapt an `iter.Seq`/`iter.Seq2` into an Observable.
+- [`Recv`](https://pkg.go.dev/github.com/reactivego/rx#Recv) turns a receive channel into an Observable; [`Send`](https://pkg.go.dev/github.com/reactivego/rx#Observable.Send) forwards emissions into a channel.
+
+```go
+for value, err := range rx.From(1, 2, 3).Values(rx.GoroutineContext()) {
+    if err != nil {
+        break // terminal error; value is the zero value
+    }
+    fmt.Println(value)
+}
+```
 
 ### Hot vs Cold Observables
 
-- **Hot Observables** emit values regardless of subscription status. Like a live broadcast, any values emitted when no subscribers are listening are permanently missed. Examples include system events, mouse movements, or real-time data feeds.
+- **Hot Observables** emit values regardless of subscription status. Like a live broadcast, values emitted while nobody is subscribed are missed. Examples include system events, mouse movements, or real-time data feeds.
 
-- **Cold Observables** begin emission only when subscribed to, ensuring subscribers receive the complete data sequence from the beginning. Examples include file contents, database queries, or HTTP requests that are executed on-demand.
+- **Cold Observables** begin emission only when subscribed to, so each subscriber receives the complete sequence from the beginning. Examples include file contents, database queries, or HTTP requests executed on demand.
 
-### Rich Lifecycle Management
+### Multicasting
 
-Observables offer comprehensive lifecycle handling. They can complete normally, terminate with errors, or continue indefinitely. Subscriptions provide fine-grained control, allowing subscribers to cancel at any point, preventing resource leaks and unwanted processing.
+By default a cold Observable restarts for every subscriber. Multicasting shares one upstream subscription among many subscribers:
 
-### Time-Varying Data Model
+- [`Publish`](https://pkg.go.dev/github.com/reactivego/rx#Observable.Publish) returns a [`Connectable[T]`](https://pkg.go.dev/github.com/reactivego/rx#Connectable): subscribers register first, and the source is subscribed only when [`Connect`](https://pkg.go.dev/github.com/reactivego/rx#Connector.Connect) is called.
+- [`Behavior`](https://pkg.go.dev/github.com/reactivego/rx#Observable.Behavior) is like `Publish` but replays the latest value (starting from a seed) to each new subscriber, with conflating, non-backpressuring semantics suited to distributing current state.
+- [`RefCount`](https://pkg.go.dev/github.com/reactivego/rx#Connectable.RefCount) turns a Connectable back into an ordinary Observable that connects when the first subscriber arrives and disconnects when the last one leaves.
+- [`AutoConnect`](https://pkg.go.dev/github.com/reactivego/rx#Connectable.AutoConnect) connects once a given number of subscribers have subscribed, and reconnects after an error or cancellation when the threshold is crossed again.
+- [`Share`](https://pkg.go.dev/github.com/reactivego/rx#Observable.Share) is shorthand for `Publish().RefCount()`.
+- [`Multicast`](https://pkg.go.dev/github.com/reactivego/rx#Multicast) and [`Subject`](https://pkg.go.dev/github.com/reactivego/rx#Subject) provide a raw Observer/Observable pair for pushing values imperatively, with configurable buffering and replay.
 
-Unlike traditional variables that represent static values, Observables elegantly model how values evolve over time. They represent the entire progression of a value's state changes, not just its current state, making them ideal for reactive programming paradigms.
-
-### Native Concurrency Support
-
-Concurrency is built into the Observable paradigm. Each Observable conceptually operates as an independent process that asynchronously pushes values to subscribers. This approach naturally aligns with concurrent programming models while abstracting away much of the complexity typically associated with managing concurrent operations.
+```go
+state := source.Behavior(initial).RefCount()
+// every subscriber immediately observes the current value, then tracks updates
+```
 
 ## Operators
 
-Operators form a language for expressing programs with Observables. They transform, filter, and combine one or more Observables into new Observables, allowing for powerful data stream processing. Each operator performs a specific function in the reactive pipeline, enabling you to compose complex asynchronous workflows through method chaining.
+Operators form a language for expressing programs with Observables. They transform, filter, and combine one or more Observables into new Observables, enabling complex asynchronous workflows through method chaining. Most operators exist both as a method on `Observable[T]` and as a standalone function returning a [`Pipe`](https://pkg.go.dev/github.com/reactivego/rx#Pipe) segment for use with [`Pipe`](https://pkg.go.dev/github.com/reactivego/rx#Observable.Pipe); operators that change the element type (like `Map` between arbitrary types) are standalone functions.
 
 ### Index
 
-[__All__](https://pkg.go.dev/github.com/reactivego/rx#Observable.All) converts an Observable stream into a Go 1.22+ iterator sequence that provides each emitted value paired with its sequential zero-based index
+[__All__](https://pkg.go.dev/github.com/reactivego/rx#Observable.All) converts the Observable into an iterator that yields each value paired with its zero-based index.
 
-[__Append__](https://pkg.go.dev/github.com/reactivego/rx#Append)
-creates a pipe that appends emitted values to a provided slice while forwarding them to the next observer, with a method variant available for chaining.
+[__Append__](https://pkg.go.dev/github.com/reactivego/rx#Append) appends each emitted value to a provided slice while forwarding all emissions.
 
-[__AsObservable__](https://pkg.go.dev/github.com/reactivego/rx#AsObservable)
-provides type conversion between observables, allowing you to safely cast an Observable of one type to another, and to convert a typed Observable to an Observable of 'any' type (and vice versa).
+[__AsObservable__](https://pkg.go.dev/github.com/reactivego/rx#AsObservable) converts between a typed `Observable[T]` and an `Observable[any]`.
 
-[__AsObserver__](https://pkg.go.dev/github.com/reactivego/rx#AsObserver) converts an Observer of type `any` to an Observer of a specific type T.
+[__AsObserver__](https://pkg.go.dev/github.com/reactivego/rx#AsObserver) converts between a typed `Observer[T]` and an `Observer[any]`, emitting `ErrTypecastFailed` when a conversion fails.
 
-[__Assign__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Assign) stores each emitted value from an Observable into a provided pointer variable while passing all emissions through to the next observer, enabling value capture during stream processing.
+[__Assign__](https://pkg.go.dev/github.com/reactivego/rx#Assign) stores each emitted value into a provided pointer variable while forwarding all emissions.
 
-[__AutoConnect__](https://pkg.go.dev/github.com/reactivego/rx#Connectable.AutoConnect) makes a (Connectable) Multicaster behave like an ordinary Observable that automatically connects the mullticaster to its source when the specified number of observers have subscribed to it.
+[__AutoConnect__](https://pkg.go.dev/github.com/reactivego/rx#Connectable.AutoConnect) connects a Connectable to its source once the specified number of subscribers have subscribed.
 
-[__AutoUnsubscribe__](https://pkg.go.dev/github.com/reactivego/rx#Observable.AutoUnsubscribe)
+[__AutoUnsubscribe__](https://pkg.go.dev/github.com/reactivego/rx#AutoUnsubscribe) unsubscribes from the source automatically as soon as the stream terminates.
 
-[__BufferCount__](https://pkg.go.dev/github.com/reactivego/rx#BufferCount)
+[__Behavior__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Behavior) returns a replay-latest, conflating multicast Connectable seeded with an initial value, suited to distributing current state.
 
-[__Catch__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Catch) recovers from an error notification by continuing the sequence without emitting the error but switching to the catch ObservableInt to provide items.
+[__BufferCount__](https://pkg.go.dev/github.com/reactivego/rx#BufferCount) collects values into slices of a given size, starting a new buffer every `startBufferEvery` values.
 
-[__CatchError__](https://pkg.go.dev/github.com/reactivego/rx#Observable.CatchError)  catches errors on the Observable to be handled by returning a new Observable or throwing error.
+[__Catch__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Catch) recovers from an error by continuing with a replacement Observable instead of emitting the error.
 
-__CombineAll__
+[__CatchError__](https://pkg.go.dev/github.com/reactivego/rx#Observable.CatchError) recovers from an error via a selector function that maps the error to a replacement Observable.
 
-__CombineLatest__ combines multiple Observables into one by emitting an array containing the latest values from each source whenever any input Observable emits a value, with variants (__CombineLatest2__, __CombineLatest3__, __CombineLatest4__, __CombineLatest5__) that return strongly-typed tuples for 2-5 input Observables respectively.
+[__CombineAll__](https://pkg.go.dev/github.com/reactivego/rx#CombineAll) collects the Observables emitted by a higher-order Observable and combines their latest values into slices.
 
-__Concat__ combines multiple Observables sequentially by emitting all values from the first Observable before proceeding to the next one, ensuring emissions never overlap.
+[__CombineLatest__](https://pkg.go.dev/github.com/reactivego/rx#CombineLatest) emits a slice of the latest values of all inputs whenever any input emits; __CombineLatest2__–__CombineLatest5__ return strongly typed tuples.
 
-__ConcatAll__ transforms a higher-order Observable (an Observable that emits other Observables) into a first-order Observable by subscribing to each inner Observable only after the previous one completes.
+[__Concat__](https://pkg.go.dev/github.com/reactivego/rx#Concat) emits all values from each Observable in turn, never overlapping emissions.
 
-__ConcatMap__ projects each source value to an Observable, subscribes to it, and emits its values, waiting for each one to complete before processing the next source value.
+[__ConcatAll__](https://pkg.go.dev/github.com/reactivego/rx#ConcatAll) flattens a higher-order Observable by subscribing to each inner Observable only after the previous one completes.
 
-__ConcatWith__ extends an Observable by appending additional Observables, ensuring that emissions from each Observable only begin after the previous one completes.
+[__ConcatMap__](https://pkg.go.dev/github.com/reactivego/rx#ConcatMap) projects each value to an inner Observable and concatenates their emissions in order.
 
-__Connectable__ is an Observable with delayed connection to its source, combining both Observable and Connector interfaces. It separates the subscription process into two parts: observers can register via Subscribe, but the Observable won't subscribe to its source until Connect is explicitly called. This enables multiple observers to subscribe before any emissions begin (multicast behavior), allowing a single source Observable to be efficiently shared among multiple consumers. Besides inheriting all methods from Observable and Connector, Connectable provides the convenience methods __AutoConnect__ and __RefCount__ to manage connection behavior.
+[__ConcatWith__](https://pkg.go.dev/github.com/reactivego/rx#Observable.ConcatWith) appends other Observables, each starting only after the previous completes.
 
-__Connect__ establishes a connection to the source Observable and returns a Subscription that can be used to cancel the connection when no longer needed.
+[__Connect__](https://pkg.go.dev/github.com/reactivego/rx#Connector.Connect) subscribes a Connectable to its source and returns a Subscription; the scheduler can be provided via context.
 
-__Connector__ provides a mechanism for controlling when a Connectable Observable subscribes to its source, allowing you to connect the Observable independently from when observers subscribe to it. This separation enables multiple subscribers to prepare their subscriptions before the source begins emitting items. It has a single method __Connect__.
+[__Connectable__](https://pkg.go.dev/github.com/reactivego/rx#Connectable) is an Observable with delayed connection to its source: observers subscribe first, emission starts on Connect.
 
-__Constraints__ type constraints __Signed__, __Unsigned__, __Integer__ and __Float__ copied verbatim from `golang.org/x/exp` so we could drop the dependency on that package.
+[__Connector__](https://pkg.go.dev/github.com/reactivego/rx#Connector) is the Connect half of a Connectable.
 
-__Count__ returns an Observable that emits a single value representing the total number of items emitted by the source Observable before it completes.
+[__Count__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Count) emits a single value: the number of items the source emitted before completing.
 
-__Create__ constructs a new Observable from a Creator function, providing a bridge between imperative code and the reactive Observable pattern. The Observable will continue producing values until the Creator signals completion, the Observer unsubscribes, or the Creator returns an error.
+[__Create__](https://pkg.go.dev/github.com/reactivego/rx#Create) constructs an Observable from a Creator function called with an incrementing index, bridging imperative code and the reactive pattern.
 
-__Creator__ is a function type that generates values for an Observable stream. It receives a zero-based index for the current iteration and returns a tuple containing the next value to emit, any error that occurred, and a boolean flag indicating whether the sequence is complete.
+[__Creator__](https://pkg.go.dev/github.com/reactivego/rx#Creator) is the function type used by Create: it returns the next value, an error, and a done flag.
 
-__Defer__
+[__Defer__](https://pkg.go.dev/github.com/reactivego/rx#Defer) calls a factory to create a fresh Observable for every subscription.
 
-__Delay__
+[__Delay__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Delay) time-shifts each emission by a duration.
 
-__DistinctUntilChanged__ only emits when the current value is different from the last.
+[__DistinctUntilChanged__](https://pkg.go.dev/github.com/reactivego/rx#Observable.DistinctUntilChanged) suppresses values that equal the previously emitted value.
 
-__Do__ calls a function for each next value passing through the observable.
+[__Do__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Do) calls a function for each value passing through the Observable.
 
-__ElementAt__ emit only item n emitted by an Observable.
+[__ElementAt__](https://pkg.go.dev/github.com/reactivego/rx#Observable.ElementAt) emits only the nth value.
 
-__Empty__ creates an Observable that emits no items but terminates normally.
+[__Empty__](https://pkg.go.dev/github.com/reactivego/rx#Empty) emits no values and terminates normally.
 
-__EndWith__
+[__EndWith__](https://pkg.go.dev/github.com/reactivego/rx#Observable.EndWith) emits additional values after the source completes.
 
-__Equal__
+[__Equal__](https://pkg.go.dev/github.com/reactivego/rx#Equal) returns an equality function for comparable types, for use with DistinctUntilChanged.
 
-__Err__
+[__Err__](https://pkg.go.dev/github.com/reactivego/rx#Err) is the base error joined into every error this package produces; test with `errors.Is`.
 
-__ExhaustAll__
+[__ExhaustAll__](https://pkg.go.dev/github.com/reactivego/rx#ExhaustAll) flattens a higher-order Observable, ignoring inner Observables that arrive while one is still active.
 
-__ExhaustMap__
+[__ExhaustMap__](https://pkg.go.dev/github.com/reactivego/rx#ExhaustMap) projects each value to an inner Observable, ignoring source values while the current inner Observable is active.
 
-__Filter__ emits only those items from an observable that pass a predicate test.
+[__Filter__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Filter) emits only the values that pass a predicate.
 
-__First__ emits only the first item from an Observable.
+[__First__](https://pkg.go.dev/github.com/reactivego/rx#Observable.First) blocks and returns the first emitted value.
 
-__Fprint__
+[__Fprint__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Fprint), [__Fprintf__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Fprintf), [__Fprintln__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Fprintln) write each value to an `io.Writer` while forwarding it.
 
-__Fprintf__
+[__From__](https://pkg.go.dev/github.com/reactivego/rx#From) creates an Observable from the values passed in.
 
-__Fprintln__
+[__Go__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Go) subscribes on the Goroutine scheduler, discards emissions, and returns a Subscription — useful for side effects.
 
-__From__ creates an observable from multiple values passed in.
+[__GoroutineContext__](https://pkg.go.dev/github.com/reactivego/rx#GoroutineContext) returns a context carrying the concurrent Goroutine scheduler, optionally wrapping a parent context.
 
-__Go__ subscribes to the observable and starts execution on a separate goroutine, ignoring all emissions from the observable sequence. This makes it useful when you only care about side effects and not the actual values. Returns a Subscription that can be used to cancel the subscription when no longer needed.
+[__Ignore__](https://pkg.go.dev/github.com/reactivego/rx#Ignore) creates an Observer that discards all emissions.
 
-__Ignore[T]__ creates an Observer[T] that simply discards any emissions from an Observable. It is useful when you need to create an Observer but don't care about its values.
+[__Interval__](https://pkg.go.dev/github.com/reactivego/rx#Interval) emits an increasing sequence of numbers spaced by a time interval.
 
-__Interval__ creates an ObservableInt that emits a sequence of integers spaced by a particular time
-terval.
+[__Last__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Last) blocks and returns the last emitted value.
 
-__Last__ emits only the last item emitted by an Observable.
+[__Map__](https://pkg.go.dev/github.com/reactivego/rx#Map), [__MapE__](https://pkg.go.dev/github.com/reactivego/rx#MapE) transform each value by applying a function; the E variant's function may also return an error.
 
-__Map__ transforms the items emitted by an Observable by applying a function to each item.
+[__Marshal__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Marshal) marshals each value to `[]byte` using a provided function.
 
-__MapE__
+[__Merge__](https://pkg.go.dev/github.com/reactivego/rx#Merge) combines multiple Observables into one by interleaving their emissions.
 
-__Marshal__
+[__MergeAll__](https://pkg.go.dev/github.com/reactivego/rx#MergeAll) flattens a higher-order Observable by merging all inner Observables concurrently.
 
-__MaxBufferSizeOption__, __WithMaxBufferSize__
+[__MergeMap__](https://pkg.go.dev/github.com/reactivego/rx#MergeMap) projects each value to an inner Observable and merges their emissions.
 
-__Merge__ combines multiple Observables into one by merging their emissions.
+[__MergeWith__](https://pkg.go.dev/github.com/reactivego/rx#Observable.MergeWith) merges other Observables into the source.
 
-__MergeAll__ flattens a higher order observable by merging the observables it emits.
+[__Multicast__](https://pkg.go.dev/github.com/reactivego/rx#Multicast) returns an Observer/Observable pair that multicasts pushed values to every subscriber, with blocking or dropping backpressure depending on buffer-size sign.
 
-__MergeMap__ transforms the items emitted by an Observable by applying a function to each item an
-turning an Observable.
+[__Must__](https://pkg.go.dev/github.com/reactivego/rx#Must) returns its value argument, panicking if the accompanying error is non-nil.
 
-__MergeWith__ combines multiple Observables into one by merging their emissions.
+[__Never__](https://pkg.go.dev/github.com/reactivego/rx#Never) emits no values and never terminates.
 
-__Multicast__
+[__Of__](https://pkg.go.dev/github.com/reactivego/rx#Of) emits a single value and completes.
 
-__Must__
+[__OnComplete__](https://pkg.go.dev/github.com/reactivego/rx#Observable.OnComplete), [__OnDone__](https://pkg.go.dev/github.com/reactivego/rx#Observable.OnDone), [__OnError__](https://pkg.go.dev/github.com/reactivego/rx#Observable.OnError), [__OnNext__](https://pkg.go.dev/github.com/reactivego/rx#Observable.OnNext) register callbacks for the corresponding stream events while forwarding all emissions.
 
-__Never__ creates an Observable that emits no items and does't terminate.
+[__Passthrough__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Passthrough) forwards all emissions unchanged.
 
-__Observable__
+[__Pipe__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Pipe) applies a chain of standalone operator segments to the Observable.
 
-__Observer__
+[__Print__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Print), [__Printf__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Printf), [__Println__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Println) print each value to stdout while forwarding it.
 
-__Of__ emits a variable amount of values in a sequence and then emits a complete notification.
+[__Publish__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Publish) returns a multicasting Connectable for the source Observable.
 
-__OnComplete__
+[__Pull__](https://pkg.go.dev/github.com/reactivego/rx#Pull), [__Pull2__](https://pkg.go.dev/github.com/reactivego/rx#Pull2) adapt a Go iterator (`iter.Seq`, `iter.Seq2`) into an Observable.
 
-__OnDone__
+[__Race__](https://pkg.go.dev/github.com/reactivego/rx#Race) mirrors the first Observable to emit or terminate, unsubscribing the others.
 
-__OnError__
+[__RaceWith__](https://pkg.go.dev/github.com/reactivego/rx#Observable.RaceWith) races the source against other Observables.
 
-__OnNext__
+[__Recv__](https://pkg.go.dev/github.com/reactivego/rx#Recv) creates an Observable from a receive channel.
 
-__Passthrough__ just passes through all output from the Observable.
+[__Reduce__](https://pkg.go.dev/github.com/reactivego/rx#Reduce), [__ReduceE__](https://pkg.go.dev/github.com/reactivego/rx#ReduceE) accumulate all values into a single final result using a seed and accumulator function.
 
-__Pipe__
+[__RefCount__](https://pkg.go.dev/github.com/reactivego/rx#Connectable.RefCount) converts a Connectable into an Observable that connects on the first subscription and disconnects when the last subscriber leaves.
 
-__Print__
+[__Repeat__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Repeat) resubscribes to the source each time it completes, indefinitely or a given number of times.
 
-__Printf__
+[__Retry__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Retry), [__RetryTime__](https://pkg.go.dev/github.com/reactivego/rx#Observable.RetryTime) resubscribe to the source when it errors, optionally limited and with a backoff schedule.
 
-__Println__ subscribes to the Observable and prints every item to os.Stdout.
+[__SampleTime__](https://pkg.go.dev/github.com/reactivego/rx#Observable.SampleTime) emits the most recent value within periodic time intervals.
 
-__Publish__ returns a multicasting Observable[T] for an underlying Observable[T] as a Connectable[T] type.
+[__Scan__](https://pkg.go.dev/github.com/reactivego/rx#Scan), [__ScanE__](https://pkg.go.dev/github.com/reactivego/rx#ScanE) apply an accumulator to each value, emitting every intermediate result.
 
-__Pull__
+[__Send__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Send) sends each value into a provided channel while forwarding it.
 
-__Pull2__
+[__Share__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Share) multicasts the source with reference counting: `Publish().RefCount()`.
 
-__Race__
+[__Skip__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Skip) suppresses the first n values.
 
-__RaceWith__
+[__Slice__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Slice) blocks and collects all values into a slice.
 
-__Recv__
+[__StartWith__](https://pkg.go.dev/github.com/reactivego/rx#Observable.StartWith) synchronously emits the given values on subscription before mirroring the source.
 
-__Reduce__ applies a reducer function to each item emitted by an Observable and the previous reducer
-sult.
+[__Subject__](https://pkg.go.dev/github.com/reactivego/rx#Subject) returns an Observer/Observable pair with a replay buffer bounded by age and capacity.
 
-__ReduceE__
+[__Subscribe__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Subscribe) attaches an Observer with a context and returns a Subscription; the context carries the scheduler and cancels the subscription.
 
-__RefCount__ makes a Connectable behave like an ordinary Observable.
+[__SubscribeOn__](https://pkg.go.dev/github.com/reactivego/rx#Observable.SubscribeOn) specifies the concurrent scheduler the Observable should use when subscribed to.
 
-__Repeat__ creates an observable that emits a sequence of items repeatedly.
+[__Take__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Take) emits only the first n values, then completes.
 
-__Retry__ if a source Observable sends an error notification, resubscribe to it in the hopes that it
-ll complete without error.
+[__TakeWhile__](https://pkg.go.dev/github.com/reactivego/rx#Observable.TakeWhile) mirrors values until a predicate becomes false.
 
-__RetryTime__
+[__Tap__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Tap) observes all emissions with a secondary Observer without altering the stream.
 
-__SampleTime__ emits the most recent item emitted by an Observable within periodic time intervals.
+[__Throw__](https://pkg.go.dev/github.com/reactivego/rx#Throw) emits no values and terminates with the given error.
 
-__Scan__ applies a accumulator function to each item emitted by an Observable and the previous
-cumulator result.
+[__Ticker__](https://pkg.go.dev/github.com/reactivego/rx#Ticker) emits timestamps after an initial delay, following a schedule of intervals.
 
-__ScanE__
+[__Timer__](https://pkg.go.dev/github.com/reactivego/rx#Timer) emits an increasing sequence of numbers after an initial delay, following a schedule of intervals.
 
-__Scheduler__
+[__Tuple2__](https://pkg.go.dev/github.com/reactivego/rx#Tuple2)–[__Tuple5__](https://pkg.go.dev/github.com/reactivego/rx#Tuple5) are the strongly typed tuples produced by the numbered combining operators.
 
-__Send__
+[__Values__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Values) converts the Observable into an iterator that yields each value, ending with the terminal error if the stream fails.
 
-__Share__
+[__Wait__](https://pkg.go.dev/github.com/reactivego/rx#Observable.Wait) subscribes and blocks until completion, returning nil, the stream's error, or a cancellation error.
 
-__Skip__ suppresses the first n items emitted by an Observable.
+[__WithLatestFrom__](https://pkg.go.dev/github.com/reactivego/rx#WithLatestFrom) emits a combination of each source value with the latest values from the other Observables; __WithLatestFrom2__–__WithLatestFrom5__ return strongly typed tuples.
 
-__Slice__
+[__WithLatestFromAll__](https://pkg.go.dev/github.com/reactivego/rx#WithLatestFromAll) applies WithLatestFrom to the Observables emitted by a higher-order Observable.
 
-__StartWith__ returns an observable that, at the moment of subscription, will synchronously emit all values provided to this operator, then subscribe to the source and mirror all of its emissions to subscribers.
+[__Zip__](https://pkg.go.dev/github.com/reactivego/rx#Zip) combines multiple Observables in lockstep, pairing the nth values of every input; __Zip2__–__Zip5__ return strongly typed tuples and accept a buffer-size option.
 
-__Subject__ is a combination of an observer and observable.
-
-__Subscribe__ operates upon the emissions and notifications from an Observable.
-
-__SubscribeOn__ specifies the scheduler an Observable should use when it is subscribed to.
-
-__Subscriber__
-
-__Subscription__
-
-__SwitchAll__
-
-__SwitchMap__
-
-__Take__ emits only the first n items emitted by an Observable.
-
-__TakeWhile__ mirrors items emitted by an Observable until a specified condition becomes false.
-
-__Tap__
-
-__Throw__ creates an observable that emits no items and terminates with an error.
-
-__Ticker__ creates an ObservableTime that emits a sequence of timestamps after an initialDelay has passed.
-
-__Timer__ creates an Observable that emits a sequence of integers (starting at zero) after an initialDelay has passed.
-
-__Tuple__
-
-__Values__
-
-__Wait__ subscribes to the Observable and waits for completion or error.
-
-__WithLatestFrom__ will subscribe to all Observables and wait for all of them to emit before emitting the first slice.
-
-__WithLatestFromAll__ flattens a higher order observable.
-
-__Zip__
-
-__ZipAll__
+[__ZipAll__](https://pkg.go.dev/github.com/reactivego/rx#ZipAll) zips the Observables emitted by a higher-order Observable.
